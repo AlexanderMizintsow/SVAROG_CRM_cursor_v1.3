@@ -11,10 +11,6 @@ import {
   Select,
   MenuItem,
   TextField,
-  Dialog,
-  DialogTitle,
-  DialogContent,
-  DialogActions,
 } from "@mui/material";
 import {
   Phone,
@@ -22,13 +18,13 @@ import {
   CallEnd,
   Person,
   Business,
-  Add,
   CheckCircle,
   Cancel,
   Schedule,
   PhoneCallback,
   Email,
 } from "@mui/icons-material";
+import Toastify from "toastify-js";
 import { BsClock } from "react-icons/bs";
 import ScheduleCallModal from "../scheduleCallModal/ScheduleCallModal";
 import { API_BASE_URL } from "../../../config";
@@ -42,9 +38,7 @@ const CallNotification = ({ callData, onClose }) => {
   const [selectedPurpose, setSelectedPurpose] = useState("");
   const [description, setDescription] = useState("");
   const [outcome, setOutcome] = useState("");
-  const [isAddPurposeDialogOpen, setIsAddPurposeDialogOpen] = useState(false);
-  const [newPurposeName, setNewPurposeName] = useState("");
-  const [newPurposeDescription, setNewPurposeDescription] = useState("");
+
   const [isLoading, setIsLoading] = useState(false);
   const [isDataSaved, setIsDataSaved] = useState(false);
 
@@ -284,55 +278,34 @@ const CallNotification = ({ callData, onClose }) => {
         const result = await response.json();
         console.log("Данные звонка успешно сохранены:", result);
         setIsDataSaved(true);
-        alert("Информация о звонке успешно сохранена!");
+        Toastify({
+          text: `Информация о звонке успешно сохранена!`,
+          duration: 5000,
+          close: true,
+          style: {
+            background: "linear-gradient(to right, #800080, #DA70D6)",
+          },
+        }).showToast();
       } else {
         const errorData = await response
           .json()
           .catch(() => ({ error: "Неизвестная ошибка" }));
         console.error("Ошибка при сохранении данных звонка:", errorData);
-        alert(
-          `Ошибка при сохранении: ${errorData.error || "Неизвестная ошибка"}`
-        );
+        Toastify({
+          text: `Ошибка при сохранении: ${
+            errorData.error || "Неизвестная ошибка"
+          }`,
+          duration: 5000,
+          close: true,
+          style: {
+            background:
+              "linear-gradient(to right,rgb(128, 0, 64),rgb(218, 112, 153))",
+          },
+        }).showToast();
       }
     } catch (error) {
       console.error("Ошибка при сохранении данных звонка:", error);
       alert(`Ошибка сети: ${error.message}`);
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  // Добавление новой цели звонка
-  const handleAddPurpose = async () => {
-    if (!newPurposeName.trim()) return;
-
-    setIsLoading(true);
-    try {
-      const response = await fetch(`${API_BASE_URL}5004/api/call-purposes`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          name: newPurposeName.trim(),
-          description: newPurposeDescription.trim(),
-        }),
-      });
-
-      if (response.ok) {
-        const newPurpose = await response.json();
-        setCallPurposes([...callPurposes, newPurpose]);
-        setSelectedPurpose(newPurpose.id);
-        setNewPurposeName("");
-        setNewPurposeDescription("");
-        setIsAddPurposeDialogOpen(false);
-      } else {
-        const error = await response.json();
-        alert(error.error || "Ошибка при добавлении цели");
-      }
-    } catch (error) {
-      console.error("Ошибка при добавлении цели:", error);
-      alert("Ошибка при добавлении цели");
     } finally {
       setIsLoading(false);
     }
@@ -485,18 +458,6 @@ const CallNotification = ({ callData, onClose }) => {
                   </Select>
                 </FormControl>
 
-                {/* Кнопка добавления новой цели */}
-                <Button
-                  variant="outlined"
-                  size="small"
-                  startIcon={<Add />}
-                  onClick={() => setIsAddPurposeDialogOpen(true)}
-                  style={{ marginBottom: "12px" }}
-                  fullWidth
-                >
-                  Добавить новую цель
-                </Button>
-
                 {/* Поле для описания */}
                 <TextField
                   fullWidth
@@ -629,48 +590,6 @@ const CallNotification = ({ callData, onClose }) => {
           notificationData={getNotificationDataForSchedule()}
         />
       )}
-
-      {/* Модальное окно для добавления новой цели звонка */}
-      <Dialog
-        open={isAddPurposeDialogOpen}
-        onClose={() => setIsAddPurposeDialogOpen(false)}
-        maxWidth="sm"
-        fullWidth
-      >
-        <DialogTitle>Добавить новую цель звонка</DialogTitle>
-        <DialogContent>
-          <TextField
-            autoFocus
-            margin="dense"
-            label="Название цели"
-            fullWidth
-            value={newPurposeName}
-            onChange={(e) => setNewPurposeName(e.target.value)}
-            style={{ marginBottom: "15px" }}
-          />
-          <TextField
-            margin="dense"
-            label="Описание (необязательно)"
-            fullWidth
-            multiline
-            rows={3}
-            value={newPurposeDescription}
-            onChange={(e) => setNewPurposeDescription(e.target.value)}
-          />
-        </DialogContent>
-        <DialogActions>
-          <Button onClick={() => setIsAddPurposeDialogOpen(false)}>
-            Отмена
-          </Button>
-          <Button
-            onClick={handleAddPurpose}
-            disabled={!newPurposeName.trim() || isLoading}
-            variant="contained"
-          >
-            {isLoading ? "Добавление..." : "Добавить"}
-          </Button>
-        </DialogActions>
-      </Dialog>
     </>
   );
 };
