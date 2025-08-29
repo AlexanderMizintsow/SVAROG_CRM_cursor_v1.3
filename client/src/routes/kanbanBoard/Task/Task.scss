@@ -1,0 +1,588 @@
+/* Task.scss */
+
+.task {
+  // background: #f4f2f2d4;
+  background: rgb(148 233 202 / 85%);
+  width: 190px;
+  display: flex;
+  flex-direction: column;
+  gap: 3px; // Уменьшил с 5px до 3px
+  padding: 5px;
+  border-radius: 12px;
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.55);
+  transition: transform 0.3s ease, box-shadow 0.3s ease;
+  position: relative;
+
+  &.highlighted {
+    background: rgb(166 0 247 / 23%); // Цвет фона при наличии global_task_id
+  }
+
+  .task-id {
+    font-size: 11px; // Уменьшил с 12px до 11px
+    position: absolute;
+    top: 0;
+    left: 10px;
+    color: gray;
+    opacity: 0.2;
+  }
+
+  .taks-deadline {
+    color: #6a1b9a;
+    font-weight: bold;
+  }
+
+  .task-header {
+    position: absolute;
+    top: 16px;
+    right: 5px;
+    z-index: 0;
+  }
+
+  .task-tag.no-tag {
+    background-color: #ddd;
+    color: #000000 !important;
+  }
+}
+
+.task-expand-icon {
+  position: relative;
+  top: -15px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+
+  &:hover {
+    transform: scale(1.2);
+  }
+}
+
+.task:hover {
+  box-shadow: 0 8px 16px rgba(0, 0, 0, 0.2);
+}
+
+.task-image {
+  width: 100%;
+  height: 150px;
+  border-radius: 12px;
+  object-fit: cover;
+}
+
+.task-tags {
+  display: flex;
+  gap: 6px; // Уменьшил с 8px до 6px
+  flex-wrap: wrap;
+}
+
+.task-tag {
+  padding: 4px 10px; // Уменьшил padding с 6px 12px до 4px 10px
+  margin-bottom: 3px; // Уменьшил с 5px до 3px
+  font-size: 9px; // Уменьшил с 10px до 9px
+  font-weight: 500;
+  border-radius: 20px;
+  background-color: #f0f0f0;
+  color: #333;
+}
+
+.task-details {
+  display: flex;
+  flex-direction: column;
+  gap: 2px; // Уменьшил с 4px до 2px
+
+  .task-time-reminder {
+    font-size: 11px; // Уменьшил с 12px до 11px
+  }
+}
+
+.task-title {
+  font-size: 16px; // Уменьшил с 17px до 16px
+  font-weight: 600;
+  color: #333;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  //white-space: nowrap;
+  line-height: 1.3; // Уменьшил с 1.4 до 1.3
+  flex-wrap: wrap;
+}
+
+.task-description {
+  font-size: 13px; // Уменьшил с 14px до 13px
+  display: -webkit-box;
+  -webkit-line-clamp: 5;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  color: #667;
+  line-height: 1.3; // Уменьшил с 1.5 до 1.3
+}
+
+.task-footer {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-top: 25px; // Уменьшил с 30px до 25px
+}
+
+.task-deadline {
+  display: flex;
+  align-items: center;
+  gap: 5px; // Уменьшил с 6px до 5px
+}
+
+.task-deadline-text {
+  font-size: 9px; // Уменьшил с 10px до 9px
+  color: #333;
+}
+
+.task-deadline-renew-wrapper {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+
+  &.pulse-effect {
+    .task-deadline-renew-icon {
+      color: #2f3feef3;
+    }
+
+    &::after {
+      content: '';
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%) scale(1);
+      width: 30px;
+      height: 30px;
+      border-radius: 50%;
+      background-color: rgba(6, 79, 250, 0.767);
+      box-shadow: 0 0 15px 5px rgb(3, 23, 247);
+      opacity: 0;
+      animation: pulse-message-global-task 2s infinite ease-in-out;
+      pointer-events: none;
+    }
+  }
+}
+
+.task-deadline-renew-icon {
+  font-size: 18px;
+  cursor: pointer;
+  transition: transform 0.5s ease;
+  &:hover {
+    transform: rotate(180deg); // Вращение на 180° при наведении
+  }
+  &.spin-on-click {
+    animation: spin-click 0.8s cubic-bezier(0.4, 0, 0.2, 1); // Анимация при клике
+  }
+}
+
+@keyframes spin-click {
+  0% {
+    transform: rotate(0deg);
+  }
+  100% {
+    transform: rotate(360deg); // Полный оборот
+  }
+}
+
+.priority-indicator {
+  width: 70px;
+  height: 6px;
+  border-radius: 50px;
+  background: transparent;
+  transition: background-color 0.3s ease;
+}
+
+.task-priority-icon {
+  position: absolute;
+  right: 4px;
+  top: 20px;
+  cursor: help;
+}
+
+.task-subtask-icon {
+  position: absolute;
+  right: 4px;
+  top: 120px;
+  cursor: pointer;
+}
+
+.high-priority {
+  background-color: #ff0000;
+  animation: neonBlink 1.5s infinite ease-in-out;
+}
+
+.medium-priority {
+  background-color: #0000ff;
+}
+
+.low-priority {
+  background-color: #55ec30fa;
+}
+
+/* Модальное окно и анимация раскрытия */
+.task-modal {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100vh;
+  background: rgba(0, 0, 0, 0.5);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.3s ease;
+  z-index: 777;
+}
+
+.close-button {
+  position: absolute;
+  top: 17px;
+  cursor: pointer;
+  z-index: 10;
+}
+
+.task-modal-content .close-button {
+  top: 10px;
+  right: 10px;
+}
+
+.task-modal.open {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+.task-modal-content {
+  background: #e5e1e1e0;
+  border-radius: 12px;
+  padding: 2rem;
+  box-shadow: 0 8px 16px rgba(0, 0, 0, 0.3);
+  max-width: 50vw;
+  max-height: 90vh;
+  overflow: auto;
+  transition: transform 0.3s ease;
+  transform: scale(0.8);
+  position: relative;
+  z-index: 999;
+}
+
+.task-modal-content.open {
+  transform: scale(1.1);
+}
+
+.send-button-task,
+.file-send-button {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin: 0 auto;
+  // margin-top: 15px;
+  padding: 4px 8px; // Уменьшил с 5px 10px до 4px 8px
+  border: none;
+  border-radius: 20px; // Уменьшил с 25px до 20px
+  font-size: 13px; // Уменьшил с 14px до 13px
+  font-weight: bold;
+  color: white;
+  background-image: linear-gradient(to right, #42a5f5, #478ed1);
+  box-shadow: 0 3px 12px 0 rgba(66, 165, 245, 0.75); // Уменьшил тень
+  cursor: pointer;
+  outline: none;
+  transition: all 0.3s ease;
+
+  &:hover {
+    background-image: linear-gradient(to right, #478ed1, #42a5f5);
+    box-shadow: 0 5px 16px 0 rgba(66, 165, 245, 0.85); // Уменьшил тень
+  }
+
+  &:active {
+    box-shadow: 0 2px 8px 0 rgba(66, 165, 245, 0.65); // Уменьшил тень
+    transform: translateY(1px); // Уменьшил с 2px до 1px
+  }
+
+  &.disabled {
+    background-color: gray;
+    color: lightgray;
+    cursor: not-allowed;
+    pointer-events: none;
+    opacity: 0.7;
+  }
+}
+
+.file-upload-textarea-styled {
+  width: 100%;
+  height: auto;
+  padding: 8px; // Уменьшил с 10px до 8px
+  margin-top: 8px; // Уменьшил с 10px до 8px
+  margin-bottom: 0;
+  border: 1px solid #ccc;
+  border-radius: 4px; // Уменьшил с 5px до 4px
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.2); // Уменьшил тень
+  resize: vertical;
+  font-size: 15px; // Уменьшил с 16px до 15px
+  transition: border-color 0.3s ease;
+
+  &:focus {
+    border-color: #498f1a;
+    outline: none;
+    box-shadow: 0 0 5px rgba(99, 240, 5, 0.5);
+  }
+}
+
+.file-upload-title-help {
+  margin-bottom: 2px; // Уменьшил с 3px до 2px
+  font-size: 9px; // Уменьшил с 10px до 9px
+  color: rgb(102, 102, 119);
+}
+
+.file-send-button {
+  margin-bottom: 5px;
+  // width: 70%;
+}
+
+.remove-file-button {
+  color: #ff0000;
+  cursor: pointer;
+  margin-left: 4px; // Уменьшил с 5px до 4px
+  transition: all 0.2s ease;
+  font-size: 15px; // Уменьшил с 16px до 15px
+  &:hover {
+    scale: 1.2; // Уменьшил с 1.3 до 1.2
+  }
+}
+.uploaded-files {
+  margin-top: 8px; // Уменьшил с 10px до 8px
+  padding: 8px 0; // Уменьшил с 10px до 8px
+  border: 1px solid #ddd;
+  border-bottom: 3px solid #08d5f0;
+  border-right: 3px solid #2cd1e781;
+  border-radius: 8px;
+  max-height: 180px; // Уменьшил с 200px до 180px
+  overflow-y: auto;
+  font-size: 11px; // Уменьшил с 12px до 11px
+}
+
+.uploaded-file {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 6px; // Уменьшил с 8px до 6px
+  border-bottom: 1px solid #ddd;
+  &:last-child {
+    border-bottom: none;
+  }
+}
+
+.file-info {
+  display: flex;
+  align-items: center;
+  flex: 1;
+  overflow: hidden;
+}
+.task-info.collapsed {
+  display: none;
+}
+.task-info-toggle {
+  cursor: pointer;
+  font-size: 15px; // Уменьшил с 16px до 15px
+  color: rgb(158, 158, 167);
+  user-select: none;
+  position: relative; /* Для позиционирования псевдоэлемента */
+  padding: 5px 0 5px 0; // Уменьшил с 7px до 5px
+}
+
+.task-info-toggle:hover {
+  color: rgba(0, 213, 255, 0.89); /* Цвет текста */
+  text-shadow: 0 0 10px rgba(0, 213, 255, 0.671); /* Тень текста */
+}
+.task-info-toggle::after {
+  content: '';
+  position: absolute;
+  top: 50%;
+  right: 0;
+  transform: translateY(-50%);
+  width: 0; /* Ширина полоски */
+  height: 1px; /* Толщина полоски */
+  background: linear-gradient(90deg, rgba(0, 212, 255, 1) 0%, rgba(9, 9, 121, 1) 100%);
+  box-shadow: 0 0 5px rgba(0, 212, 255, 0.8), 0 0 10px rgba(0, 212, 255, 0.6); /* Неоновое свечение */
+  transition: all 0.3s ease;
+}
+
+.task-info-toggle:hover::after {
+  width: 85%; /* Увеличиваем длину полоски при наведении */
+  box-shadow: 0 0 10px rgba(0, 212, 255, 1), 0 0 20px rgba(0, 212, 255, 0.8); /* Усиливаем свечение */
+}
+
+.task-participants {
+  font-size: 13px; // Уменьшил с 14px до 13px
+  width: 60%;
+  cursor: help;
+
+  .task-participants-icon {
+    cursor: help;
+    font-size: 17px; // Уменьшил с 18px до 17px
+  }
+}
+
+.file-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  flex: 1;
+  font-size: 10px; // Добавил размер шрифта
+}
+
+.file-size {
+  margin-left: 8px; // Уменьшил с 10px до 8px
+  font-size: 9px; // Уменьшил с 10px до 9px
+  white-space: nowrap;
+}
+
+.file-size-over-limit {
+  color: #ff0000;
+  font-size: 12px;
+}
+
+.file-icon {
+  margin-right: 8px;
+  flex-shrink: 0;
+  width: 20px;
+  height: 20px;
+}
+
+.remove-file-button {
+  cursor: pointer;
+  color: #ff0000;
+  flex-shrink: 0;
+  margin-left: 10px;
+}
+
+.icon-question {
+  cursor: pointer;
+  transition: all 0.3s ease;
+  transform: scale(1.6); // Уменьшил с 1.8 до 1.6
+  margin-left: 12px; // Уменьшил с 15px до 12px
+}
+
+.disabled-task {
+  cursor: not-allowed;
+  filter: grayscale(0.8);
+  pointer-events: none;
+}
+
+.disabled-task::after {
+  content: 'Ожидание одобрения';
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-80%, 50%) rotate(-45deg);
+  font-size: 24px;
+  color: rgba(252, 11, 11, 0.658);
+  white-space: nowrap;
+  font-weight: bold;
+  pointer-events: none;
+  width: 50%;
+  text-align: center;
+}
+
+.pulse {
+  animation: pulse-animation 1s infinite;
+  color: rgb(18, 53, 5);
+}
+
+@keyframes pulse-animation {
+  0% {
+    transform: scale(1);
+  }
+  50% {
+    transform: scale(1.1);
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+
+//1
+
+@keyframes neonBlink {
+  0% {
+    opacity: 1;
+    box-shadow: 0 0 5px #ff0000, 0 0 10px #ff0000, 0 0 20px #ff0000;
+  }
+  25% {
+    opacity: 0.7;
+    box-shadow: 0 0 10px #ff0000, 0 0 20px #ff0000, 0 0 30px #ff0000;
+  }
+  50% {
+    opacity: 0.5;
+    box-shadow: 0 0 15px #ff0000, 0 0 25px #ff0000, 0 0 35px #ff0000;
+  }
+  75% {
+    opacity: 0.7;
+    box-shadow: 0 0 10px #ff0000, 0 0 20px #ff0000, 0 0 30px #ff0000;
+  }
+  100% {
+    opacity: 1;
+    box-shadow: 0 0 5px #ff0000, 0 0 10px #ff0000, 0 0 20px #ff0000;
+  }
+}
+.notification-message {
+  background: linear-gradient(135deg, #4caf50, #81c784); // Градиентный фон
+  color: white; // Цвет текста
+  padding: 5px 7px; // Уменьшил с 6px 8px до 5px 7px
+  border-radius: 10px; // Уменьшил с 12px до 10px
+  font-size: 11px; // Уменьшил с 12px до 11px
+  box-shadow: 0 3px 6px rgba(0, 0, 0, 0.2); // Уменьшил тень
+}
+.task-subtask-icon {
+  transition: all 0.3s ease;
+
+  &:hover {
+    transform: scale(1.1);
+  }
+
+  svg {
+    transition: all 0.3s ease;
+  }
+}
+
+// Стили для ссылок
+.links {
+  margin-top: 6px;
+  padding: 6px 0;
+  border: 1px solid #ddd;
+  border-bottom: 2px solid #08d5f0;
+  border-right: 2px solid #2cd1e781;
+  border-radius: 6px;
+  max-height: 150px;
+  overflow-y: auto;
+  font-size: 10px;
+}
+
+.link-item {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  margin-bottom: 3px;
+  padding: 2px 4px;
+}
+
+.link {
+  text-decoration: none;
+  color: #333;
+  font-size: 10px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 120px;
+}
+
+.link-image {
+  width: 16px;
+  height: 16px;
+  object-fit: cover;
+  border-radius: 3px;
+}
+
+.file-icon {
+  width: 16px;
+  height: 16px;
+  color: #666;
+}

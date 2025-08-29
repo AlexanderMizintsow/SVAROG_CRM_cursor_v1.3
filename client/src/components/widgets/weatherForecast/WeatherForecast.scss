@@ -1,0 +1,53 @@
+.weather-card {
+  display: flex;
+  justify-content: space-between;
+  background-color: #0303031d;
+  width: 100%;
+  padding: 5px 15px;
+}
+
+.current-weather {
+  display: flex;
+  flex-direction: column;
+  text-align: left;
+  margin-right: 20px;
+  p {
+    font-size: 14px;
+  }
+}
+.weather-title {
+  margin-bottom: 5px;
+}
+
+.daily-forecast {
+  display: flex;
+  flex-direction: column;
+  text-align: left;
+}
+
+.daily-item {
+  margin-bottom: 5px;
+  p {
+    font-size: 14px;
+  }
+}
+
+.weather-item {
+  padding: 15px;
+  margin: 10px 0;
+  font-size: 12px;
+  width: 100%;
+  transition: background-color 0.3s ease;
+}
+
+.loading {
+  color: #f9ed03;
+  text-align: center;
+  margin: 10px;
+}
+
+.error {
+  color: #ff4d4d;
+  text-align: center;
+  margin: 10px;
+}

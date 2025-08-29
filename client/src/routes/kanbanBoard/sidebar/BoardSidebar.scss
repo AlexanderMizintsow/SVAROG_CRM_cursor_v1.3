@@ -1,0 +1,120 @@
+.sidebar {
+  position: fixed;
+  top: 7%;
+  right: -300px;
+  width: 300px;
+  height: 85%;
+  border-radius: 12px;
+  background-color: #fefefeef;
+  box-shadow: -2px 0 5px rgba(0, 0, 0, 0.5);
+  transition: right 0.3s ease-in-out;
+  z-index: 30;
+}
+
+.sidebar.open {
+  right: 12px;
+}
+
+.sidebar-close {
+  position: absolute;
+  top: 1px;
+  right: 7px;
+  border: none;
+  background: none;
+  cursor: pointer;
+  font-size: 1.5rem;
+  color: #ff4a4a;
+
+  &:hover {
+    color: #fe0808;
+  }
+}
+
+.sidebar-content {
+  padding: 16px;
+
+  .toggle-button {
+    background-color: #007bff;
+    color: #ffffff;
+    border: none;
+    border-radius: 5px;
+    padding: 10px;
+    cursor: pointer;
+    transition: background-color 0.3s ease;
+
+    &:hover {
+      background-color: #0056b3;
+    }
+  }
+  .employee-list-container::-webkit-scrollbar {
+    width: 1px;
+    height: 1px;
+  }
+
+  .employee-list-container {
+    overflow: scroll;
+    margin-top: 5px;
+    transition: max-height 0.3s ease-in-out, opacity 0.3s ease-in-out;
+    max-height: 0;
+
+    &.open {
+      max-height: 300px;
+    }
+
+    .employee-list {
+      padding: 0;
+      color: #030303;
+
+      .sidebar-employee-status {
+        border-radius: 50%;
+        display: inline-block;
+        margin-left: 5px;
+        padding: 3px;
+        width: 10px;
+        height: 10px;
+      }
+
+      .employee-item {
+        display: flex;
+        justify-content: space-between;
+        padding: 5px;
+        cursor: pointer;
+        transition: background-color 0.3s;
+
+        &.employee-list-selected {
+          background-color: #0cdaf5c7;
+        }
+
+        &:hover {
+          background-color: #0cdaf559;
+        }
+      }
+    }
+    .employee-list-none {
+      color: #a1a0a0;
+    }
+  }
+  .sidebar-employee-text {
+    position: relative;
+  }
+  .notification-contain-block {
+    position: absolute;
+    right: -5;
+  }
+  .notification-container {
+    display: flex;
+    align-items: center;
+  }
+  .notification-reminder {
+    font-size: 10px;
+    margin-left: 1px;
+    color: red;
+    animation: pulse 1.8s infinite;
+    transition: all 0.3s ease;
+  }
+  .notification-reminder-count {
+    font-size: 10px;
+    margin-left: 1px;
+    color: red;
+  }
+}

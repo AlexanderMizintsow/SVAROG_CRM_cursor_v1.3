@@ -1,0 +1,453 @@
+.call-notification-modal {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  backdrop-filter: blur(8px);
+  background: rgba(0, 0, 0, 0.4);
+
+  .call-notification-content {
+    position: relative;
+    background: linear-gradient(135deg, #ffffff 0%, #f8fafc 100%);
+    border-radius: 20px;
+    padding: 0;
+    max-width: 450px;
+    width: 90%;
+    max-height: 85vh;
+    overflow-y: auto;
+    box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25),
+      0 0 0 1px rgba(255, 255, 255, 0.1);
+    animation: modalSlideIn 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+    overflow: hidden;
+
+    @keyframes modalSlideIn {
+      from {
+        transform: translateY(-60px) scale(0.95);
+        opacity: 0;
+      }
+      to {
+        transform: translateY(0) scale(1);
+        opacity: 1;
+      }
+    }
+
+    // Градиентная полоса сверху
+    &::before {
+      content: "";
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      height: 4px;
+      background: linear-gradient(90deg, #667eea 0%, #764ba2 100%);
+    }
+  }
+
+  .call-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 16px 24px 12px;
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+    position: relative;
+
+    &::after {
+      content: "";
+      position: absolute;
+      bottom: -1px;
+      left: 0;
+      right: 0;
+      height: 1px;
+      background: linear-gradient(
+        90deg,
+        transparent 0%,
+        rgba(255, 255, 255, 0.2) 50%,
+        transparent 100%
+      );
+    }
+
+    .call-title {
+      font-weight: 700;
+      font-size: 1.1rem;
+      color: white;
+      margin: 0;
+      text-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+    }
+
+    .call-timer {
+      background: rgba(255, 255, 255, 0.2);
+      backdrop-filter: blur(10px);
+      border: 1px solid rgba(255, 255, 255, 0.3);
+      border-radius: 20px;
+      padding: 8px 16px;
+      font-weight: 600;
+      font-size: 14px;
+      color: white;
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+    }
+  }
+
+  .call-info {
+    padding: 20px;
+
+    .caller-info {
+      display: flex;
+      align-items: center;
+      margin-bottom: 16px;
+      padding: 16px;
+      background: linear-gradient(135deg, #f8fafc 0%, #e2e8f0 100%);
+      border-radius: 12px;
+      border: 1px solid rgba(226, 232, 240, 0.8);
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+      transition: all 0.3s ease;
+
+      &:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 8px 24px rgba(0, 0, 0, 0.1);
+      }
+
+      .caller-icon {
+        margin-right: 12px;
+        color: #667eea;
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        border-radius: 50%;
+        padding: 10px;
+        box-shadow: 0 4px 12px rgba(102, 126, 234, 0.3);
+      }
+
+      .caller-details {
+        flex: 1;
+
+        .caller-name {
+          font-weight: 700;
+          color: #1a202c;
+          margin-bottom: 6px;
+          font-size: 1.1rem;
+        }
+
+        .caller-type {
+          color: #718096;
+          margin-bottom: 6px;
+          font-size: 0.9rem;
+          font-weight: 500;
+        }
+
+        .caller-number {
+          color: #667eea;
+          font-weight: 600;
+          font-size: 1rem;
+          background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+          -webkit-background-clip: text;
+          -webkit-text-fill-color: transparent;
+          background-clip: text;
+        }
+      }
+    }
+
+    .call-message {
+      text-align: center;
+      margin-bottom: 16px;
+      padding: 16px;
+      background: linear-gradient(135deg, #e6fffa 0%, #b2f5ea 100%);
+      border-radius: 12px;
+      border: 1px solid rgba(178, 245, 234, 0.5);
+      position: relative;
+      overflow: hidden;
+
+      &::before {
+        content: "";
+        position: absolute;
+        top: 0;
+        left: 0;
+        right: 0;
+        height: 3px;
+        background: linear-gradient(90deg, #38b2ac 0%, #319795 100%);
+      }
+
+      .message-text {
+        font-weight: 600;
+        color: #234e52;
+        margin: 0;
+        font-size: 1rem;
+      }
+    }
+
+    .call-summary {
+      background: linear-gradient(135deg, #f7fafc 0%, #edf2f7 100%);
+      padding: 16px;
+      border-radius: 12px;
+      margin-bottom: 16px;
+      border: 1px solid rgba(237, 242, 247, 0.8);
+      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+
+      .duration {
+        font-weight: 600;
+        color: #2d3748;
+        margin-bottom: 8px;
+        font-size: 1rem;
+      }
+
+      .timestamp {
+        color: #718096;
+        font-size: 0.875rem;
+        font-weight: 500;
+      }
+    }
+
+    .call-form {
+      background: linear-gradient(135deg, #f8fafc 0%, #e2e8f0 100%);
+      padding: 20px;
+      border-radius: 12px;
+      border: 1px solid rgba(226, 232, 240, 0.8);
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+
+      .MuiTypography-h6 {
+        font-weight: 700;
+        color: #2d3748;
+        margin-bottom: 16px;
+        font-size: 1rem;
+      }
+
+      .MuiFormControl-root {
+        margin-bottom: 16px;
+
+        .MuiInputLabel-root {
+          font-weight: 600;
+          color: #4a5568;
+        }
+
+        .MuiOutlinedInput-root {
+          border-radius: 12px;
+          background: white;
+          transition: all 0.3s ease;
+
+          &:hover {
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+          }
+
+          &.Mui-focused {
+            box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+          }
+        }
+
+        .MuiSelect-select {
+          font-weight: 500;
+        }
+      }
+
+      .MuiTextField-root {
+        .MuiOutlinedInput-root {
+          border-radius: 12px;
+          background: white;
+          transition: all 0.3s ease;
+
+          &:hover {
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+          }
+
+          &.Mui-focused {
+            box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+          }
+        }
+      }
+
+      .MuiButton-root {
+        border-radius: 12px;
+        font-weight: 600;
+        text-transform: none;
+        padding: 10px 20px;
+        transition: all 0.3s ease;
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+
+        &:hover {
+          transform: translateY(-2px);
+          box-shadow: 0 8px 24px rgba(0, 0, 0, 0.15);
+        }
+
+        &.MuiButton-contained {
+          background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+
+          &:hover {
+            background: linear-gradient(135deg, #5a67d8 0%, #6b46c1 100%);
+          }
+        }
+
+        &.MuiButton-outlined {
+          border: 2px solid #667eea;
+          color: #667eea;
+
+          &:hover {
+            background: rgba(102, 126, 234, 0.1);
+            border-color: #5a67d8;
+            color: #5a67d8;
+          }
+        }
+      }
+    }
+  }
+
+  .call-actions {
+    display: flex;
+    gap: 12px;
+    padding: 0 24px 24px;
+
+    .MuiButton-root {
+      flex: 1;
+      padding: 4px 11px;
+      border-radius: 12px;
+      font-weight: 600;
+      text-transform: none;
+      font-size: 0.95rem;
+      transition: all 0.3s ease;
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+
+      &:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 8px 24px rgba(0, 0, 0, 0.15);
+      }
+
+      &.MuiButton-contained {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+
+        &:hover {
+          background: linear-gradient(135deg, #5a67d8 0%, #6b46c1 100%);
+        }
+      }
+
+      &.MuiButton-outlined {
+        border: 2px solid #667eea;
+        color: #667eea;
+
+        &:hover {
+          background: rgba(102, 126, 234, 0.1);
+          border-color: #5a67d8;
+          color: #5a67d8;
+        }
+      }
+    }
+  }
+}
+
+// Анимация для активного звонка
+.call-notification-modal .call-notification-content {
+  &.active-call {
+    animation: activeCallPulse 2s infinite;
+
+    @keyframes activeCallPulse {
+      0% {
+        box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25),
+          0 0 0 1px rgba(255, 255, 255, 0.1);
+      }
+      50% {
+        box-shadow: 0 25px 50px -12px rgba(102, 126, 234, 0.3),
+          0 0 0 1px rgba(102, 126, 234, 0.2);
+      }
+      100% {
+        box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25),
+          0 0 0 1px rgba(255, 255, 255, 0.1);
+      }
+    }
+  }
+}
+
+// Стили для диалога добавления цели
+.MuiDialog-root {
+  .MuiDialog-paper {
+    border-radius: 20px;
+    box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
+    overflow: hidden;
+
+    .MuiDialogTitle-root {
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      color: white;
+      font-weight: 700;
+      padding: 24px 24px 20px;
+    }
+
+    .MuiDialogContent-root {
+      padding: 24px;
+
+      .MuiTextField-root {
+        .MuiOutlinedInput-root {
+          border-radius: 12px;
+          background: #f8fafc;
+          transition: all 0.3s ease;
+
+          &:hover {
+            background: white;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+          }
+
+          &.Mui-focused {
+            background: white;
+            box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+          }
+        }
+      }
+    }
+
+    .MuiDialogActions-root {
+      padding: 20px 24px 24px;
+      gap: 12px;
+
+      .MuiButton-root {
+        border-radius: 12px;
+        font-weight: 600;
+        text-transform: none;
+        padding: 10px 20px;
+        transition: all 0.3s ease;
+
+        &:hover {
+          transform: translateY(-1px);
+        }
+
+        &.MuiButton-contained {
+          background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+
+          &:hover {
+            background: linear-gradient(135deg, #5a67d8 0%, #6b46c1 100%);
+          }
+        }
+      }
+    }
+  }
+}
+
+// Адаптивность
+@media (max-width: 480px) {
+  .call-notification-modal {
+    .call-notification-content {
+      width: 95%;
+      margin: 20px;
+
+      .call-header {
+        padding: 24px 20px 16px;
+
+        .call-title {
+          font-size: 1.1rem;
+        }
+      }
+
+      .call-info {
+        padding: 24px 20px;
+
+        .caller-info {
+          padding: 16px;
+        }
+
+        .call-form {
+          padding: 20px;
+        }
+      }
+
+      .call-actions {
+        padding: 0 20px 24px;
+        flex-direction: column;
+
+        .MuiButton-root {
+          width: 100%;
+        }
+      }
+    }
+  }
+}

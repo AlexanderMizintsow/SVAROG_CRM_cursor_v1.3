@@ -1,0 +1,259 @@
+@import '../../responsive.scss';
+.topnav {
+  height: 60px;
+  padding: 10px 20px;
+  // background-image: linear-gradient(
+  //  to right,
+  //  rgba(216, 229, 233, 0.981),
+  // rgba(22, 211, 208, 0.981),
+  // transparent
+  //  );
+
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  box-shadow: rgba(0, 0, 0, 0.16) 0px 1px 3px, rgba(0, 0, 0, 0.23) 0px 1px 3px;
+  margin-bottom: 5px;
+
+  @include sm {
+    padding: 10px 10px;
+  }
+
+  //background-color: var(--background-color);
+
+  .topnav-social-portal {
+    display: flex;
+    font-size: 21px;
+    color: #085de7;
+    gap: 20px;
+
+    & .topnav-social-portal-item {
+      cursor: pointer;
+      transition: all 0.2s ease;
+
+      &:hover {
+        scale: 1.2;
+      }
+    }
+  }
+
+  a {
+    transition: all 0.4s ease;
+
+    &:hover {
+      scale: 1.05;
+    }
+
+    @include sm {
+      display: none;
+    }
+  }
+
+  .left {
+    flex: 3;
+    display: flex;
+    align-items: center;
+    gap: 40px;
+
+    .logo {
+      font-weight: bold;
+      font-size: 20px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+
+      img {
+        width: 50px;
+      }
+
+      span {
+        letter-spacing: 5px;
+        @include sm {
+          display: none;
+        }
+        @include sm {
+          //   display: initial; // initial - возвращаем как было
+        }
+      }
+    }
+
+    .menu-icon {
+      cursor: pointer;
+      width: 35px;
+      height: 20px;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      align-items: center;
+
+      .bar1,
+      .bar2,
+      .bar3 {
+        width: 30px;
+        height: 3px;
+        background-color: #085de7;
+        transition: all 0.3s ease;
+      }
+
+      &.close {
+        .bar1 {
+          transform: rotate(-45deg) translate(-6px, 5px);
+        }
+
+        .bar2 {
+          opacity: 0;
+        }
+
+        .bar3 {
+          transform: rotate(45deg) translate(-7px, -6px);
+        }
+      }
+    }
+  }
+  .right {
+    display: flex;
+
+    .block {
+      padding: 20px;
+      position: relative;
+      @include sm {
+        padding: 10px;
+      }
+
+      .checkbox {
+        height: 20px; /* Ещё меньшая высота */
+        width: 40px; /* Ещё меньшая ширина */
+        background: #bbb8b8;
+        appearance: none;
+        border-radius: 20px; /* Адаптированный радиус границы */
+        box-shadow: inset 0 1px 7.5px rgba(0, 0, 0, 0.1), inset 0 1px 1px rgba(0, 0, 0, 0.1),
+          inset 0 -0.5px 0.5px rgba(0, 0, 0, 0.1);
+        position: relative;
+        outline: none;
+        cursor: pointer;
+        transition: 0.5s;
+
+        &::before {
+          height: 20px; /* Ещё меньшая высота */
+          width: 20px; /* Ещё меньшая ширина */
+          position: absolute;
+          top: 0;
+          left: 0;
+          content: '';
+          background: linear-gradient(to bottom, #444, #222);
+          border-radius: 20px; /* Адаптированный радиус границы */
+          transform: scale(0.9);
+          transition: 0.5s;
+          box-shadow: 0 1px 5px rgba(0, 0, 0, 0.5), inset 0.5px 0.5px rgba(255, 255, 255, 0.2),
+            inset -0.5px 0.5px rgba(255, 255, 255, 0.2);
+        }
+
+        &:checked {
+          background: #fff;
+          box-shadow: inset 0 0.25px 7.5px rgba(0, 0, 0, 0.1), inset 0 0.25px 1px rgba(0, 0, 0, 0.1),
+            inset 0 -0.5px 0.5px rgba(0, 0, 0, 0.05);
+
+          &::before {
+            left: 20px; /* Адаптированное смещение для меньшего размера */
+            box-shadow: 0 1px 2.5px rgba(0, 0, 0, 0.1), inset 0.5px 0.5px rgba(255, 255, 255, 1),
+              inset -0.5px 0.5px rgba(255, 255, 255, 1);
+            background: linear-gradient(to bottom, #eaeaea, #2c2a2a);
+          }
+        }
+      }
+    }
+
+    .icon {
+      display: flex;
+      align-items: center;
+      gap: 15px;
+      &::after {
+        content: '';
+        position: absolute;
+        right: -5px;
+        top: 50%; /* Начинается в центре родительского блока */
+        transform: translateY(-50%);
+        width: 0.1px;
+        height: 30px; /* Явно задаем высоту линии */
+        background-color: #a5a4a4;
+      }
+
+      .sun {
+        color: rgb(31, 31, 29);
+        scale: 2;
+        @include sm {
+          display: none;
+        }
+      }
+      .moon {
+        color: rgb(238, 234, 234);
+        scale: 1.5;
+        @include sm {
+          display: none;
+        }
+      }
+    }
+
+    .user {
+      display: flex;
+      position: relative;
+      align-items: center;
+      font-weight: bold;
+
+      .notification {
+        position: absolute;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        background-color: rgba(255, 0, 0, 0.679);
+        color: white;
+        width: 30px;
+        height: 30px;
+        border-radius: 50%;
+        top: 8px;
+        right: -8px;
+        cursor: pointer;
+      }
+
+      img {
+        width: 40px;
+        height: 40px;
+        border-radius: 50%;
+        object-fit: cover;
+        margin-right: 20px;
+
+        cursor: pointer;
+      }
+      .info {
+        @include sm {
+          display: none;
+        }
+        p:last-child {
+          font-size: 14px;
+          font-weight: 300;
+        }
+      }
+    }
+    .exit {
+      color: #0fa8f47b;
+      cursor: pointer;
+
+      &:hover {
+        color: #0fa8f4;
+      }
+    }
+  }
+}
+
+//----------------------
+.customDialog {
+  /* Фон для модального окна */
+  .MuiPaper-root {
+    background-color: rgba(27, 26, 26, 0.95); /* Универсальный фон */
+  }
+
+  /* Цвет текста для всего контента */
+  .MuiTypography-root {
+    color: rgba(244, 245, 245, 0.87); /* Универсальный цвет текста */
+  }
+}

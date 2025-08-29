@@ -1,0 +1,16 @@
+.company-form-input-field {
+  display: flex;
+  align-items: center;
+}
+
+.remove-form {
+  margin-left: 12px;
+  font-size: 12px;
+  opacity: 0.5;
+  position: absolute;
+  cursor: pointer;
+  transition: transform 0.3s ease-in-out;
+  &:hover {
+    transform: scale(1.3);
+  }
+}

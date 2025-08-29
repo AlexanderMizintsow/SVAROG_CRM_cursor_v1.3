@@ -1,0 +1,122 @@
+@mixin sm {
+  @media (max-width: 738px) {
+    @content;
+  }
+}
+
+.modal-backdrop {
+  position: fixed;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  width: 100%;
+  background-color: rgba(0, 0, 0, 0.7);
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+  z-index: 1000;
+
+  .modal {
+    position: absolute;
+    top: 3%;
+    right: -400px;
+    height: 90%;
+    width: 400px;
+    border-radius: 12px;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.2);
+    background-color: #fefefe;
+    transition: right 0.5s ease;
+
+    &.is-visible {
+      right: 20px;
+    }
+  }
+
+  .close {
+    position: absolute;
+    top: 1px;
+    right: 7px;
+    border: none;
+    background: none;
+    cursor: pointer;
+    font-size: 1.5rem;
+    color: #ff4a4a;
+
+    &:hover {
+      color: #fe0808;
+    }
+  }
+
+  .content {
+    display: flex;
+    flex-direction: column;
+    border-radius: 50%;
+    //padding: 10px;
+
+    .top {
+      height: auto;
+      width: 100%;
+      background: linear-gradient(to bottom, #474c4caf, #747879a1);
+      color: white;
+      border-radius: 12px 12px 0 0; // Сглаженные углы сверху
+
+      .info {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: 15px 20px;
+
+        .exit {
+          color: #07f6e6ab;
+          cursor: pointer;
+
+          &:hover {
+            color: #0ff4dd;
+          }
+        }
+      }
+
+      img {
+        width: 40px;
+        height: 40px;
+        border-radius: 50%;
+        object-fit: cover;
+        cursor: pointer;
+        transition: transform 0.3s ease;
+
+        &:hover {
+          transform: scale(1.2);
+        }
+      }
+    }
+
+    .center {
+      display: flex;
+      gap: 30px;
+      padding: 30px;
+      background: #cacacbfd;
+      border-radius: 0 0 12px 12px;
+
+      .center-icon {
+        cursor: pointer;
+        transform: scale(1.8);
+        transition: transform 0.1s ease;
+
+        &:hover {
+          transform: scale(2);
+        }
+      }
+
+      .tg {
+        color: #010bbe;
+      }
+    }
+  }
+
+  @include sm {
+    .modal {
+      width: 300px;
+    }
+    font-size: 14px;
+  }
+}

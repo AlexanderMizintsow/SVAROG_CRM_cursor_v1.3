@@ -1,0 +1,9 @@
+-- комментарий для звонков
+CREATE TABLE call_comments (
+    id SERIAL PRIMARY KEY, -- Уникальный идентификатор комментария
+    dealer_id INTEGER REFERENCES dealers(id) ON DELETE CASCADE, -- Ссылка на дилера
+    user_id INTEGER REFERENCES users(id) ON DELETE SET NULL, -- Ссылка на пользователя, который добавил комментарий
+    comment TEXT NOT NULL, -- Текст комментария
+    created_at TIMESTAMP WITHOUT TIME ZONE DEFAULT NOW(), -- Дата создания комментария
+    updated_at TIMESTAMP WITHOUT TIME ZONE DEFAULT NOW() -- Дата последнего изменения комментария
+);

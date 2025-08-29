@@ -1,0 +1,73 @@
+.container {
+  margin: 0 auto;
+  padding: 20px;
+  max-width: 1200px;
+}
+
+.card-section {
+  padding: 20px;
+  border-radius: 12px;
+}
+
+.card-content {
+  display: flex;
+  flex-direction: column;
+  gap: 10px; /* Уменьшено расстояние между элементами */
+}
+
+.card-subtitle {
+  font-size: 1.75rem;
+  margin-bottom: 10px; /* Уменьшено расстояние после заголовка */
+}
+
+.card-contact-wrapper {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(350px, 1fr));
+  gap: 20px;
+}
+
+.card-dealer {
+  padding: 25px;
+  border-radius: 12px;
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 3);
+}
+
+.card-dealer h3 {
+  margin: 0;
+  font-size: 1.5rem;
+  color: #0056b3;
+  margin-bottom: 1px; /* Уменьшено расстояние между заголовком и текстом */
+}
+
+.card-user {
+  margin-bottom: 5px; /* Уменьшено расстояние между пользователями */
+}
+
+.card-user strong {
+  font-size: 1.125rem;
+}
+
+.card-user p {
+  margin: 5px 0; /* Уменьшено расстояние между строками текста */
+  font-size: 1rem;
+  color: #333;
+  line-height: 1.5;
+}
+
+.card-user .icon {
+  margin-right: 8px;
+}
+
+.contact-me {
+  margin-top: 20px;
+  padding: 10px 20px;
+  border: none;
+  border-radius: 8px;
+  background-color: #0056b3;
+  font-size: 1rem;
+  cursor: pointer;
+}
+
+.contact-me:hover {
+  background-color: #004494;
+}

@@ -1,0 +1,754 @@
+@import '../../responsive.scss';
+
+.layout {
+  height: 100vh;
+  //max-width: 1566px; // !
+  margin: 0 auto;
+  padding: 3px 3px;
+  display: flex;
+  flex-direction: column;
+
+  .progress-container {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    height: 100%; /* Установите необходимую высоту */
+  }
+  .navbar-top {
+  }
+
+  .main {
+    display: flex;
+    flex-direction: row; // Ряд для горизонтального расположения бокового Navbar и контента
+
+    .navbar {
+      height: calc(100vh - 150px);
+      // height: 100vh;
+      flex: 1;
+      box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1),
+        0 4px 15px rgba(189, 191, 216, 0.5);
+      @include dm {
+        height: 100vh;
+      }
+      &.close {
+        display: none;
+      }
+    }
+    .content {
+      flex: 5;
+      width: 100px;
+      height: calc(100vh - 150px);
+      margin-left: 3px;
+      padding: 10px;
+      box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1),
+        0 4px 15px rgba(1, 253, 249, 0.512);
+
+      @include dm {
+        height: 100vh;
+      }
+    }
+  }
+
+  .footer {
+    margin-top: 10px;
+    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1),
+      0 4px 15px rgba(189, 191, 216, 0.5);
+  }
+
+  @include lg {
+    //  background-color: rgb(247, 210, 234);
+    max-width: 1280px;
+  }
+  @include dm {
+    //  background-color: rgb(176, 185, 234);
+    max-width: 768px;
+    .footer {
+      display: none;
+    }
+  }
+  @include sm {
+    //  background-color: rgb(196, 172, 234);
+    max-width: 640px;
+  }
+
+  .MuiDataGrid-footerContainer {
+    display: none;
+  }
+}
+
+// Определение стилей для иконок
+.icon-pointer {
+  cursor: pointer;
+  scale: 1.2;
+  transition: all 0.3s ease;
+
+  &:hover {
+    scale: 1.5;
+  }
+
+  &:active {
+    scale: 1.2;
+    transition: all 0.1s ease;
+  }
+}
+
+.light .topnav,
+.light .content,
+.light td {
+  background-color: rgb(245, 245, 245);
+}
+
+.light .navbar {
+  background-color: rgba(255, 254, 254, 0.9);
+}
+
+// Менеджер Задач
+
+.dark .dealer-group-header .dealer-group-title {
+  color: #000000;
+}
+
+.dark .notification-manager {
+  background: #75787ef6;
+
+  .notification-item {
+    background: #d2d5d8f6;
+  }
+
+  .notification-manager-close-button {
+    color: rgba(243, 34, 34, 0.829);
+
+    &:hover {
+      color: rgb(255, 0, 0);
+    }
+  }
+}
+
+// Создание проекта форма ***********************************************************************
+.dark .create-global-task-form {
+  /* Фон формы */
+  background-color: #2d3748; /* Темно-серый фон */
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.5); /* Более выраженная тень */
+
+  &__header {
+    border-bottom-color: #4a5568; /* Более светлая граница */
+  }
+
+  &__title {
+    color: #e2e8f0; /* Светлый цвет заголовка */
+  }
+
+  &__close-button {
+    color: #a0aec0; /* Светло-серый цвет иконки */
+
+    &:hover {
+      color: #fca5a5; /* Более яркий красный при наведении */
+    }
+  }
+
+  &__section {
+    border-bottom-color: #4a5568; /* Более светлая пунктирная граница */
+  }
+
+  &__label {
+    color: #cbd5e0; /* Светло-серый цвет текста метки */
+
+    .required {
+      color: #fca5a5; /* Более яркий красный для обязательных полей */
+    }
+  }
+
+  &__input,
+  &__textarea,
+  &__select {
+    background-color: #4a5568; /* Темный фон для инпутов */
+    border-color: #636b7a; /* Более светлая рамка */
+    color: #e2e8f0; /* Светлый цвет текста */
+
+    &:focus {
+      border-color: #63b3ed; /* Голубой цвет рамки при фокусе */
+      box-shadow: 0 0 0 3px rgba(96, 165, 250, 0.3); /* Более светлая тень при фокусе */
+    }
+  }
+
+  &__select {
+    /* Переопределяем цвет стрелки для темной темы */
+    background-image: url('data:image/svg+xml;charset=US-ASCII,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%22292.362%22%20height%3D%22292.362%22%3E%3Cpath%20fill%3D%22%23a0aec0%22%20d%3D%22M287.9.953a14.61 14.61 0 0 0-20.656 0L146.18 146.174 25.111.953a14.61 14.61 0 0 0-20.656 0l-4.695 4.695a14.61 14.61 0 0 0 0 20.656l130.78 130.779a14.61 14.61 0 0 0 20.656 0l130.78-130.78a14.61 14.61 0 0 0 0-20.655l-4.695-4.696z%22%2F%3E%3C%2Fsvg%3E');
+  }
+
+  // Стили для react-datepicker input
+  .react-datepicker__input-container input {
+    background-color: #4a5568; /* Темный фон для инпута даты */
+    border-color: #636b7a; /* Более светлая рамка */
+    color: #e2e8f0; /* Светлый цвет текста */
+
+    &:focus {
+      border-color: #63b3ed; /* Голубой цвет рамки при фокусе */
+      box-shadow: 0 0 0 3px rgba(96, 165, 250, 0.3); /* Более светлая тень при фокусе */
+    }
+  }
+
+  &__remove-button {
+    color: #fca5a5; /* Более яркий красный */
+
+    &:hover {
+      color: #ef4444; /* Насыщенный красный при наведении */
+    }
+  }
+
+  &__add-button {
+    background-color: #4a5568; /* Темный фон кнопки */
+    color: #cbd5e0; /* Светлый текст кнопки */
+
+    &:hover {
+      background-color: #636b7a; /* Чуть светлее при наведении */
+    }
+  }
+
+  &__responsible-item {
+    /* Переопределяем фон для элементов ответственных в темной теме */
+    background-color: #4a5568; /* Дефолтный темный фон */
+    color: #6a1b9a; /* Светлый цвет текста */
+
+    /* Переопределяем фоны для разных цветов */
+    &--bg-blue {
+      background-color: #3182ce; /* Насыщенный синий */
+      color: #5e35b1; /* Белый текст */
+    }
+    &--bg-purple {
+      background-color: #805ad5; /* Насыщенный фиолетовый */
+      color: #2e7d32; /* Белый текст */
+    }
+    &--bg-green {
+      background-color: #38a169; /* Насыщенный зеленый */
+      color: #2e7d32; /* Белый текст */
+    }
+    &--bg-orange {
+      background-color: #dd6b20; /* Насыщенный оранжевый */
+      color: #ef6c00; /* Белый текст */
+    }
+    &--bg-gray {
+      background-color: #4a5568; /* Темный серый */
+      color: #374151; /* Светлый текст */
+    }
+  }
+
+  &__responsible-avatar {
+    /* Аватары могут остаться такими же, если их цвета хорошо смотрятся на темном фоне */
+    /* Или можно сделать их чуть светлее/темнее в зависимости от дизайна */
+    &--blue {
+      background-color: #63b3ed; /* Чуть светлее */
+    }
+    &--purple {
+      background-color: #b794f4; /* Чуть светлее */
+    }
+    &--green {
+      background-color: #48bb78; /* Чуть светлее */
+    }
+    &--orange {
+      background-color: #ed8936; /* Чуть светлее */
+    }
+    &--default {
+      background-color: #a0aec0; /* Чуть светлее */
+    }
+  }
+
+  &__responsible-name {
+    color: #e2e8f0; /* Светлый цвет имени */
+  }
+
+  &__remove-responsible-button {
+    color: #fca5a5; /* Более яркий красный */
+
+    &:hover {
+      color: #ef4444; /* Насыщенный красный при наведении */
+    }
+  }
+
+  &__add-responsible-section {
+    color: #a0aec0; /* Светло-серый цвет текста */
+  }
+
+  &__button {
+    &--save {
+      background-color: #63b3ed; /* Голубой цвет кнопки сохранения */
+      color: #1a202c; /* Темный текст на светлом фоне */
+
+      &:hover {
+        background-color: #4299e1; /* Чуть темнее при наведении */
+      }
+    }
+
+    &--cancel {
+      background-color: #4a5568; /* Темный фон кнопки отмены */
+      color: #cbd5e0; /* Светлый текст */
+
+      &:hover {
+        background-color: #636b7a; /* Чуть светлее при наведении */
+      }
+    }
+
+    &:disabled {
+      opacity: 0.5; /* Чуть менее прозрачный, чем в светлой теме */
+    }
+  }
+}
+
+/* Стили для селекта ролей в темной теме */
+.dark .create-global-task-form__responsible-role-select {
+  color: inherit; /* Наследуем цвет от родителя (.create-global-task-form__responsible-item) */
+  background-image: url('data:image/svg+xml;charset=US-ASCII,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%22292.362%22%20height%3D%22292.362%22%3E%3Cpath%20fill%3D%22%23cbd5e0%22%20d%3D%22M287.9.953a14.61 14.61 0 0 0-20.656 0L146.18 146.174 25.111.953a14.61 14.61 0 0 0-20.656 0l-4.695 4.695a14.61 14.61 0 0 0 0 20.656l130.78 130.779a14.61 14.61 0 0 0 20.656 0l130.78-130.78a14.61 14.61 0 0 0 0-20.655l-4.695-4.696z%22%2F%3E%3C%2Fsvg%3E'); /* Меняем цвет стрелки на светлый */
+
+  &:hover {
+    background-color: rgba(
+      255,
+      255,
+      255,
+      0.05
+    ); /* Легкое изменение фона при наведении (полупрозрачный белый) */
+  }
+}
+
+/* Стили для опций селекта в темной теме (ограничено) */
+.dark .create-global-task-form__responsible-role-select option {
+  color: #e2e8f0; /* Светлый цвет текста опций */
+  background-color: #4a5568; /* Темный фон опций */
+}
+
+.dark .create-global-task-form__responsible-name {
+  color: #e2e8f0; /* Светлый цвет имени */
+}
+
+.dark .create-global-task-form {
+  /* ... (остальные стили для темной темы) ... */
+
+  &__responsible-item {
+    /* Переопределяем фон для элементов ответственных в темной теме */
+    background-color: #4a5568; /* Дефолтный темный фон */
+    color: #e0bcf7; /* Светлый цвет текста */
+
+    /* Переопределяем фоны для разных цветов */
+    &--bg-blue {
+      background-color: #3182ce; /* Насыщенный синий */
+      color: #c1dafafa; /* Белый текст */
+    }
+    &--bg-purple {
+      background-color: #805ad5; /* Насыщенный фиолетовый */
+      color: #c8f3ca; /* Белый текст */
+    }
+    &--bg-green {
+      background-color: #38a169; /* Насыщенный зеленый */
+      color: #ccf5ce; /* Белый текст */
+    }
+    &--bg-orange {
+      background-color: #b1734a; /* Насыщенный оранжевый */
+      color: #f5decb; /* Белый текст */
+    }
+    &--bg-gray {
+      background-color: #4a5568; /* Темный серый */
+      color: #ccddf8; /* Светлый текст */
+    }
+  }
+
+  &__responsible-avatar {
+    /* Переопределяем цвета аватаров - делаем их чуть темнее или менее насыщенными */
+    &--blue {
+      background-color: #4fa4f3; /* Насыщенный синий (для контраста с фоном) */
+      color: #fff; /* Белый текст */
+    }
+    &--purple {
+      background-color: #805ad5; /* Насыщенный фиолетовый */
+      color: #fff; /* Белый текст */
+    }
+    &--green {
+      background-color: #38a169; /* Насыщенный зеленый */
+      color: #fff; /* Белый текст */
+    }
+    &--orange {
+      background-color: #dd6b20; /* Насыщенный оранжевый */
+      color: #fff; /* Белый текст */
+    }
+    &--default {
+      background-color: #718096; /* Темно-серый */
+      color: #e2e8f0; /* Светлый текст */
+    }
+  }
+
+  /* ... (остальные стили для темной темы) ... */
+}
+
+// Чат Задач ************************************************************************************
+.dark .chat-modal {
+  background-color: #2c2f33;
+  border-radius: 12px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.5);
+
+  .message.unread {
+    background-color: #3b3f47; // Цвет фона для непрочитанных сообщений в темной теме
+  }
+
+  .message.read {
+    background-color: #2c2f33;
+  }
+  .chat-messages {
+    scrollbar-width: thin; // Установка тонкого скроллбара
+    scrollbar-color: #7289da #2c2f33; // Цвет ползунка и фона трека скроллбара
+  }
+
+  .chat-header {
+    background-color: #23272a;
+    border-bottom: 1px solid #00000034;
+
+    h3 {
+      color: #ffffff; // Цвет текста заголовка
+    }
+
+    .close-button {
+      color: #b9bbbe; // Цвет кнопки закрытия
+      &:hover {
+        color: #e23e15; // Цвет кнопки при наведении
+      }
+    }
+  }
+
+  .chat-messages {
+    background-color: #2c2f33; // Цвет фона сообщений
+    color: #ffffff;
+
+    .message {
+      .message-content {
+        background-color: #40444b; // Цвет фона для собеседника
+        color: #ffffff;
+      }
+
+      &.sent {
+        .message-content {
+          background-color: #40444b; // Цвет фона для от 1го лица
+          color: #ffffff;
+        }
+      }
+
+      &.received {
+        .message-content {
+          background-color: #7289da; // Цвет фона для собеседника
+          color: #ffffff;
+        }
+      }
+
+      .message-time,
+      .author-label {
+        color: #b9bbbe5b; // Цвет времени и имени автора
+      }
+    }
+  }
+
+  .chat-input {
+    background-color: #23272a;
+    border-top: 1px solid #444;
+
+    input {
+      border: 1px solid #444;
+      background-color: #40444b;
+      color: #ffffff;
+
+      &:focus {
+        border-color: #7289da; // Цвет границы при фокусе
+      }
+    }
+
+    button {
+      background-color: #7289da; // Цвет фона кнопки
+      &:hover {
+        background-color: #5b6e9e; // Цвет фона кнопки при наведении
+      }
+    }
+  }
+
+  .chat-participants {
+    background-color: #23272a; // Цвет фона для участников ввввввввввввввввввввввввввввввв
+
+    h4 {
+      color: #ffffff85; // Цвет заголовка участников
+    }
+
+    .participants-list {
+      .participant {
+        background-color: #40444b; // Цвет фона для участника
+        color: #ffffff77; // Цвет текста для участника
+      }
+    }
+  }
+}
+
+.dark .modal-overlay {
+  background-color: rgba(0, 0, 0, 0.8); // Темный фон для оверлея
+}
+
+.dark .hierarchy-card,
+.dark .date-button,
+.dark .group-card,
+.dark .rating-modal-content,
+.review-modal,
+.dark .context-menu-board {
+  background-color: #2a2e2d;
+}
+
+.dark .create-group label,
+.group-name {
+  color: white;
+}
+
+.dark .navbar,
+.dark .footermenu,
+.dark .topnav,
+.dark .content,
+.dark td,
+.dark .search-container .search-input,
+.dark .paper,
+.dark .modal-content,
+.dark .AccountActivation,
+.dark .custom-paper,
+.dark .modal {
+  background-color: #23272f;
+
+  .task-modal-content {
+    background: #373636f6;
+  }
+
+  textarea {
+    // background-color: #fdfdfde0;
+  }
+  .calls-settings {
+    background-color: #23272f;
+  }
+  // Канбан доска **********************************
+  .task {
+    background: rgb(47 43 47 / 83%);
+    color: white;
+    .task-description {
+      color: wheat;
+    }
+    .task-icon {
+      color: white;
+    }
+  }
+  .column-header,
+  .add-task-button {
+    background: #19171fd4;
+    color: white;
+    &.icon {
+      color: white;
+    }
+  }
+
+  .AccountActivation .card-content,
+  .card-actions {
+    background-color: #4d4d4d;
+  }
+
+  // ***********************************************
+
+  .search-input:hover {
+    background-color: #000000;
+    border-color: #ccc;
+  }
+  .search-input:focus {
+    background-color: #000000;
+    color: white;
+  }
+
+  //Уведомления
+  .notification-list {
+    background-color: #474a51;
+  }
+  .notification-card {
+    background-color: #262525;
+    .notification-text {
+      color: rgba(255, 255, 255, 0.861);
+    }
+  }
+
+  /*Карточка дилера*/
+  .card,
+  .card-buttons,
+  .card-buttons .is-active {
+    background-color: #1c1c1c;
+    color: #f5f5f5; /* Общий цвет текста */
+
+    .title,
+    .address,
+    .link,
+    .contactInfo {
+      color: #f5f5f5;
+    }
+
+    .location {
+      color: #8d99ae;
+    }
+
+    .link a {
+      color: #1671fb;
+    }
+
+    svg {
+      color: #00fbff; /* Цвет иконок */
+    }
+  }
+
+  .custom-text-field {
+    // Style the label
+    .MuiInputLabel-root {
+      color: white; // Label color
+    }
+
+    // Style the input field
+    .MuiOutlinedInput-root {
+      &.Mui-focused .MuiOutlinedInput-notchedOutline {
+        border-color: rgb(0, 200, 255); // Border color when focused
+      }
+      &:hover .MuiOutlinedInput-notchedOutline {
+        border-color: rgb(0, 200, 255); // Border color on hover
+      }
+      .MuiOutlinedInput-notchedOutline {
+        border-color: rgb(10, 87, 243); // Default border color
+      }
+      .MuiInputBase-input {
+        color: white; // Input text color
+      }
+    }
+  }
+  th,
+  td,
+  p,
+  a,
+  h1,
+  h2,
+  h3,
+  h4,
+  h5,
+  .submenu-item,
+  .icon,
+  span,
+  .submenu-item .icon,
+  .arrow,
+  .icon-pointer,
+  label,
+  .task-title-content {
+    color: rgb(247, 239, 239);
+  }
+  .selected-employee-info p {
+    color: rgba(194, 191, 191, 0.753);
+  }
+
+  .employee-list-none span {
+    color: #a1a0a0;
+  }
+
+  .MuiOutlinedInput-root {
+    .MuiOutlinedInput-input {
+      color: #92c1f3; /* Цвет текста вводимого в инпуте */
+    }
+  }
+
+  .MuiFormLabel-root {
+    color: #d5e7eae2;
+  }
+
+  .MuiOutlinedInput-root {
+    &.Mui-focused .MuiOutlinedInput-notchedOutline {
+      border-color: #1976d2; /* Цвет границы при фокусе */
+    }
+
+    .MuiOutlinedInput-notchedOutline {
+      border-color: #ccc; /* Цвет границы по умолчанию */
+    }
+
+    &.Mui-error .MuiOutlinedInput-notchedOutline {
+      border-color: red; /* Цвет границы в случае ошибки */
+    }
+  }
+
+  .MuiInputAdornment-root {
+    color: #1976d2; /* Цвет значков (например, календарь) */
+  }
+
+  .MuiSvgIcon-root {
+    color: #ffffffe8; /* Цвет иконок */ /* Был #1976d2; */
+  }
+
+  .export,
+  .icon-pointer {
+    color: rgb(0, 253, 253);
+    &:hover {
+      color: chartreuse;
+    }
+  }
+
+  .custom-cell {
+    color: whitesmoke;
+  }
+  .custom-header {
+    color: whitesmoke;
+  }
+  .MuiDataGrid-columnHeader {
+    background-color: #000000;
+  }
+
+  .topnavlogo {
+    background-size: contain;
+  }
+
+  .textFieldContainer {
+    .MuiInputLabel-root {
+      color: white;
+    }
+    .MuiInputBase-root {
+      color: white;
+    }
+
+    .MuiOutlinedInput-root {
+      fieldset {
+        border-color: white;
+      }
+
+      &:hover fieldset {
+        border-color: rgb(0, 200, 255);
+      }
+
+      &.Mui-focused fieldset {
+        border-color: rgb(0, 200, 255);
+      }
+    }
+  }
+
+  .submenu {
+    &::before {
+      background-color: #fa05d5bb;
+    }
+
+    .submenu-item {
+      &:hover {
+        color: #05d8f4d6;
+      }
+    }
+  }
+
+  .submenu-item {
+    &:hover .icon {
+      color: #0ff3f7;
+    }
+  }
+
+  .menu-item {
+    &:hover .icon {
+      color: #1ddef7d6;
+    }
+  }
+
+  .input-material-label {
+    position: absolute;
+    top: -7px;
+    left: -7px;
+    transition: 0.3s;
+  }
+}

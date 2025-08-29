@@ -1,0 +1,124 @@
+.home-container {
+  display: flex;
+  gap: 10px;
+  padding: 0 20px;
+  padding-bottom: 20px;
+}
+
+.column-container {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  width: 250px;
+}
+
+.column {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 10px 5px 40px 5px;
+  background: #ffffff1f;
+  border-radius: 8px;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.column-header {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 3px;
+  background: #c0d2f4a0;
+  border-radius: 8px;
+  color: #000000;
+  font-weight: bold;
+  font-size: 17px;
+}
+
+.add-task-button {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  padding: 10px;
+  background: #fff;
+  border-radius: 8px;
+  color: #555;
+  font-weight: 500;
+  font-size: 15px;
+  cursor: pointer;
+  opacity: 0.9;
+}
+
+.notifications-column {
+  /* Дополнительные стили для колонки Уведомления, если нужно */
+}
+
+.notifications-column-body {
+  background: #f505ed16; /* Цвет фона для колонки уведомления */
+
+  .board-move-task {
+    cursor: pointer;
+    transition: all 0.2s ease;
+
+    &:hover {
+      scale: (1.1);
+    }
+  }
+}
+
+.notifications-header {
+  background: #591a2b66; /* Задайте нужный цвет для заголовка */
+  color: #ffffff; /* Цвет текста заголовка */
+}
+
+.links {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  margin-top: 10px;
+  gap: 15px;
+  flex-wrap: wrap;
+  font-size: 12px;
+}
+
+.link-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.link-image {
+  width: 24px; // Ширина изображения
+  height: 24px; // Высота изображения
+  border-radius: 24px; // Скругление углов
+  margin-right: 8px;
+}
+
+.file-icon {
+  font-size: 24px;
+  color: #555;
+}
+
+.link {
+  color: #000000ab;
+  text-decoration: none;
+  font-weight: 400;
+  transition: color 0.3s;
+
+  &:hover {
+    color: #000000;
+  }
+}
+
+.toggle-sidebar-button {
+  transform: translateY(-5px);
+  cursor: pointer;
+  margin-left: 15px;
+  scale: 1.5;
+  color: #007bff;
+}
+.pause-column {
+  .column-header {
+    background: rgb(142 109 171 / 82%);
+  }
+}

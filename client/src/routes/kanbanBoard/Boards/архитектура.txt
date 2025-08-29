@@ -1,0 +1,10 @@
+Рекомендуемая структура проекта:
+
+/components/Boards/Boards.jsx – основной компонент доски.
+/components/Boards/TaskColumn.jsx – отдельный компонент для колонки задач.
+/components/Boards/TaskNotification.jsx – компонент для уведомлений/задач.
+/components/Boards/ModalTask.jsx – модальное окно для создания/редактирования задач.
+/hooks/useBoardColumns.js – кастомный хук для управления колонками.
+/services/reminderService.js – API-функции для работы с напоминаниями.
+/utils/boardUtils.js – утилиты для сортировки, фильтрации и других расчетов.
+/store/ – zustand-состояния.

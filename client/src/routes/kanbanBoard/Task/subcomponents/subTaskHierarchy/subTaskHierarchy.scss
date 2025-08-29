@@ -1,0 +1,206 @@
+.task-hierarchy-container {
+  position: relative;
+  width: 100%;
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 20px;
+  font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+
+  .header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 20px;
+    padding-bottom: 15px;
+    border-bottom: 1px solid #eee;
+    background-color: #ffffff;
+
+    h2 {
+      margin: 0;
+      color: #333;
+      font-size: 24px;
+    }
+
+    .legend {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+
+      span {
+        padding: 4px 10px;
+        border-radius: 4px;
+        color: white;
+        font-size: 12px;
+        font-weight: 500;
+      }
+    }
+
+    .close-button {
+      background: none;
+      border: none;
+      font-size: 24px;
+      cursor: pointer;
+      color: #666;
+      transition: color 0.2s;
+
+      &:hover {
+        color: #333;
+      }
+    }
+  }
+
+  .hierarchy-view {
+    background: white;
+    border-radius: 8px;
+    padding: 20px;
+    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.05);
+  }
+
+  .task-node {
+    position: relative;
+    padding: 15px;
+    margin-bottom: 15px;
+    border-radius: 6px;
+    background: white;
+    border-left: 4px solid var(--border-color);
+    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.08);
+    transition: all 0.3s cubic-bezier(0.25, 0.8, 0.25, 1);
+    overflow: hidden;
+    color: var(--border-color);
+
+    &::before,
+    &::after {
+      content: '';
+      position: absolute;
+      background: var(--border-color);
+      z-index: -1;
+      transition: all 0.3s ease;
+    }
+
+    &::before {
+      top: 0;
+      left: 0;
+      right: 100%;
+      height: 2px;
+    }
+
+    &::after {
+      bottom: 0;
+      right: 0;
+      width: 2px;
+      height: 0;
+    }
+
+    &:hover {
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+      z-index: 2;
+
+      &::before {
+        right: 0;
+      }
+
+      &::after {
+        height: 100%;
+      }
+
+      border-bottom: 1px solid var(--border-color);
+    }
+
+    &:not(:hover) {
+      transition: box-shadow 0.3s ease, border-bottom 0.2s ease, transform 0.3s ease;
+      border-bottom: 1px solid white;
+    }
+
+    &.completed {
+      opacity: 0.8;
+      background: #f9f9f9;
+    }
+
+    &.has-children {
+      padding-bottom: 5px;
+    }
+
+    .task-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      margin-bottom: 10px;
+
+      .task-title {
+        font-weight: 600;
+        color: #333;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+
+        .level-badge {
+          padding: 2px 8px;
+          border-radius: 12px;
+          color: white;
+          font-size: 11px;
+          font-weight: bold;
+        }
+      }
+
+      .task-status {
+        padding: 3px 10px;
+        border-radius: 12px;
+        color: white;
+        font-size: 12px;
+        font-weight: 500;
+        text-transform: capitalize;
+      }
+    }
+
+    .task-meta {
+      font-size: 13px;
+      color: #666;
+      margin-top: 8px;
+      line-height: 1.5;
+
+      div {
+        margin-bottom: 4px;
+      }
+    }
+
+    .task-children {
+      margin-top: 15px;
+      padding-left: 20px;
+      position: relative;
+
+      .child-container {
+        position: relative;
+
+        &::before {
+          content: '';
+          position: absolute;
+          left: -20px;
+          top: 10px;
+          height: calc(100% - 15px);
+          width: 20px;
+          border-left: 2px dashed var(--border-color);
+          border-bottom: 2px dashed var(--border-color);
+          border-bottom-left-radius: 8px;
+          transition: all 0.3s ease;
+        }
+
+        &:last-child::before {
+          height: 15px;
+        }
+      }
+    }
+  }
+
+  .loading-spinner,
+  .error-message,
+  .empty-message {
+    text-align: center;
+    padding: 40px;
+    font-size: 16px;
+    color: #666;
+  }
+
+  .error-message {
+    color: #d32f2f;
+  }
+}

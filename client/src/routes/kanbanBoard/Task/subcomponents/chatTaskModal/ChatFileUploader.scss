@@ -1,0 +1,185 @@
+.chat-file-uploader {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+
+  .upload-buttons {
+    display: flex;
+    gap: 6px;
+    align-items: center;
+
+    .upload-btn {
+      width: 36px;
+      height: 36px;
+      border: 2px solid #e9ecef;
+      border-radius: 50%;
+      background: #ffffff;
+      color: #6c757d;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: all 0.2s ease;
+      font-size: 14px;
+      position: relative;
+
+      &:hover:not(:disabled) {
+        border-color: #667eea;
+        color: #667eea;
+        transform: translateY(-1px);
+        box-shadow: 0 2px 8px rgba(102, 126, 234, 0.2);
+      }
+
+      &:disabled {
+        opacity: 0.5;
+        cursor: not-allowed;
+        transform: none;
+        box-shadow: none;
+      }
+
+      &.file-btn {
+        &:hover {
+          border-color: #28a745;
+          color: #28a745;
+        }
+      }
+
+      &.image-btn {
+        &:hover {
+          border-color: #ffc107;
+          color: #ffc107;
+        }
+      }
+
+      &.general-btn {
+        &:hover {
+          border-color: #17a2b8;
+          color: #17a2b8;
+        }
+      }
+
+      // Индикатор активности
+      &::after {
+        content: '';
+        position: absolute;
+        top: -2px;
+        right: -2px;
+        width: 8px;
+        height: 8px;
+        background: #667eea;
+        border-radius: 50%;
+        opacity: 0;
+        transition: opacity 0.2s ease;
+      }
+
+      &:hover::after {
+        opacity: 1;
+      }
+    }
+  }
+
+  // Состояние перетаскивания
+  &.drag-active {
+    .upload-buttons {
+      opacity: 0.3;
+    }
+  }
+
+  // Оверлей для перетаскивания
+  .drag-overlay {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(102, 126, 234, 0.1);
+    border: 2px dashed #667eea;
+    border-radius: 12px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 10;
+    animation: dragPulse 1s ease-in-out infinite;
+
+    .drag-content {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 8px;
+      color: #667eea;
+      font-weight: 600;
+
+      .drag-icon {
+        font-size: 24px;
+        animation: bounce 0.6s ease-in-out infinite;
+      }
+
+      span {
+        font-size: 12px;
+        text-align: center;
+        max-width: 120px;
+      }
+    }
+  }
+}
+
+// Анимации
+@keyframes dragPulse {
+  0%,
+  100% {
+    transform: scale(1);
+    opacity: 0.1;
+  }
+  50% {
+    transform: scale(1.02);
+    opacity: 0.2;
+  }
+}
+
+@keyframes bounce {
+  0%,
+  20%,
+  50%,
+  80%,
+  100% {
+    transform: translateY(0);
+  }
+  40% {
+    transform: translateY(-4px);
+  }
+  60% {
+    transform: translateY(-2px);
+  }
+}
+
+// Адаптивность
+@media (max-width: 768px) {
+  .chat-file-uploader {
+    .upload-buttons {
+      gap: 4px;
+
+      .upload-btn {
+        width: 32px;
+        height: 32px;
+        font-size: 12px;
+      }
+    }
+
+    .drag-overlay {
+      .drag-content {
+        .drag-icon {
+          font-size: 20px;
+        }
+
+        span {
+          font-size: 11px;
+          max-width: 100px;
+        }
+      }
+    }
+  }
+}
+
+

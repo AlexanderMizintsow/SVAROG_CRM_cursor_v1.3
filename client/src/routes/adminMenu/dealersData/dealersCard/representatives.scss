@@ -1,0 +1,64 @@
+.container {
+  margin: 0 auto;
+  padding: 20px;
+  max-width: 1200px;
+}
+
+.card-section {
+  padding: 20px;
+  border-radius: 12px;
+}
+
+.edit-dealer-btn {
+  cursor: pointer;
+  transition: all 0.1s ease;
+  &:hover {
+    scale: 1.3;
+  }
+}
+
+.card-subtitle {
+  font-size: 1.75rem;
+  margin-bottom: 25px;
+}
+
+.dealers-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(350px, 1fr));
+  gap: 20px;
+}
+
+.dealer-card {
+  padding: 25px;
+  border-radius: 12px;
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 3);
+  display: flex;
+  flex-direction: column;
+}
+
+.dealer-header {
+  margin-bottom: 15px;
+}
+
+.dealer-header h3 {
+  margin: 0;
+  font-size: 1.5rem;
+  color: #0056b3;
+}
+
+.dealer-position {
+  font-size: 1.125rem;
+}
+
+.dealer-body p {
+  margin: 8px 0;
+  font-size: 1rem;
+  color: #333;
+  line-height: 1.5;
+}
+
+.dealer-footer p {
+  margin: 8px 0;
+  font-size: 1rem;
+  color: #333;
+}

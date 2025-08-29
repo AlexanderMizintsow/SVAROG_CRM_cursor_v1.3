@@ -1,0 +1,126 @@
+CREATE TABLE dealers (
+    id SERIAL PRIMARY KEY, -- Уникальный идентификатор дилера
+    company_id INTEGER REFERENCES companies(id) ON DELETE CASCADE, -- Ссылка на компанию (из таблицы company)
+    last_name VARCHAR(255) NOT NULL,
+    first_name VARCHAR(255) NOT NULL,
+    middle_name VARCHAR(255), 
+    position VARCHAR(100), -- Должность контактного лица дилера
+    gender VARCHAR(10), -- Пол контактного лица дилера
+    birth_date DATE, -- День рождения контактного лица дилера
+    hobbies TEXT, -- Хобби контактного лица дилера  
+    address TEXT, -- Полный адрес дилера
+    region VARCHAR(100), -- Регион, в котором находится дилер
+    industry VARCHAR(100), -- Отрасль, в которой работает дилер
+    registration_number VARCHAR(100), -- Регистрационный номер дилера
+    tax_id VARCHAR(50), -- Идентификационный номер налогоплательщика
+    status VARCHAR(50) DEFAULT 'active', -- Статус дилера
+    credit_limit NUMERIC(15, 2), -- Кредитный лимит для дилера
+    current_balance NUMERIC(15, 2) DEFAULT 0.00, -- Текущий баланс дилера
+    last_order_date DATE, -- Дата последнего заказа от дилера
+    rating INTEGER CHECK (rating BETWEEN 1 AND 5), -- Рейтинг дилера от 1 до 5
+    is_preferred BOOLEAN DEFAULT false, -- Флаг, указывающий, является ли дилер приоритетным
+    contract_start_date DATE, -- Дата начала контракта с дилером
+    contract_end_date DATE, -- Дата окончания контракта с дилером
+    last_contact_date DATE, -- Дата последнего контакта с дилером 
+    dealer_type VARCHAR(50), -- Тип дилера, например, 'розничный', 'оптовый', 'дистрибьютор'
+    created_at TIMESTAMP WITHOUT TIME ZONE DEFAULT NOW(), -- Дата создания записи
+    updated_at TIMESTAMP WITHOUT TIME ZONE DEFAULT NOW(), -- Дата последнего изменения записи
+    assigned_employee_id INTEGER REFERENCES users(id) ON UPDATE CASCADE ON DELETE SET NULL, -- Ответственный сотрудник (из таблицы users)
+    sales_representative_id INTEGER REFERENCES users(id) ON UPDATE CASCADE ON DELETE SET NULL, -- Ответственный представитель отдела продаж
+    additional_notes TEXT -- Дополнительный комментарий
+);
+
+
+-- Таблица компания
+CREATE TABLE companies (
+    id SERIAL PRIMARY KEY, -- Уникальный идентификатор компании
+    name VARCHAR(255) NOT NULL, -- Название компании
+    industry VARCHAR(100), -- Отрасль, в которой работает компания
+    registration_number VARCHAR(100), -- Регистрационный номер компании
+    tax_id VARCHAR(50), -- Идентификационный номер налогоплательщика
+    website_url VARCHAR(255), -- Веб-сайт компании
+    address TEXT, -- Полный адрес компании
+    region VARCHAR(100), -- Регион, в котором находится компания
+    phone_number VARCHAR(20), -- Номер телефона компании
+    email VARCHAR(100) UNIQUE, -- Электронная почта компании
+    status VARCHAR(50) DEFAULT 'active', -- Статус компании
+    created_at TIMESTAMP WITHOUT TIME ZONE DEFAULT NOW(), -- Дата создания записи
+    updated_at TIMESTAMP WITHOUT TIME ZONE DEFAULT NOW() -- Дата последнего обновления записи
+);
+
+CREATE TABLE company_regions (
+    id SERIAL PRIMARY KEY, -- Уникальный идентификатор записи
+    company_id INT NOT NULL, -- Идентификатор компании
+    region VARCHAR(100) NOT NULL, -- Регион, куда доставляется продукция
+    FOREIGN KEY (company_id) REFERENCES companies(id) ON DELETE CASCADE, -- Внешний ключ на таблицу companies
+    UNIQUE (company_id, region) -- Уникальное сочетание компании и региона
+);
+
+
+-- Связь таблиц дилер-сотрудник
+CREATE TABLE dealer_employees (
+    dealer_id INTEGER REFERENCES dealers(id) ON DELETE CASCADE, -- Ссылка на дилера
+    employee_id INTEGER REFERENCES users(id) ON DELETE CASCADE, -- Ссылка на сотрудника
+    PRIMARY KEY (dealer_id, employee_id) -- Составной первичный ключ
+);
+
+-- Телефоны дилера
+CREATE TABLE dealer_phones (
+    id SERIAL PRIMARY KEY, -- Уникальный идентификатор телефона
+    dealer_id INTEGER REFERENCES dealers(id) ON DELETE CASCADE, -- Ссылка на таблицу дилеров
+    phone_number VARCHAR(20) NOT NULL, -- Номер телефона дилера
+    phone_type VARCHAR(20), -- Тип телефона (например, мобильный, рабочий, домашний)
+    is_primary BOOLEAN DEFAULT false -- Является ли номер основным
+);
+
+-- почта дилера
+CREATE TABLE dealer_emails (
+    id SERIAL PRIMARY KEY, -- Уникальный идентификатор записи
+    dealer_id INTEGER REFERENCES dealers(id) ON DELETE CASCADE, -- Ссылка на таблицу дилеров
+    email VARCHAR(100), -- Электронная почта дилера
+    is_primary BOOLEAN DEFAULT false -- Является ли почта основной
+);
+
+-- взаимодействия с дилером
+CREATE TABLE dealer_interactions (
+    id SERIAL PRIMARY KEY, -- Уникальный идентификатор записи взаимодействия
+    dealer_id INTEGER REFERENCES dealers(id) ON DELETE CASCADE, -- Ссылка на таблицу дилеров
+    employee_id INTEGER REFERENCES users(id) ON DELETE SET NULL, -- Ссылка на таблицу пользователей (сотрудников)
+    interaction_type VARCHAR(50), -- Тип взаимодействия (например, звонок, встреча, email)
+    interaction_date TIMESTAMP WITHOUT TIME ZONE DEFAULT NOW(), -- Дата и время взаимодействия, по умолчанию текущее время
+    notes TEXT, -- Дополнительные комментарии по взаимодействию
+    outcome VARCHAR(50) -- Результат взаимодействия (например, успешно, нужно перезвонить)
+);
+
+ 
+-- Триггер для автоматического обновления поля updated_at в таблице dealers
+CREATE OR REPLACE FUNCTION update_dealers_updated_at()
+RETURNS TRIGGER AS $$
+BEGIN
+    NEW.updated_at = NOW();
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+CREATE TRIGGER update_dealers_updated_at_trigger
+BEFORE UPDATE ON dealers
+FOR EACH ROW EXECUTE FUNCTION update_dealers_updated_at();
+
+-- Дополнительные поля для компании
+CREATE TABLE custom_fields (
+    id SERIAL PRIMARY KEY, -- Уникальный идентификатор
+    company_id INTEGER REFERENCES companies(id) ON DELETE CASCADE, -- Ссылка на компанию
+    field_name VARCHAR(255) NOT NULL, -- Название поля
+    field_value TEXT, -- Значение поля
+    UNIQUE (company_id, field_name) -- Уникальное сочетание компании и поля
+);
+
+--***---***---***---***---***---***
+-- Дополнительные поля для представителя дилера
+CREATE TABLE custom_fields_dealers (
+    id SERIAL PRIMARY KEY, -- Уникальный идентификатор
+    dealer_id INTEGER REFERENCES dealers(id) ON DELETE CASCADE, -- Ссылка на компанию
+    field_name VARCHAR(255) NOT NULL, -- Название поля
+    field_value TEXT, -- Значение поля
+    UNIQUE (dealer_id, field_name) -- Уникальное сочетание компании и поля
+);

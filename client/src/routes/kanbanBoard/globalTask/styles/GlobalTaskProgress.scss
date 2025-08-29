@@ -1,0 +1,227 @@
+.global-task-progress {
+  margin-bottom: 3rem; // mb-12
+
+  &__header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 0.5rem; // mb-2
+  }
+
+  &__label {
+    font-size: 0.875rem; // text-sm
+    font-weight: 500; // font-medium
+    color: #4b5563; // text-gray-600
+  }
+
+  &__status-container {
+    display: flex;
+    align-items: center;
+  }
+
+  &__percent {
+    font-size: 0.875rem; // text-sm
+    font-weight: 700; // font-bold
+    margin-right: 0.5rem; // mr-2
+
+    &--in-progress {
+      color: #2563eb; // text-blue-600
+    }
+
+    &--completed {
+      color: #16a34a; // text-green-600
+    }
+  }
+
+  &__status {
+    font-size: 0.75rem; // text-xs
+    padding: 0.25rem 0.5rem; // px-2 py-1
+    border-radius: 9999px; // rounded-full
+
+    &--new {
+      background-color: #f3f4f6;
+      color: #4b5563;
+    }
+    &--in-progress {
+      background-color: #dbeafe;
+      color: #1d4ed8;
+    }
+    &--completed {
+      background-color: #dcfce7;
+      color: #166534;
+    }
+
+    &--on-hold {
+      background-color: #fef3c7;
+      color: #92400e;
+    }
+    &--cancelled {
+      background-color: #fee2e2;
+      color: #991b1b;
+    }
+  }
+
+  &__track {
+    height: 8px;
+    background-color: #e5e7eb;
+    border-radius: 4px;
+    overflow: hidden;
+  }
+
+  &__bar {
+    height: 100%;
+    background: linear-gradient(90deg, #3bf63b, #f65cc8); // Default gradient
+    transition: width 0.5s ease;
+  }
+
+  &__dates {
+    display: flex;
+    justify-content: space-between;
+    margin-top: 0.25rem; // mt-1
+    & > span {
+      font-size: 0.75rem; // text-xs
+      color: #6b7280; // text-gray-500
+    }
+  }
+
+  &__controller {
+    background-color: #ffffff; // bg-white
+    border-radius: 0.5rem; // rounded-lg
+    padding: 1.5rem; // p-6
+    box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.05); // shadow-sm
+    margin-top: 2rem; // mt-8
+  }
+
+  &__controller-title {
+    font-size: 1.125rem; // text-lg
+    font-weight: 500; // font-medium
+    color: #1f2937; // text-gray-800
+    margin-bottom: 1rem; // mb-4
+  }
+
+  &__slider-container {
+    display: flex;
+    align-items: center;
+    margin-bottom: 1rem; // mb-4
+  }
+
+  &__slider {
+    width: 100%; // w-full
+    height: 8px; // h-2
+    background-color: #e5e7eb; // bg-gray-200
+    border-radius: 0.5rem; // rounded-lg
+    appearance: none;
+    cursor: pointer;
+    // Custom slider styles for different browsers might be needed here
+    // Example for WebKit (Chrome, Safari):
+    &::-webkit-slider-thumb {
+      appearance: none;
+      width: 16px; // Adjust size as needed
+      height: 16px; // Adjust size as needed
+      background: #3b82f6; // Thumb color
+      border-radius: 50%;
+      cursor: pointer;
+      margin-top: -4px; // Center thumb vertically
+      box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+    }
+    // Example for Firefox:
+    &::-moz-range-thumb {
+      width: 16px; // Adjust size as needed
+      height: 16px; // Adjust size as needed
+      background: #3b82f6; // Thumb color
+      border-radius: 50%;
+      cursor: pointer;
+      box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+    }
+  }
+
+  &__controller-actions {
+    display: flex;
+    justify-content: space-between;
+    gap: 0.5rem; // Add gap for smaller screens if needed
+  }
+
+  &__controller-extra-actions {
+    margin-top: 1.5rem; // mt-6
+    display: flex;
+    flex-wrap: wrap; // Allow wrapping on smaller screens
+    gap: 0.75rem; // space-x-3
+  }
+
+  &__controller-button {
+    padding: 0.5rem 1rem; // px-4 py-2
+    border-radius: 0.5rem; // rounded-lg
+    transition: background-color 0.2s ease-in-out; // transition-colors
+    display: flex;
+    align-items: center;
+    font-size: 0.875rem; // text-sm
+    cursor: pointer;
+    border: none; // Remove default button border
+
+    &--decrease {
+      background-color: #e5e7eb; // bg-gray-200
+      color: #374151; // text-gray-700
+      &:hover {
+        background-color: #d1d5db; // hover:bg-gray-300
+      }
+    }
+
+    &--increase {
+      background-color: #2563eb; // bg-blue-600
+      color: #ffffff; // text-white
+      &:hover {
+        background-color: #1d4ed8; // hover:bg-blue-700
+      }
+    }
+
+    &--complete {
+      background-color: #dcfce7; // bg-green-100
+      color: #14532d; // text-green-800
+      &:hover {
+        background-color: #bbf7d0; // hover:bg-green-200
+      }
+    }
+
+    &--sync {
+      background-color: #bbeef7; // bg-green-100
+      color: #0066ff; // text-green-800
+      &:hover {
+        background-color: #7ddaf7; // hover:bg-green-200
+      }
+    }
+
+    &--pause {
+      background-color: #fef3c7; // bg-yellow-100
+      color: #92400e; // text-yellow-800
+      &:hover {
+        background-color: #fde68a; // hover:bg-yellow-200
+      }
+    }
+
+    &--play {
+      background-color: #d1fec7; // bg-yellow-100
+      color: #19920e; // text-yellow-800
+      &:hover {
+        background-color: #9dfd8a; // hover:bg-yellow-200
+      }
+    }
+
+    &--delete {
+      background-color: #fee2e2; // bg-red-100
+      color: #991b1b; // text-red-800
+      &:hover {
+        background-color: #fecaca; // hover:bg-red-200
+      }
+    }
+  }
+
+  &__controller-icon {
+    margin-right: 0.5rem; // mr-2
+    vertical-align: middle;
+  }
+  button:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+    pointer-events: none; /* чтобы отключить клик */
+  }
+}

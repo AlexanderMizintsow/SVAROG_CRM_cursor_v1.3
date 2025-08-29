@@ -1,0 +1,36 @@
+{
+  "scripts": {
+    "start:client": "cd client && npm run dev",
+    "start:register": "cd server && cd register && nodemon index.js",
+    "start:email-service": "cd server && cd email-service && nodemon index.js",
+    "start:dealer-server": "cd server && cd dealer-server && nodemon index.js",
+    "start:crm-server": "cd server && cd CRM-server && nodemon index.js",
+    "start:tg-bot-server": "cd server && cd tg-bot-server && nodemon index.js",
+    "start:AW": "cd server && cd AW && nodemon index.js",
+    "start:telegram_dealer_bot": "cd server && cd telegram_dealer_bot && nodemon index.js",
+    "start:asterisk": "cd server && cd asterisk_server && nodemon Asterisk.js",
+    "dev": "concurrently \"npm run start:client\" \"npm run start:email-service\" \"npm run start:AW\" \"npm run start:register\" \"npm run start:dealer-server\" \"npm run start:crm-server\" \"npm run start:tg-bot-server\" \"npm run start:telegram_dealer_bot\" \"npm run start:asterisk\""
+  },
+  "devDependencies": {
+    "concurrently": "^8.2.2",
+    "nodemon": "^3.1.4"
+  },
+  "dependencies": {
+    "@emotion/react": "^11.13.5",
+    "@emotion/styled": "^11.13.5",
+    "@mui/material": "^6.1.8",
+    "@mui/x-date-pickers": "^7.18.0",
+    "date-fns": "^4.1.0",
+    "dotenv": "^16.4.7",
+    "express": "^4.19.2",
+    "jszip": "^3.10.1",
+    "pg": "^8.12.0",
+    "react-beautiful-dnd": "^13.1.1",
+    "react-calendar": "^5.0.0",
+    "react-datepicker": "^7.4.0",
+    "react-toastify": "^10.0.5",
+    "socket.io": "^4.8.0",
+    "socket.io-client": "^4.8.1",
+    "styled-components": "^6.1.13"
+  }
+}

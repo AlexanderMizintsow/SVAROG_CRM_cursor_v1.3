@@ -1,0 +1,54 @@
+.search-container {
+  position: relative;
+  display: inline-block;
+  width: 100%;
+  max-width: 200px;
+  //transform: translateY(-10px);
+  .search-input {
+    width: 100%;
+    padding: 5px 10px 5px 35px; // Увеличили отступ для иконки
+    border: 1px solid #ddd;
+    border-radius: 30px;
+    font-size: 16px;
+    color: #333;
+    background-color: #f7f7f7;
+    transition: all 0.3s ease;
+    box-shadow: 0 0 0 rgba(74, 144, 226, 0.1);
+
+    &:focus {
+      outline: none;
+      border-color: #4a90e2;
+      background-color: #fff;
+      box-shadow: 0 0 8px rgba(74, 144, 226, 0.3);
+    }
+
+    &::placeholder {
+      color: #999;
+      transition: color 0.3s ease;
+    }
+
+    &:focus::placeholder {
+      color: transparent;
+    }
+
+    &:hover {
+      background-color: #fff;
+      border-color: #ccc;
+    }
+  }
+
+  .search-icon {
+    position: absolute;
+    top: 50%;
+    left: 10px;
+    transform: translateY(-50%);
+    font-size: 20px;
+    color: #aaa;
+    transition: color 0.3s ease, transform 0.3s ease;
+
+    .search-input:focus ~ & {
+      color: #4a90e2;
+      transform: translateY(-50%) scale(1.1);
+    }
+  }
+}

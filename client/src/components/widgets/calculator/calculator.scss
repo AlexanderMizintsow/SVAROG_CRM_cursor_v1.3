@@ -1,0 +1,94 @@
+$overlay-bg: rgba(0, 0, 0, 0.9);
+$modal-bg: #2c2c2c;
+$modal-padding: 30px;
+$modal-radius: 12px;
+$modal-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
+$button-bg: #4caf50; // Центральный зеленый цвет
+$button-hover-bg: #45a049; // Более светлый оттенок при наведении
+$button-color: #ffffff;
+$input-border: #444;
+$input-focus-border: #4caf50;
+
+// Основные стили для модального окна
+.calculator-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+
+.calculator-modal {
+  position: relative;
+  background: $modal-bg;
+  padding: $modal-padding;
+  border-radius: $modal-radius;
+  width: 400px;
+  height: 500px;
+
+  font-family: 'Arial', sans-serif; // Задайте стиль шрифта
+}
+
+.calculator-close-button {
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  font-size: 20px;
+  position: absolute;
+  top: 15px;
+  right: 20px;
+  color: #ff4a4a;
+
+  &:hover {
+    color: #c0392b;
+  }
+}
+
+.calculator-h2,
+.calculator-h3 {
+  text-align: center;
+  color: #f0f0f0; // Цвет заголовков
+}
+
+.calculator-button {
+  background-color: $button-bg;
+  color: $button-color;
+  border: none;
+  border-radius: 6px;
+  padding: 10px 15px;
+  cursor: pointer;
+  margin: 8px 0;
+  transition: background-color 0.3s;
+  font-size: 16px;
+  width: 100%;
+
+  &:hover {
+    background-color: $button-hover-bg;
+  }
+}
+
+.calculator-input {
+  border: 1px solid $input-border;
+  border-radius: 6px;
+  padding: 10px;
+  margin: 8px 0;
+  width: 100%;
+  box-sizing: border-box;
+  color: #ffffff; // Цвет текста в полях ввода
+  background-color: #3c3c3c; // Цвет фона полей ввода
+
+  &:focus {
+    border-color: $input-focus-border;
+    outline: none;
+  }
+}
+
+.calculator-label {
+  display: block;
+  margin-bottom: 5px;
+  color: #d0d0d0; // Цвет текста меток
+  font-weight: 600;
+}

@@ -1,0 +1,77 @@
+.hierarchy-container {
+  max-height: 75vh;
+  overflow-y: auto;
+}
+
+.hierarchy-card {
+  background: #ffffff;
+  border-radius: 15px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+
+  transition: transform 0.2s, box-shadow 0.2s;
+  text-align: center;
+  border: 1px solid black;
+  border-bottom: 2px solid black;
+}
+
+.hierarchy-card:hover {
+  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.2);
+}
+
+.image img {
+  border-radius: 50%;
+  width: 80px;
+  height: 80px;
+  object-fit: cover;
+}
+
+.card-body h4 {
+  color: #333;
+  margin: 10px 0;
+  font-size: 1.2rem;
+}
+
+.card-body p {
+  color: #666;
+  margin: 5px 0;
+  font-size: 0.9rem;
+}
+
+.card-footer {
+  padding: 10px;
+  background-color: #007bff;
+  border-bottom-left-radius: 15px;
+  border-bottom-right-radius: 15px;
+  color: white;
+  font-size: 0.8rem;
+  display: flex;
+  justify-content: center;
+  gap: 30px;
+}
+
+.card-footer-icon {
+  cursor: pointer;
+  scale: 1.5;
+  color: #ffffff91;
+
+  &:hover {
+    scale: 1.7;
+    color: #ffffff;
+  }
+}
+.react-flow__node {
+  background-color: #f0f8ff !important;
+  border: none !important;
+  min-width: 250px !important;
+}
+
+.react-flow__node-default,
+.react-flow__node-group,
+.react-flow__node-input,
+.react-flow__node-output {
+  padding: 0 !important;
+  border-bottom-left-radius: 20px !important;
+  border-bottom-right-radius: 20px !important;
+  border-top-left-radius: 18px !important;
+  border-top-right-radius: 12px !important;
+}

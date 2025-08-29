@@ -1,0 +1,42 @@
+.mood-modal {
+  display: flex;
+  align-items: flex-start;
+  justify-content: flex-end;
+
+  .modal-content {
+    background-color: #fff;
+    padding: 20px;
+    border-radius: 8px;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.2);
+    text-align: center;
+    width: 400px;
+    margin: 20px;
+
+    h2 {
+      margin-bottom: 20px;
+      color: #333;
+      font-size: 24px;
+    }
+
+    .mood-buttons {
+      display: flex;
+      justify-content: space-around;
+      margin-bottom: 20px;
+
+      button {
+        flex: 1;
+        margin: 0 5px;
+      }
+    }
+
+    .modal-actions {
+      display: flex;
+      justify-content: space-between;
+
+      button {
+        flex: 1;
+        margin: 0 5px;
+      }
+    }
+  }
+}

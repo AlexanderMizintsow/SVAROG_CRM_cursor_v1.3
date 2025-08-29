@@ -1,0 +1,36 @@
+.global-task-tabs {
+  margin-bottom: 1.5rem; // mb-6
+  border-bottom: 1px solid #e5e7eb; // border-b border-gray-200
+
+  &__list {
+    display: flex;
+    gap: 2rem; // space-x-8
+    overflow-x: auto; // Add horizontal scroll for small screens
+    -webkit-overflow-scrolling: touch; // Improve scrolling on touch devices
+  }
+
+  &__button {
+    padding: 0.5rem 0.25rem; // py-2 px-1
+    font-weight: 500; // font-medium
+    transition: color 0.2s ease-in-out; // transition-colors
+    cursor: pointer;
+    border: none;
+    background: none;
+    white-space: nowrap; // Prevent text wrapping in tab labels
+
+    color: #6b7280; // text-gray-500
+    &:hover {
+      color: #374151; // hover:text-gray-700
+    }
+
+    &--active {
+      border-bottom: 2px solid #3b82f6; // border-b-2 border-blue-500
+      color: #2563eb; // text-blue-600
+    }
+  }
+
+  &__icon {
+    margin-right: 0.5rem; // mr-2
+    vertical-align: middle;
+  }
+}

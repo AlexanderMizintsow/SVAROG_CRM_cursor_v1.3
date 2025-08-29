@@ -1,0 +1,24 @@
+// Основные стили для страницы и контейнера
+.global-task-page {
+  background-color: #f9fafb; // bg-gray-50
+  min-height: 100vh;
+  padding: 2rem 0; // py-8
+
+  &__container {
+    // max-width: 960px; // max-w-4xl
+    margin-left: auto;
+    margin-right: auto;
+    padding-left: 1rem; // px-4
+    padding-right: 1rem; // px-4
+  }
+}
+
+// Базовые стили для body
+body {
+  margin: 0;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen',
+    'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue',
+    sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}

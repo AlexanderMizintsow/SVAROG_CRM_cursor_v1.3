@@ -1,0 +1,124 @@
+/* Общий контейнер редактора целей */
+.global-task-additional__modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background-color: rgba(0, 0, 0, 0.096);
+  box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1),
+    0 4px 6px -2px rgba(0, 0, 0, 0.05);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+  .goals-additional-info__modal {
+    background-color: #ffffffe7;
+    border-radius: 0.5rem;
+    padding: 1.5rem;
+    max-width: 520px;
+  }
+
+  /* Заголовок редактора целей */
+  .goals-additional-info__header {
+    margin-bottom: 30px;
+    font-size: 1.25rem;
+    font-weight: 600;
+    text-align: center;
+  }
+
+  /* Список целей */
+  .goals-additional-info__list {
+    max-height: 200px;
+    overflow-y: auto;
+    padding: 0;
+    margin: 0;
+    list-style: none;
+    border: 1px solid #d1d5db;
+    border-radius: 0.375rem;
+    background-color: #f9fafb;
+  }
+
+  /* Элемент списка цели */
+  .goals-additional-info__list li {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 0.5rem 1rem;
+    border-bottom: 1px solid #d1d5db;
+  }
+
+  /* Удаление границы у последнего элемента */
+  .goals-additional-info__list li:last-child {
+    border-bottom: none;
+  }
+
+  /* Текст цели */
+  .goals-additional-info__list li span {
+    word-break: break-word;
+  }
+
+  /* Кнопка "Удалить" */
+  .goals-additional-info__list button {
+    background: none;
+    border: none;
+    cursor: pointer;
+    font-size: 1.2rem;
+    padding: 0 0.5rem;
+    color: #ef44ca; /* красный цвет */
+    transition: color 0.2s;
+  }
+
+  .goals-additional-info__list button:hover {
+    color: #a40bb8; /* более тёмный красный при наведении */
+  }
+
+  /* Ввод новой цели */
+  .goals-additional-info__input {
+    padding: 0.5rem;
+    border: 1px solid #d1d5db;
+    border-radius: 0.375rem;
+    font-size: 1rem;
+    width: 100%;
+    box-sizing: border-box;
+    margin-top: 0.5rem;
+  }
+
+  /* Контейнер для кнопок */
+  .goals-additional-info__buttons {
+    display: flex;
+    justify-content: flex-end;
+    gap: 0.75rem;
+    margin-top: 10px;
+  }
+
+  /* Общий стиль для кнопок */
+  .goals-additional-info__button {
+    padding: 0.75rem 1.25rem;
+    border: none;
+    border-radius: 0.375rem;
+    font-size: 1rem;
+    cursor: pointer;
+    transition: background-color 0.2s;
+  }
+
+  /* Кнопка "Добавить" и "Сохранить" */
+  .goals-additional-info__save-btn {
+    background-color: #3b82f6; /* голубой */
+    color: #ffffff;
+  }
+
+  .goals-additional-info__save-btn:hover {
+    background-color: #2563eb;
+  }
+
+  /* Кнопка "Отмена" */
+  .goals-additional-info__cancel-btn {
+    background-color: #e5e7eb; /* светлый серый */
+    color: #374151;
+  }
+
+  .goals-additional-info__cancel-btn:hover {
+    background-color: #d1d5db;
+  }
+}

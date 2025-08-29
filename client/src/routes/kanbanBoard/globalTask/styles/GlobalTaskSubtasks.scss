@@ -1,0 +1,203 @@
+.global-task-subtasks {
+  background-color: #ffffff; // bg-white
+  border-radius: 0.5rem; // rounded-lg
+  padding: 1.5rem; // p-6
+  box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.05); // shadow-sm
+  margin-bottom: 2rem; // mb-8
+
+  &__header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 1rem; // mb-4
+  }
+
+  &__title {
+    font-size: 1.125rem; // text-lg
+    font-weight: 500; // font-medium
+    color: #1f2937; // text-gray-800
+    display: flex;
+    align-items: center;
+  }
+
+  &__title-icon {
+    color: #3b82f6; // text-blue-500
+    margin-right: 0.5rem; // mr-2
+    vertical-align: middle;
+  }
+
+  &__add-button {
+    color: #2563eb; // text-blue-600
+    &:hover {
+      color: #1e40af; // hover:text-blue-800
+    }
+    font-size: 0.875rem; // text-sm
+    display: flex;
+    align-items: center;
+    cursor: pointer;
+    border: none;
+    background: none;
+    padding: 0;
+    transition: color 0.2s ease-in-out;
+  }
+
+  &__add-icon {
+    margin-right: 0.25rem; // mr-1
+    vertical-align: middle;
+  }
+
+  &__table-container {
+    overflow-x: auto; // overflow-x-auto
+    -webkit-overflow-scrolling: touch; // Improve scrolling on touch devices
+  }
+
+  table {
+    min-width: 100%; // min-w-full
+    border-collapse: collapse; // Ensure borders collapse
+    border-spacing: 0;
+
+    thead {
+      background-color: #f9fafb; // bg-gray-50
+      tr {
+        border-bottom: 1px solid #e5e7eb; // divide-y divide-gray-200
+      }
+    }
+
+    th,
+    td {
+      padding: 0.75rem 1.5rem; // px-6 py-3 (th), px-6 py-4 (td) - adjusted for consistency
+      text-align: left; // text-left
+      white-space: nowrap; // whitespace-nowrap (td)
+      font-size: 0.75rem; // text-xs (th)
+    }
+
+    th {
+      font-weight: 500; // font-medium
+      color: #6b7280; // text-gray-500
+      text-transform: uppercase; // uppercase
+      letter-spacing: 0.05em; // tracking-wider
+    }
+
+    tbody {
+      background-color: #ffffff; // bg-white
+      tr {
+        border-bottom: 1px solid #e5e7eb; // divide-y divide-gray-200
+        &:last-child {
+          border-bottom: none; // Remove border for the last row
+        }
+      }
+    }
+  }
+
+  &__status {
+    padding: 0.25rem 0.5rem; // px-2 py-1
+    font-size: 0.75rem; // text-xs
+    border-radius: 9999px; // rounded-full
+    display: inline-block; // Ensure padding/background works correctly
+
+    &--new {
+      background-color: #f3f4f6;
+      color: #4b5563;
+    }
+    &--in-progress {
+      background-color: #dbeafe;
+      color: #1d4ed8;
+    }
+    &--completed {
+      background-color: #dcfce7;
+      color: #166534;
+    }
+    &--on-hold {
+      background-color: #fef3c7;
+      color: #92400e;
+    }
+    &--cancelled {
+      background-color: #fee2e2;
+      color: #991b1b;
+    }
+  }
+
+  &__name {
+    font-size: 0.875rem; // text-sm
+    font-weight: 500; // font-medium
+    color: #1f2937; // text-gray-900
+  }
+
+  &__description {
+    font-size: 0.875rem; // text-sm
+    color: #6b7280; // text-gray-500
+  }
+
+  &__responsible {
+    display: flex; /* Оставляем flex на родительском */
+    align-items: center;
+    padding: 7px;
+    border-radius: 7px;
+  }
+
+  .global-task-subtasks__responsible {
+    display: inline-flex; /* Меняем с flex на inline-flex */
+    /* Остальные ваши стили */
+  }
+
+  &__responsible-avatar {
+    width: 1.5rem; // w-6
+    height: 1.5rem; // h-6
+    border-radius: 9999px; // rounded-full
+    background-color: #3b82f6; // bg-blue-500 (default)
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #ffffff; // text-white
+    font-size: 0.75rem; // text-xs
+    font-weight: 700; // font-bold
+    margin-right: 0.5rem; // mr-2
+
+    &--blue {
+      background-color: #f593f8b7;
+    }
+    &--purple {
+      background-color: #8b5cf6;
+    }
+    &--green {
+      background-color: #10b981;
+    }
+    &--default {
+      background-color: #6b7280;
+    }
+  }
+
+  &__responsible-name {
+    font-size: 0.875rem; // text-sm
+    color: #1f2937; // text-gray-900
+  }
+
+  &__actions {
+    display: flex;
+    gap: 0.75rem; // Add spacing between buttons
+  }
+
+  &__action-button {
+    font-size: 0.875rem; // text-sm
+    font-weight: 500; // font-medium
+    cursor: pointer;
+    border: none;
+    background: none;
+    padding: 0; // Remove default padding
+    transition: color 0.2s ease-in-out;
+
+    &--edit {
+      color: #2563eb; // text-blue-600
+      &:hover {
+        color: #1e40af; // hover:text-blue-900
+      }
+    }
+
+    &--delete {
+      color: #dc2626; // text-red-600
+      &:hover {
+        color: #991b1b; // hover:text-red-900
+      }
+    }
+  }
+}

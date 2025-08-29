@@ -1,0 +1,73 @@
+.global-task-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 2rem; // mb-8
+
+  &-id {
+    font-size: 10px;
+    color: rgba(128, 128, 128, 0.308);
+  }
+
+  &__title {
+    font-size: 1.875rem; // text-3xl
+    font-weight: 700; // font-bold
+    color: #1f2937; // text-gray-800
+  }
+
+  &__meta {
+    display: flex;
+    align-items: center;
+    margin-top: 0.5rem;
+    & > span {
+      font-size: 0.9rem;
+      color: #6b7280;
+      &:not(:last-child) {
+        margin-right: 1rem;
+      }
+    }
+  }
+
+  &__icon {
+    display: inline-block;
+    margin-right: 0.25rem; // mr-1
+    vertical-align: middle;
+  }
+
+  /* &__actions {
+    display: flex;
+    gap: 0.5rem; // space-x-2
+  }*/
+
+  /*&__button {
+    padding: 0.5rem 1rem; // px-4 py-2
+    border-radius: 0.5rem; // rounded-lg
+    transition: background-color 0.2s ease-in-out; // transition-colors
+    display: flex;
+    align-items: center;
+    font-size: 0.875rem; // text-sm
+    cursor: pointer;
+    border: none; // Remove default button border
+
+    &--edit {
+      background-color: #2563eb; // bg-blue-600
+      color: #ffffff; // text-white
+      &:hover {
+        background-color: #1d4ed8; // hover:bg-blue-700
+      }
+    }
+
+    &--history {
+      background-color: #e5e7eb; // bg-gray-200
+      color: #374151; // text-gray-700
+      &:hover {
+        background-color: #d1d5db; // hover:bg-gray-300
+      }
+    }
+  }*/
+
+  /* &__button-icon {
+    margin-right: 0.5rem; // mr-2
+    vertical-align: middle;
+  }*/
+}

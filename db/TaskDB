@@ -1,0 +1,134 @@
+CREATE TABLE tasks (
+    id SERIAL PRIMARY KEY,
+    department_id INTEGER REFERENCES departments(id) ON DELETE CASCADE, -- Ссылка на отдел
+    creator_id INTEGER REFERENCES users(id) ON DELETE SET NULL, -- Создатель задачи
+    assignee_id INTEGER REFERENCES users(id) ON DELETE SET NULL, -- Исполнитель задачи
+    title VARCHAR(200) NOT NULL, -- Название задачи
+    description TEXT, -- Описание задачи
+    status VARCHAR(50) DEFAULT 'new', -- Статус задачи (например, 'новая', 'в работе', 'выполнена')
+    created_at TIMESTAMP DEFAULT NOW(), -- Дата создания задачи
+    due_date TIMESTAMP, -- Срок выполнения задачи
+    is_admin_task BOOLEAN DEFAULT false -- Флаг, указывающий, является ли задача административной
+);
+
+CREATE TABLE task_watchers (
+    task_id INTEGER REFERENCES tasks(id) ON DELETE CASCADE, -- Ссылка на задачу
+    user_id INTEGER REFERENCES users(id) ON DELETE CASCADE, -- Ссылка на наблюдателя
+    PRIMARY KEY (task_id, user_id)
+);
+
+CREATE TABLE task_approvers (
+    task_id INTEGER REFERENCES tasks(id) ON DELETE CASCADE, -- Ссылка на задачу
+    user_id INTEGER REFERENCES users(id) ON DELETE CASCADE, -- Ссылка на одобряющего
+    approved BOOLEAN DEFAULT false, -- Флаг, указывающий, одобрена ли задача
+    PRIMARY KEY (task_id, user_id)
+);
+
+
+CREATE TABLE task_permissions (
+    id SERIAL PRIMARY KEY,
+    user_id INTEGER REFERENCES users(id) ON DELETE CASCADE, -- Пользователь с разрешением
+    can_assign_to_admin BOOLEAN DEFAULT false, -- Разрешение на создание задач для Администраторов
+    can_assign_to_department BOOLEAN DEFAULT false, -- Разрешение на создание задач для отделов
+    can_assign_to_any_user BOOLEAN DEFAULT false -- Разрешение на создание задач для любого пользователя
+);
+
+
+CREATE OR REPLACE FUNCTION create_task(
+    _creator_id INTEGER,
+    _department_id INTEGER,
+    _assignee_id INTEGER,
+    _title VARCHAR,
+    _description TEXT,
+    _due_date TIMESTAMP,
+    _is_admin_task BOOLEAN,
+    _watchers INTEGER[],
+    _approvers INTEGER[]
+)
+RETURNS VOID AS $
+DECLARE
+    _task_id INTEGER;
+BEGIN
+    -- Проверка прав на создание задачи
+    IF _is_admin_task THEN
+        IF NOT EXISTS (
+            SELECT 1 FROM task_permissions 
+            WHERE user_id = _creator_id AND can_assign_to_admin = true
+        ) THEN
+            RAISE EXCEPTION 'Нет прав на создание задач Администраторам.';
+        END IF;
+    ELSE
+        -- Проверка на возможность создания задачи для отдела
+        IF NOT EXISTS (
+            SELECT 1 
+            FROM departments 
+            WHERE head_user_id = _creator_id AND id = _department_id
+        ) AND NOT EXISTS (
+            SELECT 1 
+            FROM task_permissions 
+            WHERE user_id = _creator_id AND can_assign_to_department = true
+        ) THEN
+            RAISE EXCEPTION 'Нет прав на создание задач для этого отдела.';
+        END IF;
+    END IF;
+
+    -- Создание задачи
+    INSERT INTO tasks (department_id, creator_id, assignee_id, title, description, created_at, due_date, is_admin_task)
+    VALUES (_department_id, _creator_id, _assignee_id, _title, _description, NOW(), _due_date, _is_admin_task)
+    RETURNING id INTO _task_id;
+
+    -- Добавление наблюдателей
+    IF _watchers IS NOT NULL THEN
+        FOREACH _user_id IN ARRAY _watchers LOOP
+            INSERT INTO task_watchers (task_id, user_id) VALUES (_task_id, _user_id);
+        END LOOP;
+    END IF;
+
+    -- Добавление одобряющих
+    IF _approvers IS NOT NULL THEN
+        FOREACH _user_id IN ARRAY _approvers LOOP
+            INSERT INTO task_approvers (task_id, user_id) VALUES (_task_id, _user_id);
+        END LOOP;
+    END IF;
+END;
+$ LANGUAGE plpgsql;
+
+CREATE TABLE task_history (
+    id SERIAL PRIMARY KEY,
+    task_id INTEGER REFERENCES tasks(id) ON DELETE CASCADE,
+    changed_by INTEGER REFERENCES users(id),
+    change_date TIMESTAMP DEFAULT NOW(),
+    field_changed VARCHAR(100),
+    old_value TEXT,
+    new_value TEXT
+);
+
+
+
+CREATE INDEX idx_tasks_department_id ON tasks(department_id);
+CREATE INDEX idx_tasks_assignee_id ON tasks(assignee_id);
+CREATE INDEX idx_tasks_is_admin_task ON tasks(is_admin_task);
+
+
+
+-- --------- ------------------ ----------------------
+-- Задачи для сотрудников отдела
+SELECT * FROM tasks 
+WHERE department_id = 1 
+AND (assignee_id = 3 OR EXISTS (
+    SELECT 1 FROM task_watchers WHERE task_id = tasks.id AND user_id = 3
+));
+
+-- Задачи для Администраторов
+SELECT * FROM tasks 
+WHERE is_admin_task = true 
+AND EXISTS (
+    SELECT 1 FROM task_watchers WHERE task_id = tasks.id AND user_id = 2
+);
+CREATE VIEW department_tasks AS
+SELECT * FROM tasks
+WHERE department_id = (SELECT department_id FROM users WHERE id = CURRENT_USER);
+
+CREATE VIEW admin_tasks AS
+SELECT * FROM tasks
+WHERE is_admin_task = true;

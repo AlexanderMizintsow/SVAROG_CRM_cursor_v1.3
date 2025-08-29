@@ -1,0 +1,71 @@
+
+-------------------------ЧАТЫ-------------------------------
+------------------------------------------------------------
+------------------------------------------------------------
+-- Таблица комнат чата
+CREATE TABLE chat_rooms (
+    id SERIAL PRIMARY KEY,
+    name VARCHAR(100) NOT NULL,
+    created_at TIMESTAMP WITHOUT TIME ZONE DEFAULT NOW(),
+    updated_at TIMESTAMP WITHOUT TIME ZONE DEFAULT NOW()
+);
+
+-- Таблица сообщений
+CREATE TABLE messages (
+    id SERIAL PRIMARY KEY,
+    chat_room_id INTEGER REFERENCES chat_rooms(id) ON DELETE CASCADE,
+    sender_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
+    content TEXT NOT NULL,
+    sent_at TIMESTAMP WITHOUT TIME ZONE DEFAULT NOW()
+);
+
+-- Таблица пользователей в комнатах чата
+CREATE TABLE user_chat_rooms (
+    user_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
+    chat_room_id INTEGER REFERENCES chat_rooms(id) ON DELETE CASCADE,
+    joined_at TIMESTAMP WITHOUT TIME ZONE DEFAULT NOW(),
+    PRIMARY KEY (user_id, chat_room_id)
+);
+
+
+CREATE OR REPLACE FUNCTION update_chat_rooms_updated_at()
+RETURNS TRIGGER AS $$
+BEGIN
+    UPDATE chat_rooms SET updated_at = NOW() WHERE id = NEW.chat_room_id;
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+CREATE TRIGGER update_chat_rooms_updated_at_trigger
+AFTER INSERT ON messages
+FOR EACH ROW EXECUTE FUNCTION update_chat_rooms_updated_at();
+
+
+-- Процедура отправки сообщения
+CREATE OR REPLACE FUNCTION send_message(_chat_room_id INTEGER, _sender_id INTEGER, _content TEXT)
+RETURNS VOID AS $$
+BEGIN
+    INSERT INTO messages (chat_room_id, sender_id, content, sent_at)
+    VALUES (_chat_room_id, _sender_id, _content, NOW());
+END;
+$$ LANGUAGE plpgsql;
+
+-- Процедура присоединения к комнате чата
+CREATE OR REPLACE FUNCTION join_chat_room(_user_id INTEGER, _chat_room_id INTEGER)
+RETURNS VOID AS $$
+BEGIN
+    INSERT INTO user_chat_rooms (user_id, chat_room_id, joined_at)
+    VALUES (_user_id, _chat_room_id, NOW())
+    ON CONFLICT (user_id, chat_room_id) DO NOTHING;
+END;
+$$ LANGUAGE plpgsql;
+
+
+-- -- Создание комнаты чата
+-- INSERT INTO chat_rooms (name) VALUES ('Общий чат');
+
+-- Пользователь 1 присоединяется к Общему чату
+-- SELECT join_chat_room(2, 1);
+
+-- Пользователь 1 отправляет сообщение в Общем чате
+-- SELECT send_message(1, 2, 'Привет, это администратор!');

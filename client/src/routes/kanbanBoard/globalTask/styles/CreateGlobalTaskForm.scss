@@ -1,0 +1,396 @@
+.create-global-task-form-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background-color: rgba(0, 0, 0, 0.6);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  z-index: 1000;
+}
+
+.create-global-task-form {
+  background-color: #fff;
+  border-radius: 8px;
+  padding: 2rem;
+  width: 90%;
+  max-width: 700px;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.2);
+  position: relative;
+  max-height: 90vh; // Ограничиваем высоту
+  overflow-y: auto; // Добавляем скролл, если форма слишком большая
+
+  &__header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 1.5rem;
+    padding-bottom: 1rem;
+    border-bottom: 1px solid #e5e7eb; // Граница под заголовком
+  }
+
+  &__title {
+    font-size: 1.8rem;
+    font-weight: 600;
+    color: #1f2937;
+  }
+
+  &__close-button {
+    background: none;
+    border: none;
+    font-size: 1.5rem;
+    color: #6b7280;
+    cursor: pointer;
+    transition: color 0.2s ease;
+
+    &:hover {
+      color: #ef4444;
+    }
+  }
+
+  &__section {
+    margin-bottom: 1.5rem;
+    padding-bottom: 1.5rem;
+    border-bottom: 1px dashed #e5e7eb; // Пунктирная граница между секциями
+
+    &:last-child {
+      border-bottom: none; // Убираем границу у последней секции
+      padding-bottom: 0;
+    }
+  }
+
+  &__section-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 0.8rem;
+  }
+
+  &__label {
+    display: block;
+    font-size: 1rem;
+    font-weight: 500;
+    color: #374151;
+    margin-bottom: 0.5rem;
+
+    .required {
+      color: #ef4444; // Цвет для обязательных полей
+      margin-left: 0.25rem;
+    }
+  }
+
+  &__input,
+  &__textarea,
+  &__select {
+    display: block;
+    width: 100%;
+    padding: 0.75rem 1rem;
+    border: 1px solid #d1d5db;
+    border-radius: 6px;
+    font-size: 1rem;
+    color: #374151;
+    transition: border-color 0.2s ease, box-shadow 0.2s ease;
+
+    &:focus {
+      outline: none;
+      border-color: #3b82f6;
+      box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.3);
+    }
+  }
+
+  &__textarea {
+    resize: vertical; // Разрешаем изменение размера только по вертикали
+  }
+
+  &__select {
+    cursor: pointer;
+    // Убираем стандартную стрелку в некоторых браузерах
+    -webkit-appearance: none;
+    -moz-appearance: none;
+    appearance: none;
+    background-image: url('data:image/svg+xml;charset=US-ASCII,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%22292.362%22%20height%3D%22292.362%22%3E%3Cpath%20fill%3D%22%236B7280%22%20d%3D%22M287.9.953a14.61 14.61 0 0 0-20.656 0L146.18 146.174 25.111.953a14.61 14.61 0 0 0-20.656 0l-4.695 4.695a14.61 14.61 0 0 0 0 20.656l130.78 130.779a14.61 14.61 0 0 0 20.656 0l130.78-130.78a14.61 14.61 0 0 0 0-20.655l-4.695-4.696z%22%2F%3E%3C%2Fsvg%3E');
+    background-repeat: no-repeat;
+    background-position: right 1rem center;
+    background-size: 0.8em auto;
+  }
+
+  // Стили для react-datepicker input
+  .react-datepicker-wrapper {
+    display: block; // Чтобы инпут занимал всю ширину
+  }
+  .react-datepicker__input-container input {
+    display: block; // Чтобы инпут занимал всю ширину
+    width: 100%;
+    padding: 0.75rem 1rem;
+    border: 1px solid #d1d5db;
+    border-radius: 6px;
+    font-size: 1rem;
+    color: #374151;
+    transition: border-color 0.2s ease, box-shadow 0.2s ease;
+
+    &:focus {
+      outline: none;
+      border-color: #3b82f6;
+      box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.3);
+    }
+  }
+
+  &__goal-field,
+  &__additional-info-field {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem; // Расстояние между инпутом и кнопкой
+    margin-bottom: 0.75rem; // Расстояние между полями
+
+    .create-global-task-form__input {
+      flex-grow: 1; // Инпут занимает оставшееся пространство
+      margin-bottom: 0; // Убираем нижний отступ у инпута внутри флекс-контейнера
+    }
+
+    .create-global-task-form__additional-info-key {
+      flex-basis: 40%; // Ключ занимает 40%
+    }
+    .create-global-task-form__additional-info-value {
+      flex-basis: 60%; // Значение занимает 60%
+    }
+  }
+
+  &__remove-button {
+    background: none;
+    border: none;
+    color: #ef4444;
+    cursor: pointer;
+    font-size: 1rem;
+    padding: 0.5rem; // Увеличиваем область клика
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: color 0.2s ease;
+
+    &:hover {
+      color: #b91c1c;
+    }
+  }
+
+  &__add-button {
+    background-color: #e5e7eb;
+    color: #374151;
+    border: none;
+    border-radius: 6px;
+    padding: 0.5rem 1rem;
+    cursor: pointer;
+    font-size: 0.9rem;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    transition: background-color 0.2s ease;
+
+    &:hover {
+      background-color: #d1d5db;
+    }
+  }
+
+  &__responsibles-list {
+    display: flex;
+    flex-wrap: wrap; // Перенос на новую строку при недостатке места
+    gap: 0.75rem; // Расстояние между ответственными
+    margin-bottom: 1rem;
+  }
+
+  &__responsible-item {
+    display: flex;
+    align-items: center;
+    background-color: #f3f4f6;
+    border-radius: 20px; // Овальная форма
+    padding: 0.3rem 0.75rem 0.3rem 0.3rem;
+    gap: 0.5rem;
+    font-size: 0.9rem;
+    color: #374151;
+
+    /* Новые классы для фона элемента ответственного */
+    &--bg-blue {
+      background-color: #f4d5fd; /* Очень светлый синий */
+      color: #6a1b9a; /* Темно-фиолетовый/синий текст */
+    }
+    &--bg-purple {
+      background-color: #ede9fe; /* Очень светлый фиолетовый */
+      color: #5e35b1; /* Темно-фиолетовый текст */
+    }
+    &--bg-green {
+      background-color: #d1fae5; /* Очень светлый зеленый */
+      color: #2e7d32;
+    }
+    &--bg-orange {
+      background-color: #fff7ed; /* Очень светлый оранжевый */
+      color: #ef6c00;
+    }
+    &--bg-gray {
+      /* Дефолтный светлый фон */
+      background-color: #f3f4f6; /* Ваш текущий фон */
+      color: #374151;
+    }
+  }
+
+  &__responsible-avatar {
+    width: 28px; // Размер аватара
+    height: 28px;
+    border-radius: 50%;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    font-size: 0.8rem;
+    font-weight: 600;
+    color: #fff;
+
+    &--blue {
+      background-color: #3b82f6;
+    }
+    &--purple {
+      background-color: #8b5cf6;
+    }
+    &--green {
+      background-color: #10b981;
+    }
+    &--orange {
+      background-color: #f97316;
+    }
+    &--default {
+      background-color: #6b7280;
+    }
+  }
+
+  &__responsible-name {
+    margin-right: 0.5rem; // Отступ после имени перед кнопкой удаления
+  }
+
+  &__remove-responsible-button {
+    background: none;
+    border: none;
+    color: #ef4444;
+    cursor: pointer;
+    font-size: 0.9rem;
+    padding: 0; // Убираем внутренние отступы
+    display: flex; // Для центрирования иконки
+    align-items: center;
+    justify-content: center;
+    transition: color 0.2s ease;
+
+    &:hover {
+      color: #b91c1c;
+    }
+  }
+
+  &__add-responsible-section {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    color: #6b7280;
+
+    .create-global-task-form__select {
+      width: auto; // Ширина по содержимому
+      flex-grow: 0; // Не растягиваем селект
+    }
+  }
+
+  &__actions {
+    display: flex;
+    justify-content: flex-end; // Выравнивание кнопок справа
+    gap: 1rem;
+    margin-top: 2rem;
+  }
+
+  &__button {
+    padding: 0.75rem 1.5rem;
+    border: none;
+    border-radius: 6px;
+    font-size: 1rem;
+    font-weight: 500;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    transition: background-color 0.2s ease, opacity 0.2s ease;
+
+    &--save {
+      background-color: #3b82f6;
+      color: #fff;
+
+      &:hover {
+        background-color: #2563eb;
+      }
+    }
+
+    &--cancel {
+      background-color: #e5e7eb;
+      color: #374151;
+
+      &:hover {
+        background-color: #d1d5db;
+      }
+    }
+
+    &:disabled {
+      opacity: 0.6;
+      cursor: not-allowed;
+    }
+  }
+}
+
+.create-global-task-form__responsible-role-select {
+  /* Сброс стандартных стилей */
+  appearance: none; /* Убираем стандартную стрелку */
+  -webkit-appearance: none;
+  -moz-appearance: none;
+  border: none; /* Убираем рамку */
+  background: none; /* Убираем фон */
+  padding: 0; /* Убираем внутренние отступы */
+  margin-top: 5px; /* Убираем внешние отступы */
+  cursor: pointer; /* Показываем, что элемент кликабельный */
+  font-size: 0.9rem; /* Размер шрифта как у имени */
+  font-weight: 300; /* Легкий жирность */
+  color: inherit;
+  outline: none; /* Убираем синий контур при фокусе */
+  width: auto; /* Ширина по содержимому */
+  min-width: 80px; /* Минимальная ширина, чтобы не схлопывался сильно */
+  text-align: center; /* Выравнивание текста справа, чтобы стрелка была справа */
+  padding-right: 1rem; /* Отступ справа под стрелку */
+  font-size: 12px;
+
+  /* Добавляем кастомную стрелку с помощью background-image */
+  background-image: url('data:image/svg+xml;charset=US-ASCII,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%22292.362%22%20height%3D%22292.362%22%3E%3Cpath%20fill%3D%22%236B7280%22%20d%3D%22M287.9.953a14.61 14.61 0 0 0-20.656 0L146.18 146.174 25.111.953a14.61 14.61 0 0 0-20.656 0l-4.695 4.695a14.61 14.61 0 0 0 0 20.656l130.78 130.779a14.61 14.61 0 0 0 20.656 0l130.78-130.78a14.61 14.61 0 0 0 0-20.655l-4.695-4.696z%22%2F%3E%3C%2Fsvg%3E');
+  background-repeat: no-repeat;
+  background-position: right 0.2rem center; /* Позиция стрелки */
+  background-size: 0.6em auto; /* Размер стрелки */
+  transition: background-color 0.2s ease; /* Плавное изменение фона при наведении */
+}
+
+.create-global-task-form__responsible-role-select:hover {
+  background-color: rgba(0, 0, 0, 0.05);
+  border-radius: 50px; /* Легкое скругление при наведении */
+}
+
+/* Стили для опций в выпадающем списке (нельзя стилизовать глубоко стандартными CSS) */
+/* Но можно задать базовые стили для текста опций */
+.create-global-task-form__responsible-role-select option {
+  color: #374151; /* Цвет текста опций */
+  background-color: #8580802a; /* Фон опций */
+}
+
+/* Стили для контейнера деталей, чтобы текст имени и селект были в одной строке и выровнены */
+.create-global-task-form__responsible-details {
+  display: flex;
+  flex-direction: column;
+  flex-grow: 1;
+}
+
+.create-global-task-form__responsible-name {
+  font-size: 0.9rem;
+  color: #000000;
+}
+
+//*************************************************************************
+//*************************************************************************
+//*************************************************************************
+//*************************************************************************

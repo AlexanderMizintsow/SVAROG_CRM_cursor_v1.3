@@ -1,0 +1,108 @@
+.extension-request {
+  &-container {
+    position: relative;
+    padding-left: 18px;
+    margin-left: 3px;
+  }
+
+  &-border {
+    position: absolute;
+    left: 0;
+    top: 0;
+    bottom: 0;
+    width: 1px;
+    background: #00b3ff;
+    box-shadow: -2px 0 8px #00f7ff, -4px 0 12px rgba(0, 247, 255, 0.3);
+    animation: pulse-glow-blue 1.5s infinite ease-in-out;
+  }
+  @keyframes pulse-glow-blue {
+    0%,
+    100% {
+      box-shadow: -2px 0 8px #004cff23, -4px 0 12px rgba(0, 38, 255, 0.3);
+      opacity: 0.8;
+    }
+    50% {
+      box-shadow: -2px 0 12px #001eff, -6px 0 20px rgba(0, 132, 255, 0.968);
+      opacity: 1;
+    }
+  }
+
+  &-title {
+    display: block;
+  }
+
+  &-reason {
+    margin-top: 5px;
+  }
+
+  &-no-reason {
+    color: blue;
+    font-size: 21px;
+  }
+
+  &-date {
+    margin-top: 5px;
+  }
+
+  &-buttons {
+    display: flex;
+    margin-top: 10px;
+    gap: 10px;
+  }
+
+  &-icon {
+    font-size: 21px;
+  }
+}
+
+// Ваши существующие стили кнопок (оставьте без изменений)
+.extension-approve-btn {
+  padding: 4px 8px;
+  margin-bottom: 10px;
+  font-size: 14px;
+  font-weight: 500;
+  color: #f5f5f5;
+  background: linear-gradient(135deg, #4caf50, #2e7d32);
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+  opacity: 0.9;
+  transition: 0.3s, opacity 0.3s, transform 0.2s;
+  backdrop-filter: blur(4px);
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+
+  &:hover {
+    box-shadow: 0 4px 10px rgba(0, 0, 0, 0.7);
+  }
+  &:active {
+    transform: translateY(1px) scale(0.98);
+    box-shadow: 0 2px 5px rgba(0, 0, 0, 0.5), 0 0 0 0 rgba(0, 0, 0, 0.1);
+    transition: all 0.1s ease;
+  }
+}
+
+.extension-reject-btn {
+  padding: 4px 8px;
+  margin-bottom: 10px;
+  font-size: 14px;
+  font-weight: 500;
+  color: #f5f5f5;
+  background: linear-gradient(135deg, #f44336, #c62828);
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+  opacity: 0.9;
+  transition: 0.3s, opacity 0.3s, transform 0.2s;
+  backdrop-filter: blur(4px);
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+
+  &:hover {
+    box-shadow: 0 4px 10px rgba(0, 0, 0, 0.7);
+  }
+  &:active {
+    transform: translateY(1px) scale(0.98);
+    box-shadow: 0 2px 5px rgba(0, 0, 0, 0.5), 0 0 0 0 rgba(0, 0, 0, 0.1);
+    transition: all 0.1s ease;
+  }
+}
+//*

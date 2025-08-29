@@ -1,0 +1,140 @@
+.rating-modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.7);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  z-index: 1000;
+
+  .rating-modal-content {
+    background: whitesmoke;
+    padding: 30px;
+    border-radius: 12px;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.2);
+    width: 400px;
+    max-width: 90%;
+    animation: slideIn 0.3s ease-out;
+
+    h2 {
+      margin-bottom: 20px;
+      font-size: 24px;
+      color: #333;
+      text-align: center;
+    }
+
+    .rating {
+      display: flex;
+      justify-content: center;
+      margin-bottom: 20px;
+
+      label {
+        font-size: 30px;
+        cursor: pointer;
+        margin: 0 5px;
+        transition: transform 0.2s;
+
+        &:hover {
+          transform: scale(1.2);
+          color: gold;
+        }
+
+        input[type='radio'] {
+          display: none;
+        }
+
+        .filled {
+          color: gold;
+        }
+
+        span {
+          color: lightgray; // Цвет незаполненных звезд
+        }
+      }
+    }
+
+    textarea {
+      width: 100%;
+      height: 80px;
+      padding: 10px;
+      border: 1px solid #ccc;
+      border-radius: 6px;
+      resize: none;
+      margin-bottom: 20px;
+      font-family: inherit;
+      font-size: 16px;
+      color: #333;
+      background-color: #f9f9f9;
+
+      &:focus {
+        border-color: #007bff;
+        outline: none;
+      }
+    }
+
+    button {
+      padding: 10px 15px;
+      border: none;
+      border-radius: 6px;
+      cursor: pointer;
+      font-size: 16px;
+      margin-right: 10px;
+      transition: background-color 0.3s;
+
+      &:hover {
+        background-color: #5fbd73;
+        color: white;
+      }
+
+      &:last-child {
+        background-color: #dc3545;
+        color: white;
+
+        &:hover {
+          background-color: #c82333;
+        }
+      }
+    }
+  }
+}
+
+.review-modal {
+  position: fixed;
+  top: 10%;
+  left: 20%;
+  right: 20%;
+  background: white;
+  border-radius: 8px;
+  padding: 20px;
+  z-index: 1000;
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+}
+
+.review-modal ul {
+  list-style: none;
+  padding: 0;
+}
+
+.review-modal li {
+  border-bottom: 1px solid #ccc;
+  padding: 10px 0;
+}
+
+.review-modal button {
+  margin-top: 10px;
+}
+
+// Анимация появления модального окна
+@keyframes slideIn {
+  from {
+    transform: translateY(-20px);
+    opacity: 0;
+  }
+  to {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}

@@ -1,0 +1,51 @@
+* {
+  padding: 0;
+  margin: 0;
+  box-sizing: border-box;
+}
+
+a {
+  text-decoration: none;
+  color: inherit;
+}
+
+body {
+  font-family: 'Lato', sans-serif;
+  overflow: hidden;
+  background: linear-gradient(
+    180deg,
+    rgba(189, 191, 216, 0.685) 0%,
+    rgba(255, 255, 255, 0) 100%
+  );
+}
+
+/* Стили для всего скроллбара */
+::-webkit-scrollbar {
+  width: 7px; /* Ширина вертикального скроллбара */
+  height: 7px; /* Высота горизонтального скроллбара */
+}
+
+/* Фон скроллбара */
+::-webkit-scrollbar-track {
+  background: #f1f1f1; /* Цвет фона трека */
+}
+
+/* Ползунок скроллбара */
+::-webkit-scrollbar-thumb {
+  background: #888; /* Цвет ползунка */
+  border-radius: 6px; /* Скругленные углы */
+}
+
+/* Ползунок при наведении */
+::-webkit-scrollbar-thumb:hover {
+  background: #06e9f1b1; /* Цвет ползунка при наведении */
+}
+
+/* Стили для горизонтального скроллбара */
+body {
+  overflow-x: scroll; /* Включить горизонтальный скролл */
+}
+
+html {
+  scroll-behavior: smooth; /* Плавный скроллинг */
+}

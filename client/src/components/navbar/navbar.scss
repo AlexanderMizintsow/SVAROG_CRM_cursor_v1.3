@@ -1,0 +1,259 @@
+@import '../../responsive.scss';
+.navbar {
+  min-width: 250px;
+
+  padding: 20px;
+  box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+  background-color: #f0f0f0;
+  // background-image: linear-gradient(rgba(0, 0, 0, 0.5), rgba(0, 0, 0, 0.5)),
+  // url('/background/autumn.jpg');
+  background-blend-mode: overlay;
+  background-repeat: no-repeat;
+  background-size: cover;
+  overflow-y: auto;
+
+  .menu {
+    margin-bottom: 40px;
+  }
+  h5 {
+    margin-bottom: 20px;
+    color: blue;
+  }
+
+  .menu-item {
+    display: flex;
+    align-items: center;
+    cursor: pointer;
+    position: relative;
+    margin-bottom: 15px;
+
+    .icon {
+      margin-right: 10px;
+      color: #33333344;
+      transition: all 0.7s ease;
+    }
+
+    &:hover .icon {
+      color: #333333;
+    }
+
+    .arrow {
+      margin-left: auto; // Располагает стрелку справа
+    }
+  }
+
+  .notification-container {
+    display: flex;
+    align-items: center;
+  }
+  .notification-reminder {
+    margin-left: 8px;
+    color: #ff4757;
+    animation: pulse 1.8s infinite;
+    transition: all 0.3s ease;
+    font-size: 18px;
+
+    &:hover {
+      transform: scale(1.1);
+      color: #ff3742;
+    }
+  }
+
+  .notification-reminder-count {
+    font-size: 13px;
+    margin-left: 6px;
+    color: #ff4757;
+    font-weight: 600;
+    background: rgba(255, 71, 87, 0.1);
+    padding: 2px 6px;
+    border-radius: 8px;
+    border: 1px solid rgba(255, 71, 87, 0.2);
+    transition: all 0.3s ease;
+
+    &:hover {
+      background: rgba(255, 71, 87, 0.15);
+      border-color: rgba(255, 71, 87, 0.3);
+    }
+  }
+  .submenu {
+    display: flex;
+    flex-direction: column;
+    margin-top: 10px;
+    padding-left: 20px; // Отступ для линии
+    position: relative;
+    margin-bottom: 30px;
+
+    &::before {
+      content: '';
+      position: absolute;
+      top: 0;
+      bottom: 0;
+      width: 2px;
+      background-color: #1782f444; // Голубая линия
+    }
+
+    .submenu-item {
+      text-decoration: none;
+      color: #333;
+      margin-left: 10px;
+      transition: all 0.7s ease;
+      padding: 5px;
+      border-radius: 3px;
+
+      .icon {
+        margin-left: 10px;
+        color: #33333344;
+        transition: all 0.7s ease;
+      }
+
+      .red-icon {
+        color: #e57373; // Красим иконку в красный цвет #EF5350 #FF6F61 #e57373
+      }
+
+      &:hover .icon {
+        color: #333333;
+      }
+
+      &:hover {
+        background: #05d8f411;
+        color: #4020f7ce;
+      }
+    }
+  }
+
+  .notification-circle {
+    display: inline-flex;
+    justify-content: center;
+    align-items: center;
+    min-width: 24px;
+    height: 24px;
+    padding: 0 8px;
+    border-radius: 12px;
+    color: white;
+    font-size: 11px;
+    font-weight: 700;
+    margin-left: 8px;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    cursor: pointer;
+    position: relative;
+    overflow: hidden;
+    text-shadow: 0 1px 2px rgba(0, 0, 0, 0.3);
+    letter-spacing: 0.5px;
+
+    // Анимация пульсации для miss-count
+    &.miss-count {
+      background: linear-gradient(135deg, #ff4757, #ff3742);
+      animation: pulse-glow 2s ease-in-out infinite;
+
+      &:hover {
+        transform: scale(1.1);
+        box-shadow: 0 4px 16px rgba(255, 71, 87, 0.4);
+      }
+
+      // Добавляем внутреннее свечение
+      &::before {
+        content: '';
+        position: absolute;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background: linear-gradient(135deg, rgba(255, 255, 255, 0.2), transparent);
+        border-radius: 12px;
+        pointer-events: none;
+      }
+
+      // Адаптивный размер для больших чисел
+      &[data-count='99+'] {
+        min-width: 32px;
+        font-size: 10px;
+      }
+
+      &[data-count='999+'] {
+        min-width: 36px;
+        font-size: 9px;
+      }
+    }
+
+    &.fixed-count {
+      background: linear-gradient(135deg, #e50fed, #c44569);
+      &:hover {
+        transform: scale(1.05);
+        box-shadow: 0 4px 16px rgba(229, 15, 237, 0.3);
+      }
+    }
+
+    &.range-count {
+      background: linear-gradient(135deg, #900af0, #6c5ce7);
+      &:hover {
+        transform: scale(1.05);
+        box-shadow: 0 4px 16px rgba(144, 10, 240, 0.3);
+      }
+    }
+
+    // Общие hover эффекты
+    &:hover {
+      transform: translateY(-1px);
+    }
+
+    // Анимация появления
+    animation: slideIn 0.3s ease-out;
+  }
+
+  // Анимация пульсации для miss-count
+  @keyframes pulse-glow {
+    0%,
+    100% {
+      box-shadow: 0 2px 8px rgba(255, 71, 87, 0.15);
+    }
+    50% {
+      box-shadow: 0 4px 16px rgba(255, 71, 87, 0.4);
+    }
+  }
+
+  // Анимация появления
+  @keyframes slideIn {
+    from {
+      opacity: 0;
+      transform: translateY(-10px) scale(0.8);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0) scale(1);
+    }
+  }
+
+  // Анимация пульсации для напоминаний
+  @keyframes pulse {
+    0% {
+      transform: scale(1);
+    }
+    50% {
+      transform: scale(1.05);
+    }
+    100% {
+      transform: scale(1);
+    }
+  }
+
+  // Адаптивность для мобильных устройств
+  @media (max-width: 768px) {
+    .notification-circle {
+      min-width: 20px;
+      height: 20px;
+      font-size: 10px;
+      padding: 0 6px;
+      margin-left: 6px;
+
+      &.miss-count {
+        animation: pulse-glow 3s ease-in-out infinite;
+      }
+    }
+
+    .notification-reminder-count {
+      font-size: 12px;
+      padding: 1px 4px;
+    }
+  }
+}

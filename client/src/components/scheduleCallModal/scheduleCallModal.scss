@@ -1,0 +1,49 @@
+/* styles.css или аналогичный файл */
+.react-datepicker {
+  background-color: rgba(211, 209, 209, 0.9); /* Цвет фона календаря */
+}
+
+.react-datepicker__header {
+  position: relative;
+  overflow: hidden; /* Не показывать части псевдоэлемента, выходящие за границы */
+}
+
+.react-datepicker__header::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-image: url('../../assets/img/seasons.jpg');
+  background-size: cover;
+  background-position: center;
+  opacity: 0.5; /* Установите нужный уровень прозрачности */
+  z-index: 1; /* Убедитесь, что псевдоэлемент ниже текста */
+}
+
+.react-datepicker__header h2 {
+  position: relative; /* Убедитесь, что заголовок выше псевдоэлемента */
+  z-index: 2;
+  color: white; /* Цвет текста в заголовке */
+}
+
+.react-datepicker__day--selected {
+  background-color: rgb(147, 147, 232); /* Цвет для выделенного дня */
+  color: white; /* Цвет текста выбранного дня */
+}
+
+.react-datepicker__day {
+  color: black; /* Цвет текста для дней */
+}
+
+.react-datepicker__triangle {
+  display: none; /* Скрыть треугольник, если он есть */
+}
+.light-text-field {
+  .MuiOutlinedInput-root {
+    background-color: #fff; // Светлый фон
+    color: #333; // Темный текст
+    padding: 8px;
+  }
+}

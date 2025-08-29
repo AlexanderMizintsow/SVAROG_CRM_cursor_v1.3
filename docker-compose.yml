@@ -1,0 +1,110 @@
+version: '3.9'
+
+services:
+  server2:
+    build: ./register
+    container_name: register-service
+    ports:
+      - '5000:5000'
+    networks:
+      - app-network
+    environment:
+      DB_USER: postgres
+      DB_HOST: db
+      DB_NAME: SVAROG_DB
+      DB_PASSWORD: postgres
+      DB_PORT: 5432
+
+  server1:
+    build: ./email-service
+    container_name: email-service
+    ports:
+      - '5001:5001'
+    networks:
+      - app-network
+    environment:
+      DB_USER: postgres
+      DB_HOST: db
+      DB_NAME: SVAROG_DB
+      DB_PASSWORD: postgres
+      DB_PORT: 5432
+
+  server3:
+    build: ./dealer-server
+    container_name: dealer-server
+    ports:
+      - '5003:5003'
+    networks:
+      - app-network
+    environment:
+      DB_USER: postgres
+      DB_HOST: db
+      DB_NAME: SVAROG_DB
+      DB_PASSWORD: postgres
+      DB_PORT: 5432
+
+  client:
+    build:
+      context: .
+      dockerfile: ./client/Dockerfile
+    container_name: client-service
+    ports:
+      - '5173:80'
+    environment:
+      - NODE_ENV=production
+
+  db:
+    image: postgres:16
+    container_name: postgres-db
+    ports:
+      - '5433:5432'
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: SVAROG_DB
+    networks:
+      - app-network
+    volumes:
+      - db-data:/var/lib/postgresql/data
+      - ./db/init.sql:/docker-entrypoint-initdb.d/init.sql
+
+  nginx:
+    image: nginx:alpine
+    container_name: nginx-server
+    ports:
+      - '8080:80'
+    volumes:
+      - ./client/dist:/usr/share/nginx/html
+      - ./nginx/nginx.conf:/etc/nginx/conf.d/default.conf
+    depends_on:
+      - client
+
+networks:
+  app-network:
+    driver: bridge
+
+volumes:
+  db-data:
+# docker-compose down
+# docker-compose build
+# docker-compose up
+
+# git add .
+# git commit -m " "
+# git push
+
+# Резервное копирование базы данных
+# docker exec -t postgres-db pg_dump -U postgres SVAROG_DB > backup.sql
+# Восстановление базы данных из резервной копии
+# cat backup.sql | docker exec -i postgres-db psql -U postgres -d SVAROG_DB
+
+# Сохранение и загрузка образов
+# docker save -o postgres-db.tar postgres:16
+# docker save -o svarog-server1.tar svarog-server1
+# docker save -o svarog-server2.tar svarog-server2
+# docker save -o svarog-client.tar svarog-client
+# docker save -o nginx-server.tar nginx:alpine
+
+# docker-compose down
+# docker-compose up --build
+

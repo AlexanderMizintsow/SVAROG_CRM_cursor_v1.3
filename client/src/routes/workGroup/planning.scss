@@ -1,0 +1,132 @@
+$primary-color: #4caf50;
+$hover-color: #45a049;
+$background-color: #f9f9f9;
+$border-color: #ddd;
+$shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+$border-radius: 5px;
+$box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+$transition-time: 0.3s;
+
+.planning-container {
+  max-width: 900px;
+  margin: auto;
+  padding: 20px;
+  background: #f8f9fa;
+  border-radius: 8px;
+  box-shadow: $shadow;
+
+  h3 {
+    text-align: center;
+    margin-bottom: 20px;
+  }
+}
+
+.group-card {
+  background-color: $background-color;
+  border: 1px solid $border-color;
+  border-radius: $border-radius;
+  box-shadow: $box-shadow;
+  padding: 20px;
+  margin: 15px 0;
+  transition: box-shadow $transition-time, transform $transition-time;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+
+  &:hover {
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.2);
+  }
+}
+
+.group-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.participants-header {
+  font-weight: bold;
+  color: $primary-color;
+}
+
+.group-name {
+  font-size: 1.5em;
+  margin: 10px 0;
+}
+
+.description {
+  color: #555;
+}
+
+.time {
+  color: #333;
+  font-style: italic;
+}
+
+.participant {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  border-bottom: 1px solid $border-color;
+  padding: 10px 0;
+
+  .participant-name {
+    font-weight: 600;
+  }
+}
+
+.remove-participant {
+  background-color: #d72929;
+  color: white;
+  border: none;
+  padding: 5px 10px;
+  border-radius: $border-radius;
+  cursor: pointer;
+
+  &:hover {
+    background-color: #fa0303;
+  }
+}
+
+.date-selection {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+}
+
+.date-label {
+  display: inline-block;
+}
+
+.date-button {
+  padding: 8px 12px;
+  border: 1px solid $border-color;
+  border-radius: $border-radius;
+  background-color: $background-color;
+  cursor: pointer;
+  transition: background-color 0.3s, transform 0.2s;
+
+  &:hover {
+    background-color: #10e2f5;
+    transform: translateY(-2px);
+  }
+
+  &.selected {
+    background-color: $primary-color;
+    color: white;
+  }
+}
+
+.confirm-dates {
+  background-color: $primary-color;
+  color: white;
+  border: none;
+  padding: 8px 12px;
+  border-radius: $border-radius;
+  cursor: pointer;
+  transition: background-color $transition-time;
+}
+
+.confirm-dates:hover {
+  background-color: $hover-color;
+}

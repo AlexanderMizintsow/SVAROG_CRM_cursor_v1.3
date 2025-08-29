@@ -1,0 +1,15 @@
+.ql-container {
+  font-family: inherit;
+  font-size: 16px;
+  z-index: auto !important;
+}
+
+.ql-toolbar {
+  z-index: auto !important;
+  background-color: #f5f5f5;
+}
+
+.ql-editor {
+  min-height: 200px;
+  cursor: text !important;
+}

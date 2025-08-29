@@ -1,0 +1,65 @@
+.calls-settings {
+  padding: 20px;
+  background: #f9f9f9;
+  border-radius: 8px;
+
+  h2 {
+    margin-bottom: 20px;
+  }
+
+  .settings-group {
+    margin-bottom: 20px;
+    & label {
+      display: block; /* Или используйте flex с flex-direction: column */
+      margin-bottom: 10px; /* Пробел между элементами */
+
+      & input {
+        margin-right: 10px;
+      }
+    }
+    h4 {
+      margin: 30px 0 10px 0;
+    }
+    a {
+      color: #007bff;
+    }
+    .command {
+      color: rgb(221, 0, 255);
+      margin-left: 20px;
+    }
+    .user-list {
+      margin-left: 10px;
+
+      label {
+        display: block;
+        margin-bottom: 5px;
+      }
+    }
+    .bot-href {
+      margin-bottom: 20px;
+    }
+  }
+
+  .save-settings {
+    background: #007bff;
+    color: white;
+    border: none;
+    padding: 10px 15px;
+    border-radius: 5px;
+    cursor: pointer;
+
+    &:hover {
+      background: #0056b3;
+    }
+  }
+}
+.icon-puls {
+  cursor: pointer;
+  animation: pulse 1.8s infinite;
+  transition: all 0.3s ease;
+  &:hover {
+    color: rgb(6, 30, 247);
+    animation: none;
+    scale: 1.2;
+  }
+}

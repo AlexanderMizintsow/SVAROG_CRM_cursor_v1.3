@@ -1,0 +1,117 @@
+-- Полная очистка БД от прошлых таблиц
+DROP TABLE IF EXISTS user_department_position CASCADE;
+DROP TABLE IF EXISTS departments CASCADE;
+DROP TABLE IF EXISTS users CASCADE;
+DROP TABLE IF EXISTS roles CASCADE;
+DROP TABLE IF EXISTS positions CASCADE;
+
+-- Создание таблицы roles
+CREATE TABLE roles (
+    id SERIAL PRIMARY KEY, -- Уникальный идентификатор роли
+    name VARCHAR(100) NOT NULL -- Название роли (например, "Администратор", "Менеджер", "Сотрудник")
+);
+
+-- Вставка ролей
+INSERT INTO roles (id, name) VALUES (1, 'Администратор');
+
+-- Создание таблицы users с дополнительными полями, индексами и триггером для updated_at
+CREATE TABLE users (
+    id SERIAL PRIMARY KEY, -- Уникальный идентификатор пользователя
+    role_id INTEGER REFERENCES roles(id), -- Ссылка на роль пользователя (из таблицы roles)
+    first_name VARCHAR(30), -- Имя пользователя
+    middle_name VARCHAR(30), -- Отчество пользователя
+    last_name VARCHAR(30), -- Фамилия пользователя
+    birth_date DATE, -- Дата рождения пользователя
+    username VARCHAR(30) UNIQUE NOT NULL, -- Уникальное имя пользователя (логин)
+    password VARCHAR(50) NOT NULL, -- Хешированный пароль пользователя
+    email VARCHAR(50) UNIQUE NOT NULL, -- Уникальный адрес электронной почты пользователя
+    email_token VARCHAR(100), -- Токен для подтверждения электронной почты
+    avatar_url VARCHAR(200), -- URL-адрес аватара пользователя
+    user_photo BYTEA, -- Бинарные данные фотографии пользователя
+    role_assigned BOOLEAN DEFAULT false, -- Флаг, назначена ли пользователю роль
+    supervisor_id INTEGER REFERENCES users(id) ON UPDATE CASCADE ON DELETE SET NULL, -- Ссылка на руководителя пользователя
+    created_at TIMESTAMP WITHOUT TIME ZONE DEFAULT NOW(), -- Дата создания записи
+    updated_at TIMESTAMP WITHOUT TIME ZONE DEFAULT NOW(), -- Дата последнего изменения записи
+    department_id INTEGER REFERENCES departments(id), -- Ссылка на отдел (из таблицы departments)
+    position_id INTEGER REFERENCES positions(id), -- Ссылка на должность (из таблицы positions)
+    status VARCHAR(10) DEFAULT 'offline' -- Статус пользователя (онлайн/оффлайн)
+    gender VARCHAR(10) DEFAULT 'не установлен' -- Пол (м/ж)
+);
+
+-- Создание таблицы user_phones для хранения телефонов пользователей
+CREATE TABLE user_phones (
+    id SERIAL PRIMARY KEY, -- Уникальный идентификатор телефона
+    user_id INTEGER REFERENCES users(id) ON DELETE CASCADE, -- Ссылка на пользователя
+    phone_number VARCHAR(20) NOT NULL, -- Номер телефона
+    phone_type VARCHAR(20) NOT NULL -- Тип телефона (например, "мобильный", "рабочий")
+);
+
+
+-- Создание триггера для обновления поля updated_at в таблице users
+CREATE OR REPLACE FUNCTION update_users_updated_at()
+RETURNS TRIGGER AS $
+BEGIN
+    NEW.updated_at = NOW();
+    RETURN NEW;
+END;
+$ LANGUAGE plpgsql;
+
+CREATE TRIGGER update_users_updated_at_trigger
+BEFORE UPDATE ON users
+FOR EACH ROW EXECUTE FUNCTION update_users_updated_at();
+
+-- Создание таблицы departments с дополнительными индексами и триггером для updated_at
+CREATE TABLE departments (
+    id SERIAL PRIMARY KEY, -- Уникальный идентификатор отдела
+    name VARCHAR(100) NOT NULL, -- Название отдела
+    head_user_id INTEGER REFERENCES users(id) -- Ссылка на руководителя отдела
+);
+
+-- Создание таблицы positions
+CREATE TABLE positions (
+    id SERIAL PRIMARY KEY, -- Уникальный идентификатор должности
+    name VARCHAR(100) NOT NULL -- Название должности (например, "Программист", "Менеджер по продажам")
+);
+
+-- Создание таблицы user_department_position с дополнительными ограничениями
+CREATE TABLE user_department_position (
+    user_id INTEGER REFERENCES users(id) ON DELETE CASCADE, -- Ссылка на пользователя
+    department_id INTEGER REFERENCES departments(id) ON DELETE CASCADE, -- Ссылка на отдел
+    position_id INTEGER REFERENCES positions(id) ON DELETE CASCADE, -- Ссылка на должность
+    start_date DATE NOT NULL, -- Дата начала работы в отделе/на должности
+    end_date DATE, -- Дата окончания работы в отделе/на должности
+    is_current BOOLEAN DEFAULT false, -- Флаг, указывающий, является ли эта запись текущей
+    PRIMARY KEY (user_id, department_id, position_id) -- Составной первичный ключ
+);
+
+-- Частичные индексы для уникальности текущих записей
+CREATE UNIQUE INDEX idx_user_department_current 
+ON user_department_position(user_id, department_id) 
+WHERE is_current = true;
+
+CREATE UNIQUE INDEX idx_user_position_current 
+ON user_department_position(user_id, position_id) 
+WHERE is_current = true;
+
+-- Триггер для проверки даты окончания в таблице user_department_position
+CREATE OR REPLACE FUNCTION check_end_date()
+RETURNS TRIGGER AS $
+BEGIN
+    IF NEW.end_date IS NOT NULL AND NEW.end_date < NEW.start_date THEN
+        RAISE EXCEPTION 'Дата окончания не может быть раньше даты начала.';
+    END IF;
+    RETURN NEW;
+END;
+$ LANGUAGE plpgsql;
+
+CREATE TRIGGER check_end_date_trigger
+BEFORE INSERT OR UPDATE ON user_department_position
+FOR EACH ROW EXECUTE FUNCTION check_end_date();
+
+-- Вставка данных в таблицу users
+INSERT INTO users (
+    id, role_id, first_name, middle_name, last_name, birth_date, username, password, email, email_token, avatar_url, user_photo, role_assigned, supervisor_id, created_at, updated_at, department_id, position_id, status
+) VALUES (
+    2, 1, 'Александр', 'Александрович', 'Мизинцов', '1988-07-04', 'admin', '$2b$10$un.Xb7XNkRIsJskA0VEhYO17T1VbnwP3J7QhjVo.B7kOmg9BahrGS', 'a.mizincov@poz-sar.com', 'RjfRSdye9zgfyVUhkAtg', NULL, 'binary data', TRUE, NULL, '2024-07-25 20:36:23.138278', '2024-07-25 20:36:23.138278', NULL, NULL, 'offline'
+);
+

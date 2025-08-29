@@ -1,0 +1,82 @@
+.competitor-form-container {
+  display: flex;
+  flex-direction: column;
+  margin: 20px;
+  height: calc(100vh - 180px);
+  overflow: hidden;
+
+  .form-section {
+    position: sticky;
+    top: 0;
+    z-index: 1000;
+    border-radius: 10px;
+    padding: 20px;
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+    margin-bottom: 20px;
+  }
+
+  .list-section {
+    overflow-y: auto; // Добавить прокрутку
+    flex: 1; // Позволяет занимать свободное пространство
+    padding: 20px;
+
+    h2 {
+      margin-bottom: 10px;
+    }
+
+    ul {
+      list-style-type: none;
+      padding: 0;
+
+      .competitor-item {
+        border: 1px solid #ececec;
+        border-radius: 5px;
+        padding: 10px;
+        margin-bottom: 10px;
+
+        h3 {
+          margin: 0 0 5px;
+        }
+
+        p {
+          margin: 0;
+          color: #555;
+        }
+      }
+    }
+  }
+
+  .input-group {
+    margin-bottom: 15px;
+
+    label {
+      display: block;
+      margin-bottom: 5px;
+      font-weight: bold;
+    }
+
+    input {
+      width: 100%;
+      padding: 10px;
+      border: 1px solid #ccc;
+      border-radius: 5px;
+      font-size: 16px;
+    }
+  }
+
+  .submit-button {
+    width: 100%;
+    padding: 10px;
+    background-color: #3f51b5;
+    color: white;
+    border: none;
+    border-radius: 5px;
+    font-size: 16px;
+    cursor: pointer;
+    transition: background-color 0.3s;
+
+    &:hover {
+      background-color: #303f9f;
+    }
+  }
+}

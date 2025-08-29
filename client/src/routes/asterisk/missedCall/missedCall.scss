@@ -1,0 +1,11 @@
+.missed-call-header {
+  display: flex;
+  align-items: center;
+  margin-bottom: 10px;
+
+  .missed-call-count {
+    margin-left: 8px;
+    font-size: 16px;
+    font-weight: bold;
+  }
+}

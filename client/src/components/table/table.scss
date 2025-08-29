@@ -1,0 +1,13 @@
+.export {
+  width: 20px;
+  height: 20px;
+  margin: 5px;
+  cursor: pointer;
+  right: 0;
+  transition: all 0.3s ease;
+
+  &:hover {
+    color: rgba(83, 83, 232, 0.823);
+    scale: 1.2;
+  }
+}
