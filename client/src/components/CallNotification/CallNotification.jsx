@@ -46,6 +46,7 @@ const CallNotification = ({ callData, onClose }) => {
   const [newPurposeName, setNewPurposeName] = useState("");
   const [newPurposeDescription, setNewPurposeDescription] = useState("");
   const [isLoading, setIsLoading] = useState(false);
+  const [isDataSaved, setIsDataSaved] = useState(false);
 
   console.log("CallNotification render:", { callData, isActive, timeElapsed });
 
@@ -86,9 +87,27 @@ const CallNotification = ({ callData, onClose }) => {
           if (response.ok) {
             const data = await response.json();
             console.log("Полученные данные звонка:", data);
-            setSelectedPurpose(data.purpose_id || "");
-            setDescription(data.description || "");
-            setOutcome(data.outcome || "");
+            // Загружаем данные только если поля пустые, чтобы не перезаписывать введенные данные
+            if (!selectedPurpose) setSelectedPurpose(data.purpose_id || "");
+            if (!description) setDescription(data.description || "");
+            if (!outcome) setOutcome(data.outcome || "");
+            // Если данные уже есть в базе, считаем что они сохранены
+            if (data.purpose_id || data.description || data.outcome) {
+              setIsDataSaved(true);
+            }
+
+            // Если purpose_id установлен, но selectedPurpose пустой, проверяем не "Без цели" ли это
+            if (data.purpose_id && !selectedPurpose) {
+              const noPurpose = callPurposes.find(
+                (p) => p.id === data.purpose_id && p.name === "Без цели"
+              );
+              if (noPurpose) {
+                // Не устанавливаем selectedPurpose для "Без цели", чтобы пользователь мог выбрать реальную цель
+                console.log(
+                  "Найдена цель 'Без цели', оставляем поле пустым для выбора"
+                );
+              }
+            }
           } else {
             console.error(
               "Ошибка при загрузке деталей звонка:",
@@ -229,8 +248,18 @@ const CallNotification = ({ callData, onClose }) => {
 
     setIsLoading(true);
     try {
+      // Если итог выбран, но цель не выбрана, автоматически устанавливаем "Без цели"
+      let finalPurposeId = selectedPurpose;
+      if (outcome && !selectedPurpose) {
+        // Находим ID цели "Без цели"
+        const noPurpose = callPurposes.find((p) => p.name === "Без цели");
+        if (noPurpose) {
+          finalPurposeId = noPurpose.id;
+        }
+      }
+
       const requestBody = {
-        purpose_id: selectedPurpose || null,
+        purpose_id: finalPurposeId || null,
         description: description || "",
         outcome: outcome || null,
       };
@@ -254,6 +283,7 @@ const CallNotification = ({ callData, onClose }) => {
       if (response.ok) {
         const result = await response.json();
         console.log("Данные звонка успешно сохранены:", result);
+        setIsDataSaved(true);
         alert("Информация о звонке успешно сохранена!");
       } else {
         const errorData = await response
@@ -412,10 +442,25 @@ const CallNotification = ({ callData, onClose }) => {
 
             {/* Форма для выбора цели звонка и описания */}
             {(callData?.type === "call_started" ||
-              callData?.type === "call_ended") && (
+              callData?.type === "call_ended" ||
+              selectedPurpose ||
+              description ||
+              outcome) && (
               <div className="call-form" style={{ marginTop: "16px" }}>
                 <Typography variant="h6" style={{ marginBottom: "12px" }}>
                   Информация о звонке
+                  {(selectedPurpose || description || outcome) && (
+                    <span
+                      style={{
+                        fontSize: "0.8rem",
+                        color: "#10b981",
+                        marginLeft: "8px",
+                        fontWeight: "normal",
+                      }}
+                    >
+                      (заполнено)
+                    </span>
+                  )}
                 </Typography>
 
                 {/* Выбор цели звонка */}
@@ -423,7 +468,10 @@ const CallNotification = ({ callData, onClose }) => {
                   <InputLabel>Цель звонка</InputLabel>
                   <Select
                     value={selectedPurpose}
-                    onChange={(e) => setSelectedPurpose(e.target.value)}
+                    onChange={(e) => {
+                      setSelectedPurpose(e.target.value);
+                      setIsDataSaved(false);
+                    }}
                     label="Цель звонка"
                   >
                     <MenuItem value="">
@@ -456,18 +504,37 @@ const CallNotification = ({ callData, onClose }) => {
                   rows={2}
                   label="Описание звонка"
                   value={description}
-                  onChange={(e) => setDescription(e.target.value)}
+                  onChange={(e) => {
+                    setDescription(e.target.value);
+                    setIsDataSaved(false);
+                  }}
                   placeholder="Введите описание звонка..."
                   style={{ marginBottom: "12px" }}
                 />
 
                 {/* Выбор итога звонка */}
                 <FormControl fullWidth style={{ marginBottom: "12px" }}>
-                  <InputLabel>Итог звонка</InputLabel>
+                  <InputLabel>
+                    Итог звонка <span style={{ color: "#ef4444" }}>*</span>
+                  </InputLabel>
                   <Select
                     value={outcome}
-                    onChange={(e) => setOutcome(e.target.value)}
+                    onChange={(e) => {
+                      setOutcome(e.target.value);
+                      setIsDataSaved(false);
+                    }}
                     label="Итог звонка"
+                    sx={{
+                      "& .MuiOutlinedInput-root": {
+                        borderColor: !outcome ? "#ef4444" : undefined,
+                        "&:hover": {
+                          borderColor: !outcome ? "#dc2626" : undefined,
+                        },
+                        "&.Mui-focused": {
+                          borderColor: !outcome ? "#dc2626" : undefined,
+                        },
+                      },
+                    }}
                   >
                     <MenuItem value="">
                       <em>Выберите итог</em>
@@ -504,7 +571,7 @@ const CallNotification = ({ callData, onClose }) => {
                   variant="contained"
                   color="primary"
                   onClick={handleSaveCallData}
-                  disabled={isLoading}
+                  disabled={isLoading || !outcome}
                   fullWidth
                   style={{ marginBottom: "12px" }}
                 >
@@ -517,7 +584,10 @@ const CallNotification = ({ callData, onClose }) => {
           <div className="call-actions">
             {/* Кнопка "Назначить время для перезвона" для активного и завершенного звонка */}
             {(callData?.type === "call_started" ||
-              callData?.type === "call_ended") && (
+              callData?.type === "call_ended" ||
+              selectedPurpose ||
+              description ||
+              outcome) && (
               <Button
                 variant="outlined"
                 color="primary"
@@ -535,9 +605,14 @@ const CallNotification = ({ callData, onClose }) => {
                 variant="contained"
                 color="primary"
                 onClick={onClose}
+                disabled={!outcome || !isDataSaved}
                 fullWidth
               >
-                Закрыть
+                {!outcome
+                  ? "Выберите итог звонка"
+                  : !isDataSaved
+                  ? "Сохраните информацию"
+                  : "Закрыть"}
               </Button>
             )}
           </div>

@@ -214,6 +214,12 @@
         .MuiInputLabel-root {
           font-weight: 600;
           color: #4a5568;
+
+          // Стили для обязательного поля
+          &.required-field {
+            color: #ef4444;
+            font-weight: 700;
+          }
         }
 
         .MuiOutlinedInput-root {

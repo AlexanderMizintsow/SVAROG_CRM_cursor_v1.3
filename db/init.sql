@@ -1181,6 +1181,15 @@ FOR EACH ROW EXECUTE FUNCTION update_orders_1c_updated_at();
 
 
 
+-- Таблица целей звонков
+CREATE TABLE call_purposes (
+    id SERIAL PRIMARY KEY,
+    name VARCHAR(100) NOT NULL UNIQUE,
+    description TEXT,
+    is_active BOOLEAN DEFAULT true,
+    created_at TIMESTAMP WITHOUT TIME ZONE DEFAULT NOW()
+);
+
 -- Вставка базовых целей звонков
 INSERT INTO call_purposes (name, description) VALUES
     ('Расчет', 'Вопросы по расчетам и ценообразованию'),
@@ -1194,21 +1203,6 @@ ALTER TABLE calls
 ADD COLUMN purpose_id INTEGER REFERENCES call_purposes(id),
 ADD COLUMN description TEXT,
 ADD COLUMN updated_at TIMESTAMP WITHOUT TIME ZONE DEFAULT NOW();
-
--- Добавление поля итога звонка в таблицу calls
-ALTER TABLE calls 
-ADD COLUMN outcome VARCHAR(50) CHECK (outcome IN ('success', 'failed', 'postponed', 'callback', 'send_info'));
-
--- Создание индекса для быстрого поиска по итогу звонка
-CREATE INDEX idx_calls_outcome ON calls(outcome);
-
--- Комментарии к значениям поля outcome:
--- 'success' - Успешно (цель достигнута, клиент доволен)
--- 'failed' - Неудачно (цель не достигнута, клиент недоволен)
--- 'postponed' - Отложено (вопрос требует дополнительного времени)
--- 'callback' - Перезвонить (нужно связаться позже)
--- 'send_info' - Отправить информацию (требуется отправка документов/информации)
-
 
 -- Создание индекса для быстрого поиска по цели звонка
 CREATE INDEX idx_calls_purpose_id ON calls(purpose_id);
@@ -1225,3 +1219,31 @@ $$ LANGUAGE plpgsql;
 CREATE TRIGGER update_calls_updated_at_trigger
 BEFORE UPDATE ON calls
 FOR EACH ROW EXECUTE FUNCTION update_calls_updated_at();
+
+-- Добавление поля итога звонка в таблицу calls
+ALTER TABLE calls 
+ADD COLUMN outcome VARCHAR(50) CHECK (outcome IN ('success', 'failed', 'postponed', 'callback', 'send_info'));
+
+-- Создание индекса для быстрого поиска по итогу звонка
+CREATE INDEX idx_calls_outcome ON calls(outcome);
+
+-- Комментарии к значениям поля outcome:
+-- 'success' - Успешно (цель достигнута, клиент доволен)
+-- 'failed' - Неудачно (цель не достигнута, клиент недоволен)
+-- 'postponed' - Отложено (вопрос требует дополнительного времени)
+-- 'callback' - Перезвонить (нужно связаться позже)
+-- 'send_info' - Отправить информацию (требуется отправка документов/информации)
+
+-- Обновление триггера для автоматического обновления updated_at при изменении outcome
+-- (триггер уже существует и будет работать автоматически)
+
+-- Добавление цели "Без цели" для звонков без выбранной цели
+INSERT INTO call_purposes (name, description) VALUES
+    ('Без цели', 'Звонок без указанной цели') 
+ON CONFLICT (name) DO NOTHING;
+
+CREATE INDEX IF NOT EXISTS idx_calls_purpose_id ON calls(purpose_id);
+
+
+
+
