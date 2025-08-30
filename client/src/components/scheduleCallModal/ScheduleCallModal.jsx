@@ -54,6 +54,13 @@ const ScheduleCallModal = ({
     time: new Date().toLocaleString("ru-RU"),
   };
 
+  // Инициализируем комментарий с информацией о звонке, если она передана
+  useEffect(() => {
+    if (notificationData?.callInfoComment) {
+      setComment(notificationData.callInfoComment);
+    }
+  }, [notificationData?.callInfoComment]);
+
   const [infoComment] = useState(`
 
     НАПОМИНАНИЕ СОЗДАНО ДЛЯ:
@@ -152,7 +159,13 @@ const ScheduleCallModal = ({
           backgroundColor: "linear-gradient(to right, #007BFF, #0056b3)",
         },
       }).showToast();
-      onClose();
+
+      // Возвращаем ID созданного напоминания через callback
+      if (onClose && typeof onClose === "function") {
+        onClose(response.data.id);
+      } else {
+        onClose();
+      }
     } catch (error) {
       console.error(
         "Error creating reminder:",

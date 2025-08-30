@@ -6,7 +6,7 @@
   left: 0;
   width: 100vw;
   height: 100vh;
-  z-index: 100;
+  z-index: 9999;
   background: rgba(0, 0, 0, 0.5);
 
   .titleInput {
@@ -26,7 +26,7 @@
 
   .content {
     position: relative;
-    z-index: 20;
+    z-index: 10000;
     width: 95%;
     max-width: 1000px;
     background: #ffffff;
@@ -48,6 +48,9 @@
       background: #fff;
       transition: all 0.3s ease;
       margin-bottom: 1rem;
+      pointer-events: auto;
+      position: relative;
+      z-index: 10001;
 
       &:focus {
         border-color: #ff6f61;
@@ -91,6 +94,9 @@
         overflow-y: auto;
         border: 1px solid #e0e0e0;
         border-radius: 8px;
+        pointer-events: auto;
+        position: relative;
+        z-index: 10001;
 
         .ql-editor {
           max-width: 500px;
@@ -98,6 +104,9 @@
           padding: 1rem;
           background: #fdfdfd;
           font-family: "Roboto", sans-serif;
+          pointer-events: auto;
+          position: relative;
+          z-index: 10001;
           font-size: 1rem;
           color: #333;
         }
@@ -261,6 +270,30 @@
       transform: scale(1);
     }
   }
+}
+
+// Глобальные стили для Quill редактора
+:global(.ql-editor) {
+  pointer-events: auto !important;
+  position: relative !important;
+  z-index: 10001 !important;
+}
+
+:global(.ql-toolbar) {
+  pointer-events: auto !important;
+  position: relative !important;
+  z-index: 10001 !important;
+}
+
+:global(.ql-container) {
+  pointer-events: auto !important;
+  position: relative !important;
+  z-index: 10001 !important;
+}
+
+// Стили для предотвращения проблем с aria-hidden
+:global(#root[aria-hidden]) {
+  pointer-events: auto !important;
 }
 
 .pulse {

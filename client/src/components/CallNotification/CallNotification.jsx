@@ -12,6 +12,7 @@ import {
   MenuItem,
   TextField,
 } from "@mui/material";
+import AddModal from "../../routes/kanbanBoard/Modals/AddModal";
 import {
   Phone,
   PhoneDisabled,
@@ -41,6 +42,10 @@ const CallNotification = ({ callData, onClose }) => {
 
   const [isLoading, setIsLoading] = useState(false);
   const [isDataSaved, setIsDataSaved] = useState(false);
+  const [isAddModalOpen, setIsAddModalOpen] = useState(false);
+  const [initialTaskData, setInitialTaskData] = useState(null);
+  const [existingReminderId, setExistingReminderId] = useState(null);
+  const [existingTaskId, setExistingTaskId] = useState(null);
 
   console.log("CallNotification render:", { callData, isActive, timeElapsed });
 
@@ -85,6 +90,11 @@ const CallNotification = ({ callData, onClose }) => {
             if (!selectedPurpose) setSelectedPurpose(data.purpose_id || "");
             if (!description) setDescription(data.description || "");
             if (!outcome) setOutcome(data.outcome || "");
+
+            // Сохраняем существующие ID
+            if (data.reminder_id) setExistingReminderId(data.reminder_id);
+            if (data.task_id) setExistingTaskId(data.task_id);
+
             // Если данные уже есть в базе, считаем что они сохранены
             if (data.purpose_id || data.description || data.outcome) {
               setIsDataSaved(true);
@@ -93,12 +103,12 @@ const CallNotification = ({ callData, onClose }) => {
             // Если purpose_id установлен, но selectedPurpose пустой, проверяем не "Без цели" ли это
             if (data.purpose_id && !selectedPurpose) {
               const noPurpose = callPurposes.find(
-                (p) => p.id === data.purpose_id && p.name === "Без цели"
+                (p) => p.id === data.purpose_id && p.name === "Консультация"
               );
               if (noPurpose) {
                 // Не устанавливаем selectedPurpose для "Без цели", чтобы пользователь мог выбрать реальную цель
                 console.log(
-                  "Найдена цель 'Без цели', оставляем поле пустым для выбора"
+                  "Найдена цель 'Консультация', оставляем поле пустым для выбора"
                 );
               }
             }
@@ -219,8 +229,13 @@ const CallNotification = ({ callData, onClose }) => {
     setScheduleModalOpen(true);
   };
 
-  const handleScheduleModalClose = () => {
+  const handleScheduleModalClose = (reminderId) => {
     setScheduleModalOpen(false);
+
+    // Если получен ID напоминания, обновляем звонок
+    if (reminderId) {
+      updateCallWithReminderId(reminderId);
+    }
   };
 
   // Сохранение данных звонка
@@ -256,6 +271,8 @@ const CallNotification = ({ callData, onClose }) => {
         purpose_id: finalPurposeId || null,
         description: description || "",
         outcome: outcome || null,
+        reminder_id: existingReminderId, // Сохраняем существующий reminder_id
+        task_id: existingTaskId, // Сохраняем существующий task_id
       };
 
       console.log("Отправляем запрос:", {
@@ -263,6 +280,12 @@ const CallNotification = ({ callData, onClose }) => {
         method: "PUT",
         body: requestBody,
       });
+      console.log(
+        "Существующие ID - reminder_id:",
+        existingReminderId,
+        "task_id:",
+        existingTaskId
+      );
 
       const response = await fetch(`${API_BASE_URL}5004/api/calls/${callId}`, {
         method: "PUT",
@@ -286,6 +309,28 @@ const CallNotification = ({ callData, onClose }) => {
             background: "linear-gradient(to right, #800080, #DA70D6)",
           },
         }).showToast();
+
+        // Если итог "Перезвонить", автоматически открываем модальное окно для назначения времени
+        if (outcome === "callback") {
+          setScheduleModalOpen(true);
+        }
+
+        // Если итог "Создать задачу", автоматически открываем AddModal
+        if (outcome === "send_info") {
+          // Получаем название цели звонка
+          const purposeName =
+            callPurposes.find((p) => p.id === finalPurposeId)?.name ||
+            "Неизвестная цель";
+
+          // Подготавливаем данные для предзаполнения задачи
+          const taskData = {
+            title: `Входящий звонок - ${purposeName}`,
+            description: description || "",
+          };
+
+          setInitialTaskData(taskData);
+          setIsAddModalOpen(true);
+        }
       } else {
         const errorData = await response
           .json()
@@ -311,6 +356,142 @@ const CallNotification = ({ callData, onClose }) => {
     }
   };
 
+  // Функция для обработки закрытия AddModal
+  const handleAddModalClose = (taskId) => {
+    console.log("=== AddModal закрыт ===");
+    console.log("Получен taskId:", taskId);
+    console.log("Тип taskId:", typeof taskId);
+    console.log("taskId === null:", taskId === null);
+    console.log("taskId === undefined:", taskId === undefined);
+    console.log("taskId === 0:", taskId === 0);
+    console.log("Boolean(taskId):", Boolean(taskId));
+
+    setIsAddModalOpen(false);
+    setInitialTaskData(null);
+
+    // Если задача была создана, обновляем звонок с ID задачи
+    if (taskId && taskId !== null && taskId !== undefined && taskId !== 0) {
+      console.log("✅ Обновляем звонок с ID задачи:", taskId);
+      updateCallWithTaskId(taskId);
+    } else {
+      console.log(
+        "❌ ID задачи не получен или невалиден, обновление не требуется"
+      );
+      console.log("Возможные причины:");
+      console.log("- Пользователь закрыл модальное окно без создания задачи");
+      console.log("- Произошла ошибка при создании задачи");
+      console.log("- taskId равен 0, null или undefined");
+    }
+  };
+
+  // Функция для обновления звонка с ID задачи
+  const updateCallWithTaskId = async (taskId) => {
+    console.log("=== updateCallWithTaskId вызвана ===");
+    console.log("Полученный taskId:", taskId);
+    console.log("Тип taskId:", typeof taskId);
+
+    const callId = callData?.callId || callData?.id || callData?.call_id;
+    console.log("callId:", callId);
+
+    if (!callId) {
+      console.error("❌ ID звонка не найден для обновления task_id");
+      return;
+    }
+
+    try {
+      const updateData = {
+        purpose_id: selectedPurpose || null,
+        description: description || "",
+        outcome: outcome || null,
+        task_id: taskId,
+        reminder_id: existingReminderId, // Сохраняем существующий reminder_id
+      };
+
+      console.log("🔄 Обновляем звонок с ID задачи:", taskId);
+      console.log("📤 Данные для обновления:", updateData);
+
+      const response = await fetch(`${API_BASE_URL}5004/api/calls/${callId}`, {
+        method: "PUT",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(updateData),
+      });
+
+      if (response.ok) {
+        const result = await response.json();
+        console.log("✅ Звонок успешно обновлен с ID задачи:", taskId);
+        console.log("📥 Ответ сервера:", result);
+        setExistingTaskId(taskId); // Обновляем состояние
+        Toastify({
+          text: "Задача успешно создана и связана со звонком!",
+          duration: 5000,
+          close: true,
+          style: {
+            background: "linear-gradient(to right, #10b981, #34d399)",
+          },
+        }).showToast();
+      } else {
+        const errorText = await response.text();
+        console.error("❌ Ошибка при обновлении звонка с ID задачи");
+        console.error("Статус:", response.status);
+        console.error("Ответ:", errorText);
+      }
+    } catch (error) {
+      console.error("Ошибка при обновлении звонка с ID задачи:", error);
+    }
+  };
+
+  // Функция для обновления звонка с ID напоминания
+  const updateCallWithReminderId = async (reminderId) => {
+    console.log("=== updateCallWithReminderId вызвана ===");
+    console.log("Полученный reminderId:", reminderId);
+    console.log("Тип reminderId:", typeof reminderId);
+
+    const callId = callData?.callId || callData?.id || callData?.call_id;
+    console.log("callId:", callId);
+
+    if (!callId) {
+      console.error("❌ ID звонка не найден для обновления reminder_id");
+      return;
+    }
+
+    try {
+      const updateData = {
+        purpose_id: selectedPurpose || null,
+        description: description || "",
+        outcome: outcome || null,
+        reminder_id: reminderId,
+        task_id: existingTaskId, // Сохраняем существующий task_id
+      };
+
+      console.log("🔄 Обновляем звонок с ID напоминания:", reminderId);
+      console.log("📤 Данные для обновления:", updateData);
+
+      const response = await fetch(`${API_BASE_URL}5004/api/calls/${callId}`, {
+        method: "PUT",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(updateData),
+      });
+
+      if (response.ok) {
+        const result = await response.json();
+        console.log("✅ Звонок успешно обновлен с ID напоминания:", reminderId);
+        console.log("📥 Ответ сервера:", result);
+        setExistingReminderId(reminderId); // Обновляем состояние
+      } else {
+        const errorText = await response.text();
+        console.error("❌ Ошибка при обновлении звонка с ID напоминания");
+        console.error("Статус:", response.status);
+        console.error("Ответ:", errorText);
+      }
+    } catch (error) {
+      console.error("Ошибка при обновлении звонка с ID напоминания:", error);
+    }
+  };
+
   // Подготавливаем данные для ScheduleCallModal в нужном формате
   const getNotificationDataForSchedule = () => {
     // Извлекаем числовой ID из callData
@@ -330,6 +511,15 @@ const CallNotification = ({ callData, onClose }) => {
       numericId = Math.floor(Date.now() / 1000); // Используем timestamp в секундах
     }
 
+    // Получаем название выбранной цели звонка
+    const selectedPurposeName =
+      callPurposes.find((p) => p.id === selectedPurpose)?.name || "";
+
+    // Формируем комментарий с информацией о цели и описании
+    const callInfoComment = `Цель звонка: ${selectedPurposeName}\n\nОписание звонка:\n${
+      description || "Описание не указано"
+    }`;
+
     const notificationData = {
       id: numericId,
       callerName: callData?.callerName || "Неизвестный",
@@ -341,6 +531,7 @@ const CallNotification = ({ callData, onClose }) => {
           ? "ended"
           : "incoming",
       time: new Date().toLocaleString("ru-RU"),
+      callInfoComment: callInfoComment, // Добавляем информацию о цели и описании
     };
 
     console.log("Notification data for schedule:", notificationData);
@@ -504,15 +695,7 @@ const CallNotification = ({ callData, onClose }) => {
                       <CheckCircle
                         style={{ marginRight: 8, color: "#10b981" }}
                       />
-                      Успешно
-                    </MenuItem>
-                    <MenuItem value="failed">
-                      <Cancel style={{ marginRight: 8, color: "#ef4444" }} />
-                      Неудачно
-                    </MenuItem>
-                    <MenuItem value="postponed">
-                      <Schedule style={{ marginRight: 8, color: "#f59e0b" }} />
-                      Отложено
+                      Завершено
                     </MenuItem>
                     <MenuItem value="callback">
                       <PhoneCallback
@@ -522,7 +705,7 @@ const CallNotification = ({ callData, onClose }) => {
                     </MenuItem>
                     <MenuItem value="send_info">
                       <Email style={{ marginRight: 8, color: "#8b5cf6" }} />
-                      Отправить информацию
+                      Создать задачу
                     </MenuItem>
                   </Select>
                 </FormControl>
@@ -590,6 +773,15 @@ const CallNotification = ({ callData, onClose }) => {
           notificationData={getNotificationDataForSchedule()}
         />
       )}
+
+      {/* Модальное окно для создания задачи */}
+      <AddModal
+        isOpen={isAddModalOpen}
+        onClose={handleAddModalClose}
+        setOpen={setIsAddModalOpen}
+        userId={callData?.userId || 1} // Используем ID пользователя из callData или дефолтное значение
+        initialTaskData={initialTaskData}
+      />
     </>
   );
 };

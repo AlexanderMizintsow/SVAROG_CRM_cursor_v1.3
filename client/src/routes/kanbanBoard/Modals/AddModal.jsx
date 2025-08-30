@@ -28,8 +28,9 @@ const AddModal = ({
   globalTaskId,
   parentTaskId,
   rootTaskId,
+  initialTaskData: externalInitialTaskData,
 }) => {
-  const initialTaskData = {
+  const defaultInitialTaskData = {
     title: "",
     description: "",
     deadline: "",
@@ -46,9 +47,13 @@ const AddModal = ({
     comment_file: "",
     name_file: "",
     global_task_id: globalTaskId,
-    parentTaskId, // Добавляем parentTaskId
+    parentTaskId,
     rootTaskId,
   };
+
+  const initialTaskData = externalInitialTaskData
+    ? { ...defaultInitialTaskData, ...externalInitialTaskData }
+    : defaultInitialTaskData;
 
   const [taskData, setTaskData] = useState(initialTaskData);
   const [users, setUsers] = useState([]);
@@ -119,6 +124,36 @@ const AddModal = ({
       }
     }
   }, [userId, users]);
+
+  // Обновляем taskData при изменении externalInitialTaskData
+  useEffect(() => {
+    if (isOpen && externalInitialTaskData) {
+      setTaskData(initialTaskData);
+    }
+  }, [isOpen, externalInitialTaskData]);
+
+  // Принудительная активация Quill редактора при открытии модального окна
+  useEffect(() => {
+    if (isOpen && quillInstance) {
+      // Небольшая задержка для корректной инициализации
+      setTimeout(() => {
+        if (quillInstance && quillInstance.root) {
+          quillInstance.root.focus();
+        }
+      }, 100);
+    }
+  }, [isOpen, quillInstance]);
+
+  // Обновление содержимого Quill при изменении externalInitialTaskData
+  useEffect(() => {
+    if (
+      quillInstance &&
+      externalInitialTaskData &&
+      externalInitialTaskData.description
+    ) {
+      quillInstance.root.innerHTML = externalInitialTaskData.description;
+    }
+  }, [quillInstance, externalInitialTaskData]);
 
   useEffect(() => {
     const fetchUsers = async () => {
@@ -269,7 +304,13 @@ const AddModal = ({
           backgroundColor: "linear-gradient(to right, #006400, #00FF00)",
         }).showToast();
         quillInstance.root.innerHTML = "";
-        closeModal();
+
+        // Возвращаем ID первой созданной задачи через callback
+        if (onClose && typeof onClose === "function") {
+          onClose(taskIds[0]); // Возвращаем ID первой задачи
+        } else {
+          closeModal();
+        }
       } catch (error) {
         console.error("Ошибка при создании задачи:", error);
         Toastify({
@@ -326,9 +367,14 @@ const AddModal = ({
         },
       });
       setQuillInstance(quill);
-      if (selectedTemplate) {
+
+      // Устанавливаем начальное содержимое из externalInitialTaskData
+      if (externalInitialTaskData && externalInitialTaskData.description) {
+        quill.root.innerHTML = externalInitialTaskData.description;
+      } else if (selectedTemplate) {
         quill.root.innerHTML = selectedTemplate.description;
       }
+
       quill.on("text-change", () => {
         setTaskData((prev) => ({ ...prev, description: quill.root.innerHTML }));
       });
@@ -336,7 +382,7 @@ const AddModal = ({
         quill.off("text-change");
       };
     }
-  }, [quillInstance, selectedTemplate]);
+  }, [quillInstance, selectedTemplate, externalInitialTaskData]);
 
   const availableTags = useMemo(() => {
     let existingTags = [];
@@ -353,9 +399,8 @@ const AddModal = ({
   const remainingUsersForRole = useCallback(
     (roleKey) => {
       return users.filter(
-        (user) =>
-          !taskData[roleKey].includes(user.id) &&
-          user.id !== taskData.created_by
+        (user) => !taskData[roleKey].includes(user.id)
+        // user.id !== taskData.created_by // ДАННУЮ ЛОГИКУ УДАЛЯТЬ НЕЛЬЗЯ! Запрещает создателю задачи назначать себя исполнителем/зрителем/утверждающим
       );
     },
     [users, taskData]
@@ -372,9 +417,22 @@ const AddModal = ({
             value={taskData.title}
             onChange={handleChange}
             placeholder="Наименование задачи"
+            onClick={(e) => e.stopPropagation()}
+            onMouseDown={(e) => e.stopPropagation()}
+            onFocus={(e) => e.stopPropagation()}
+            style={{
+              pointerEvents: "auto",
+              position: "relative",
+              zIndex: 100001,
+            }}
           />
 
-          <div className={styles.editorContainer}>
+          <div
+            className={styles.editorContainer}
+            onClick={(e) => e.stopPropagation()}
+            onMouseDown={(e) => e.stopPropagation()}
+            onFocus={(e) => e.stopPropagation()}
+          >
             <div ref={quillRef} className="ql-editor" />
           </div>
 

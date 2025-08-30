@@ -1255,16 +1255,18 @@ app.post("/api/call-purposes", async (req, res) => {
   }
 });
 
-// API для обновления звонка (цель, описание и итог)
+// API для обновления звонка (цель, описание, итог, reminder_id и task_id)
 app.put("/api/calls/:callId", async (req, res) => {
   const { callId } = req.params;
-  const { purpose_id, description, outcome } = req.body;
+  const { purpose_id, description, outcome, reminder_id, task_id } = req.body;
 
   console.log("Получен запрос на обновление звонка:", {
     callId,
     purpose_id,
     description,
     outcome,
+    reminder_id,
+    task_id,
     body: req.body,
   });
 
@@ -1280,15 +1282,17 @@ app.put("/api/calls/:callId", async (req, res) => {
 
     const query = `
       UPDATE calls 
-      SET purpose_id = $1, description = $2, outcome = $3, updated_at = NOW()
-      WHERE id = $4
-      RETURNING id, caller_number, receiver_number, purpose_id, description, outcome, updated_at
+      SET purpose_id = $1, description = $2, outcome = $3, reminder_id = $4, task_id = $5, updated_at = NOW()
+      WHERE id = $6
+      RETURNING id, caller_number, receiver_number, purpose_id, description, outcome, reminder_id, task_id, updated_at
     `;
 
     console.log("Выполняем запрос:", query, [
       purpose_id,
       description,
       outcome,
+      reminder_id,
+      task_id,
       callId,
     ]);
 
@@ -1296,6 +1300,8 @@ app.put("/api/calls/:callId", async (req, res) => {
       purpose_id,
       description,
       outcome,
+      reminder_id,
+      task_id,
       callId,
     ]);
 
@@ -1325,6 +1331,8 @@ app.get("/api/calls/:callId/details", async (req, res) => {
         c.purpose_id,
         c.description,
         c.outcome,
+        c.reminder_id,
+        c.task_id,
         c.updated_at,
         cp.name as purpose_name,
         cp.description as purpose_description
