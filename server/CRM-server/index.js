@@ -1446,6 +1446,107 @@ app.get("/api/department-employees/:departmentId", async (req, res) => {
   }
 });
 
+// API для получения истории звонков по компании
+app.get("/api/company-calls/:companyId", async (req, res) => {
+  const { companyId } = req.params;
+  const { page = 1, limit = 20 } = req.query;
+
+  try {
+    const offset = (page - 1) * limit;
+
+    // Запрос для получения звонков, связанных с компанией
+    const query = `
+      SELECT 
+        c.id,
+        c.caller_number,
+        c.receiver_number,
+        c.accepted_at,
+        c.status,
+        c.purpose_id,
+        c.description,
+        c.outcome,
+        c.reminder_id,
+        c.task_id,
+        c.updated_at,
+        cp.name as purpose_name,
+        cp.description as purpose_description,
+        -- Информация о звонящем (дилер)
+        CONCAT(d.last_name, ' ', d.first_name, ' ', COALESCE(d.middle_name, '')) as caller_name,
+        d.id as dealer_id,
+        -- Информация о получателе (сотрудник)
+        CONCAT(u.last_name, ' ', u.first_name, ' ', COALESCE(u.middle_name, '')) as receiver_name,
+        u.id as receiver_user_id,
+        -- Информация о напоминании
+        r.title as reminder_title,
+        r.comment as reminder_comment,
+        r.date_time as reminder_date,
+        -- Исполнитель напоминания
+        CONCAT(reminder_executor.last_name, ' ', reminder_executor.first_name, ' ', COALESCE(reminder_executor.middle_name, '')) as reminder_executor_name,
+        reminder_executor.id as reminder_executor_id,
+        -- Информация о задаче
+        t.title as task_title,
+        t.description as task_description,
+        t.status as task_status,
+        -- Создатель задачи
+        CONCAT(task_creator.last_name, ' ', task_creator.first_name, ' ', COALESCE(task_creator.middle_name, '')) as task_creator_name,
+        task_creator.id as task_creator_id,
+        -- Исполнители задачи (объединенные в строку)
+        COALESCE(
+          (SELECT STRING_AGG(
+            CONCAT(task_executors.last_name, ' ', task_executors.first_name, ' ', COALESCE(task_executors.middle_name, '')), 
+            ', '
+          ) 
+          FROM task_assignments ta
+          JOIN users task_executors ON ta.user_id = task_executors.id
+          WHERE ta.task_id = t.id), 
+          'Не назначен'
+        ) as task_executors_names
+      FROM calls c
+      LEFT JOIN call_purposes cp ON c.purpose_id = cp.id
+      -- Связь с дилерами через номера телефонов
+      LEFT JOIN dealer_phone_numbers dpn ON c.caller_number = dpn.phone_number
+      LEFT JOIN dealers d ON dpn.dealer_id = d.id
+      -- Связь с сотрудниками через номера телефонов
+      LEFT JOIN user_phones up ON c.receiver_number = up.phone_number
+      LEFT JOIN users u ON up.user_id = u.id
+      -- Связь с напоминаниями и их исполнителями
+      LEFT JOIN reminders r ON c.reminder_id = r.id
+      LEFT JOIN users reminder_executor ON r.user_id = reminder_executor.id
+      -- Связь с задачами и их создателями
+      LEFT JOIN tasks t ON c.task_id = t.id
+      LEFT JOIN users task_creator ON t.created_by = task_creator.id
+      WHERE c.description IS NOT NULL 
+        AND d.company_id = $1
+      ORDER BY c.accepted_at DESC
+      LIMIT $2 OFFSET $3
+    `;
+
+    const result = await dbPool.query(query, [companyId, limit, offset]);
+
+    // Запрос для общего количества
+    const countQuery = `
+      SELECT COUNT(*) 
+      FROM calls c
+      LEFT JOIN dealer_phone_numbers dpn ON c.caller_number = dpn.phone_number
+      LEFT JOIN dealers d ON dpn.dealer_id = d.id
+      WHERE c.description IS NOT NULL 
+        AND d.company_id = $1
+    `;
+
+    const countResult = await dbPool.query(countQuery, [companyId]);
+
+    res.json({
+      data: result.rows,
+      total: parseInt(countResult.rows[0].count, 10),
+      page: parseInt(page, 10),
+      limit: parseInt(limit, 10),
+    });
+  } catch (error) {
+    console.error("Ошибка при получении истории звонков компании:", error);
+    res.status(500).json({ error: "Ошибка сервера", details: error.message });
+  }
+});
+
 // Получение всех сотрудников, которые есть в звонках (для фильтров)
 app.get("/api/calls-employees", async (req, res) => {
   try {

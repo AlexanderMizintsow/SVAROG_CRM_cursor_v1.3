@@ -1,0 +1,265 @@
+.call-history-container {
+  padding: 20px;
+  max-width: 100%;
+
+  .call-history-title {
+    margin-bottom: 24px;
+    color: #333;
+    font-weight: 600;
+  }
+
+  .calls-grid {
+    display: grid;
+    gap: 16px;
+    margin-bottom: 24px;
+  }
+
+  .call-card {
+    border-radius: 12px;
+    transition: all 0.3s ease;
+    border: 1px solid #e0e0e0;
+
+    &:hover {
+      box-shadow: 0 8px 25px rgba(0, 0, 0, 0.15);
+      transform: translateY(-2px);
+    }
+
+    .call-card-content {
+      padding: 20px;
+    }
+
+    .call-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      margin-bottom: 16px;
+
+      .call-info-main {
+        flex: 1;
+
+        .call-number-info {
+          display: flex;
+          align-items: center;
+          gap: 8px;
+          margin-bottom: 8px;
+
+          .call-icon {
+            color: #2196f3;
+            font-size: 20px;
+          }
+
+          .call-number {
+            font-weight: 600;
+            color: #333;
+            margin: 0;
+          }
+        }
+
+        .call-meta {
+          display: flex;
+          align-items: center;
+          gap: 12px;
+
+          .status-chip {
+            font-size: 0.75rem;
+            font-weight: 500;
+          }
+
+          .call-date {
+            color: #666;
+            font-size: 0.8rem;
+          }
+        }
+      }
+
+      .call-actions {
+        display: flex;
+        gap: 8px;
+
+        .reminder-icon,
+        .task-icon {
+          padding: 6px;
+
+          &:hover {
+            background-color: rgba(0, 0, 0, 0.04);
+          }
+        }
+      }
+    }
+
+    .call-divider {
+      margin: 16px 0;
+      border-color: #e0e0e0;
+    }
+
+    .call-details {
+      .caller-info,
+      .receiver-info,
+      .purpose-info,
+      .outcome-info {
+        margin-bottom: 16px;
+
+        .caller-header,
+        .receiver-header,
+        .purpose-header,
+        .outcome-header {
+          display: flex;
+          align-items: center;
+          gap: 8px;
+          margin-bottom: 4px;
+
+          .caller-icon,
+          .receiver-icon,
+          .purpose-icon {
+            color: #666;
+            font-size: 16px;
+          }
+
+          .caller-label,
+          .receiver-label,
+          .purpose-label,
+          .outcome-label {
+            font-weight: 600;
+            color: #555;
+            margin: 0;
+          }
+        }
+
+        .caller-name,
+        .receiver-name,
+        .purpose-name,
+        .outcome-text {
+          color: #333;
+          margin: 0;
+          padding-left: 24px;
+        }
+      }
+
+      .description-section {
+        margin-top: 16px;
+        padding-top: 16px;
+        border-top: 1px solid #f0f0f0;
+
+        .description-header {
+          display: flex;
+          align-items: center;
+          gap: 8px;
+          margin-bottom: 8px;
+
+          .description-icon {
+            color: #666;
+            font-size: 16px;
+          }
+
+          .description-label {
+            font-weight: 600;
+            color: #555;
+            margin: 0;
+          }
+        }
+
+        .description-text {
+          color: #333;
+          margin: 0;
+          padding-left: 24px;
+          line-height: 1.5;
+          white-space: pre-wrap;
+        }
+      }
+    }
+  }
+}
+
+// Адаптивность
+@media (max-width: 768px) {
+  .call-history-container {
+    padding: 16px;
+
+    .call-card {
+      .call-card-content {
+        padding: 16px;
+      }
+
+      .call-header {
+        flex-direction: column;
+        gap: 12px;
+
+        .call-actions {
+          align-self: flex-end;
+        }
+      }
+
+      .call-details {
+        .caller-info,
+        .receiver-info,
+        .purpose-info,
+        .outcome-info {
+          .caller-name,
+          .receiver-name,
+          .purpose-name,
+          .outcome-text {
+            padding-left: 16px;
+          }
+        }
+
+        .description-section {
+          .description-text {
+            padding-left: 16px;
+          }
+        }
+      }
+    }
+  }
+}
+
+// Анимации
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.call-card {
+  animation: fadeIn 0.3s ease-out;
+}
+
+// Стили для тултипов
+.MuiTooltip-tooltip {
+  background-color: #333 !important;
+  color: white !important;
+  font-size: 0.875rem !important;
+  padding: 12px !important;
+  border-radius: 8px !important;
+  max-width: 300px !important;
+
+  .MuiTypography-body2 {
+    color: white !important;
+    margin-bottom: 4px !important;
+
+    &:last-child {
+      margin-bottom: 0 !important;
+    }
+  }
+}
+
+// Стили для пагинации
+.MuiPagination-root {
+  .MuiPaginationItem-root {
+    border-radius: 8px;
+    margin: 0 2px;
+
+    &.Mui-selected {
+      background-color: #2196f3;
+      color: white;
+
+      &:hover {
+        background-color: #1976d2;
+      }
+    }
+  }
+}
