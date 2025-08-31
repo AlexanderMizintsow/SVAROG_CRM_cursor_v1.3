@@ -342,6 +342,8 @@ app.get("/api/calls", async (req, res) => {
         calls.receiver_number,
         calls.accepted_at,
         calls.status,
+        calls.reminder_id,
+        calls.task_id,
         CASE 
           WHEN dealers.id IS NOT NULL THEN CONCAT(dealers.last_name, ' ', dealers.first_name, ' ', COALESCE(dealers.middle_name, ''))
           ELSE CONCAT(users.last_name, ' ', users.first_name, ' ', COALESCE(users.middle_name, ''))
@@ -349,9 +351,31 @@ app.get("/api/calls", async (req, res) => {
         CASE 
           WHEN dealers2.id IS NOT NULL THEN CONCAT(dealers2.last_name, ' ', dealers2.first_name, ' ', COALESCE(dealers2.middle_name, ''))
           ELSE CONCAT(users2.last_name, ' ', users2.first_name, ' ', COALESCE(users2.middle_name, ''))
-        END AS receiver_name
+        END AS receiver_name,
+        reminders.title AS reminder_title,
+        reminders.comment AS reminder_comment,
+        CONCAT(reminder_users.last_name, ' ', reminder_users.first_name, ' ', COALESCE(reminder_users.middle_name, '')) AS reminder_creator_name,
+        tasks.title AS task_title,
+        tasks.description AS task_description,
+        tasks.status AS task_status,
+        CONCAT(task_creator.last_name, ' ', task_creator.first_name, ' ', COALESCE(task_creator.middle_name, '')) AS task_creator_name,
+        -- Исполнители задачи (объединенные в строку)
+        COALESCE(
+          (SELECT STRING_AGG(
+            CONCAT(task_executors.last_name, ' ', task_executors.first_name, ' ', COALESCE(task_executors.middle_name, '')), 
+            ', '
+          ) 
+          FROM task_assignments ta
+          JOIN users task_executors ON ta.user_id = task_executors.id
+          WHERE ta.task_id = tasks.id), 
+          'Не назначен'
+        ) as task_executors_names
       FROM calls
       ${joins.join("\n")}
+      LEFT JOIN reminders ON calls.reminder_id = reminders.id
+      LEFT JOIN users AS reminder_users ON reminders.user_id = reminder_users.id
+      LEFT JOIN tasks ON calls.task_id = tasks.id
+      LEFT JOIN users AS task_creator ON tasks.created_by = task_creator.id
       ${whereClause}
       ORDER BY calls.accepted_at DESC
       LIMIT $${params.length + 1} OFFSET $${params.length + 2}
@@ -840,6 +864,45 @@ app.put("/api/calls-settings/:userId", async (req, res) => {
 });
 
 // Обработчик маршрута для создания напоминания для ЗВОНКОВ
+// Эндпоинт для получения напоминания по ID
+app.get("/api/reminders/:id", async (req, res) => {
+  const { id } = req.params;
+
+  try {
+    const query = `
+      SELECT 
+        r.id,
+        r.related_id,
+        r.user_id,
+        r.date_time,
+        r.comment,
+        r.type_reminders,
+        r.priority_notifications,
+        r.title,
+        r.tags,
+        r.links,
+        r.created_at,
+        r.is_completed,
+        r.completed_at,
+        CONCAT(u.last_name, ' ', u.first_name, ' ', COALESCE(u.middle_name, '')) AS creator_name
+      FROM reminders r
+      LEFT JOIN users u ON r.user_id = u.id
+      WHERE r.id = $1
+    `;
+
+    const result = await dbPool.query(query, [id]);
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: "Напоминание не найдено" });
+    }
+
+    res.json(result.rows[0]);
+  } catch (error) {
+    console.error("Ошибка при получении напоминания:", error);
+    res.status(500).json({ error: "Ошибка при получении напоминания" });
+  }
+});
+
 app.post("/api/reminders", async (req, res) => {
   const {
     related_id,

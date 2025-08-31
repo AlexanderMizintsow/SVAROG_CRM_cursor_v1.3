@@ -139,18 +139,28 @@ const CallHistory = ({ companyId }) => {
         return "Отменена";
       case "on_hold":
         return "Приостановлена";
+      case "backlog":
+        return "В очереди";
       default:
         return status || "Неизвестно";
     }
   };
 
   const formatDate = (dateString) => {
-    return new Date(dateString).toLocaleString("ru-RU", {
+    // Parse the date string and create a Date object
+    const date = new Date(dateString);
+
+    // Add 4 hours to convert from UTC to Saratov time (UTC+4)
+    const saratovTime = new Date(date.getTime() + 4 * 60 * 60 * 1000);
+
+    // Format the date in Saratov timezone
+    return saratovTime.toLocaleString("ru-RU", {
       year: "numeric",
       month: "2-digit",
       day: "2-digit",
       hour: "2-digit",
       minute: "2-digit",
+      timeZone: "Europe/Samara", // Use Samara timezone (UTC+4) for Saratov Oblast
     });
   };
 
