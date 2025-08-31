@@ -19,3 +19,8 @@ lerna-debug.log*
 # Large data files
 level_*.json
 *.csv
+
+# Electron build files
+Dextop_svarog/dist/
+Dextop_svarog/build/
+*.exe
