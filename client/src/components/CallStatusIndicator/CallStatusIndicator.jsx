@@ -35,7 +35,7 @@ const CallStatusIndicator = ({ isConnected, currentCall }) => {
           return "Звонок";
       }
     }
-    return isConnected ? "Звонки активны" : "Звонки недоступны";
+    return isConnected ? "CRM online" : "CRM offline";
   };
 
   const getTooltipText = () => {
