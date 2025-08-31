@@ -8,6 +8,9 @@ const useCallNotifications = () => {
   const [isConnected, setIsConnected] = useState(false);
   const { user } = useUserStore();
 
+  // Проверяем доступность Electron API
+  const electronAPI = window.electronAPI || null;
+
   const connectToCallServer = useCallback(() => {
     if (!user?.id) return null;
 
@@ -38,6 +41,17 @@ const useCallNotifications = () => {
       console.log("Получено уведомление о входящем звонке:", callData);
       console.log("Устанавливаем currentCall:", callData);
       setCurrentCall(callData);
+
+      // Отправляем уведомление в десктопное приложение
+      if (
+        electronAPI &&
+        typeof electronAPI.sendCallNotification === "function"
+      ) {
+        console.log("Отправляем уведомление в десктопное приложение");
+        electronAPI.sendCallNotification(callData);
+      } else {
+        console.log("Electron API недоступен для уведомлений о звонках");
+      }
     });
 
     // Обработка начала разговора
@@ -45,6 +59,17 @@ const useCallNotifications = () => {
       console.log("Получено уведомление о начале разговора:", callData);
       console.log("Устанавливаем currentCall для активного звонка:", callData);
       setCurrentCall(callData);
+
+      // Отправляем уведомление в десктопное приложение
+      if (
+        electronAPI &&
+        typeof electronAPI.sendCallNotification === "function"
+      ) {
+        console.log(
+          "Отправляем уведомление о начале звонка в десктопное приложение"
+        );
+        electronAPI.sendCallNotification(callData);
+      }
     });
 
     // Обработка завершения звонка
@@ -60,10 +85,18 @@ const useCallNotifications = () => {
       // Пользователь должен закрыть его вручную после внесения необходимых записей
       setCurrentCall(callData);
       console.log("currentCall обновлен на завершенный звонок");
+
+      // Отправляем уведомление о завершении в десктопное приложение
+      if (electronAPI && typeof electronAPI.sendCallEnded === "function") {
+        console.log(
+          "Отправляем уведомление о завершении звонка в десктопное приложение"
+        );
+        electronAPI.sendCallEnded(callData);
+      }
     });
 
     return socket;
-  }, [user?.id]);
+  }, [user?.id, electronAPI]);
 
   const closeCallNotification = useCallback(() => {
     setCurrentCall(null);

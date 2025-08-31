@@ -9,7 +9,7 @@ const io = require("socket.io-client");
 const pool = new Pool({
   user: "postgres",
   host: "localhost",
-  database: "Svarog_TEST",
+  database: "Svarog",
   password: "postgres",
   port: 5432,
 });

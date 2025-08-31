@@ -1,0 +1,51 @@
+{
+  "name": "dextop",
+  "version": "1.0.0",
+  "description": "",
+  "main": "main.js",
+  "scripts": {
+    "start": "electron .",
+    "build": "electron-builder"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "devDependencies": {
+    "electron": "^22.3.0",
+    "electron-builder": "^24.0.0"
+  },
+  "build": {
+    "appId": "com.svarog.dextop",
+    "productName": "Dextop",
+    "files": [
+      "main.js",
+      "preload.js",
+      "package.json",
+      "assets/notification.mp3",
+      "assets/icon.ico",
+      "assets/icon_flashing.ico"
+    ],
+    "directories": {
+      "buildResources": "assets"
+    },
+    "win": {
+      "target": [
+        {
+          "target": "nsis",
+          "arch": [
+            "x64",
+            "ia32"
+          ]
+        }
+      ],
+      "icon": "assets/icon.ico",
+      "requestedExecutionLevel": "asInvoker"
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true
+    }
+  }
+}

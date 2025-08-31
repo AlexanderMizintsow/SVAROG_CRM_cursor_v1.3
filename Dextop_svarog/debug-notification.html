@@ -1,0 +1,53 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Debug Notification</title>
+    <style>
+        body {
+            background: red !important;
+            color: white;
+            font-family: Arial, sans-serif;
+            font-size: 24px;
+            margin: 0;
+            padding: 20px;
+            text-align: center;
+        }
+        .debug {
+            background: blue;
+            padding: 10px;
+            margin: 10px;
+            border-radius: 5px;
+        }
+    </style>
+</head>
+<body>
+    <h1>DEBUG NOTIFICATION</h1>
+    <div class="debug">
+        <p>Если вы видите этот текст, HTML загружается правильно</p>
+        <p>Время загрузки: <span id="time"></span></p>
+    </div>
+    
+    <div class="debug">
+        <p>Данные звонка: <span id="callData">Ожидание...</span></p>
+    </div>
+
+    <script>
+        document.getElementById('time').textContent = new Date().toLocaleTimeString();
+        
+        console.log('Debug HTML загружен');
+        
+        const { ipcRenderer } = require('electron');
+        
+        ipcRenderer.on('call-data', (event, callData) => {
+            console.log('Получены данные:', callData);
+            document.getElementById('callData').textContent = JSON.stringify(callData);
+        });
+        
+        // Обработка клика
+        document.addEventListener('click', () => {
+            console.log('Клик по окну');
+            ipcRenderer.send('notification-clicked');
+        });
+    </script>
+</body>
+</html>

@@ -1,0 +1,196 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Входящий звонок</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            overflow: hidden;
+            user-select: none;
+            -webkit-app-region: drag;
+            width: 100vw;
+            height: 100vh;
+        }
+
+        .notification-container {
+            width: 100%;
+            height: 100%;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            padding: 20px;
+            position: relative;
+        }
+
+        .phone-icon {
+            font-size: 48px;
+            margin-bottom: 15px;
+            animation: pulse 2s infinite;
+        }
+
+        @keyframes pulse {
+            0% { transform: scale(1); opacity: 1; }
+            50% { transform: scale(1.1); opacity: 0.8; }
+            100% { transform: scale(1); opacity: 1; }
+        }
+
+        .call-title {
+            font-size: 18px;
+            font-weight: bold;
+            margin-bottom: 10px;
+            text-align: center;
+        }
+
+        .caller-info {
+            text-align: center;
+            margin-bottom: 15px;
+        }
+
+        .caller-name {
+            font-size: 16px;
+            font-weight: 600;
+            margin-bottom: 5px;
+        }
+
+        .caller-number {
+            font-size: 14px;
+            opacity: 0.9;
+        }
+
+        .caller-type {
+            font-size: 12px;
+            opacity: 0.7;
+            margin-top: 5px;
+        }
+
+        .click-hint {
+            font-size: 12px;
+            opacity: 0.8;
+            text-align: center;
+            margin-top: 10px;
+            -webkit-app-region: no-drag;
+        }
+
+        .close-button {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            width: 20px;
+            height: 20px;
+            background: rgba(255, 255, 255, 0.2);
+            border: none;
+            border-radius: 50%;
+            color: white;
+            font-size: 12px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            -webkit-app-region: no-drag;
+        }
+
+        .close-button:hover {
+            background: rgba(255, 255, 255, 0.3);
+        }
+
+        .debug-info {
+            position: absolute;
+            top: 10px;
+            left: 10px;
+            font-size: 10px;
+            opacity: 0.7;
+            -webkit-app-region: no-drag;
+        }
+    </style>
+</head>
+<body>
+    <div class="debug-info" id="debugInfo">Загрузка...</div>
+    
+    <div class="notification-container" id="notificationContainer">
+        <button class="close-button" id="closeButton">×</button>
+        
+        <div class="phone-icon">📞</div>
+        
+        <div class="call-title" id="callTitle">Входящий звонок</div>
+        
+        <div class="caller-info">
+            <div class="caller-name" id="callerName">Загрузка...</div>
+            <div class="caller-number" id="callerNumber"></div>
+            <div class="caller-type" id="callerType"></div>
+        </div>
+        
+        <div class="click-hint">Нажмите для открытия приложения</div>
+    </div>
+
+    <script>
+        console.log('Скрипт загружен');
+        
+        // Обновляем отладочную информацию
+        document.getElementById('debugInfo').textContent = 'HTML загружен: ' + new Date().toLocaleTimeString();
+        
+        const { ipcRenderer } = require('electron');
+
+        // Получаем данные о звонке от основного процесса
+        ipcRenderer.on('call-data', (event, callData) => {
+            console.log('Получены данные о звонке:', callData);
+            document.getElementById('debugInfo').textContent = 'Данные получены: ' + new Date().toLocaleTimeString();
+            
+            // Обновляем информацию в интерфейсе
+            document.getElementById('callerName').textContent = callData.callerName || 'Неизвестный';
+            document.getElementById('callerNumber').textContent = callData.callerNumber || '';
+            
+            // Определяем тип звонящего
+            let callerTypeText = '';
+            if (callData.callerType === 'user') {
+                callerTypeText = 'Сотрудник';
+            } else if (callData.callerType === 'dealer') {
+                callerTypeText = 'Дилер';
+            } else {
+                callerTypeText = 'Неизвестный';
+            }
+            document.getElementById('callerType').textContent = callerTypeText;
+            
+            // Обновляем заголовок в зависимости от типа звонка
+            if (callData.type === 'incoming_call') {
+                document.getElementById('callTitle').textContent = 'Входящий звонок';
+            } else if (callData.type === 'call_started') {
+                document.getElementById('callTitle').textContent = 'Активный звонок';
+            } else if (callData.type === 'call_ended') {
+                document.getElementById('callTitle').textContent = 'Звонок завершен';
+            }
+        });
+
+        // Обработка клика по окну уведомления
+        document.getElementById('notificationContainer').addEventListener('click', () => {
+            console.log('Клик по окну уведомления');
+            ipcRenderer.send('notification-clicked');
+        });
+
+        // Обработка клика по кнопке закрытия
+        document.getElementById('closeButton').addEventListener('click', (e) => {
+            e.stopPropagation();
+            console.log('Клик по кнопке закрытия');
+            window.close();
+        });
+
+        // Автоматическое закрытие окна через 30 секунд
+        setTimeout(() => {
+            console.log('Автоматическое закрытие окна');
+            window.close();
+        }, 30000);
+
+        console.log('Скрипт инициализирован');
+    </script>
+</body>
+</html>

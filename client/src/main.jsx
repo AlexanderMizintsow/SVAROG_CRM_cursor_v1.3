@@ -71,3 +71,49 @@ pm2 list
 1. npm run build
   
 */
+
+// НОВЫЕ pm2
+/*
+
+# Остановка и удаление существующих процессов
+pm2 stop all
+pm2 delete all
+
+# Запуск серверов
+cd server/asterisk_server; pm2 start asterisk.js --name "asterisk-server"; cd ../..
+cd server/AW; pm2 start index.js --name "aw-server"; cd ../..
+cd server/CRM-server; pm2 start index.js --name "CRM-server"; cd ../..
+cd server/dealer-server; pm2 start index.js --name "dealer-server"; cd ../..
+cd server/register; pm2 start index.js --name "register-service"; cd ../..
+cd server/telegram_dealer_bot; pm2 start index.js --name "telegram_dealer_bot-server"; cd ../..
+cd server/tg-bot-server; pm2 start index.js --name "tg-bot-server"; cd ../..
+cd server/email-service; pm2 start index.js --name "email-service"; cd ../..
+cd client; pm2 serve dist 5173 --spa --name "SVAROG"; cd ..
+
+# Сохранение конфигурации
+pm2 save
+
+# Создание задачи в Windows Task Scheduler
+schtasks /create /tn "SVAROG-Restart" /tr "pm2 restart all" /sc daily /st 07:50 /f
+
+
+
+# Проверка серверов
+pm2 list
+
+# Проверка расписания
+schtasks /query /tn "SVAROG-Restart"
+
+# Изменить на 8:00
+schtasks /change /tn "SVAROG-Restart" /st 08:00
+
+# Изменить на 6:30
+schtasks /change /tn "SVAROG-Restart" /st 06:30
+
+schtasks /delete /tn "SVAROG-Restart" /f
+
+pm2 stop all
+pm2 delete all
+pm2 save
+
+*/

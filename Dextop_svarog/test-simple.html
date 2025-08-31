@@ -1,0 +1,78 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <title>Тест</title>
+    <style>
+      body {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        color: white;
+        font-family: Arial, sans-serif;
+        font-size: 18px;
+        margin: 0;
+        padding: 20px;
+        text-align: center;
+        height: 100vh;
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+        align-items: center;
+      }
+      .test-box {
+        background: rgba(255, 255, 255, 0.2);
+        padding: 20px;
+        border-radius: 10px;
+        margin: 10px;
+      }
+    </style>
+  </head>
+  <body>
+    <h1>🎉 ТЕСТ УВЕДОМЛЕНИЯ</h1>
+
+    <div class="test-box">
+      <p>Если вы видите этот текст с градиентным фоном,</p>
+      <p>значит HTML загружается правильно!</p>
+    </div>
+
+    <div class="test-box">
+      <p>Время загрузки: <span id="time"></span></p>
+      <p>Данные звонка: <span id="callData">Ожидание...</span></p>
+    </div>
+
+    <script>
+      // Показываем время загрузки
+      document.getElementById("time").textContent =
+        new Date().toLocaleTimeString();
+
+      console.log("Тестовый HTML загружен успешно");
+
+      // Проверяем доступность Electron API
+      if (typeof require !== "undefined") {
+        try {
+          const { ipcRenderer } = require("electron");
+          console.log("Electron API доступен");
+
+          // Получаем данные о звонке
+          ipcRenderer.on("call-data", (event, callData) => {
+            console.log("Получены данные звонка:", callData);
+            document.getElementById("callData").textContent =
+              callData.callerName + " (" + callData.callerNumber + ")";
+          });
+
+          // Обработка клика
+          document.addEventListener("click", () => {
+            console.log("Клик по окну уведомления");
+            ipcRenderer.send("notification-clicked");
+          });
+        } catch (error) {
+          console.error("Ошибка при работе с Electron API:", error);
+          document.getElementById("callData").textContent =
+            "Ошибка API: " + error.message;
+        }
+      } else {
+        console.log("Electron API недоступен");
+        document.getElementById("callData").textContent =
+          "Electron API недоступен";
+      }
+    </script>
+  </body>
+</html>
