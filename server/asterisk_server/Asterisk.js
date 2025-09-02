@@ -44,6 +44,30 @@ const desktopPath = path.join(
   "Desktop"
 );
 
+// Функция для проверки внутренних номеров
+const isInternalNumber = (phoneNumber) => {
+  if (!phoneNumber) return false;
+
+  // Проверяем, является ли номер трехзначным
+  if (phoneNumber.length === 3) {
+    return true;
+  }
+
+  // Можно добавить другие паттерны внутренних номеров
+  // Например, номера начинающиеся с определенных цифр
+  // const internalPatterns = [
+  //   /^777$/, // Трехзначные номера
+  //   /^888$/,
+  //   /^999$/,
+  //   /^100$/, // Можно добавить другие
+  //   /^101$/,
+  //   /^102$/,
+  // ];
+
+  // return internalPatterns.some((pattern) => pattern.test(phoneNumber));
+  return false; // Пока не нужны дополнительные паттерны
+};
+
 // Функция для определения пользователя по номеру телефона
 const findUserByPhoneNumber = async (phoneNumber) => {
   try {
@@ -85,6 +109,12 @@ const sendIncomingCallNotification = async (callData) => {
     console.log(
       `Попытка отправки уведомления: звонящий=${callData.callerNumber}, получатель=${callData.receiverNumber}`
     );
+
+    // Проверяем, не является ли звонящий внутренним номером
+    if (isInternalNumber(callData.callerNumber)) {
+      console.log(`Пропускаем внутренний номер: ${callData.callerNumber}`);
+      return;
+    }
 
     // Определяем получателя звонка по номеру, на который звонят
     const receiverUser = await findUserByPhoneNumber(callData.receiverNumber);
@@ -154,6 +184,12 @@ const sendCallStartedNotification = async (callData) => {
   try {
     console.log("Попытка отправки уведомления о начале разговора:", callData);
 
+    // Проверяем, не является ли звонящий внутренним номером
+    if (isInternalNumber(callData.callerNumber)) {
+      console.log(`Пропускаем внутренний номер: ${callData.callerNumber}`);
+      return;
+    }
+
     const receiverUser = await findUserByPhoneNumber(callData.receiverNumber);
 
     if (receiverUser) {
@@ -222,6 +258,12 @@ const sendCallEndedNotification = async (callData, callId) => {
   console.log("callId:", callId);
 
   try {
+    // Проверяем, не является ли звонящий внутренним номером
+    if (isInternalNumber(callData.callerNumber)) {
+      console.log(`Пропускаем внутренний номер: ${callData.callerNumber}`);
+      return;
+    }
+
     const receiverUser = await findUserByPhoneNumber(callData.receiverNumber);
 
     if (receiverUser) {
