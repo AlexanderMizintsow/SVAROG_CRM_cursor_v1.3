@@ -6,6 +6,7 @@ import { FaPlus } from 'react-icons/fa'
 import UserStore from '../../../store/userStore'
 import GlobalTaskPage from './GlobalTaskPage'
 import CreateGlobalTaskForm from './CreateGlobalTaskForm'
+import HelpModalGlobalTask from './subcomponents/HelpModalGlobalTask'
 import './styles/GlobalTasksContainer.scss'
 import axios from 'axios'
 
@@ -18,6 +19,7 @@ const GlobalTasksContainer = ({ onClose }) => {
   const [refreshSubTask, setrefreshSubTask] = useState(true)
   const [refreshHistory, setrefreshHistory] = useState([])
   const [error, setError] = useState(null)
+  const [isHelpModalOpen, setIsHelpModalOpen] = useState(false)
 
   const userId = user ? user.id : null
 
@@ -27,18 +29,14 @@ const GlobalTasksContainer = ({ onClose }) => {
       if (!selectedTask) return
       try {
         // Загрузка обновленной задачи через axios
-        const response = await axios.get(
-          `${API_BASE_URL}5000/api/global-tasks/${taskId}`
-        )
+        const response = await axios.get(`${API_BASE_URL}5000/api/global-tasks/${taskId}`)
         const updatedTask = response.data
 
         setSelectedTask(updatedTask)
 
         // Обновление списка задач
         setTasks((prevTasks) =>
-          prevTasks.map((task) =>
-            task.id === updatedTask.id ? updatedTask : task
-          )
+          prevTasks.map((task) => (task.id === updatedTask.id ? updatedTask : task))
         )
 
         const historyResponse = await axios.get(
@@ -59,15 +57,12 @@ const GlobalTasksContainer = ({ onClose }) => {
     setIsLoading(true)
     setError(null)
     try {
-      const response = await fetch(
-        `${API_BASE_URL}5000/api/global-tasks-all?userId=${userId}`,
-        {
-          method: 'GET',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-        }
-      )
+      const response = await fetch(`${API_BASE_URL}5000/api/global-tasks-all?userId=${userId}`, {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      })
 
       if (!response.ok) {
         const errorData = await response.json()
@@ -118,22 +113,16 @@ const GlobalTasksContainer = ({ onClose }) => {
         const dataToSend = {
           ...newTaskData,
           created_by: userId, // Передаем ID текущего пользователя как автора
-          deadline: newTaskData.deadline
-            ? newTaskData.deadline.toISOString()
-            : null,
+          deadline: newTaskData.deadline ? newTaskData.deadline.toISOString() : null,
           // goals и additionalInfo должны быть уже в правильном формате (объект/массив) из формы
         }
 
         // Используем axios для отправки POST-запроса
-        const response = await axios.post(
-          `${API_BASE_URL}5000/api/create/global-tasks`,
-          dataToSend,
-          {
-            headers: {
-              'Content-Type': 'application/json',
-            },
-          }
-        )
+        await axios.post(`${API_BASE_URL}5000/api/create/global-tasks`, dataToSend, {
+          headers: {
+            'Content-Type': 'application/json',
+          },
+        })
 
         // После успешного ответа
         handleCloseCreateForm() // Закрыть форму
@@ -150,10 +139,7 @@ const GlobalTasksContainer = ({ onClose }) => {
           )
         } else if (error.request) {
           // Запрос был сделан, но ответ не был получен
-          console.error(
-            'Ошибка сети или другая ошибка при сохранении:',
-            error.request
-          )
+          console.error('Ошибка сети или другая ошибка при сохранении:', error.request)
           alert('Произошла ошибка при отправке данных.')
         } else {
           // Произошла ошибка при настройке запроса
@@ -242,9 +228,7 @@ const GlobalTasksContainer = ({ onClose }) => {
               Загрузка...
             </button>
           </div>
-          <div className="global-tasks-container__loading">
-            Загрузка проектов...
-          </div>
+          <div className="global-tasks-container__loading">Загрузка проектов...</div>
         </div>
       </div>
     )
@@ -262,25 +246,18 @@ const GlobalTasksContainer = ({ onClose }) => {
               className="global-tasks-container__create-button"
               onClick={handleOpenCreateForm}
             >
-              <FaPlus className="global-tasks-container__create-icon" /> Создать
-              проект
+              <FaPlus className="global-tasks-container__create-icon" /> Создать проект
             </button>
           </div>
           <div className="global-tasks-container__error">{error}</div>
           {/* Кнопка для повторной попытки загрузки */}
-          <button
-            onClick={fetchGlobalTasks}
-            className="global-tasks-container__retry-button"
-          >
+          <button onClick={fetchGlobalTasks} className="global-tasks-container__retry-button">
             Повторить попытку загрузки
           </button>
         </div>
         {/* Форма создания может быть доступна даже при ошибке загрузки списка */}
         {isCreateFormVisible && (
-          <CreateGlobalTaskForm
-            onSave={handleSaveNewTask}
-            onCancel={handleCloseCreateForm}
-          />
+          <CreateGlobalTaskForm onSave={handleSaveNewTask} onCancel={handleCloseCreateForm} />
         )}
       </div>
     )
@@ -292,16 +269,24 @@ const GlobalTasksContainer = ({ onClose }) => {
       <div className="global-tasks-container__list-view">
         <div className="global-tasks-container__list-header">
           <h1 className="global-tasks-container__title">Список проектов</h1>
-          <button className="close-button" onClick={onClose}>
-            <MdClose />
-          </button>
-          <button
-            className="global-tasks-container__create-button"
-            onClick={handleOpenCreateForm}
-          >
-            <FaPlus className="global-tasks-container__create-icon" /> Создать
-            проект
-          </button>
+          <div className="global-tasks-container__header-buttons">
+            <button
+              className="global-tasks-container__help-button"
+              onClick={() => setIsHelpModalOpen(true)}
+              title="Открыть справку"
+            >
+              ?
+            </button>
+            <button className="close-button" onClick={onClose}>
+              <MdClose />
+            </button>
+            <button
+              className="global-tasks-container__create-button"
+              onClick={handleOpenCreateForm}
+            >
+              <FaPlus className="global-tasks-container__create-icon" /> Создать проект
+            </button>
+          </div>
         </div>
 
         <div className="global-tasks-container__list">
@@ -317,9 +302,7 @@ const GlobalTasksContainer = ({ onClose }) => {
                   {task.status === 'Пауза' ? 'ПРОЕКТ ПРИОСТАНОВЛЕН' : null}
                 </h2>
                 <div className="global-tasks-container__item-header">
-                  <h3 className="global-tasks-container__item-title">
-                    {task.title}
-                  </h3>
+                  <h3 className="global-tasks-container__item-title">{task.title}</h3>
                   <span
                     className={`global-tasks-container__item-priority global-tasks-container__item-priority--${task.priority}`}
                   >
@@ -332,9 +315,7 @@ const GlobalTasksContainer = ({ onClose }) => {
                 </div>
                 {/* Убедитесь, что task.description существует и используйте безопасный доступ */}
                 <p className="global-tasks-container__item-description">
-                  {task.description
-                    ? `${task.description.substring(0, 100)}...`
-                    : 'Нет описания'}
+                  {task.description ? `${task.description.substring(0, 100)}...` : 'Нет описания'}
                 </p>
                 <div className="global-tasks-container__item-meta">
                   {/* Предполагаем, что первый ответственный в массиве - главный */}
@@ -347,9 +328,7 @@ const GlobalTasksContainer = ({ onClose }) => {
                   {/* Убедитесь, что task.deadline существует и форматируйте его */}
                   <span>
                     Срок:{' '}
-                    {task.deadline
-                      ? new Date(task.deadline).toLocaleDateString()
-                      : 'Не указан'}
+                    {task.deadline ? new Date(task.deadline).toLocaleDateString() : 'Не указан'}
                   </span>
                 </div>
                 {/* Прогресс бар в списке */}
@@ -383,10 +362,12 @@ const GlobalTasksContainer = ({ onClose }) => {
 
       {/* Рендерим форму создания задачи, если isCreateFormVisible равно true */}
       {isCreateFormVisible && (
-        <CreateGlobalTaskForm
-          onSave={handleSaveNewTask}
-          onCancel={handleCloseCreateForm}
-        />
+        <CreateGlobalTaskForm onSave={handleSaveNewTask} onCancel={handleCloseCreateForm} />
+      )}
+
+      {/* Рендерим справку, если isHelpModalOpen равно true */}
+      {isHelpModalOpen && (
+        <HelpModalGlobalTask open={isHelpModalOpen} onClose={() => setIsHelpModalOpen(false)} />
       )}
     </div>
   )

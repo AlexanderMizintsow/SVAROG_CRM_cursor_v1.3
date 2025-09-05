@@ -35,6 +35,8 @@ import TaskListManager from './subcomponents/TaskListManager/TaskListManager'
 import './Boards.scss'
 import GlobalTasksContainer from '../globalTask/GlobalTasksContainer'
 import { IoMdNotificationsOff } from 'react-icons/io'
+import { AiOutlineQuestionCircle } from 'react-icons/ai'
+import HelpModalKanban from './subcomponents/HelpModalKanban'
 
 const Boards = () => {
   // Получение состояний из zustand-хранилищ
@@ -56,6 +58,7 @@ const Boards = () => {
   const [isTaskListManagerOpen, setTaskListManagerOpen] = useState(false)
   const [isGlobalProjectOpen, setGlobalProjectOpen] = useState(false)
   const [isCompletedHistoryOpen, setCompletedHistoryOpen] = useState(false)
+  const [isHelpOpen, setHelpOpen] = useState(false)
 
   const userId = user ? user.id : null
 
@@ -253,6 +256,11 @@ const Boards = () => {
           className="toggle-sidebar-button"
           onClick={toggleCompletedHistory}
         />
+        <AiOutlineQuestionCircle
+          title="Справка по Канбан"
+          className="toggle-sidebar-button"
+          onClick={() => setHelpOpen(true)}
+        />
       </div>
       <DragDropContext
         onDragEnd={(result) =>
@@ -416,6 +424,7 @@ const Boards = () => {
         onClose={toggleCompletedHistory}
         userId={userId}
       />
+      <HelpModalKanban open={isHelpOpen} onClose={() => setHelpOpen(false)} />
     </div>
   )
 }

@@ -1,4 +1,3 @@
-import React from 'react'
 import {
   Typography,
   Paper,
@@ -42,6 +41,7 @@ const TaskFiltersHeader = ({
   setSelectedAssignee,
   users,
   updatedTasks,
+  onOpenHelp,
 }) => {
   // Подсчет задач без срока
   const withoutDeadlineCount = updatedTasks.filter((task) => {
@@ -54,20 +54,6 @@ const TaskFiltersHeader = ({
 
     return hasNoDeadline
   }).length
-
-  // Подсчет задач для каждого исполнителя
-  const getUserTaskCounts = (userId) => {
-    return updatedTasks.filter((task) => {
-      // Для задач без срока
-      const hasNoDeadline = task.deadline === null || task.deadline === 'Не указан'
-
-      if (userId === 'all') {
-        return hasNoDeadline
-      } else {
-        return hasNoDeadline && task.assigned_user_ids.includes(userId)
-      }
-    }).length
-  }
 
   return (
     <Paper sx={{ p: 3, mb: 3, borderRadius: 2 }}>
@@ -127,6 +113,21 @@ const TaskFiltersHeader = ({
 
         <Box display="flex" gap={2} alignItems="center">
           <IconButton
+            onClick={onOpenHelp}
+            color="default"
+            title="Открыть справку"
+            sx={{
+              backgroundColor: '#6b7280',
+              color: '#fff',
+              '&:hover': {
+                backgroundColor: '#4b5563',
+              },
+            }}
+          >
+            ?
+          </IconButton>
+
+          <IconButton
             onClick={() => setIsFiltersOpen(!isFiltersOpen)}
             color={isFiltersOpen ? 'primary' : 'default'}
           >
@@ -164,8 +165,6 @@ const TaskFiltersHeader = ({
           const userTaskCount = updatedTasks.filter((task) =>
             task.assigned_user_ids.includes(user.id)
           ).length
-
-          const userWithoutDeadlineCount = getUserTaskCounts(user.id)
 
           if (userTaskCount === 0) return null
 

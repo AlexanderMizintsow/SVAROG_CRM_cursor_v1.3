@@ -421,10 +421,6 @@ async function handleCallbackQuery(bot, chatId, callbackQuery) {
 
 //************************************************************ */
 module.exports = (bot) => {
-  // 1. Инициализация cron-задачи при старте модуля
-  // initReconciliationCron(bot)
-  // initReclamationCron(bot)
-
   // Обработчики сообщений и callback-запросов
   bot.on('message', (msg) => {
     const chatId = msg.chat.id

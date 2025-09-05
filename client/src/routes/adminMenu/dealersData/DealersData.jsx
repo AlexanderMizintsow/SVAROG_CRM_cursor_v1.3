@@ -7,7 +7,7 @@ import { FaRegAddressCard } from 'react-icons/fa'
 import CompanyForm from './company/CompanyForm'
 import DealerForm from './employee/DealerForm'
 import CompanyList from './dealersCard/CompanyList'
-import HelpModalDealersInfo from './HelpModalDealersInfo'
+import HelpModalDealersData from './HelpModalDealersData'
 import SearchBar from '../../../components/searchBar/SearchBar'
 import { API_BASE_URL } from '../../../../config'
 import './dealerData.scss'
@@ -17,14 +17,10 @@ const DealersData = () => {
   const [isFormVisibleDealer, setIsFormVisibleDealer] = useState(false)
   const [searchTerm, setSearchTerm] = useState('')
   const [openHelpModal, setOpenHelpModal] = useState(false)
-  const [helpModalType, setHelpModalType] = useState('')
 
   const handleCompanySubmit = async (company) => {
     try {
-      const response = await axios.post(
-        `${API_BASE_URL}5003/api/companies`,
-        company
-      )
+      const response = await axios.post(`${API_BASE_URL}5003/api/companies`, company)
       Toastify({
         text: `Компания создана: ${response.data.name}`,
         close: true,
@@ -61,19 +57,14 @@ const DealersData = () => {
     setIsFormVisibleCompany(false)
   }
 
-  const handleOpenHelpModal = (type) => {
-    setHelpModalType(type) // Устанавливаем тип справки
+  const handleOpenHelpModal = () => {
     setOpenHelpModal(true) // Открываем модальное окно
   }
 
   return (
     <span style={{ position: 'relative' }}>
       {/* Модальное окно справки */}
-      <HelpModalDealersInfo
-        type={helpModalType}
-        open={openHelpModal}
-        onClose={() => setOpenHelpModal(false)}
-      />
+      <HelpModalDealersData isOpen={openHelpModal} onClose={() => setOpenHelpModal(false)} />
       <MdAddBusiness
         className="icon-pointer"
         title="Создать карточку Дилера"
@@ -98,25 +89,24 @@ const DealersData = () => {
 
       <MdContactSupport
         className="help-icon"
-        onClick={() =>
-          handleOpenHelpModal(
-            isFormVisibleCompany
-              ? 'dealer'
-              : isFormVisibleDealer
-              ? 'persone'
-              : 'card'
-          )
-        }
-        title="Справка"
-        style={{ fontSize: '24px', marginLeft: '15px' }}
+        onClick={handleOpenHelpModal}
+        title="Справка по управлению дилерами"
+        style={{
+          fontSize: '24px',
+          marginLeft: '15px',
+          color: '#0b63c5',
+          cursor: 'pointer',
+          padding: '5px',
+          borderRadius: '50%',
+          backgroundColor: '#eef6ff',
+          border: '2px solid #0b63c5',
+        }}
       />
 
       {/* Поиск */}
       <SearchBar searchTerm={searchTerm} setSearchTerm={setSearchTerm} />
 
-      {!isFormVisibleCompany && !isFormVisibleDealer && (
-        <CompanyList searchTerm={searchTerm} />
-      )}
+      {!isFormVisibleCompany && !isFormVisibleDealer && <CompanyList searchTerm={searchTerm} />}
 
       {isFormVisibleCompany && <CompanyForm onSubmit={handleCompanySubmit} />}
       {isFormVisibleDealer && <DealerForm />}

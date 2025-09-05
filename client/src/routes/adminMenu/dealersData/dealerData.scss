@@ -52,3 +52,32 @@
     }
   }
 }
+
+.help-icon {
+  cursor: pointer;
+  color: #666;
+  transition: color 0.3s ease, transform 0.2s ease;
+
+  &:hover {
+    color: #0b63c5;
+    transform: scale(1.1);
+  }
+
+  &:active {
+    transform: scale(0.95);
+  }
+}
+
+.icon-pointer {
+  cursor: pointer;
+  transition: color 0.3s ease, transform 0.2s ease;
+
+  &:hover {
+    color: #0b63c5;
+    transform: scale(1.1);
+  }
+
+  &:active {
+    transform: scale(0.95);
+  }
+}

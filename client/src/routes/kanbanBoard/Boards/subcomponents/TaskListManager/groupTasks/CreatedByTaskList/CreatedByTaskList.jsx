@@ -11,6 +11,7 @@ import Toastify from 'toastify-js'
 import TaskFiltersHeader from './TaskFiltersHeader'
 import TaskRenderer from './TaskRenderer'
 import TaskModals from './TaskModals'
+import HelpModalCreatedByTaskList from './HelpModalCreatedByTaskList'
 
 const CreatedByTaskList = ({ tasks, userId, handleTaskAccept, refreshTasks }) => {
   const { user, users } = useUserStore()
@@ -50,6 +51,7 @@ const CreatedByTaskList = ({ tasks, userId, handleTaskAccept, refreshTasks }) =>
   const [viewMode, setViewMode] = useState('cards') // cards, list
   const [sortBy, setSortBy] = useState('deadline')
   const [isFiltersOpen, setIsFiltersOpen] = useState(false)
+  const [isHelpModalOpen, setIsHelpModalOpen] = useState(false)
 
   const removeTask = useTaskStateTracker((state) => state.removeTask)
 
@@ -389,6 +391,7 @@ const CreatedByTaskList = ({ tasks, userId, handleTaskAccept, refreshTasks }) =>
         setSelectedAssignee={setSelectedAssignee}
         users={users}
         updatedTasks={updatedTasks}
+        onOpenHelp={() => setIsHelpModalOpen(true)}
       />
 
       {/* Рендеринг задач */}
@@ -447,6 +450,12 @@ const CreatedByTaskList = ({ tasks, userId, handleTaskAccept, refreshTasks }) =>
         setSelectedNewUserId={setSelectedNewUserId}
         handleConfirmReplaceUser={handleConfirmReplaceUser}
         users={users}
+      />
+
+      {/* Справка */}
+      <HelpModalCreatedByTaskList
+        isOpen={isHelpModalOpen}
+        onClose={() => setIsHelpModalOpen(false)}
       />
     </Box>
   )

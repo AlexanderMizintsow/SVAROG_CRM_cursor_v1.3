@@ -4,17 +4,19 @@ import { CircularProgress } from '@mui/material'
 import './callsSettingsUsers.scss'
 import Toastify from 'toastify-js'
 import { PiTelegramLogoLight } from 'react-icons/pi'
+import { MdContactSupport } from 'react-icons/md'
 import { API_BASE_URL } from '../../../../config'
 import callsNotificationStore from '../../../store/callsNotificationStore' // Импортируйте Zustand
+import HelpModalAsterisk from '../HelpModalAsterisk'
 
 const CallsSettingsUsers = () => {
   const [isLoading, setLoading] = useState(true)
   const { toggleAppRestart } = callsNotificationStore()
   const [showMissedCallsEmployee, setShowMissedCallsEmployee] = useState(true)
-  const [showAcceptedCallsEmployee, setShowAcceptedCallsEmployee] =
-    useState(true)
+  const [showAcceptedCallsEmployee, setShowAcceptedCallsEmployee] = useState(true)
   const [showCallMissedTg, setShowCallMissedTg] = useState(false) // Новое состояние для Telegram
   const [showRemindersCalls, setShowRemindersCalls] = useState(false)
+  const [openHelpModal, setOpenHelpModal] = useState(false)
 
   useEffect(() => {
     const fetchSettings = async () => {
@@ -30,18 +32,12 @@ const CallsSettingsUsers = () => {
           const acceptedResponse = await axios.get(
             `${API_BASE_URL}5004/api/calls-settings-accepted/${userId}`
           )
-          const tgResponse = await axios.get(
-            `${API_BASE_URL}5004/api/calls-settings-tg/${userId}`
-          ) // Запрос для нового поля
+          const tgResponse = await axios.get(`${API_BASE_URL}5004/api/calls-settings-tg/${userId}`) // Запрос для нового поля
           const remindersResponse = await axios.get(
             `${API_BASE_URL}5004/api/calls-settings-reminders/${userId}` // Запрос для нового поля
           )
-          setShowMissedCallsEmployee(
-            missedResponse.data.showMissedCallsEmployee
-          )
-          setShowAcceptedCallsEmployee(
-            acceptedResponse.data.showAcceptedCallsEmployee
-          )
+          setShowMissedCallsEmployee(missedResponse.data.showMissedCallsEmployee)
+          setShowAcceptedCallsEmployee(acceptedResponse.data.showAcceptedCallsEmployee)
           setShowCallMissedTg(tgResponse.data.showCallMissedTg) // Установка нового значения
           setShowRemindersCalls(remindersResponse.data.showRemindersCalls)
         } catch (error) {
@@ -103,19 +99,40 @@ const CallsSettingsUsers = () => {
           height: '100vh',
         }}
       >
-        <CircularProgress
-          className="progress"
-          color="primary"
-          size={50}
-          variant="indeterminate"
-        />
+        <CircularProgress className="progress" color="primary" size={50} variant="indeterminate" />
       </div>
     )
   }
 
   return (
     <div className="calls-settings">
-      <h2>Настройки звонков</h2>
+      {/* Модальное окно справки */}
+      <HelpModalAsterisk isOpen={openHelpModal} onClose={() => setOpenHelpModal(false)} />
+
+      {/* Заголовок с кнопкой справки */}
+      <div
+        style={{
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          marginBottom: '20px',
+        }}
+      >
+        <h2 style={{ margin: 0 }}>Настройки звонков</h2>
+        <MdContactSupport
+          onClick={() => setOpenHelpModal(true)}
+          title="Справка по системе телефонии"
+          style={{
+            fontSize: '24px',
+            color: '#0b63c5',
+            cursor: 'pointer',
+            padding: '5px',
+            borderRadius: '50%',
+            backgroundColor: '#eef6ff',
+            border: '2px solid #0b63c5',
+          }}
+        />
+      </div>
 
       <div className="settings-group">
         <h4>Параметры отображения звонков внутри офиса</h4>
@@ -125,9 +142,7 @@ const CallsSettingsUsers = () => {
             checked={showMissedCallsEmployee}
             onChange={() => setShowMissedCallsEmployee((prev) => !prev)}
           />
-          <span>
-            Показывать пропущенные звонки от сотрудников внутри компании
-          </span>
+          <span>Показывать пропущенные звонки от сотрудников внутри компании</span>
         </label>
         <label>
           <input
@@ -135,10 +150,7 @@ const CallsSettingsUsers = () => {
             checked={showAcceptedCallsEmployee}
             onChange={() => setShowAcceptedCallsEmployee((prev) => !prev)}
           />
-          <span>
-            {' '}
-            Показывать принятые звонки от сотрудников внутри компании{' '}
-          </span>
+          <span> Показывать принятые звонки от сотрудников внутри компании </span>
         </label>
         <label>
           <h4>Параметры отображения звонков и уведомлений для Telegramm</h4>
@@ -151,18 +163,14 @@ const CallsSettingsUsers = () => {
             >
               Написать в бота https://t.me/svarog_notifications_bot{' '}
             </a>{' '}
-            <span> Запуск чат-бота:</span>{' '}
-            <span className="command">/start</span>
+            <span> Запуск чат-бота:</span> <span className="command">/start</span>
           </p>
           <input
             type="checkbox"
             checked={showCallMissedTg}
             onChange={() => setShowCallMissedTg((prev) => !prev)}
           />
-          <span>
-            {' '}
-            Отображать уведомления пропущенных звонков в чатах Телеграмм{' '}
-          </span>
+          <span> Отображать уведомления пропущенных звонков в чатах Телеграмм </span>
           <PiTelegramLogoLight
             title="При включении данной функции необходимо добавить чат-бот в Телеграмме ..."
             className="icon icon-puls"
@@ -170,8 +178,7 @@ const CallsSettingsUsers = () => {
           />{' '}
           <span>
             <p>
-              (Настройка доступна из чата{' '}
-              <span className="command">/пропущенные - </span>,{' '}
+              (Настройка доступна из чата <span className="command">/пропущенные - </span>,{' '}
               <span className="command">/пропущенные +</span>, )
             </p>
           </span>
@@ -183,9 +190,7 @@ const CallsSettingsUsers = () => {
             checked={showRemindersCalls}
             onChange={() => setShowRemindersCalls((prev) => !prev)}
           />
-          <span>
-            Отображать напоминания в чат-бот для уведомлений о звонках
-          </span>
+          <span>Отображать напоминания в чат-бот для уведомлений о звонках</span>
         </label>
       </div>
 

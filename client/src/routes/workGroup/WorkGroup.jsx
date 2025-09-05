@@ -2,6 +2,7 @@ import { useState } from 'react'
 import CreateGroup from './CreateGroup' // Импорт вашего компонента создания группы
 import Planning from './Planning' // Импорт вашего компонента планирования
 import AgreedGroup from './AgreedGroup' // Импорт вашего компонента для согласованной группы
+import HelpModalWorkGroup from './HelpModalWorkGroup'
 import './workGroup.scss'
 import useRemindersStore from '../../store/useRemindersStore'
 
@@ -16,6 +17,7 @@ const WorkGroup = () => {
   const [importance, setImportance] = useState('low')
   const [activeTab, setActiveTab] = useState('create')
   const [time, setTime] = useState('09:00')
+  const [isHelpModalOpen, setIsHelpModalOpen] = useState(false)
   const { groupCounts } = useRemindersStore()
 
   const handleCreateGroup = () => {
@@ -64,9 +66,7 @@ const WorkGroup = () => {
     if (agreedDate) {
       setGroups((prevGroups) =>
         prevGroups.map((g) =>
-          g.name === group.name
-            ? { ...g, date: agreedDate[0], voting: false }
-            : g
+          g.name === group.name ? { ...g, date: agreedDate[0], voting: false } : g
         )
       )
     }
@@ -74,40 +74,58 @@ const WorkGroup = () => {
 
   return (
     <div className="container">
-      <div>
-        <button
-          className={`button ${activeTab === 'create' ? 'active' : ''}`}
-          onClick={() => setActiveTab('create')}
-        >
-          Создать группу
-        </button>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 16 }}>
+        <div style={{ display: 'flex', gap: 8 }}>
+          <button
+            className={`button ${activeTab === 'create' ? 'active' : ''}`}
+            onClick={() => setActiveTab('create')}
+          >
+            Создать группу
+          </button>
 
-        <button
-          className={`button ${activeTab === 'planning' ? 'active' : ''}`}
-          onClick={() => setActiveTab('planning')}
-        >
-          Планирование
-          {groupCounts.rangeCount > 0 && (
-            <>
-              <span className="notification-circle-work-group range-count">
-                {groupCounts.rangeCount}
-              </span>
-            </>
-          )}
-        </button>
+          <button
+            className={`button ${activeTab === 'planning' ? 'active' : ''}`}
+            onClick={() => setActiveTab('planning')}
+          >
+            Планирование
+            {groupCounts.rangeCount > 0 && (
+              <>
+                <span className="notification-circle-work-group range-count">
+                  {groupCounts.rangeCount}
+                </span>
+              </>
+            )}
+          </button>
 
+          <button
+            className={`button ${activeTab === 'agreed' ? 'active' : ''}`}
+            onClick={() => setActiveTab('agreed')}
+          >
+            Согласованная группа
+            {groupCounts.fixedCount > 0 && (
+              <>
+                <span className="notification-circle-work-group fixed-count">
+                  {groupCounts.fixedCount}
+                </span>
+              </>
+            )}
+          </button>
+        </div>
         <button
-          className={`button ${activeTab === 'agreed' ? 'active' : ''}`}
-          onClick={() => setActiveTab('agreed')}
+          onClick={() => setIsHelpModalOpen(true)}
+          style={{
+            padding: '8px 12px',
+            borderRadius: 8,
+            border: '1px solid #0b63c5',
+            background: '#eef6ff',
+            color: '#0b63c5',
+            cursor: 'pointer',
+            fontSize: 14,
+            fontWeight: 600,
+          }}
+          title="Открыть справку"
         >
-          Согласованная группа
-          {groupCounts.fixedCount > 0 && (
-            <>
-              <span className="notification-circle-work-group fixed-count">
-                {groupCounts.fixedCount}
-              </span>
-            </>
-          )}
+          ?
         </button>
       </div>
 
@@ -149,6 +167,10 @@ const WorkGroup = () => {
             high: { color: 'red' },
           }}
         />
+      )}
+
+      {isHelpModalOpen && (
+        <HelpModalWorkGroup open={isHelpModalOpen} onClose={() => setIsHelpModalOpen(false)} />
       )}
     </div>
   )
