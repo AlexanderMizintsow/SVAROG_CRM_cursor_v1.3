@@ -925,42 +925,53 @@ function initReclamationCron(bot, cronManager) {
 
   const task = async () => {
     const timestamp = new Date().toISOString()
-    console.log(`[CRON][V6Z][${timestamp}] Старт проверки рекламаций...`)
+    const cronTaskId = `CRON_V6Z_${Date.now()}`
+    const startTime = Date.now()
+    console.log(`[CRON_START][${cronTaskId}] V6Z - Старт проверки рекламаций...`)
 
     const TASK_TIMEOUT = 5 * 60 * 1000 // 5 минут таймаут
 
     try {
       await runWithTimeout(
         async () => {
-          console.log('[CRON][V6Z] Запрос данных...')
+          console.log(`[TASK_START][${cronTaskId}] V6Z - Начало обработки рекламаций...`)
+          console.log(`[TASK_PROGRESS][${cronTaskId}] V6Z - Запрос данных из 1С...`)
           const result = await getReclamationClose('V6Z')
-          console.log('[CRON][V6Z] Получено записей:', result.length)
+          console.log(`[TASK_PROGRESS][${cronTaskId}] V6Z - Получено записей: ${result.length}`)
 
           if (result.length > 0) {
-            console.log('[CRON][V6Z] Обработка результатов...')
+            console.log(`[TASK_PROGRESS][${cronTaskId}] V6Z - Обработка результатов...`)
             await processReclamationResult(result, bot)
-            console.log('[CRON][V6Z] Обработка завершена')
+            console.log(`[TASK_SUCCESS][${cronTaskId}] V6Z - Обработка завершена успешно`)
           } else {
-            console.log('[CRON][V6Z] Нет данных для обработки')
+            console.log(`[TASK_SUCCESS][${cronTaskId}] V6Z - Нет данных для обработки`)
           }
         },
         TASK_TIMEOUT,
         'Reclamation Check'
       )
+      const executionTime = Date.now() - startTime
+      console.log(`[CRON_SUCCESS][${cronTaskId}] V6Z - Cron-задача выполнена успешно`)
+      console.log(`[CRON_RESULT][${cronTaskId}] V6Z - Время выполнения: ${executionTime}ms`)
     } catch (error) {
-      console.error(`[CRON][V6Z][ERROR] ${error.message}`)
-      console.error(error.stack)
+      const executionTime = Date.now() - startTime
+      console.error(`[CRON_ERROR][${cronTaskId}] V6Z - Ошибка выполнения cron-задачи`)
+      console.error(`[CRON_ERROR][${cronTaskId}] V6Z - Ошибка: ${error.message}`)
+      console.error(`[CRON_ERROR][${cronTaskId}] V6Z - Время до ошибки: ${executionTime}ms`)
+      console.error(`[CRON_ERROR][${cronTaskId}] V6Z - Stack trace:`, error.stack)
 
       // Логируем ошибку для диагностики
-      console.error(`[CRON][V6Z][${timestamp}] Задача завершилась с ошибкой:`, {
+      console.error(`[CRON_ERROR][${cronTaskId}] V6Z - Задача завершилась с ошибкой:`, {
         error: error.message,
         stack: error.stack,
         timestamp: timestamp,
+        taskId: cronTaskId,
+        executionTime: executionTime,
       })
 
       throw error // Перебрасываем ошибку для CronManager
     } finally {
-      console.log(`[CRON][V6Z][${timestamp}] Завершено`)
+      console.log(`[CRON_END][${cronTaskId}] V6Z - Cron-задача завершена`)
     }
   }
 
@@ -974,7 +985,7 @@ function initReclamationCron(bot, cronManager) {
     })
 
     job.on('error', (error) => {
-      console.error('[CRON][V6Z][CRON_ERROR] Ошибка в cron-задаче:', error)
+      console.error('[CRON_ERROR][FALLBACK] V6Z - Ошибка в cron-задаче:', error)
     })
 
     return job
@@ -986,42 +997,53 @@ function initReconciliationCron(bot, cronManager) {
 
   const task = async () => {
     const timestamp = new Date().toISOString()
-    console.log(`[CRON][V0Z][${timestamp}] Старт сверки заказов...`)
+    const cronTaskId = `CRON_V0Z_${Date.now()}`
+    const startTime = Date.now()
+    console.log(`[CRON_START][${cronTaskId}] V0Z - Старт сверки заказов...`)
 
     const TASK_TIMEOUT = 5 * 60 * 1000 // 5 минут таймаут
 
     try {
       await runWithTimeout(
         async () => {
-          console.log('[CRON][V0Z] Запрос данных...')
+          console.log(`[TASK_START][${cronTaskId}] V0Z - Начало обработки сверки заказов...`)
+          console.log(`[TASK_PROGRESS][${cronTaskId}] V0Z - Запрос данных из 1С...`)
           const response = await getReconciliationOrders('V0Z')
-          console.log('[CRON][V0Z] Получено записей:', response.length)
+          console.log(`[TASK_PROGRESS][${cronTaskId}] V0Z - Получено записей: ${response.length}`)
 
           if (response.length > 0) {
-            console.log('[CRON][V0Z] Обработка результатов...')
+            console.log(`[TASK_PROGRESS][${cronTaskId}] V0Z - Обработка результатов...`)
             await processReconciliationResponse(response, bot)
-            console.log('[CRON][V0Z] Обработка завершена')
+            console.log(`[TASK_SUCCESS][${cronTaskId}] V0Z - Обработка завершена успешно`)
           } else {
-            console.log('[CRON][V0Z] Нет данных для обработки')
+            console.log(`[TASK_SUCCESS][${cronTaskId}] V0Z - Нет данных для обработки`)
           }
         },
         TASK_TIMEOUT,
         'Reconciliation Check'
       )
+      const executionTime = Date.now() - startTime
+      console.log(`[CRON_SUCCESS][${cronTaskId}] V0Z - Cron-задача выполнена успешно`)
+      console.log(`[CRON_RESULT][${cronTaskId}] V0Z - Время выполнения: ${executionTime}ms`)
     } catch (error) {
-      console.error(`[CRON][V0Z][ERROR] ${error.message}`)
-      console.error(error.stack)
+      const executionTime = Date.now() - startTime
+      console.error(`[CRON_ERROR][${cronTaskId}] V0Z - Ошибка выполнения cron-задачи`)
+      console.error(`[CRON_ERROR][${cronTaskId}] V0Z - Ошибка: ${error.message}`)
+      console.error(`[CRON_ERROR][${cronTaskId}] V0Z - Время до ошибки: ${executionTime}ms`)
+      console.error(`[CRON_ERROR][${cronTaskId}] V0Z - Stack trace:`, error.stack)
 
       // Логируем ошибку для диагностики
-      console.error(`[CRON][V0Z][${timestamp}] Задача завершилась с ошибкой:`, {
+      console.error(`[CRON_ERROR][${cronTaskId}] V0Z - Задача завершилась с ошибкой:`, {
         error: error.message,
         stack: error.stack,
         timestamp: timestamp,
+        taskId: cronTaskId,
+        executionTime: executionTime,
       })
 
       throw error // Перебрасываем ошибку для CronManager
     } finally {
-      console.log(`[CRON][V0Z][${timestamp}] Завершено`)
+      console.log(`[CRON_END][${cronTaskId}] V0Z - Cron-задача завершена`)
     }
   }
 
@@ -1035,7 +1057,7 @@ function initReconciliationCron(bot, cronManager) {
     })
 
     job.on('error', (error) => {
-      console.error('[CRON][V0Z][CRON_ERROR] Ошибка в cron-задаче:', error)
+      console.error('[CRON_ERROR][FALLBACK] V0Z - Ошибка в cron-задаче:', error)
     })
 
     return job

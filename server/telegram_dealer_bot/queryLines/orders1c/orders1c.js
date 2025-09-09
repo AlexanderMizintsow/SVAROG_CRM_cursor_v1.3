@@ -2,6 +2,7 @@ const net = require('net')
 const iconv = require('iconv-lite')
 const dbPool = require('../../database/db')
 const { createReminder } = require('../../helpers/api')
+const ConnectionPool = require('../../helpers/connectionPool')
 
 // Функция для выполнения задачи с таймаутом (аналогично api.js)
 async function runWithTimeout(fn, timeoutMs, taskName) {
@@ -32,8 +33,66 @@ async function runWithTimeout(fn, timeoutMs, taskName) {
   }
 }
 
-// Функция для получения заказов 1С (тестовая версия)
-async function getOrders1C(sScan, testMode = true) {
+// Функция для выполнения задачи с периодическим освобождением event loop
+async function runWithEventLoopRelease(task, name) {
+  const startTime = Date.now()
+  const maxExecutionTime = 90 * 1000 // 90 секунд максимум
+  const checkInterval = 1000 // Проверяем каждую секунду
+
+  return new Promise(async (resolve, reject) => {
+    let isCompleted = false
+    let taskPromise
+
+    try {
+      taskPromise = task()
+      const checkTimer = setInterval(() => {
+        if (isCompleted) {
+          clearInterval(checkTimer)
+          return
+        }
+        const elapsed = Date.now() - startTime
+        if (elapsed > maxExecutionTime) {
+          clearInterval(checkTimer)
+          isCompleted = true
+          reject(
+            new Error(
+              `Задача ${name} превысила максимальное время выполнения (${maxExecutionTime}ms)`
+            )
+          )
+          return
+        }
+        // Принудительно освобождаем event loop
+        setImmediate(() => {})
+      }, checkInterval)
+      const result = await taskPromise
+      isCompleted = true
+      clearInterval(checkTimer)
+      resolve(result)
+    } catch (error) {
+      isCompleted = true
+      reject(error)
+    }
+  })
+}
+
+// Инициализация пула соединений
+let connectionPool = null
+
+function getConnectionPool() {
+  if (!connectionPool) {
+    connectionPool = new ConnectionPool({
+      host: '192.168.57.77',
+      port: 8240,
+      maxConnections: 3,
+      connectionTimeout: 10000,
+      responseTimeout: 30000,
+    })
+  }
+  return connectionPool
+}
+
+// Функция для получения заказов 1С (оптимизированная версия)
+async function getOrders1C(sScan, testMode = false) {
   if (testMode) {
     console.log('[TEST] Возвращаем тестовые данные для заказов 1С')
     return Promise.resolve([
@@ -63,54 +122,47 @@ async function getOrders1C(sScan, testMode = true) {
     ])
   }
 
-  // Настоящая функция для запроса к 1С (закомментирована)
+  console.log('Начало обработки запроса заказов 1С', { scan: sScan })
 
-  return new Promise((resolve, reject) => {
-    const client = new net.Socket()
+  try {
+    const message = `Q11\x01EB35000999\x02\t${sScan}\r`
+    const response = await getConnectionPool().executeRequest(message, sScan)
+    return await processOrdersServerResponse(response, sScan)
+  } catch (err) {
+    console.error(`[CONNECTION_POOL] Ошибка получения заказов 1С: ${err.message}`)
+    throw err
+  }
+}
 
-    // Устанавливаем таймаут
-    client.setTimeout(10000) // 10 секунд
+// Обработка ответа сервера для заказов 1С
+async function processOrdersServerResponse(responseData, sScan) {
+  try {
+    console.log('Начало обработки ответа сервера заказов 1С', { scan: sScan })
 
-    client.connect(8240, '192.168.57.77', () => {
-      console.log('Соединение установлено с сервером.')
-      const message = `Q11\x01EB35000999\x02\t${sScan}\r`
-      console.log('Отправляем сообщение:', message)
-      console.log('Закодированное сообщение:', iconv.encode(message, 'windows-1251'))
-      client.write(iconv.encode(message, 'windows-1251'))
+    // Нормализация данных
+    const cleanData = responseData.split('q11\x01')[0].trim()
+    const lines = cleanData
+      .split(/\r?\n/)
+      .map((line) => line.trim())
+      .filter((line) => line && !line.startsWith('q11'))
+
+    if (lines.length === 0) {
+      console.log('Нет данных для обработки заказов 1С', { scan: sScan })
+      return []
+    }
+
+    // Парсинг данных заказов
+    const orders = parseOrdersData(cleanData)
+    console.log(`Успешно обработано заказов: ${orders.length}`)
+    return orders
+  } catch (err) {
+    console.log('Ошибка обработки ответа сервера заказов 1С', {
+      scan: sScan,
+      error: err.message,
+      stack: err.stack,
     })
-
-    client.on('data', (data) => {
-      console.log('Получены данные от сервера!')
-      console.log('Полученные сырые данные:', data)
-
-      const decodedData = iconv.decode(data, 'windows-1251')
-      console.log('Декодированные данные:', decodedData)
-
-      // Парсинг данных
-      const orders = parseOrdersData(decodedData)
-      resolve(orders)
-      client.destroy()
-    })
-
-    client.on('timeout', () => {
-      console.log('Таймаут соединения - сервер не ответил')
-      client.destroy()
-      reject(new Error('Таймаут соединения'))
-    })
-
-    client.on('error', (err) => {
-      console.error(`Произошла ошибка: ${err.message}`)
-      reject(err)
-    })
-
-    client.on('close', (hadError) => {
-      console.log('Соединение закрыто.', hadError ? 'С ошибкой' : 'Нормально')
-    })
-
-    client.on('end', () => {
-      console.log('Сервер завершил соединение')
-    })
-  })
+    throw new Error('❌ Ошибка обработки данных заказов от сервера')
+  }
 }
 
 // Парсинг данных заказов из ответа 1С
@@ -347,48 +399,68 @@ async function sendOrderNotifications(bot, orders) {
 
 // Основная функция обработки заказов
 async function processOrders1C(bot) {
+  const taskId = `V0O_${Date.now()}`
+  const startTime = Date.now()
+
   try {
-    console.log('[ORDERS_1C] Начало обработки заказов 1С...')
+    console.log(`[TASK_START][${taskId}] V0O - Начало обработки заказов 1С...`)
 
     // Получение заказов
+    console.log(`[TASK_PROGRESS][${taskId}] V0O - Запрос данных из 1С...`)
     const orders = await getOrders1C('V0O', false) // true для тестового режима
-    console.log(`[ORDERS_1C] Получено заказов: ${orders.length}`)
+    console.log(`[TASK_PROGRESS][${taskId}] V0O - Получено заказов: ${orders.length}`)
 
     if (orders.length === 0) {
-      console.log('[ORDERS_1C] Нет заказов для обработки')
+      console.log(`[TASK_SUCCESS][${taskId}] V0O - Нет заказов для обработки`)
       return
     }
 
     // Фильтрация по дате (только заказы на второй день)
+    console.log(`[TASK_PROGRESS][${taskId}] V0O - Фильтрация заказов по дате...`)
     const filteredOrders = filterOrdersByDate(orders)
-    console.log(`[ORDERS_1C] Заказов на второй день: ${filteredOrders.length}`)
+    console.log(`[TASK_PROGRESS][${taskId}] V0O - Заказов на второй день: ${filteredOrders.length}`)
 
     if (filteredOrders.length === 0) {
-      console.log('[ORDERS_1C] Нет заказов на второй день')
+      console.log(`[TASK_SUCCESS][${taskId}] V0O - Нет заказов на второй день`)
       return
     }
 
     // Проверка существующих заказов
+    console.log(`[TASK_PROGRESS][${taskId}] V0O - Проверка существующих заказов в БД...`)
     const newOrders = await checkExistingOrders(filteredOrders)
-    console.log(`[ORDERS_1C] Новых/измененных заказов: ${newOrders.length}`)
+    console.log(`[TASK_PROGRESS][${taskId}] V0O - Новых/измененных заказов: ${newOrders.length}`)
 
     if (newOrders.length === 0) {
-      console.log('[ORDERS_1C] Нет новых заказов для отправки')
+      console.log(`[TASK_SUCCESS][${taskId}] V0O - Нет новых заказов для отправки`)
       return
     }
 
     // Сохранение в БД
+    console.log(`[TASK_PROGRESS][${taskId}] V0O - Сохранение заказов в БД...`)
     await saveOrdersToDatabase(newOrders)
-    console.log('[ORDERS_1C] Заказы сохранены в БД')
+    console.log(`[TASK_PROGRESS][${taskId}] V0O - Заказы сохранены в БД`)
 
     // Отправка уведомлений
+    console.log(`[TASK_PROGRESS][${taskId}] V0O - Отправка уведомлений дилерам...`)
     const results = await sendOrderNotifications(bot, newOrders)
 
     const successful = results.filter((r) => r.success).length
-    console.log(`[ORDERS_1C] Итоговый отчет: ${successful}/${newOrders.length} отправлено успешно`)
-    console.log('[ORDERS_1C] Детали обработки:', results)
+    const failed = results.filter((r) => !r.success).length
+    const executionTime = Date.now() - startTime
+
+    console.log(`[TASK_SUCCESS][${taskId}] V0O - Задача завершена успешно`)
+    console.log(
+      `[TASK_RESULT][${taskId}] V0O - Итоговый отчет: ${successful}/${newOrders.length} отправлено успешно, ${failed} ошибок`
+    )
+    console.log(`[TASK_RESULT][${taskId}] V0O - Время выполнения: ${executionTime}ms`)
+    console.log(`[TASK_DETAILS][${taskId}] V0O - Детали обработки:`, results)
   } catch (error) {
-    console.error('[ORDERS_1C] Критическая ошибка:', error)
+    const executionTime = Date.now() - startTime
+    console.error(`[TASK_ERROR][${taskId}] V0O - Критическая ошибка выполнения задачи`)
+    console.error(`[TASK_ERROR][${taskId}] V0O - Ошибка: ${error.message}`)
+    console.error(`[TASK_ERROR][${taskId}] V0O - Время до ошибки: ${executionTime}ms`)
+    console.error(`[TASK_ERROR][${taskId}] V0O - Stack trace:`, error.stack)
+    throw error
   }
 }
 
@@ -398,49 +470,61 @@ function initOrders1CCron(bot, cronManager) {
 
   const task = async () => {
     const timestamp = new Date().toISOString()
-    console.log(`[CRON][V0O][${timestamp}] Старт проверки заказов 1С...`)
+    const cronTaskId = `CRON_V0O_${Date.now()}`
+    console.log(`[CRON_START][${cronTaskId}] V0O - Старт проверки заказов 1С...`)
 
-    const TASK_TIMEOUT = 5 * 60 * 1000 // 5 минут таймаут
+    const TASK_TIMEOUT = 2 * 60 * 1000 // 2 минуты таймаут (уменьшено с 5 минут)
 
     try {
       await runWithTimeout(
         async () => {
-          console.log('[CRON][V0O] Обработка заказов...')
+          console.log(`[CRON_PROGRESS][${cronTaskId}] V0O - Запуск обработки заказов...`)
           await processOrders1C(bot)
-          console.log('[CRON][V0O] Обработка завершена')
+          console.log(`[CRON_PROGRESS][${cronTaskId}] V0O - Обработка заказов завершена`)
         },
         TASK_TIMEOUT,
         'Orders 1C Check'
       )
+      console.log(`[CRON_SUCCESS][${cronTaskId}] V0O - Cron-задача выполнена успешно`)
     } catch (error) {
-      console.error(`[CRON][V0O][ERROR] ${error.message}`)
-      console.error(error.stack)
+      console.error(`[CRON_ERROR][${cronTaskId}] V0O - Ошибка выполнения cron-задачи`)
+      console.error(`[CRON_ERROR][${cronTaskId}] V0O - Ошибка: ${error.message}`)
+      console.error(`[CRON_ERROR][${cronTaskId}] V0O - Stack trace:`, error.stack)
 
-      console.error(`[CRON][V0O][${timestamp}] Задача завершилась с ошибкой:`, {
+      console.error(`[CRON_ERROR][${cronTaskId}] V0O - Задача завершилась с ошибкой:`, {
         error: error.message,
         stack: error.stack,
         timestamp: timestamp,
+        taskId: cronTaskId,
       })
 
       throw error
     } finally {
-      console.log(`[CRON][V0O][${timestamp}] Завершено`)
+      console.log(`[CRON_END][${cronTaskId}] V0O - Cron-задача завершена`)
     }
   }
 
   // Cron-задача для проверки поздних ответов (каждый час с 12:00  )
   const lateResponseTask = async () => {
     const timestamp = new Date().toISOString()
-    console.log(`[CRON][LATE_RESPONSE][${timestamp}] Проверка поздних ответов...`)
+    const lateResponseTaskId = `CRON_LATE_RESPONSE_${Date.now()}`
+    console.log(`[CRON_START][${lateResponseTaskId}] LATE_RESPONSE - Проверка поздних ответов...`)
 
     try {
+      console.log(`[CRON_PROGRESS][${lateResponseTaskId}] LATE_RESPONSE - Запуск проверки...`)
       const { checkAndBlockLateResponses } = require('./orderHandlers')
       await checkAndBlockLateResponses(bot)
-      console.log('[CRON][LATE_RESPONSE] Проверка завершена')
+      console.log(
+        `[CRON_SUCCESS][${lateResponseTaskId}] LATE_RESPONSE - Проверка завершена успешно`
+      )
     } catch (error) {
-      console.error(`[CRON][LATE_RESPONSE][ERROR] ${error.message}`)
+      console.error(
+        `[CRON_ERROR][${lateResponseTaskId}] LATE_RESPONSE - Ошибка выполнения проверки`
+      )
+      console.error(`[CRON_ERROR][${lateResponseTaskId}] LATE_RESPONSE - Ошибка: ${error.message}`)
+      console.error(`[CRON_ERROR][${lateResponseTaskId}] LATE_RESPONSE - Stack trace:`, error.stack)
     } finally {
-      console.log(`[CRON][LATE_RESPONSE][${timestamp}] Завершено`)
+      console.log(`[CRON_END][${lateResponseTaskId}] LATE_RESPONSE - Cron-задача завершена`)
     }
   }
 
@@ -448,9 +532,9 @@ function initOrders1CCron(bot, cronManager) {
     const mainJob = cronManager.addJob('orders1c', '0 9 * * *', task) // Каждый день в 9:00 утра
     const lateResponseJob = cronManager.addJob(
       'orders1c_late_response',
-      '0 12 * * *',
+      '10 12 * * *',
       lateResponseTask
-    ) // Каждый день в 12:00 дня
+    ) // Каждый день в 12:10 дня
 
     return { mainJob, lateResponseJob }
   } else {
@@ -461,17 +545,17 @@ function initOrders1CCron(bot, cronManager) {
       timezone: 'Europe/Moscow',
     })
 
-    const lateResponseJob = cron.schedule('0 12 * * *', lateResponseTask, {
+    const lateResponseJob = cron.schedule('10 12 * * *', lateResponseTask, {
       scheduled: true,
       timezone: 'Europe/Moscow',
     })
 
     mainJob.on('error', (error) => {
-      console.error('[CRON][V0O][CRON_ERROR] Ошибка в cron-задаче:', error)
+      console.error('[CRON_ERROR][FALLBACK] V0O - Ошибка в cron-задаче:', error)
     })
 
     lateResponseJob.on('error', (error) => {
-      console.error('[CRON][LATE_RESPONSE][CRON_ERROR] Ошибка в cron-задаче:', error)
+      console.error('[CRON_ERROR][FALLBACK] LATE_RESPONSE - Ошибка в cron-задаче:', error)
     })
 
     return { mainJob, lateResponseJob }
@@ -488,4 +572,5 @@ module.exports = {
   sendOrderNotifications,
   parseOrdersData,
   parseDate,
+  getConnectionPool,
 }
