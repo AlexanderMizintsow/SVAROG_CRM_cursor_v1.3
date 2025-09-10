@@ -19,11 +19,7 @@ const port = 5777
 app.use(express.json())
 app.use(
   cors({
-    origin: [
-      'http://localhost:5173',
-      'http://192.168.57.112:5173',
-      'http://172.26.32.1:5173',
-    ],
+    origin: ['http://localhost:5173', 'http://192.168.57.112:5173', 'http://172.26.32.1:5173'],
     methods: ['GET', 'POST'],
     allowedHeaders: ['Content-Type'],
     credentials: true,

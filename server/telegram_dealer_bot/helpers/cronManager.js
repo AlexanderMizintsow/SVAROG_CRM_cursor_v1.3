@@ -63,7 +63,7 @@ class CronManager {
     console.log(`[CRON_MANAGER][${name}] Запуск выполнения`)
 
     try {
-      await this.runWithEventLoopRelease(task, name)
+      await task()
       status.lastSuccess = new Date()
       status.errorCount = 0
       console.log(`[CRON_MANAGER][${name}] Выполнение завершено успешно`)
@@ -79,48 +79,6 @@ class CronManager {
     } finally {
       status.isRunning = false
     }
-  }
-
-  // Функция для выполнения задачи с периодическим освобождением event loop
-  async runWithEventLoopRelease(task, name) {
-    const startTime = Date.now()
-    const maxExecutionTime = 90 * 1000 // 90 секунд максимум
-    const checkInterval = 1000 // Проверяем каждую секунду
-
-    return new Promise(async (resolve, reject) => {
-      let isCompleted = false
-      let taskPromise
-
-      try {
-        taskPromise = task()
-        const checkTimer = setInterval(() => {
-          if (isCompleted) {
-            clearInterval(checkTimer)
-            return
-          }
-          const elapsed = Date.now() - startTime
-          if (elapsed > maxExecutionTime) {
-            clearInterval(checkTimer)
-            isCompleted = true
-            reject(
-              new Error(
-                `Задача ${name} превысила максимальное время выполнения (${maxExecutionTime}ms)`
-              )
-            )
-            return
-          }
-          // Принудительно освобождаем event loop
-          setImmediate(() => {})
-        }, checkInterval)
-        const result = await taskPromise
-        isCompleted = true
-        clearInterval(checkTimer)
-        resolve(result)
-      } catch (error) {
-        isCompleted = true
-        reject(error)
-      }
-    })
   }
 
   // Обновление статуса задачи
@@ -229,9 +187,6 @@ class CronManager {
         )
         this.restartJob(name)
       }
-
-      // Принудительно освобождаем event loop после каждой итерации
-      setImmediate(() => {})
     }
   }
 

@@ -10,12 +10,16 @@
   "license": "ISC",
   "description": "",
   "dependencies": {
+    "@zxing/library": "^0.21.3",
     "axios": "^1.7.7",
     "cors": "^2.8.5",
     "dotenv": "^16.4.5",
     "node-cron": "^3.0.3",
     "node-telegram-bot-api": "^0.66.0",
+    "node-zxing": "^0.1.4",
+    "sharp": "^0.34.3",
     "socket.io-client": "^4.8.0",
-    "tg-bot-server": "file:"
+    "tg-bot-server": "file:",
+    "zxing-wasm": "^2.2.1"
   }
 }

@@ -1,7 +1,9 @@
 //файл messageHandler.js
+// исходная логика без распознавания штрихкодов
+
 async function handleRegisteredUserMessage(msg, bot, dbPool, userStates) {
   const chatId = msg.chat.id
-  const userMessage = msg.text.toLowerCase()
+  const userMessage = (msg.text || '').toLowerCase()
   const validCommands = [
     { command: '/start', description: 'Запустить бота и начать регистрацию' },
     { command: '/help', description: 'Показать доступные команды' },
@@ -172,10 +174,7 @@ async function handleRegisteredUserMessage(msg, bot, dbPool, userStates) {
       )
 
       // Отправляем сообщение о статусе
-      bot.sendMessage(
-        chatId,
-        'Уведомления о напоминаниях для звонков активированы.'
-      )
+      bot.sendMessage(chatId, 'Уведомления о напоминаниях для звонков активированы.')
       return // Завершить выполнение
     } catch (error) {
       console.error('Ошибка при обработке команды:', error)

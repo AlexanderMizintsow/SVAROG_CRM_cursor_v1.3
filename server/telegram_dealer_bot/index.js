@@ -375,18 +375,6 @@ function gracefulShutdown() {
       console.log('Пул соединений закрыт')
     }
 
-    // Закрытие пула TCP соединений для заказов 1С
-    try {
-      const { getConnectionPool } = require('./queryLines/orders1c/orders1c')
-      const connectionPool = getConnectionPool()
-      if (connectionPool) {
-        connectionPool.closeAll()
-        console.log('Пул TCP соединений закрыт')
-      }
-    } catch (error) {
-      console.warn('Ошибка закрытия пула TCP соединений:', error.message)
-    }
-
     // Остановка бота
     bot.stopPolling()
     console.log('Бот остановлен')
