@@ -448,9 +448,9 @@ function initOrders1CCron(bot, cronManager) {
     const mainJob = cronManager.addJob('orders1c', '0 9 * * *', task) // Каждый день в 9:00 утра
     const lateResponseJob = cronManager.addJob(
       'orders1c_late_response',
-      '0 12 * * *',
+      '10 12 * * *',
       lateResponseTask
-    ) // Каждый день в 12:00 дня
+    ) // Каждый день в 12:10 дня (избегаем конфликта с рекламациями)
 
     return { mainJob, lateResponseJob }
   } else {
@@ -461,7 +461,7 @@ function initOrders1CCron(bot, cronManager) {
       timezone: 'Europe/Moscow',
     })
 
-    const lateResponseJob = cron.schedule('0 12 * * *', lateResponseTask, {
+    const lateResponseJob = cron.schedule('10 12 * * *', lateResponseTask, {
       scheduled: true,
       timezone: 'Europe/Moscow',
     })

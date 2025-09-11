@@ -23,6 +23,7 @@ import { PiTelegramLogoLight } from 'react-icons/pi'
 import { IoStarSharp } from 'react-icons/io5'
 import { PiLockKeyOpenFill } from 'react-icons/pi'
 import { TbApps } from 'react-icons/tb'
+import { MdAssessment } from 'react-icons/md'
 
 const NavBar = () => {
   const { user } = useUserStore()
@@ -142,6 +143,11 @@ const NavBar = () => {
       name: 'Сервисные рейтинги',
       icon: IoStarSharp,
       link: '/reports-dealer-ratings',
+    },
+    {
+      name: 'Статистика заказов',
+      icon: MdAssessment,
+      link: '/statistics-orders',
     },
   ]
 

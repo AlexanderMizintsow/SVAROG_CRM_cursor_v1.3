@@ -1352,7 +1352,7 @@ function getReconciliationOrders(sScan, testMode = false) {
       if (csvPathMatch) {
         console.log('Обнаружен путь к CSV файлу:', csvPathMatch[0])
         try {
-          const dealers = await processCsvFile(csvPathMatch[0])
+          const dealers = await processCsvFile(csvPathMatch[0]) // Добавлено await
           cleanup()
           resolve(dealers)
         } catch (err) {

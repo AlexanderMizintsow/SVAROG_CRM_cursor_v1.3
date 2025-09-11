@@ -2,6 +2,7 @@ require('dotenv').config()
 const express = require('express')
 const Firebird = require('node-firebird')
 const cors = require('cors')
+const StatisticsController = require('./controllers/statisticsController')
 const app = express()
 const port = process.env.PORT || 5005
 
@@ -32,6 +33,9 @@ function getDbOptions(year) {
   }
   return dbOptions // если для указанного года нет отдельной переменной - используем БД по умолчанию
 }
+
+// Создаем экземпляр контроллера статистики
+const statisticsController = new StatisticsController(dbOptions, getDbOptions)
 
 // Новый маршрут для получения наименований элементов в заказе
 app.get('/app/order/items/:orderNo/:inn/:year?', (req, res) => {
@@ -139,6 +143,62 @@ app.get('/app/totalprice/:orderNo/:inn/:isButton?', (req, res) => {
       res.json({ totalPrice })
     })
   })
+})
+
+// Маршрут для получения статистики по заказам
+app.post('/app/statistics/orders', async (req, res) => {
+  try {
+    const result = await statisticsController.getOrdersStatistics(req.body)
+    res.json({ result })
+  } catch (error) {
+    console.error('Statistics error:', error)
+    res.status(500).json({ message: error.message })
+  }
+})
+
+// Маршрут для получения сводной статистики
+app.post('/app/statistics/summary', async (req, res) => {
+  try {
+    const result = await statisticsController.getSummaryStatistics(req.body)
+    res.json({ result })
+  } catch (error) {
+    console.error('Summary statistics error:', error)
+    res.status(500).json({ message: error.message })
+  }
+})
+
+// Маршрут для получения списка типов товаров
+app.get('/app/statistics/stuff-types/:year?', async (req, res) => {
+  try {
+    const year = req.params.year
+    const result = await statisticsController.getStuffTypes(year)
+    res.json({ result })
+  } catch (error) {
+    console.error('Stuff types error:', error)
+    res.status(500).json({ message: error.message })
+  }
+})
+
+// Маршрут для получения общей статистики по заказам
+app.post('/app/statistics/overview', async (req, res) => {
+  try {
+    const result = await statisticsController.getOrdersOverview(req.body)
+    res.json({ result })
+  } catch (error) {
+    console.error('Orders overview error:', error)
+    res.status(500).json({ message: error.message })
+  }
+})
+
+// Маршрут для получения статистики по материалам
+app.post('/app/statistics/materials', async (req, res) => {
+  try {
+    const result = await statisticsController.getMaterialsStatistics(req.body)
+    res.json({ result })
+  } catch (error) {
+    console.error('Materials statistics error:', error)
+    res.status(500).json({ message: error.message })
+  }
 })
 
 // Запуск сервера

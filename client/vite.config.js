@@ -4,6 +4,10 @@ import { terser } from 'rollup-plugin-terser'
 
 export default defineConfig({
   plugins: [react()],
+  optimizeDeps: {
+    include: ['@mui/material', '@mui/icons-material'],
+    exclude: ['@mui/x-date-pickers'],
+  },
   build: {
     minify: 'terser',
     rollupOptions: {
