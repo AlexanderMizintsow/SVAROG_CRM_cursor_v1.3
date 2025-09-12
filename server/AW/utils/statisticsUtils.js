@@ -85,6 +85,25 @@ function validateFilters(filters) {
     throw new Error('Неверный год')
   }
 
+  // Валидация строковых полей поиска
+  if (validated.materialName && typeof validated.materialName !== 'string') {
+    throw new Error('Неверный формат наименования материала')
+  }
+  if (validated.materialMarking && typeof validated.materialMarking !== 'string') {
+    throw new Error('Неверный формат артикула материала')
+  }
+  if (validated.orderNumber && typeof validated.orderNumber !== 'string') {
+    throw new Error('Неверный формат номера заказа')
+  }
+
+  // Валидация пагинации
+  if (validated.page && Number(validated.page) < 1) {
+    validated.page = 1
+  }
+  if (validated.limit && (Number(validated.limit) < 1 || Number(validated.limit) > 1000)) {
+    validated.limit = 50
+  }
+
   return validated
 }
 
@@ -104,7 +123,7 @@ function isValidDate(dateString) {
  * @returns {Object} Объект с условиями и параметрами
  */
 function buildWhereConditions(filters) {
-  const conditions = ['o.DELETED = 0']
+  const conditions = []
   const params = []
 
   if (filters.startDate) {
@@ -124,18 +143,47 @@ function buildWhereConditions(filters) {
     params.push(filters.orderStatus)
   }
   if (filters.stuffType) {
-    conditions.push('ggt.CODE = ?')
+    conditions.push('ggt.ID = ?')
     params.push(filters.stuffType)
   }
   if (filters.materialName) {
-    conditions.push('UPPER(g.NAME) LIKE UPPER(?)')
-    params.push(`%${filters.materialName}%`)
+    conditions.push('g.NAME CONTAINING ?')
+    params.push(filters.materialName)
+  }
+  if (filters.materialMarking) {
+    conditions.push('g.MARKING CONTAINING ?')
+    params.push(filters.materialMarking)
+  }
+  if (filters.orderNumber) {
+    // Обработка поиска по номеру заказа
+    if (
+      filters.orderNumber.includes('-') ||
+      filters.orderNumber.includes('_') ||
+      filters.orderNumber.includes(' ')
+    ) {
+      // Точный поиск для сложных номеров
+      conditions.push('o.ORDERNO CONTAINING ?')
+      params.push(filters.orderNumber)
+    } else {
+      // Поиск по цифрам для простых номеров
+      const orderNumberDigits = filters.orderNumber.replace(/\D/g, '')
+      if (orderNumberDigits) {
+        conditions.push('o.ORDERNO CONTAINING ?')
+        params.push(orderNumberDigits)
+      } else {
+        conditions.push('o.ORDERNO CONTAINING ?')
+        params.push(filters.orderNumber)
+      }
+    }
   }
 
-  return {
+  const result = {
     whereClause: conditions.length > 0 ? 'WHERE ' + conditions.join(' AND ') : '',
     params,
   }
+
+  console.log('buildWhereConditions result:', result)
+  return result
 }
 
 /**

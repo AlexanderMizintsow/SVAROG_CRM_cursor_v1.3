@@ -59,6 +59,9 @@ if (orders1cJobs.lateResponseJob) {
   cronJobs.orders1c_late_response = orders1cJobs.lateResponseJob
 }
 
+// Запуск всех cron-задач
+cronManager.startAllJobs()
+
 // Запуск мониторинга здоровья cron-задач
 cronManager.startHealthCheck()
 

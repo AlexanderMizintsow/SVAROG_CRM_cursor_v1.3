@@ -6,14 +6,14 @@
   min-height: 100vh;
 
   .statistics-header {
-    padding: 24px;
-    margin-bottom: 24px;
+    padding: 16px 24px;
+    margin-bottom: 16px;
     background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
     color: white;
     border-radius: 12px;
-    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.1);
 
-    .MuiTypography-h4 {
+    .MuiTypography-h5 {
       color: white;
       font-weight: 600;
     }
@@ -24,17 +24,11 @@
   }
 
   .filters-section {
-    padding: 24px;
-    margin-bottom: 24px;
+    padding: 16px 24px;
+    margin-bottom: 16px;
     border-radius: 12px;
     background: white;
-    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
-
-    .MuiTypography-h6 {
-      color: #333;
-      font-weight: 600;
-      margin-bottom: 16px;
-    }
+    box-shadow: 0 2px 12px rgba(0, 0, 0, 0.08);
 
     .MuiButton-root {
       border-radius: 8px;
@@ -85,6 +79,12 @@
     background: white;
     box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
     overflow: hidden;
+
+    .content-container {
+      // Стили для основного контейнера с прокруткой
+      border-radius: 8px;
+      background: white;
+    }
 
     .MuiTabs-root {
       border-bottom: 1px solid #e0e0e0;
@@ -271,5 +271,100 @@
 
   .MuiTypography-body2 {
     color: #999;
+  }
+
+  // Стили для карточек
+  .MuiCard-root {
+    border-radius: 12px;
+    box-shadow: 0 2px 12px rgba(0, 0, 0, 0.08);
+    transition: all 0.3s ease;
+    border: 1px solid rgba(0, 0, 0, 0.05);
+
+    &:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 8px 25px rgba(0, 0, 0, 0.15);
+    }
+  }
+
+  // Стили для переключателя видов
+  .MuiToggleButtonGroup-root {
+    border-radius: 8px;
+    overflow: hidden;
+
+    .MuiToggleButton-root {
+      border-radius: 0;
+      border: 1px solid rgba(0, 0, 0, 0.12);
+
+      &:first-of-type {
+        border-top-left-radius: 8px;
+        border-bottom-left-radius: 8px;
+      }
+
+      &:last-of-type {
+        border-top-right-radius: 8px;
+        border-bottom-right-radius: 8px;
+      }
+
+      &.Mui-selected {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        color: white;
+
+        &:hover {
+          background: linear-gradient(135deg, #5a6fd8 0%, #6a4190 100%);
+        }
+      }
+    }
+  }
+
+  // Стили для пагинации
+  .MuiPagination-root {
+    .MuiPaginationItem-root {
+      border-radius: 8px;
+      margin: 0 2px;
+
+      &.Mui-selected {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        color: white;
+      }
+    }
+  }
+
+  // Стили для прокрутки
+  .scrollable-container {
+    max-height: 70vh;
+    overflow: auto;
+
+    &::-webkit-scrollbar {
+      width: 8px;
+    }
+
+    &::-webkit-scrollbar-track {
+      background: #f1f1f1;
+      border-radius: 4px;
+    }
+
+    &::-webkit-scrollbar-thumb {
+      background: #c1c1c1;
+      border-radius: 4px;
+
+      &:hover {
+        background: #a8a8a8;
+      }
+    }
+  }
+
+  // Стили для таблиц с прокруткой
+  .MuiTableContainer-root {
+    &.scrollable-table {
+      max-height: 70vh;
+      overflow: auto;
+
+      .MuiTableHead-root {
+        position: sticky;
+        top: 0;
+        z-index: 10;
+        background: white;
+      }
+    }
   }
 }

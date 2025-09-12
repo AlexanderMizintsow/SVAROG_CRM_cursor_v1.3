@@ -1,0 +1,301 @@
+.material-search-page {
+  padding: 24px;
+  max-width: 1400px;
+  margin: 0 auto;
+
+  .search-header {
+    padding: 20px 24px;
+    margin-bottom: 24px;
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+    border-radius: 12px;
+
+    .MuiTypography-h5 {
+      color: white;
+      font-weight: 600;
+    }
+
+    .MuiTypography-body2 {
+      color: rgba(255, 255, 255, 0.8);
+    }
+
+    .MuiSvgIcon-root {
+      color: white;
+    }
+  }
+
+  .filters-section {
+    padding: 20px 24px;
+    margin-bottom: 24px;
+    border-radius: 12px;
+    background: #fafafa;
+
+    .MuiTypography-h6 {
+      color: #333;
+      font-weight: 600;
+    }
+
+    .MuiTextField-root,
+    .MuiFormControl-root {
+      .MuiOutlinedInput-root {
+        background: white;
+        border-radius: 8px;
+      }
+    }
+
+    .MuiButton-root {
+      border-radius: 8px;
+      text-transform: none;
+      font-weight: 500;
+    }
+  }
+
+  .search-stats {
+    padding: 16px 24px;
+    margin-bottom: 24px;
+    border-radius: 12px;
+    background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);
+    color: white;
+
+    .MuiTypography-h6 {
+      color: white;
+      font-weight: 600;
+    }
+
+    .MuiChip-root {
+      background: rgba(255, 255, 255, 0.2);
+      color: white;
+      border: 1px solid rgba(255, 255, 255, 0.3);
+
+      &:hover {
+        background: rgba(255, 255, 255, 0.3);
+      }
+    }
+
+    .MuiSvgIcon-root {
+      color: white;
+    }
+  }
+
+  .results-section {
+    .order-accordion {
+      margin-bottom: 16px;
+      border-radius: 12px !important;
+      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+      border: 1px solid #e0e0e0;
+
+      &:before {
+        display: none;
+      }
+
+      .MuiAccordionSummary-root {
+        padding: 16px 24px;
+        background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
+        border-radius: 12px 12px 0 0;
+
+        &.Mui-expanded {
+          border-radius: 12px 12px 0 0;
+        }
+
+        .MuiAccordionSummary-content {
+          margin: 0;
+        }
+      }
+
+      .MuiAccordionDetails-root {
+        padding: 0;
+        background: white;
+        border-radius: 0 0 12px 12px;
+      }
+
+      .item-accordion {
+        margin: 0;
+        border: none;
+        border-bottom: 1px solid #f0f0f0;
+        box-shadow: none;
+
+        &:last-child {
+          border-bottom: none;
+        }
+
+        &:before {
+          display: none;
+        }
+
+        .MuiAccordionSummary-root {
+          padding: 12px 24px;
+          background: #fafafa;
+          min-height: 48px;
+
+          .MuiAccordionSummary-content {
+            margin: 0;
+          }
+        }
+
+        .MuiAccordionDetails-root {
+          padding: 0;
+          background: white;
+        }
+      }
+    }
+  }
+
+  .empty-state {
+    padding: 48px 24px;
+    text-align: center;
+    border-radius: 12px;
+    background: #fafafa;
+
+    .MuiSvgIcon-root {
+      color: #bdbdbd;
+    }
+  }
+
+  // Стили для таблицы материалов
+  .MuiTableContainer-root {
+    border-radius: 0 0 12px 12px;
+    box-shadow: none;
+
+    .MuiTable-root {
+      .MuiTableHead-root {
+        background: #f5f5f5;
+
+        .MuiTableCell-head {
+          font-weight: 600;
+          color: #333;
+          border-bottom: 2px solid #e0e0e0;
+        }
+      }
+
+      .MuiTableBody-root {
+        .MuiTableRow-root {
+          &:hover {
+            background: #f8f9fa;
+          }
+
+          .MuiTableCell-root {
+            border-bottom: 1px solid #f0f0f0;
+            padding: 12px 16px;
+          }
+        }
+      }
+    }
+  }
+
+  // Стили для чипов
+  .MuiChip-root {
+    border-radius: 16px;
+    font-weight: 500;
+
+    &.MuiChip-colorPrimary {
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      color: white;
+    }
+
+    &.MuiChip-colorSecondary {
+      background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+      color: white;
+    }
+
+    &.MuiChip-colorInfo {
+      background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);
+      color: white;
+    }
+  }
+
+  // Стили для кнопок
+  .MuiButton-root {
+    border-radius: 8px;
+    text-transform: none;
+    font-weight: 500;
+    padding: 8px 16px;
+
+    &.MuiButton-contained {
+      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+
+      &:hover {
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+      }
+    }
+  }
+
+  // Стили для иконок
+  .MuiIconButton-root {
+    border-radius: 8px;
+
+    &:hover {
+      background: rgba(0, 0, 0, 0.04);
+    }
+  }
+
+  // Адаптивность
+  @media (max-width: 768px) {
+    padding: 16px;
+
+    .search-header {
+      padding: 16px;
+      margin-bottom: 16px;
+    }
+
+    .filters-section {
+      padding: 16px;
+      margin-bottom: 16px;
+    }
+
+    .search-stats {
+      padding: 12px 16px;
+      margin-bottom: 16px;
+
+      .MuiBox-root {
+        flex-direction: column;
+        gap: 8px;
+        align-items: flex-start;
+      }
+    }
+
+    .results-section {
+      .order-accordion {
+        .MuiAccordionSummary-root {
+          padding: 12px 16px;
+        }
+
+        .item-accordion {
+          .MuiAccordionSummary-root {
+            padding: 8px 16px;
+          }
+        }
+      }
+    }
+  }
+
+  // Анимации
+  .MuiAccordion-root {
+    transition: all 0.3s ease;
+
+    &:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 4px 16px rgba(0, 0, 0, 0.15);
+    }
+  }
+
+  // Стили для скроллбара
+  .MuiTableContainer-root {
+    &::-webkit-scrollbar {
+      height: 8px;
+    }
+
+    &::-webkit-scrollbar-track {
+      background: #f1f1f1;
+      border-radius: 4px;
+    }
+
+    &::-webkit-scrollbar-thumb {
+      background: #c1c1c1;
+      border-radius: 4px;
+
+      &:hover {
+        background: #a8a8a8;
+      }
+    }
+  }
+}

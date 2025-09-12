@@ -2,7 +2,7 @@ require('dotenv').config()
 const express = require('express')
 const Firebird = require('node-firebird')
 const cors = require('cors')
-const StatisticsController = require('./controllers/statisticsController')
+const StatisticsController = require('./controllers/statisticsController_new')
 const app = express()
 const port = process.env.PORT || 5005
 
@@ -18,6 +18,7 @@ const dbOptions = {
   lowercase_keys: false,
   role: null,
   pageSize: 4096,
+  encoding: 'UTF8',
 }
 
 // Функция для получения настроек БД по году
@@ -145,7 +146,87 @@ app.get('/app/totalprice/:orderNo/:inn/:isButton?', (req, res) => {
   })
 })
 
-// Маршрут для получения статистики по заказам
+// Маршрут для поиска материалов в заказах (оптимизированный)
+app.post('/app/statistics/orders-with-materials', async (req, res) => {
+  try {
+    const result = await statisticsController.getOrdersWithMaterials(req.body)
+    res.json({ result })
+  } catch (error) {
+    console.error('Orders with materials error:', error)
+    res.status(500).json({ message: error.message })
+  }
+})
+
+// Маршрут для получения общей статистики поиска (быстрый)
+app.post('/app/statistics/search-summary', async (req, res) => {
+  try {
+    const result = await statisticsController.getSearchSummary(req.body)
+    res.json({ result })
+  } catch (error) {
+    console.error('Search summary error:', error)
+    res.status(500).json({ message: error.message })
+  }
+})
+
+// Маршрут для получения статистики по материалам
+app.post('/app/statistics/materials-summary', async (req, res) => {
+  try {
+    const result = await statisticsController.getMaterialsSummary(req.body)
+    res.json({ result })
+  } catch (error) {
+    console.error('Materials summary error:', error)
+    res.status(500).json({ message: error.message })
+  }
+})
+
+// Маршрут для получения списка заказов (оптимизированный)
+app.post('/app/statistics/orders-list', async (req, res) => {
+  try {
+    const result = await statisticsController.getOrdersList(req.body)
+    res.json({ result })
+  } catch (error) {
+    console.error('Orders list error:', error)
+    res.status(500).json({ message: error.message })
+  }
+})
+
+// Маршрут для получения детальной информации по заказу
+app.post('/app/statistics/order-details/:orderId', async (req, res) => {
+  try {
+    const orderId = parseInt(req.params.orderId)
+    const result = await statisticsController.getOrderDetails(orderId, req.body)
+    res.json({ result })
+  } catch (error) {
+    console.error('Order details error:', error)
+    res.status(500).json({ message: error.message })
+  }
+})
+
+// Маршрут для получения статистики по материалам конкретного заказа
+app.post('/app/statistics/order-materials/:orderId', async (req, res) => {
+  try {
+    const orderId = parseInt(req.params.orderId)
+    const result = await statisticsController.getOrderMaterialsSummary(orderId, req.body)
+    res.json({ result })
+  } catch (error) {
+    console.error('Order materials summary error:', error)
+    res.status(500).json({ message: error.message })
+  }
+})
+
+// Маршрут для поиска заказов по номеру (мини-окошко)
+app.post('/app/statistics/search-orders', async (req, res) => {
+  try {
+    const { orderNumber, ...filters } = req.body
+    const result = await statisticsController.searchOrdersByNumber(orderNumber, filters)
+    res.json({ result })
+  } catch (error) {
+    console.error('Orders search error:', error)
+    res.status(500).json({ message: error.message })
+  }
+})
+
+// Маршрут для получения статистики по заказам (старый)
 app.post('/app/statistics/orders', async (req, res) => {
   try {
     const result = await statisticsController.getOrdersStatistics(req.body)
