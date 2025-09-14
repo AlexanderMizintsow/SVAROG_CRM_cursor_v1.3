@@ -128,11 +128,11 @@ function buildWhereConditions(filters) {
 
   if (filters.startDate) {
     conditions.push('o.DATECREATED >= ?')
-    params.push(filters.startDate)
+    params.push(filters.startDate + ' 00:00:00')
   }
   if (filters.endDate) {
-    conditions.push('o.DATECREATED <= ?')
-    params.push(filters.endDate)
+    conditions.push('o.DATECREATED < ?')
+    params.push(filters.endDate + ' 23:59:59')
   }
   if (
     filters.orderStatus !== undefined &&
@@ -182,7 +182,52 @@ function buildWhereConditions(filters) {
     params,
   }
 
+  console.log('buildWhereConditions input filters:', filters)
   console.log('buildWhereConditions result:', result)
+  return result
+}
+
+/**
+ * Построение условий WHERE для фильтрации материалов (без дат и статуса)
+ * @param {Object} filters - Параметры фильтра
+ * @returns {Object} Объект с условиями и параметрами
+ */
+function buildMaterialWhereConditions(filters) {
+  const conditions = []
+  const params = []
+
+  // Фильтр по типу материала
+  if (filters.stuffType) {
+    // Если передан ID типа материала (число), фильтруем по ID
+    if (!isNaN(filters.stuffType) && Number(filters.stuffType) > 0) {
+      conditions.push('ggt.ID = ?')
+      params.push(Number(filters.stuffType))
+    } else {
+      // Если передан текст, фильтруем по имени
+      conditions.push('ggt.NAME CONTAINING ?')
+      params.push(String(filters.stuffType))
+    }
+  }
+
+  // Фильтр по наименованию материала
+  if (filters.materialName) {
+    conditions.push('g.NAME CONTAINING ?')
+    params.push(filters.materialName)
+  }
+
+  // Фильтр по артикулу материала
+  if (filters.materialMarking) {
+    conditions.push('g.MARKING CONTAINING ?')
+    params.push(filters.materialMarking)
+  }
+
+  const result = {
+    whereClause: conditions.length > 0 ? 'WHERE ' + conditions.join(' AND ') : '',
+    params,
+  }
+
+  console.log('buildMaterialWhereConditions input filters:', filters)
+  console.log('buildMaterialWhereConditions result:', result)
   return result
 }
 
@@ -354,6 +399,7 @@ module.exports = {
   validateFilters,
   isValidDate,
   buildWhereConditions,
+  buildMaterialWhereConditions,
   groupByMaterialType,
   calculateTotals,
   sortData,

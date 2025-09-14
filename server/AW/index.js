@@ -157,6 +157,28 @@ app.post('/app/statistics/orders-with-materials', async (req, res) => {
   }
 })
 
+// Старая логика - полные заказы со всеми данными
+app.post('/app/statistics/full-orders-with-materials', async (req, res) => {
+  try {
+    const result = await statisticsController.getFullOrdersWithMaterials(req.body)
+    res.json({ result })
+  } catch (error) {
+    console.error('Full orders with materials error:', error)
+    res.status(500).json({ message: error.message })
+  }
+})
+
+// Новая оптимизированная логика - только заказы без материалов
+app.post('/app/statistics/full-orders-data', async (req, res) => {
+  try {
+    const result = await statisticsController.getFullOrdersData(req.body)
+    res.json({ result })
+  } catch (error) {
+    console.error('Full orders data error:', error)
+    res.status(500).json({ message: error.message })
+  }
+})
+
 // Маршрут для получения общей статистики поиска (быстрый)
 app.post('/app/statistics/search-summary', async (req, res) => {
   try {
@@ -202,8 +224,21 @@ app.post('/app/statistics/order-details/:orderId', async (req, res) => {
   }
 })
 
-// Маршрут для получения статистики по материалам конкретного заказа
+// Маршрут для получения материалов конкретного заказа (для раскрытия)
 app.post('/app/statistics/order-materials/:orderId', async (req, res) => {
+  try {
+    const orderId = parseInt(req.params.orderId)
+    const filters = req.body || {}
+    const result = await statisticsController.getOrderMaterials(orderId, filters)
+    res.json({ success: true, data: result })
+  } catch (error) {
+    console.error('Order materials error:', error)
+    res.status(500).json({ success: false, message: error.message })
+  }
+})
+
+// Маршрут для получения статистики по материалам конкретного заказа (отдельный эндпоинт)
+app.post('/app/statistics/order-materials-summary/:orderId', async (req, res) => {
   try {
     const orderId = parseInt(req.params.orderId)
     const result = await statisticsController.getOrderMaterialsSummary(orderId, req.body)

@@ -26,15 +26,6 @@ import {
   Tooltip,
   Divider,
   Badge,
-  Dialog,
-  DialogTitle,
-  DialogContent,
-  DialogActions,
-  List,
-  ListItem,
-  ListItemIcon,
-  ListItemText,
-  Pagination,
 } from '@mui/material'
 import {
   Search as SearchIcon,
@@ -49,7 +40,6 @@ import {
 } from '@mui/icons-material'
 import { format } from 'date-fns'
 import { ru } from 'date-fns/locale'
-import { debounce } from 'lodash'
 import axios from 'axios'
 import { API_BASE_URL } from '../../../config.js'
 import './materialSearchPage.scss'
@@ -73,16 +63,6 @@ const MaterialSearchPage = () => {
   const [expandedOrders, setExpandedOrders] = useState(new Set())
   const [expandedItems, setExpandedItems] = useState(new Set())
   const [currentPage, setCurrentPage] = useState(1)
-  const [orderDetails, setOrderDetails] = useState(new Map()) // Кэш деталей заказов
-  const [loadingDetails, setLoadingDetails] = useState(new Set()) // Загружающиеся детали
-  const [orderMaterialsStats, setOrderMaterialsStats] = useState(new Map()) // Кэш статистики по материалам заказов
-  const [loadingMaterialsStats, setLoadingMaterialsStats] = useState(new Set()) // Загружающаяся статистика
-
-  // Состояние для мини-окошка поиска заказов
-  const [orderSearchOpen, setOrderSearchOpen] = useState(false)
-  const [orderSearchQuery, setOrderSearchQuery] = useState('')
-  const [orderSearchResults, setOrderSearchResults] = useState([])
-  const [loadingOrderSearch, setLoadingOrderSearch] = useState(false)
 
   // Загрузка типов товаров
   const fetchStuffTypes = useCallback(async () => {
@@ -96,7 +76,7 @@ const MaterialSearchPage = () => {
     }
   }, [filters.year])
 
-  // Поиск материалов (оптимизированная версия)
+  // Поиск материалов
   const searchMaterials = useCallback(
     async (page = 1) => {
       setLoading(true)
@@ -114,14 +94,14 @@ const MaterialSearchPage = () => {
           orderNumber: String(filters.orderNumber || ''),
           year: String(filters.year || ''),
           page: Number(page) || 1,
-          limit: 50, // Уменьшили лимит для лучшей производительности
+          limit: 100,
         }
 
         console.log('Sending filters:', cleanFilters)
 
-        // Используем оптимизированный эндпоинт
+        // Используем новый оптимизированный эндпоинт - только заказы без материалов
         const response = await axios.post(
-          `${API_BASE_URL}5005/app/statistics/orders-with-materials`,
+          `${API_BASE_URL}5005/app/statistics/full-orders-data`,
           cleanFilters
         )
         const result = response.data
@@ -132,9 +112,9 @@ const MaterialSearchPage = () => {
         } else {
           // Последующие страницы - добавляем к существующим, избегая дублирования
           setData((prevData) => {
-            const existingOrderIds = new Set((prevData?.orders || []).map((order) => order.ORDERID))
+            const existingOrderIds = new Set((prevData?.orders || []).map((order) => order.orderId))
             const newOrders = result.result.orders.filter(
-              (order) => !existingOrderIds.has(order.ORDERID)
+              (order) => !existingOrderIds.has(order.orderId)
             )
 
             return {
@@ -149,70 +129,6 @@ const MaterialSearchPage = () => {
         console.error('Search error:', err)
       } finally {
         setLoading(false)
-      }
-    },
-    [filters]
-  )
-
-  // Загрузка статистики по материалам заказа
-  const loadOrderMaterialsStats = useCallback(
-    async (orderId) => {
-      try {
-        const cleanFilters = {
-          startDate: String(filters.startDate || ''),
-          endDate: String(filters.endDate || ''),
-          orderStatus: String(filters.orderStatus || ''),
-          stuffType: String(filters.stuffType || ''),
-          materialName: String(filters.materialName || ''),
-          materialMarking: String(filters.materialMarking || ''),
-          orderNumber: String(filters.orderNumber || ''),
-          year: String(filters.year || ''),
-        }
-
-        setLoadingMaterialsStats((prev) => new Set(prev).add(orderId))
-
-        const response = await axios.post(
-          `${API_BASE_URL}5005/app/statistics/order-materials/${orderId}`,
-          cleanFilters
-        )
-        setOrderMaterialsStats((prev) => new Map(prev).set(orderId, response.data.result))
-      } catch (err) {
-        console.error('Error loading order materials stats:', err)
-        setError('Ошибка загрузки статистики по материалам')
-      } finally {
-        setLoadingMaterialsStats((prev) => {
-          const newSet = new Set(prev)
-          newSet.delete(orderId)
-          return newSet
-        })
-      }
-    },
-    [filters]
-  )
-
-  // Загрузка детальной информации по заказу
-  const loadOrderDetails = useCallback(
-    async (orderId) => {
-      try {
-        const cleanFilters = {
-          startDate: String(filters.startDate || ''),
-          endDate: String(filters.endDate || ''),
-          orderStatus: String(filters.orderStatus || ''),
-          stuffType: String(filters.stuffType || ''),
-          materialName: String(filters.materialName || ''),
-          materialMarking: String(filters.materialMarking || ''),
-          orderNumber: String(filters.orderNumber || ''),
-          year: String(filters.year || ''),
-        }
-
-        const response = await axios.post(
-          `${API_BASE_URL}5005/app/statistics/order-details/${orderId}`,
-          cleanFilters
-        )
-        return response.data.result
-      } catch (err) {
-        console.error('Order details error:', err)
-        throw err
       }
     },
     [filters]
@@ -235,51 +151,6 @@ const MaterialSearchPage = () => {
     setCurrentPage(1)
   }, [])
 
-  // Поиск заказов по номеру
-  const searchOrders = useCallback(
-    async (query) => {
-      if (!query || query.trim().length < 2) {
-        setOrderSearchResults([])
-        return
-      }
-
-      try {
-        setLoadingOrderSearch(true)
-        const cleanFilters = {
-          startDate: String(filters.startDate || ''),
-          endDate: String(filters.endDate || ''),
-          orderStatus: String(filters.orderStatus || ''),
-          stuffType: String(filters.stuffType || ''),
-          materialName: String(filters.materialName || ''),
-          materialMarking: String(filters.materialMarking || ''),
-          year: String(filters.year || ''),
-        }
-
-        const response = await axios.post(`${API_BASE_URL}5005/app/statistics/search-orders`, {
-          ...cleanFilters,
-          orderNumber: query.trim(),
-        })
-
-        setOrderSearchResults(response.data.result || [])
-      } catch (err) {
-        console.error('Error searching orders:', err)
-        setOrderSearchResults([])
-      } finally {
-        setLoadingOrderSearch(false)
-      }
-    },
-    [filters]
-  )
-
-  // Debounced поиск заказов
-  const debouncedSearchOrders = useMemo(
-    () =>
-      debounce((query) => {
-        searchOrders(query)
-      }, 300),
-    [searchOrders]
-  )
-
   // Фильтр по конкретному заказу
   const filterByOrder = useCallback((orderNumber) => {
     setFilters((prev) => ({
@@ -289,55 +160,85 @@ const MaterialSearchPage = () => {
       materialMarking: '',
     }))
     setCurrentPage(1)
-    setOrderSearchOpen(false)
-    setOrderSearchQuery('')
-    setOrderSearchResults([])
   }, [])
+
+  // Функция для загрузки материалов конкретного заказа
+  const loadOrderMaterials = useCallback(
+    async (orderId) => {
+      try {
+        setLoading(true)
+        console.log(`Loading materials for order ${orderId}`)
+        console.log('Sending filters:', filters)
+
+        // Передаем текущие фильтры для правильной фильтрации материалов
+        const response = await axios.post(
+          `${API_BASE_URL}5005/app/statistics/order-materials/${orderId}`,
+          filters
+        )
+
+        console.log('Response received:', response.data)
+
+        if (response.data.success) {
+          const orderData = response.data.data
+          console.log('Order data:', orderData)
+
+          // Обновляем данные заказа с загруженными материалами
+          setData((prevData) => {
+            if (!prevData?.orders) return prevData
+
+            const updatedOrders = prevData.orders.map((order) => {
+              if (order.orderId === orderId) {
+                return {
+                  ...order,
+                  items: orderData ? orderData.items : [],
+                  materialsLoaded: true,
+                  filteredItemsCount: orderData ? orderData.filteredItemsCount : 0,
+                  filteredMaterialsCount: orderData ? orderData.filteredMaterialsCount : 0,
+                  filteredCost: orderData ? orderData.filteredCost : 0,
+                  filteredQuantity: orderData ? orderData.filteredQuantity : 0,
+                }
+              }
+              return order
+            })
+
+            return {
+              ...prevData,
+              orders: updatedOrders,
+            }
+          })
+        }
+      } catch (error) {
+        console.error('Error loading order materials:', error)
+        console.error('Error response:', error.response?.data)
+        console.error('Error status:', error.response?.status)
+        setError(`Ошибка при загрузке материалов заказа: ${error.message}`)
+      } finally {
+        setLoading(false)
+      }
+    },
+    [filters]
+  )
 
   // Переключение развернутости заказа
   const toggleOrderExpansion = useCallback(
-    async (orderId) => {
+    (orderId) => {
       setExpandedOrders((prev) => {
         const newSet = new Set(prev)
         if (newSet.has(orderId)) {
           newSet.delete(orderId)
         } else {
           newSet.add(orderId)
-          // Загружаем детали заказа и статистику по материалам при первом раскрытии
-          if (!orderDetails.has(orderId) && !loadingDetails.has(orderId)) {
-            setLoadingDetails((prev) => new Set(prev).add(orderId))
-            loadOrderDetails(orderId)
-              .then((details) => {
-                setOrderDetails((prev) => new Map(prev).set(orderId, details))
-              })
-              .catch((err) => {
-                console.error('Failed to load order details:', err)
-              })
-              .finally(() => {
-                setLoadingDetails((prev) => {
-                  const newSet = new Set(prev)
-                  newSet.delete(orderId)
-                  return newSet
-                })
-              })
-          }
-
-          // Загружаем статистику по материалам заказа
-          if (!orderMaterialsStats.has(orderId) && !loadingMaterialsStats.has(orderId)) {
-            loadOrderMaterialsStats(orderId)
+          // Загружаем материалы при раскрытии заказа
+          const order = data?.orders?.find((o) => o.orderId === orderId)
+          if (order && !order.materialsLoaded) {
+            console.log(`Expanding order ${orderId}, loading materials...`)
+            loadOrderMaterials(orderId)
           }
         }
         return newSet
       })
     },
-    [
-      orderDetails,
-      loadingDetails,
-      loadOrderDetails,
-      orderMaterialsStats,
-      loadingMaterialsStats,
-      loadOrderMaterialsStats,
-    ]
+    [data?.orders, loadOrderMaterials]
   )
 
   // Переключение развернутости изделия
@@ -353,19 +254,43 @@ const MaterialSearchPage = () => {
     })
   }, [])
 
+  // Копирование номера заказа
+  const copyOrderNumber = useCallback((orderNumber) => {
+    navigator.clipboard
+      .writeText(orderNumber)
+      .then(() => {
+        // Можно добавить уведомление об успешном копировании
+        console.log('Номер заказа скопирован:', orderNumber)
+      })
+      .catch((err) => {
+        console.error('Ошибка копирования:', err)
+      })
+  }, [])
+
   // Загрузка типов товаров при изменении года
   useEffect(() => {
     fetchStuffTypes()
   }, [fetchStuffTypes])
+
+  // Автоматический поиск при загрузке компонента с базовыми фильтрами
+  useEffect(() => {
+    // Автоматически выполняем поиск только если есть базовые фильтры (даты и статус)
+    if (filters.startDate && filters.endDate && filters.orderStatus) {
+      searchMaterials(1)
+    }
+  }, [filters.startDate, filters.endDate, filters.orderStatus, searchMaterials])
 
   // Статистика поиска
   const searchStats = useMemo(() => {
     if (!data) return null
 
     return {
-      totals: data.totals,
-      materials: data.materials,
-      grouping: data.grouping,
+      totalOrders: data.totalOrders,
+      totalItems: data.totalItems,
+      totalMaterials: data.totalMaterials,
+      totalCost: data.totalCost,
+      totalQuantity: data.totalQuantity,
+      materialsStats: data.materialsStats,
     }
   }, [data])
 
@@ -399,7 +324,7 @@ const MaterialSearchPage = () => {
       <Paper className="search-header" elevation={2} sx={{ py: 1.5 }}>
         <Box display="flex" alignItems="center" gap={2}>
           <SearchIcon color="primary" />
-          <Box>
+          <Box flex={1}>
             <Typography variant="h6" component="h1">
               Поиск материалов в заказах
             </Typography>
@@ -407,6 +332,14 @@ const MaterialSearchPage = () => {
               Найдите заказы и изделия по материалам, артикулам или номерам заказов
             </Typography>
           </Box>
+          {loading && (
+            <Box display="flex" alignItems="center" gap={1}>
+              <CircularProgress size={20} />
+              <Typography variant="body2" color="text.secondary">
+                Загрузка...
+              </Typography>
+            </Box>
+          )}
         </Box>
       </Paper>
 
@@ -449,7 +382,12 @@ const MaterialSearchPage = () => {
               <InputLabel>Статус заказа</InputLabel>
               <Select
                 value={filters.orderStatus}
-                onChange={(e) => setFilters((prev) => ({ ...prev, orderStatus: e.target.value }))}
+                onChange={(e) =>
+                  setFilters((prev) => ({
+                    ...prev,
+                    orderStatus: e.target.value,
+                  }))
+                }
                 label="Статус заказа"
               >
                 <MenuItem value="">Все</MenuItem>
@@ -498,7 +436,12 @@ const MaterialSearchPage = () => {
               label="Наименование материала"
               placeholder="Введите название материала..."
               value={filters.materialName}
-              onChange={(e) => setFilters((prev) => ({ ...prev, materialName: e.target.value }))}
+              onChange={(e) =>
+                setFilters((prev) => ({
+                  ...prev,
+                  materialName: e.target.value,
+                }))
+              }
             />
           </Grid>
 
@@ -509,7 +452,12 @@ const MaterialSearchPage = () => {
               label="Артикул материала"
               placeholder="Введите артикул..."
               value={filters.materialMarking}
-              onChange={(e) => setFilters((prev) => ({ ...prev, materialMarking: e.target.value }))}
+              onChange={(e) =>
+                setFilters((prev) => ({
+                  ...prev,
+                  materialMarking: e.target.value,
+                }))
+              }
             />
           </Grid>
 
@@ -554,20 +502,6 @@ const MaterialSearchPage = () => {
               >
                 Сброс
               </Button>
-              <Button
-                variant="outlined"
-                startIcon={<SearchIcon />}
-                onClick={() => setOrderSearchOpen(true)}
-                disabled={loading}
-                sx={{
-                  minHeight: '40px',
-                  fontSize: '14px',
-                  fontWeight: 500,
-                  minWidth: '120px',
-                }}
-              >
-                Найти заказ
-              </Button>
             </Box>
           </Grid>
         </Grid>
@@ -583,168 +517,42 @@ const MaterialSearchPage = () => {
       {/* Статистика поиска */}
       {searchStats && (
         <Paper className="search-stats" elevation={1}>
-          <Box display="flex" alignItems="center" gap={2} flexWrap="wrap" mb={2}>
-            <InfoIcon color="primary" />
-            <Typography variant="h6">Результаты поиска:</Typography>
-            <Chip label={`${searchStats.totals.totalOrders} заказов`} color="primary" />
-            <Chip label={`${searchStats.totals.totalItems} изделий`} color="secondary" />
-            <Chip label={`${searchStats.totals.totalMaterials} материалов`} color="info" />
-            {searchStats.totals.totalQuantity && (
-              <Chip
-                label={`${searchStats.totals.totalQuantity.toFixed(2)} ед.`}
-                color="warning"
-                variant="outlined"
-              />
-            )}
-            {searchStats.totals.totalCost && (
-              <Chip
-                label={`${searchStats.totals.totalCost.toFixed(2)} ₽`}
-                color="success"
-                variant="outlined"
-              />
+          <Box>
+            <Box display="flex" alignItems="center" gap={2} mb={2}>
+              <InfoIcon color="primary" />
+              <Typography variant="h6">Результаты поиска:</Typography>
+              <Chip label={`${searchStats.totalOrders} заказов`} color="primary" />
+              <Chip label={`${searchStats.totalItems} изделий`} color="secondary" />
+              <Chip label={`${searchStats.totalMaterials} единиц материала`} color="info" />
+            </Box>
+
+            {searchStats.totalCost > 0 && (
+              <Box display="flex" alignItems="center" gap={2}>
+                <Typography variant="body2" color="text.secondary">
+                  Общая стоимость:
+                </Typography>
+                <Chip
+                  label={`${searchStats.totalCost.toFixed(2)} ₽`}
+                  color="success"
+                  variant="outlined"
+                />
+                {searchStats.totalQuantity > 0 && (
+                  <>
+                    <Typography variant="body2" color="text.secondary">
+                      Количество:
+                    </Typography>
+                    <Chip
+                      label={`${searchStats.totalQuantity.toFixed(2)}`}
+                      color="warning"
+                      variant="outlined"
+                    />
+                  </>
+                )}
+              </Box>
             )}
           </Box>
-
-          {/* Детальная статистика по материалам */}
-          {searchStats.materials && searchStats.materials.length > 0 && (
-            <Box>
-              <Typography variant="subtitle2" gutterBottom>
-                {searchStats.grouping === 'by_material'
-                  ? 'Статистика по материалам:'
-                  : searchStats.grouping === 'by_type'
-                  ? 'Статистика по типам материалов:'
-                  : 'Общая статистика:'}
-              </Typography>
-              <TableContainer>
-                <Table size="small">
-                  <TableHead>
-                    <TableRow>
-                      <TableCell>Тип материала</TableCell>
-                      <TableCell>Материал</TableCell>
-                      <TableCell>Артикул</TableCell>
-                      <TableCell>Заказов</TableCell>
-                      <TableCell>Изделий</TableCell>
-                      <TableCell>Количество</TableCell>
-                      <TableCell>Стоимость</TableCell>
-                    </TableRow>
-                  </TableHead>
-                  <TableBody>
-                    {searchStats.materials.slice(0, 10).map((material, index) => (
-                      <TableRow key={index}>
-                        <TableCell>
-                          <Chip label={material.STUFF_TYPE_NAME} size="small" />
-                        </TableCell>
-                        <TableCell>{material.MATERIAL_NAME || '-'}</TableCell>
-                        <TableCell>
-                          <Typography variant="body2" fontFamily="monospace">
-                            {material.MATERIAL_MARKING || '-'}
-                          </Typography>
-                        </TableCell>
-                        <TableCell>{material.ORDERS_COUNT}</TableCell>
-                        <TableCell>{material.ITEMS_COUNT}</TableCell>
-                        <TableCell>
-                          {material.TOTAL_QUANTITY
-                            ? `${material.TOTAL_QUANTITY.toFixed(2)} ${
-                                material.MEASURE_UNIT || 'ед.'
-                              }`
-                            : '-'}
-                        </TableCell>
-                        <TableCell>
-                          {material.TOTAL_COST ? `${material.TOTAL_COST.toFixed(2)} ₽` : '-'}
-                        </TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-              </TableContainer>
-              {searchStats.materials.length > 10 && (
-                <Typography
-                  variant="caption"
-                  color="text.secondary"
-                  sx={{ mt: 1, display: 'block' }}
-                >
-                  Показано 10 из {searchStats.materials.length} материалов
-                </Typography>
-              )}
-            </Box>
-          )}
         </Paper>
       )}
-
-      {/* Мини-окошко поиска заказов */}
-      <Dialog
-        open={orderSearchOpen}
-        onClose={() => {
-          setOrderSearchOpen(false)
-          setOrderSearchQuery('')
-          setOrderSearchResults([])
-        }}
-        maxWidth="sm"
-        fullWidth
-      >
-        <DialogTitle>
-          <Box display="flex" alignItems="center" gap={1}>
-            <SearchIcon />
-            Поиск заказов
-          </Box>
-        </DialogTitle>
-        <DialogContent>
-          <TextField
-            fullWidth
-            label="Номер заказа"
-            value={orderSearchQuery}
-            onChange={(e) => {
-              const query = e.target.value
-              setOrderSearchQuery(query)
-              debouncedSearchOrders(query)
-            }}
-            placeholder="Введите номер заказа..."
-            InputProps={{
-              endAdornment: loadingOrderSearch ? <CircularProgress size={20} /> : <SearchIcon />,
-            }}
-            sx={{ mb: 2 }}
-          />
-
-          {orderSearchResults.length > 0 && (
-            <List>
-              {orderSearchResults.map((order) => (
-                <ListItem
-                  key={order.ORDERID}
-                  button
-                  onClick={() => filterByOrder(order.ORDERNO)}
-                  sx={{
-                    border: '1px solid',
-                    borderColor: 'divider',
-                    borderRadius: 1,
-                    mb: 1,
-                  }}
-                >
-                  <ListItemIcon>
-                    <AssignmentIcon color="primary" />
-                  </ListItemIcon>
-                  <ListItemText
-                    primary={`Заказ № ${order.ORDERNO}`}
-                    secondary={`${format(new Date(order.DATECREATED), 'dd.MM.yyyy', {
-                      locale: ru,
-                    })} • ${getStatusText(order.ORDERSTATUS)}`}
-                  />
-                </ListItem>
-              ))}
-            </List>
-          )}
-
-          {orderSearchQuery.length >= 2 &&
-            orderSearchResults.length === 0 &&
-            !loadingOrderSearch && (
-              <Typography variant="body2" color="text.secondary" textAlign="center" py={2}>
-                Заказы не найдены
-              </Typography>
-            )}
-        </DialogContent>
-        <DialogActions>
-          <Button onClick={() => setOrderSearchOpen(false)}>Закрыть</Button>
-        </DialogActions>
-      </Dialog>
 
       {/* Результаты поиска */}
       {data && data.orders && (
@@ -789,106 +597,169 @@ const MaterialSearchPage = () => {
             </Box>
           )}
 
-          {data.orders.map((order) => {
-            const orderDetailsData = orderDetails.get(order.ORDERID)
-            const isLoadingDetails = loadingDetails.has(order.ORDERID)
+          {data.orders.map((order) => (
+            <Accordion
+              key={order.orderId}
+              expanded={expandedOrders.has(order.orderId)}
+              onChange={() => toggleOrderExpansion(order.orderId)}
+              className="order-accordion"
+            >
+              <AccordionSummary expandIcon={<ExpandMoreIcon />}>
+                <Box display="flex" alignItems="center" gap={2} width="100%">
+                  <AssignmentIcon color="primary" />
+                  <Box flexGrow={1}>
+                    <Typography variant="h6">Заказ № {order.orderNumber}</Typography>
+                    <Typography variant="body2" color="text.secondary">
+                      {format(new Date(order.dateCreated), 'dd.MM.yyyy', {
+                        locale: ru,
+                      })}{' '}
+                      •
+                      {order.materialsLoaded ? (
+                        <>
+                          {order.filteredItemsCount || 0} изделий с искомым материалом •{' '}
+                          {order.filteredMaterialsCount || 0} материалов
+                          {order.filteredCost > 0 && (
+                            <>
+                              {' '}
+                              • {order.filteredCost.toFixed(2)} ₽
+                              {order.filteredQuantity > 0 && (
+                                <> • {order.filteredQuantity.toFixed(2)}</>
+                              )}
+                            </>
+                          )}
+                        </>
+                      ) : (
+                        <>{order.itemsWithMaterial || 0} изделий с искомым материалом</>
+                      )}
+                    </Typography>
+                  </Box>
+                  <Chip
+                    label={getStatusText(order.orderStatus)}
+                    color={getStatusColor(order.orderStatus)}
+                    size="small"
+                  />
+                  <Tooltip title="Копировать номер заказа">
+                    <IconButton
+                      size="small"
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        copyOrderNumber(order.orderNumber)
+                      }}
+                    >
+                      <VisibilityIcon />
+                    </IconButton>
+                  </Tooltip>
+                  <Tooltip title="Фильтр по заказу">
+                    <IconButton
+                      size="small"
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        filterByOrder(order.orderNumber)
+                      }}
+                    >
+                      <FilterListIcon />
+                    </IconButton>
+                  </Tooltip>
+                </Box>
+              </AccordionSummary>
 
-            return (
-              <Accordion
-                key={order.ORDERID}
-                expanded={expandedOrders.has(order.ORDERID)}
-                onChange={() => toggleOrderExpansion(order.ORDERID)}
-                className="order-accordion"
-              >
-                <AccordionSummary expandIcon={<ExpandMoreIcon />}>
-                  <Box display="flex" alignItems="center" gap={2} width="100%">
-                    <AssignmentIcon color="primary" />
-                    <Box flexGrow={1}>
-                      <Typography variant="h6">Заказ № {order.ORDERNO}</Typography>
-                      <Typography variant="body2" color="text.secondary">
-                        {format(new Date(order.DATECREATED), 'dd.MM.yyyy', { locale: ru })} •
-                        {order.items_count} изделий • {order.materials_count} материалов
-                        {order.total_quantity && <> • {order.total_quantity.toFixed(2)} ед.</>}
-                        {order.total_cost && <> • {order.total_cost.toFixed(2)} ₽</>}
+              <AccordionDetails>
+                <Box>
+                  {!order.materialsLoaded ? (
+                    <Box display="flex" justifyContent="center" alignItems="center" p={3}>
+                      <CircularProgress size={24} />
+                      <Typography variant="body2" color="text.secondary" ml={2}>
+                        Загрузка материалов...
                       </Typography>
                     </Box>
-                    <Chip
-                      label={getStatusText(order.ORDERSTATUS)}
-                      color={getStatusColor(order.ORDERSTATUS)}
-                      size="small"
-                    />
-                    <Tooltip title="Фильтр по заказу">
-                      <IconButton
-                        size="small"
-                        onClick={(e) => {
-                          e.stopPropagation()
-                          filterByOrder(order.ORDERNO)
-                        }}
+                  ) : (
+                    order.items.map((item) => (
+                      <Accordion
+                        key={item.orderItemsId}
+                        expanded={expandedItems.has(item.orderItemsId)}
+                        onChange={() => toggleItemExpansion(item.orderItemsId)}
+                        className="item-accordion"
                       >
-                        <VisibilityIcon />
-                      </IconButton>
-                    </Tooltip>
-                  </Box>
-                </AccordionSummary>
+                        <AccordionSummary expandIcon={<ExpandMoreIcon />}>
+                          <Box display="flex" alignItems="center" gap={2} width="100%">
+                            <BuildIcon color="secondary" />
+                            <Box flexGrow={1}>
+                              <Typography variant="subtitle1">{item.itemName}</Typography>
+                              <Typography variant="body2" color="text.secondary">
+                                {item.filteredMaterialsCount || item.materials.length} материалов с
+                                искомым материалом
+                                {item.filteredCost > 0 && (
+                                  <>
+                                    {' '}
+                                    • {item.filteredCost.toFixed(2)} ₽
+                                    {item.filteredQuantity > 0 && (
+                                      <> • {item.filteredQuantity.toFixed(2)}</>
+                                    )}
+                                  </>
+                                )}
+                              </Typography>
+                            </Box>
+                            <Badge
+                              badgeContent={item.filteredMaterialsCount || item.materials.length}
+                              color="primary"
+                            >
+                              <InventoryIcon />
+                            </Badge>
+                          </Box>
+                        </AccordionSummary>
 
-                <AccordionDetails>
-                  {/* Статистика по материалам заказа */}
-                  {(() => {
-                    const materialsStats = orderMaterialsStats.get(order.ORDERID)
-                    const isLoadingMaterialsStats = loadingMaterialsStats.has(order.ORDERID)
-
-                    if (isLoadingMaterialsStats) {
-                      return (
-                        <Box display="flex" justifyContent="center" py={2}>
-                          <CircularProgress size={24} />
-                          <Typography variant="body2" sx={{ ml: 2 }}>
-                            Загрузка статистики по материалам...
-                          </Typography>
-                        </Box>
-                      )
-                    }
-
-                    if (materialsStats && materialsStats.materials.length > 0) {
-                      return (
-                        <Box mb={3}>
-                          <Typography variant="subtitle2" gutterBottom>
-                            Статистика по материалам заказа:
-                          </Typography>
+                        <AccordionDetails>
                           <TableContainer>
                             <Table size="small">
                               <TableHead>
                                 <TableRow>
-                                  <TableCell>Тип материала</TableCell>
+                                  <TableCell>Тип</TableCell>
                                   <TableCell>Материал</TableCell>
                                   <TableCell>Артикул</TableCell>
-                                  <TableCell>Изделий</TableCell>
+                                  <TableCell>Цвет</TableCell>
+                                  <TableCell>Размеры</TableCell>
                                   <TableCell>Количество</TableCell>
-                                  <TableCell>Стоимость</TableCell>
+                                  <TableCell>Цена</TableCell>
                                 </TableRow>
                               </TableHead>
                               <TableBody>
-                                {materialsStats.materials.map((material, index) => (
+                                {item.materials.map((material, index) => (
                                   <TableRow key={index}>
                                     <TableCell>
-                                      <Chip label={material.STUFF_TYPE_NAME} size="small" />
+                                      <Chip label={material.stuffType} size="small" />
                                     </TableCell>
-                                    <TableCell>{material.MATERIAL_NAME || '-'}</TableCell>
+                                    <TableCell>{material.materialName}</TableCell>
                                     <TableCell>
                                       <Typography variant="body2" fontFamily="monospace">
-                                        {material.MATERIAL_MARKING || '-'}
+                                        {material.itemArt}
                                       </Typography>
                                     </TableCell>
-                                    <TableCell>{material.ITEMS_COUNT}</TableCell>
                                     <TableCell>
-                                      {material.TOTAL_QUANTITY
-                                        ? `${material.TOTAL_QUANTITY.toFixed(2)} ${
-                                            material.MEASURE_UNIT || 'ед.'
-                                          }`
-                                        : '-'}
+                                      <Box>
+                                        <Typography variant="caption" display="block">
+                                          Внутри: {material.itemColorIn}
+                                        </Typography>
+                                        <Typography variant="caption" display="block">
+                                          Снаружи: {material.itemColorOut}
+                                        </Typography>
+                                      </Box>
                                     </TableCell>
                                     <TableCell>
-                                      {material.TOTAL_COST
-                                        ? `${material.TOTAL_COST.toFixed(2)} ₽`
+                                      {material.width} × {material.height} × {material.length}
+                                    </TableCell>
+                                    <TableCell>
+                                      <Box>
+                                        <Typography variant="body2">
+                                          {material.itemQty} {material.itemMesure}
+                                        </Typography>
+                                        <Typography variant="caption" color="text.secondary">
+                                          Объем: {material.itemTotQty?.toFixed(2)}
+                                        </Typography>
+                                      </Box>
+                                    </TableCell>
+                                    <TableCell>
+                                      {material.itemPrice
+                                        ? `${material.itemPrice.toFixed(2)} ₽`
                                         : '-'}
                                     </TableCell>
                                   </TableRow>
@@ -896,190 +767,14 @@ const MaterialSearchPage = () => {
                               </TableBody>
                             </Table>
                           </TableContainer>
-                          <Box display="flex" gap={2} mt={2}>
-                            <Chip
-                              label={`Итого: ${materialsStats.totals.totalItems} изделий`}
-                              color="primary"
-                              size="small"
-                            />
-                            <Chip
-                              label={`${materialsStats.totals.totalMaterials} материалов`}
-                              color="secondary"
-                              size="small"
-                            />
-                            {materialsStats.totals.totalQuantity > 0 && (
-                              <Chip
-                                label={`${materialsStats.totals.totalQuantity.toFixed(2)} ед.`}
-                                color="warning"
-                                size="small"
-                                variant="outlined"
-                              />
-                            )}
-                            {materialsStats.totals.totalCost > 0 && (
-                              <Chip
-                                label={`${materialsStats.totals.totalCost.toFixed(2)} ₽`}
-                                color="success"
-                                size="small"
-                                variant="outlined"
-                              />
-                            )}
-                          </Box>
-                        </Box>
-                      )
-                    }
-
-                    return null
-                  })()}
-
-                  {isLoadingDetails ? (
-                    <Box display="flex" justifyContent="center" py={2}>
-                      <CircularProgress size={24} />
-                      <Typography variant="body2" sx={{ ml: 2 }}>
-                        Загрузка деталей заказа...
-                      </Typography>
-                    </Box>
-                  ) : orderDetailsData ? (
-                    <Box>
-                      {orderDetailsData.items.map((item) => (
-                        <Accordion
-                          key={item.orderItemsId}
-                          expanded={expandedItems.has(item.orderItemsId)}
-                          onChange={() => toggleItemExpansion(item.orderItemsId)}
-                          className="item-accordion"
-                        >
-                          <AccordionSummary expandIcon={<ExpandMoreIcon />}>
-                            <Box display="flex" alignItems="center" gap={2} width="100%">
-                              <BuildIcon color="secondary" />
-                              <Box flexGrow={1}>
-                                <Typography variant="subtitle1">{item.itemName}</Typography>
-                                <Typography variant="body2" color="text.secondary">
-                                  {item.materials.length} материалов
-                                </Typography>
-                              </Box>
-                              <Badge badgeContent={item.materials.length} color="primary">
-                                <InventoryIcon />
-                              </Badge>
-                            </Box>
-                          </AccordionSummary>
-
-                          <AccordionDetails>
-                            <TableContainer>
-                              <Table size="small">
-                                <TableHead>
-                                  <TableRow>
-                                    <TableCell>Тип</TableCell>
-                                    <TableCell>Материал</TableCell>
-                                    <TableCell>Артикул</TableCell>
-                                    <TableCell>Цвет</TableCell>
-                                    <TableCell>Размеры</TableCell>
-                                    <TableCell>Количество</TableCell>
-                                    <TableCell>Цена</TableCell>
-                                  </TableRow>
-                                </TableHead>
-                                <TableBody>
-                                  {item.materials.map((material, index) => (
-                                    <TableRow key={index}>
-                                      <TableCell>
-                                        <Chip label={material.stuffType} size="small" />
-                                      </TableCell>
-                                      <TableCell>{material.materialName}</TableCell>
-                                      <TableCell>
-                                        <Typography variant="body2" fontFamily="monospace">
-                                          {material.itemArt}
-                                        </Typography>
-                                      </TableCell>
-                                      <TableCell>
-                                        <Box>
-                                          <Typography variant="caption" display="block">
-                                            Внутри: {material.itemColorIn}
-                                          </Typography>
-                                          <Typography variant="caption" display="block">
-                                            Снаружи: {material.itemColorOut}
-                                          </Typography>
-                                        </Box>
-                                      </TableCell>
-                                      <TableCell>
-                                        {material.width} × {material.height} × {material.length}
-                                      </TableCell>
-                                      <TableCell>
-                                        <Box>
-                                          <Typography variant="body2">
-                                            {material.itemQty} {material.itemMesure}
-                                          </Typography>
-                                          <Typography variant="caption" color="text.secondary">
-                                            Объем: {material.itemTotQty?.toFixed(2)}
-                                          </Typography>
-                                        </Box>
-                                      </TableCell>
-                                      <TableCell>
-                                        {material.itemPrice
-                                          ? `${material.itemPrice.toFixed(2)} ₽`
-                                          : '-'}
-                                      </TableCell>
-                                    </TableRow>
-                                  ))}
-                                </TableBody>
-                              </Table>
-                            </TableContainer>
-                          </AccordionDetails>
-                        </Accordion>
-                      ))}
-                    </Box>
-                  ) : (
-                    <Typography variant="body2" color="text.secondary" textAlign="center" py={2}>
-                      Нажмите для загрузки деталей заказа
-                    </Typography>
+                        </AccordionDetails>
+                      </Accordion>
+                    ))
                   )}
-                </AccordionDetails>
-              </Accordion>
-            )
-          })}
-
-          {/* Улучшенная пагинация */}
-          {data.pagination && data.pagination.totalPages > 1 && (
-            <Box display="flex" justifyContent="center" alignItems="center" gap={2} mt={3} p={2}>
-              <Typography variant="body2" color="text.secondary">
-                Страница {data.pagination.page} из {data.pagination.totalPages}(
-                {data.pagination.totalCount} заказов)
-              </Typography>
-              <Pagination
-                count={data.pagination.totalPages}
-                page={data.pagination.page}
-                onChange={(event, page) => {
-                  setCurrentPage(page)
-                  searchMaterials(page)
-                }}
-                color="primary"
-                size="large"
-                showFirstButton
-                showLastButton
-              />
-            </Box>
-          )}
-
-          {/* Кнопка "Загрузить еще" для бесконечной прокрутки */}
-          {data.pagination && data.pagination.hasMore && (
-            <Box display="flex" justifyContent="center" mt={2}>
-              <Button
-                variant="outlined"
-                onClick={() => {
-                  const nextPage = currentPage + 1
-                  setCurrentPage(nextPage)
-                  searchMaterials(nextPage)
-                }}
-                disabled={loading}
-                sx={{
-                  minHeight: '44px',
-                  fontSize: '15px',
-                  fontWeight: 500,
-                  px: 3,
-                  py: 1.5,
-                }}
-              >
-                {loading ? <CircularProgress size={20} /> : 'Загрузить еще'}
-              </Button>
-            </Box>
-          )}
+                </Box>
+              </AccordionDetails>
+            </Accordion>
+          ))}
         </Box>
       )}
 

@@ -107,10 +107,7 @@ $transition-time: 0.3s;
   }
 
   &.active {
-    background-color: lighten(
-      $primary-color,
-      5%
-    ); // Цвет для активного состояния
+    background-color: lighten($primary-color, 5%); // Цвет для активного состояния
   }
 
   &.active {

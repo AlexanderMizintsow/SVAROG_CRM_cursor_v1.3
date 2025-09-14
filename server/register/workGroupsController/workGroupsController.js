@@ -38,12 +38,7 @@ const saveParticipantVotes = (dbPool, io) => async (req, res) => {
   const { group_id, participant, selected_dates } = req.body
 
   // Проверка наличия необходимых данных
-  if (
-    !group_id ||
-    !participant ||
-    !Array.isArray(selected_dates) ||
-    selected_dates.length === 0
-  ) {
+  if (!group_id || !participant || !Array.isArray(selected_dates) || selected_dates.length === 0) {
     return res.status(400).json({ error: 'Неверные данные запроса.' })
   }
 
@@ -204,10 +199,10 @@ const addParticipantsToGroup = (dbPool, io) => async (req, res) => {
   const { work_groups_id, user_id } = req.body
 
   try {
-    await dbPool.query(
-      `INSERT INTO group_participants (work_groups_id, user_id) VALUES ($1, $2)`,
-      [work_groups_id, user_id]
-    )
+    await dbPool.query(`INSERT INTO group_participants (work_groups_id, user_id) VALUES ($1, $2)`, [
+      work_groups_id,
+      user_id,
+    ])
 
     const result = await dbPool.query(
       `SELECT group_name, created_by FROM work_groups WHERE id = $1`,

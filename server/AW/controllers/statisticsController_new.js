@@ -1,6 +1,10 @@
 const Firebird = require('node-firebird')
 const { ERROR_MESSAGES } = require('../constants/statisticsConstants')
-const { validateFilters, buildWhereConditions } = require('../utils/statisticsUtils')
+const {
+  validateFilters,
+  buildWhereConditions,
+  buildMaterialWhereConditions,
+} = require('../utils/statisticsUtils')
 
 /**
  * Контроллер для работы со статистикой и отчетами
@@ -54,7 +58,7 @@ class StatisticsController {
           const { whereClause, params: queryParams } = buildWhereConditions(validatedFilters)
 
           // Определяем уровень группировки на основе фильтров
-          let groupByFields = 'ggt.ID, ggt.NAME, g.ID, g.NAME, g.MARKING'
+          let groupByFields = 'ggt.ID, ggt.NAME, g.ID, g.NAME, g.MARKING, m.SHORTNAME'
           let selectFields = `
             ggt.ID as stuff_type_id,
             ggt.NAME as stuff_type_name,
@@ -94,10 +98,11 @@ class StatisticsController {
               ${selectFields},
               COUNT(DISTINCT o.ORDERID) as orders_count,
               COUNT(DISTINCT oi.ORDERITEMSID) as items_count,
+              LIST(DISTINCT o.ORDERNO, ', ') as order_numbers,
               SUM(
                 CASE
                   WHEN (itd.ISEXTENDED = 1) THEN itd.QTY
-                  WHEN (itd.ISEXTENDED = 0) AND (COALESCE(g.AMOUNTGROUPID,0) = 1) THEN itd.QTY*oi.QTY/COUNT(*)
+                  WHEN (itd.ISEXTENDED = 0) AND (COALESCE(g.AMOUNTGROUPID,0) = 1) THEN itd.QTY*oi.QTY
                   ELSE itd.QTY*oi.QTY
                 END
               ) as total_quantity,
@@ -126,7 +131,9 @@ class StatisticsController {
             // Вычисляем общие итоги
             const totals = result.reduce(
               (acc, material) => {
+                // Для заказов используем максимальное значение, так как один заказ может содержать несколько материалов
                 acc.totalOrders = Math.max(acc.totalOrders, material.ORDERS_COUNT)
+                // Для изделий суммируем, но нужно быть осторожным с дублированием
                 acc.totalItems += material.ITEMS_COUNT
                 acc.totalMaterials += 1
                 acc.totalQuantity += material.TOTAL_QUANTITY || 0
@@ -191,7 +198,7 @@ class StatisticsController {
               SUM(
                 CASE
                   WHEN (itd.ISEXTENDED = 1) THEN itd.QTY
-                  WHEN (itd.ISEXTENDED = 0) AND (COALESCE(g.AMOUNTGROUPID,0) = 1) THEN itd.QTY*oi.QTY/COUNT(*)
+                  WHEN (itd.ISEXTENDED = 0) AND (COALESCE(g.AMOUNTGROUPID,0) = 1) THEN itd.QTY*oi.QTY
                   ELSE itd.QTY*oi.QTY
                 END
               ) as total_quantity,
@@ -233,7 +240,7 @@ class StatisticsController {
   }
 
   /**
-   * Получение заказов с материалами для поиска (оптимизированная версия)
+   * Получение полных заказов со всеми изделиями и материалами (старая логика)
    * @param {Object} filters - Фильтры для поиска
    * @param {string} filters.startDate - Дата начала (YYYY-MM-DD)
    * @param {string} filters.endDate - Дата окончания (YYYY-MM-DD)
@@ -243,9 +250,9 @@ class StatisticsController {
    * @param {string} filters.materialMarking - Артикул материала
    * @param {string} filters.orderNumber - Номер заказа
    * @param {string} filters.year - Год базы данных
-   * @returns {Promise<Object>} Объект с заказами и материалами
+   * @returns {Promise<Object>} Объект с полными заказами
    */
-  async getOrdersWithMaterials(filters) {
+  async getFullOrdersWithMaterials(filters) {
     return new Promise((resolve, reject) => {
       try {
         // Валидация фильтров
@@ -261,32 +268,475 @@ class StatisticsController {
 
         const currentDbOptions = this.getDbOptions(validatedFilters.year)
 
-        // Используем новый подход: получаем статистику по материалам, список заказов и общее количество
-        Promise.all([
-          this.getMaterialsSummary(validatedFilters),
-          this.getOrdersList(validatedFilters),
-          this.getOrdersCount(validatedFilters),
-        ])
-          .then(([materialsSummary, ordersList, totalCount]) => {
-            const response = {
-              orders: ordersList.orders,
-              materials: materialsSummary.materials,
-              totals: materialsSummary.totals,
-              grouping: materialsSummary.grouping,
-              pagination: {
-                ...ordersList.pagination,
-                totalCount: totalCount,
-                totalPages: Math.ceil(totalCount / ordersList.pagination.limit),
-              },
-            }
-
+        // Используем старый подход: загружаем полные заказы со всеми данными
+        this.getFullOrdersData(validatedFilters)
+          .then((result) => {
             // Сохраняем в кэш
-            this.setCache(cacheKey, response)
-            resolve(response)
+            this.setCache(cacheKey, result)
+            resolve(result)
           })
           .catch((error) => {
             reject(error)
           })
+      } catch (error) {
+        reject(error)
+      }
+    })
+  }
+
+  /**
+   * Получение полных данных заказов со всеми изделиями и материалами
+   * @param {Object} filters - Фильтры для поиска
+   * @returns {Promise<Object>} Полные данные заказов
+   */
+  async getFullOrdersData(filters) {
+    return new Promise((resolve, reject) => {
+      try {
+        const validatedFilters = validateFilters(filters)
+        const currentDbOptions = this.getDbOptions(validatedFilters.year)
+
+        Firebird.attach(currentDbOptions, (err, db) => {
+          if (err) {
+            console.error('Database connection error:', err)
+            return reject(new Error(ERROR_MESSAGES.DB_CONNECTION))
+          }
+
+          const { whereClause, params: queryParams } = buildWhereConditions(validatedFilters)
+
+          console.log('SQL Query will be executed with:')
+          console.log('Where clause:', whereClause)
+          console.log('Parameters:', queryParams)
+
+          // Пагинация
+          const page = Number(validatedFilters.page) || 1
+          const limit = Number(validatedFilters.limit) || 100
+          const skip = Math.max(0, (page - 1) * limit)
+
+          // СНАЧАЛА найдем заказы с правильной пагинацией
+          // Всегда включаем JOIN'ы с таблицами материалов для правильного подсчета изделий с материалами
+          const ordersQuery = `
+             SELECT 
+               o.ORDERID, 
+               o.ORDERNO, 
+               o.DATECREATED, 
+               o.ORDERSTATUS,
+               COUNT(DISTINCT oi.ORDERITEMSID) as ITEMS_WITH_MATERIAL
+             FROM ORDERS o
+             LEFT JOIN ORDERITEMS oi ON o.ORDERID = oi.ORDERID
+             LEFT JOIN MODELS md ON md.ORDERITEMSID = oi.ORDERITEMSID
+             JOIN ITEMSDETAIL itd ON (itd.MODELNO = COALESCE(md.MODELNO,0) AND itd.ORDERITEMSID = oi.ORDERITEMSID)
+             JOIN STUFFS g ON (g.ID=itd.GOODSID)
+             LEFT JOIN RECALCGROUP rec ON rec.RECALCGROUPID=g.RECALCGROUPID
+             JOIN STUFFTYPES ggt ON (ggt.ID = g.STUFFTYPEID)
+             WHERE o.DELETED = 0
+             ${whereClause ? whereClause.replace('WHERE', 'AND') : ''}
+             AND COALESCE(rec.NAME,'') <> 'VIRT'
+             GROUP BY o.ORDERID, o.ORDERNO, o.DATECREATED, o.ORDERSTATUS
+             ORDER BY o.DATECREATED DESC, o.ORDERNO
+             ROWS ${skip + 1} TO ${skip + limit}
+           `
+
+          console.log('Orders query:', ordersQuery)
+          console.log('Query parameters:', queryParams)
+
+          // Сначала найдем заказы
+          db.query(ordersQuery, queryParams, (err, ordersResult) => {
+            if (err) {
+              console.error('Orders query error:', err)
+              return reject(new Error(ERROR_MESSAGES.QUERY_EXECUTION))
+            }
+
+            console.log(`Found ${ordersResult.length} orders in date range`)
+            if (ordersResult.length > 0) {
+              console.log(
+                'Orders found:',
+                ordersResult.map((order) => ({
+                  ORDERID: order.ORDERID,
+                  ORDERNO: order.ORDERNO,
+                  DATECREATED: order.DATECREATED,
+                }))
+              )
+            }
+
+            if (ordersResult.length === 0) {
+              return resolve({
+                orders: [],
+                totalOrders: 0,
+                totalItems: 0,
+                totalMaterials: 0,
+                pagination: {
+                  page: page,
+                  limit: limit,
+                  totalCount: 0,
+                  hasMore: false,
+                },
+              })
+            }
+
+            // Запрос для общей статистики по искомому материалу
+            const overallStatsQuery = `
+              SELECT 
+                COUNT(DISTINCT o.ORDERID) as TOTAL_ORDERS,
+                COUNT(DISTINCT oi.ORDERITEMSID) as TOTAL_ITEMS,
+                COUNT(DISTINCT g.ID) as TOTAL_UNIQUE_MATERIALS,
+                COUNT(itd.GOODSID) as TOTAL_MATERIAL_INSTANCES,
+                SUM(
+                  CASE
+                    WHEN (itd.ISEXTENDED = 1) THEN itd.QTY*itd.THICK/COALESCE(NULLIF(m.AMFACTOR, 0), 1)
+                    ELSE itd.QTY*itd.THICK*oi.QTY/COALESCE(NULLIF(m.AMFACTOR, 0), 1)
+                  END
+                ) as TOTAL_QUANTITY,
+                SUM(itd.SAVINGCOST * (
+                  CASE
+                    WHEN (itd.ISEXTENDED = 1) THEN itd.QTY
+                    WHEN (itd.ISEXTENDED = 0) AND (COALESCE(g.AMOUNTGROUPID,0) = 1) THEN itd.QTY*oi.QTY
+                    ELSE itd.QTY*oi.QTY
+                  END
+                )) as TOTAL_COST
+              FROM ORDERS o
+              JOIN ORDERITEMS oi ON o.ORDERID = oi.ORDERID
+              LEFT JOIN MODELS md ON md.ORDERITEMSID = oi.ORDERITEMSID
+              JOIN ITEMSDETAIL itd ON (itd.MODELNO = COALESCE(md.MODELNO,0) AND itd.ORDERITEMSID = oi.ORDERITEMSID)
+              JOIN STUFFS g ON (g.ID=itd.GOODSID)
+              LEFT JOIN RECALCGROUP rec ON rec.RECALCGROUPID=g.RECALCGROUPID
+              JOIN STUFFTYPES ggt ON (ggt.ID = g.STUFFTYPEID)
+              JOIN MEASURE m ON (g.MEASUREID = m.MEASUREID)
+              WHERE o.DELETED = 0
+              ${whereClause ? whereClause.replace('WHERE', 'AND') : ''}
+              AND COALESCE(rec.NAME,'') <> 'VIRT'
+            `
+
+            // Запрос для детальной статистики по материалам (с GROUP BY)
+            const materialsDetailQuery = `
+              SELECT 
+                g.NAME as MATERIAL_NAME,
+                g.MARKING as MATERIAL_MARKING,
+                ggt.NAME as MATERIAL_TYPE,
+                m.SHORTNAME as MEASURE,
+                COUNT(DISTINCT o.ORDERID) as MATERIAL_ORDERS,
+                COUNT(oi.ORDERITEMSID) as MATERIAL_ITEMS,
+                COUNT(itd.GOODSID) as MATERIAL_INSTANCES,
+                SUM(
+                  CASE
+                    WHEN (itd.ISEXTENDED = 1) THEN itd.QTY*itd.THICK/COALESCE(NULLIF(m.AMFACTOR, 0), 1)
+                    ELSE itd.QTY*itd.THICK*oi.QTY/COALESCE(NULLIF(m.AMFACTOR, 0), 1)
+                  END
+                ) as MATERIAL_QUANTITY,
+                SUM(itd.SAVINGCOST * (
+                  CASE
+                    WHEN (itd.ISEXTENDED = 1) THEN itd.QTY
+                    WHEN (itd.ISEXTENDED = 0) AND (COALESCE(g.AMOUNTGROUPID,0) = 1) THEN itd.QTY*oi.QTY
+                    ELSE itd.QTY*oi.QTY
+                  END
+                )) as MATERIAL_COST
+              FROM ORDERS o
+              JOIN ORDERITEMS oi ON o.ORDERID = oi.ORDERID
+              LEFT JOIN MODELS md ON md.ORDERITEMSID = oi.ORDERITEMSID
+              JOIN ITEMSDETAIL itd ON (itd.MODELNO = COALESCE(md.MODELNO,0) AND itd.ORDERITEMSID = oi.ORDERITEMSID)
+              JOIN STUFFS g ON (g.ID=itd.GOODSID)
+              LEFT JOIN RECALCGROUP rec ON rec.RECALCGROUPID=g.RECALCGROUPID
+              JOIN STUFFTYPES ggt ON (ggt.ID = g.STUFFTYPEID)
+              JOIN MEASURE m ON (g.MEASUREID = m.MEASUREID)
+              WHERE o.DELETED = 0
+              ${whereClause ? whereClause.replace('WHERE', 'AND') : ''}
+              AND COALESCE(rec.NAME,'') <> 'VIRT'
+              GROUP BY g.ID, g.NAME, g.MARKING, ggt.NAME, m.SHORTNAME
+            `
+
+            console.log('Overall statistics query:', overallStatsQuery)
+            console.log('Materials detail query:', materialsDetailQuery)
+            console.log('Query parameters:', queryParams)
+
+            // Выполняем оба запроса параллельно
+            let overallStats = null
+            let materialsDetail = null
+            let completedQueries = 0
+
+            const processResults = () => {
+              if (completedQueries === 2) {
+                // Обрабатываем результаты
+                console.log('Overall statistics result:', overallStats)
+                console.log('Materials detail result:', materialsDetail)
+
+                // Преобразуем заказы в нужный формат (без материалов)
+                const orders = ordersResult.map((order) => ({
+                  orderId: order.ORDERID,
+                  orderNumber: order.ORDERNO,
+                  dateCreated: order.DATECREATED,
+                  orderStatus: order.ORDERSTATUS,
+                  items: [], // Пустой массив - материалы загружаются отдельно
+                  materialsLoaded: false, // Флаг для отслеживания загрузки
+                  itemsWithMaterial: order.ITEMS_WITH_MATERIAL || 0, // Количество изделий с искомым материалом
+                }))
+
+                // Используем данные из общего запроса
+                const stats = overallStats[0] || {
+                  TOTAL_ORDERS: 0,
+                  TOTAL_ITEMS: 0,
+                  TOTAL_UNIQUE_MATERIALS: 0,
+                  TOTAL_MATERIAL_INSTANCES: 0,
+                  TOTAL_QUANTITY: 0,
+                  TOTAL_COST: 0,
+                }
+
+                const totalOrders = stats.TOTAL_ORDERS
+                const totalItems = stats.TOTAL_ITEMS
+                const totalMaterials = stats.TOTAL_UNIQUE_MATERIALS // Количество уникальных материалов
+                const totalCost = stats.TOTAL_COST
+                const totalQuantity = stats.TOTAL_QUANTITY || 0
+
+                // Определяем, нужно ли показывать количество материалов
+                // Показываем только если есть фильтр по конкретному материалу или типу
+                const showMaterialsQuantity =
+                  validatedFilters.materialName ||
+                  validatedFilters.materialMarking ||
+                  validatedFilters.stuffType
+
+                // Для поиска по конкретному материалу/артикулу показываем количество экземпляров материала
+                // Для поиска по типу показываем количество уникальных материалов
+                let materialsCountToShow = null
+                if (showMaterialsQuantity) {
+                  if (validatedFilters.materialName || validatedFilters.materialMarking) {
+                    // Поиск по конкретному материалу - показываем общее количество экземпляров
+                    materialsCountToShow = Math.round(totalQuantity * 100) / 100
+                  } else if (validatedFilters.stuffType) {
+                    // Поиск по типу - показываем количество уникальных материалов
+                    materialsCountToShow = totalMaterials
+                  }
+                }
+
+                console.log(
+                  `Found ${
+                    orders.length
+                  } orders on page, total: ${totalOrders} orders, ${totalItems} items, ${
+                    materialsCountToShow || 'N/A'
+                  } materials`
+                )
+                console.log(
+                  `Total cost: ${totalCost.toFixed(2)} ₽, Total quantity: ${totalQuantity.toFixed(
+                    2
+                  )}`
+                )
+
+                const response = {
+                  orders: orders,
+                  totalOrders: totalOrders,
+                  totalItems: totalItems,
+                  totalMaterials: materialsCountToShow, // Количество материалов в зависимости от типа поиска
+                  totalCost: totalCost,
+                  totalQuantity: showMaterialsQuantity ? totalQuantity : null, // Скрываем при поиске по всем материалам
+                  materialsStats: materialsDetail, // Детальная статистика по каждому материалу
+                  pagination: {
+                    page: page,
+                    limit: limit,
+                    totalCount: totalOrders,
+                    hasMore: orders.length === limit,
+                  },
+                }
+
+                resolve(response)
+                db.detach()
+              }
+            }
+
+            // Загружаем общую статистику
+            db.query(overallStatsQuery, queryParams, (err, result) => {
+              if (err) {
+                console.error('Overall statistics query error:', err)
+                return reject(new Error(ERROR_MESSAGES.QUERY_EXECUTION))
+              }
+              overallStats = result
+              completedQueries++
+              processResults()
+            })
+
+            // Загружаем детальную статистику по материалам
+            db.query(materialsDetailQuery, queryParams, (err, result) => {
+              if (err) {
+                console.error('Materials detail query error:', err)
+                return reject(new Error(ERROR_MESSAGES.QUERY_EXECUTION))
+              }
+              materialsDetail = result
+              completedQueries++
+              processResults()
+            })
+          })
+        })
+      } catch (error) {
+        reject(error)
+      }
+    })
+  }
+
+  /**
+   * Получение материалов конкретного заказа (для раскрытия)
+   * @param {number} orderId - ID заказа
+   * @returns {Promise<Object>} Материалы заказа
+   */
+  async getOrderMaterials(orderId, filters = {}) {
+    return new Promise((resolve, reject) => {
+      try {
+        console.log(`Loading materials for order ID: ${orderId} with filters:`, filters)
+
+        const currentDbOptions = this.getDbOptions(filters.year || '2025')
+
+        Firebird.attach(currentDbOptions, (err, db) => {
+          if (err) {
+            console.error('Database connection error:', err)
+            return reject(new Error(ERROR_MESSAGES.DB_CONNECTION))
+          }
+
+          // Строим условия фильтрации - используем ВСЕ фильтры как в основном запросе
+          const { whereClause, params } = buildWhereConditions(filters)
+
+          console.log('Filters for order:', orderId, filters)
+          console.log('Where clause:', whereClause)
+          console.log('Params:', params)
+
+          const materialsQuery = `
+            SELECT 
+              o.ORDERID,
+              o.ORDERNO,
+              o.DATECREATED,
+              o.ORDERSTATUS,
+              oi.ORDERITEMSID,
+              oi.NAME as ITEM_NAME,
+              ggt.NAME as STUFF_TYPE,
+              g.NAME as MATERIAL_NAME,
+              g.MARKING as ITEM_ART,
+              CASE
+                WHEN c_in.TITLE IS NOT NULL THEN c_in.TITLE
+                ELSE ''
+              END as ITEM_COLORIN,
+              CASE
+                WHEN c_out.TITLE IS NOT NULL THEN c_out.TITLE
+                ELSE ''
+              END as ITEM_COLOROUT,
+              itd.WIDTH,
+              itd.HEIGHT,
+              itd.THICK as LENGTH,
+              CASE
+                WHEN (itd.ISEXTENDED = 1) THEN itd.QTY
+                WHEN (itd.ISEXTENDED = 0) AND (COALESCE(g.AMOUNTGROUPID,0) = 1) THEN itd.QTY*oi.QTY
+                ELSE itd.QTY*oi.QTY
+              END as ITEM_QTY,
+              CASE
+                WHEN (itd.ISEXTENDED = 1) THEN itd.QTY*itd.THICK/m.AMFACTOR
+                ELSE itd.QTY*itd.THICK*oi.QTY/m.AMFACTOR
+              END as ITEM_TOTQTY,
+              itd.SAVINGCOST as ITEM_PRICE,
+              m.SHORTNAME as ITEM_MESURE
+            FROM ORDERITEMS oi
+            JOIN ORDERS o ON o.ORDERID = oi.ORDERID
+            LEFT JOIN MODELS md ON md.ORDERITEMSID = oi.ORDERITEMSID
+            JOIN ITEMSDETAIL itd ON (itd.MODELNO = COALESCE(md.MODELNO,0) AND itd.ORDERITEMSID = oi.ORDERITEMSID)
+            JOIN STUFFS g ON (g.ID=itd.GOODSID)
+            LEFT JOIN RECALCGROUP rec ON rec.RECALCGROUPID=g.RECALCGROUPID
+            JOIN STUFFTYPES ggt ON (ggt.ID = g.STUFFTYPEID)
+            JOIN MEASURE m ON (g.MEASUREID = m.MEASUREID)
+            LEFT JOIN COLORS c_in ON (c_in.COLORID = itd.INCOLORID)
+            LEFT JOIN COLORS c_out ON (c_out.COLORID = itd.OUTCOLORID)
+            WHERE o.DELETED = 0 
+            AND o.ORDERID = ?
+            AND COALESCE(rec.NAME,'') <> 'VIRT'
+            ${whereClause ? whereClause.replace('WHERE', 'AND') : ''}
+            ORDER BY oi.ORDERITEMSID, g.ID
+          `
+
+          const queryParams = [orderId, ...params]
+
+          console.log('Order materials query:', materialsQuery)
+          console.log('Query parameters:', queryParams)
+
+          db.query(materialsQuery, queryParams, (err, result) => {
+            if (err) {
+              console.error('Order materials query error:', err)
+              return reject(new Error(ERROR_MESSAGES.QUERY_EXECUTION))
+            }
+
+            console.log(`Order materials query returned ${result.length} filtered rows`)
+
+            if (result.length === 0) {
+              return resolve(null) // Нет материалов, соответствующих фильтру
+            }
+
+            // Группируем данные по изделиям с подсчетом статистики
+            const itemsMap = new Map()
+            let totalOrderCost = 0
+            let totalOrderQuantity = 0
+
+            result.forEach((row) => {
+              const itemId = row.ORDERITEMSID
+
+              if (!itemsMap.has(itemId)) {
+                itemsMap.set(itemId, {
+                  orderItemsId: itemId,
+                  itemName: row.ITEM_NAME,
+                  materials: [],
+                  filteredMaterialsCount: 0,
+                  filteredCost: 0,
+                  filteredQuantity: 0,
+                })
+              }
+
+              const item = itemsMap.get(itemId)
+
+              const materialCost = row.ITEM_PRICE * row.ITEM_QTY
+              const materialQuantity = row.ITEM_TOTQTY
+
+              item.materials.push({
+                stuffType: row.STUFF_TYPE,
+                materialName: row.MATERIAL_NAME,
+                itemArt: row.ITEM_ART,
+                itemColorIn: row.ITEM_COLORIN,
+                itemColorOut: row.ITEM_COLOROUT,
+                width: row.WIDTH,
+                height: row.HEIGHT,
+                length: row.LENGTH,
+                itemQty: row.ITEM_QTY,
+                itemTotQty: row.ITEM_TOTQTY,
+                itemPrice: row.ITEM_PRICE,
+                itemMesure: row.ITEM_MESURE,
+              })
+
+              // Подсчитываем статистику по изделию
+              item.filteredMaterialsCount++
+              item.filteredCost += materialCost
+              item.filteredQuantity += materialQuantity
+
+              // Подсчитываем общую статистику по заказу
+              totalOrderCost += materialCost
+              totalOrderQuantity += materialQuantity
+            })
+
+            // Преобразуем Map в массив
+            const items = Array.from(itemsMap.values())
+
+            console.log(
+              `Found ${items.length} items with ${result.length} filtered materials for order ${orderId}`
+            )
+            console.log(
+              `Order total cost: ${totalOrderCost.toFixed(
+                2
+              )} ₽, quantity: ${totalOrderQuantity.toFixed(2)}`
+            )
+
+            const response = {
+              orderId: orderId,
+              orderNumber: result.length > 0 ? result[0].ORDERNO : '',
+              dateCreated: result.length > 0 ? result[0].DATECREATED : null,
+              orderStatus: result.length > 0 ? result[0].ORDERSTATUS : null,
+              items: items,
+              filteredItemsCount: items.length,
+              filteredMaterialsCount: result.length,
+              filteredCost: totalOrderCost,
+              filteredQuantity: totalOrderQuantity,
+            }
+
+            resolve(response)
+            db.detach()
+          })
+        })
       } catch (error) {
         reject(error)
       }
@@ -482,13 +932,13 @@ class StatisticsController {
           }
 
           const orderMaterialsQuery = `
-            SELECT 
+            SELECT
               ${selectFields},
               COUNT(DISTINCT oi.ORDERITEMSID) as items_count,
               SUM(
                 CASE
                   WHEN (itd.ISEXTENDED = 1) THEN itd.QTY
-                  WHEN (itd.ISEXTENDED = 0) AND (COALESCE(g.AMOUNTGROUPID,0) = 1) THEN itd.QTY*oi.QTY/COUNT(*)
+                  WHEN (itd.ISEXTENDED = 0) AND (COALESCE(g.AMOUNTGROUPID,0) = 1) THEN itd.QTY*oi.QTY
                   ELSE itd.QTY*oi.QTY
                 END
               ) as total_quantity,
@@ -680,7 +1130,7 @@ class StatisticsController {
               m.SHORTNAME as ITEM_MESURE,
               CASE
                 WHEN (itd.ISEXTENDED = 1) THEN itd.QTY
-                WHEN (itd.ISEXTENDED = 0) AND (COALESCE(g.AMOUNTGROUPID,0) = 1) THEN itd.QTY*oi.QTY/COUNT(*)
+                WHEN (itd.ISEXTENDED = 0) AND (COALESCE(g.AMOUNTGROUPID,0) = 1) THEN itd.QTY*oi.QTY
                 ELSE itd.QTY*oi.QTY
               END as ITEM_QTY,
               CASE
@@ -964,7 +1414,7 @@ class StatisticsController {
               END as ITEM_PARTNO,
               CASE
                 WHEN (itd.ISEXTENDED = 1) THEN SUM(itd.QTY)
-                WHEN (itd.ISEXTENDED = 0) AND (COALESCE(g.AMOUNTGROUPID,0) = 1) THEN SUM(itd.QTY*oi.QTY)/COUNT(*)
+                WHEN (itd.ISEXTENDED = 0) AND (COALESCE(g.AMOUNTGROUPID,0) = 1) THEN SUM(itd.QTY*oi.QTY)
                 ELSE SUM(itd.QTY*oi.QTY)
               END as ITEM_QTY,
               CASE
@@ -1147,7 +1597,7 @@ class StatisticsController {
               SUM(
                 CASE
                   WHEN (itd.ISEXTENDED = 1) THEN itd.QTY
-                  WHEN (itd.ISEXTENDED = 0) AND (COALESCE(g.AMOUNTGROUPID,0) = 1) THEN itd.QTY*oi.QTY/COUNT(*)
+                  WHEN (itd.ISEXTENDED = 0) AND (COALESCE(g.AMOUNTGROUPID,0) = 1) THEN itd.QTY*oi.QTY
                   ELSE itd.QTY*oi.QTY
                 END
               ) as TOTAL_QTY,
@@ -1344,3 +1794,4 @@ class StatisticsController {
 }
 
 module.exports = StatisticsController
+//1

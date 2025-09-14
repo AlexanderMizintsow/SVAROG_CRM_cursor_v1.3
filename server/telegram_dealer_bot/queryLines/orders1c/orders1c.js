@@ -67,49 +67,98 @@ async function getOrders1C(sScan, testMode = true) {
 
   return new Promise((resolve, reject) => {
     const client = new net.Socket()
+    let isResolved = false
+    let connectionTimeout
+    let responseTimeout
 
-    // Устанавливаем таймаут
-    client.setTimeout(10000) // 10 секунд
+    // Таймаут на подключение (5 секунд)
+    connectionTimeout = setTimeout(() => {
+      if (!isResolved && !client.destroyed) {
+        isResolved = true
+        client.destroy()
+        reject(new Error('Таймаут подключения к серверу (5с)'))
+      }
+    }, 5000)
 
-    client.connect(8240, '192.168.57.77', () => {
-      console.log('Соединение установлено с сервером.')
-      const message = `Q11\x01EB35000999\x02\t${sScan}\r`
-      console.log('Отправляем сообщение:', message)
-      console.log('Закодированное сообщение:', iconv.encode(message, 'windows-1251'))
-      client.write(iconv.encode(message, 'windows-1251'))
-    })
+    // Таймаут на ответ (15 секунд)
+    responseTimeout = setTimeout(() => {
+      if (!isResolved && !client.destroyed) {
+        isResolved = true
+        client.destroy()
+        reject(new Error('Таймаут ожидания ответа сервера (15с)'))
+      }
+    }, 15000)
 
-    client.on('data', (data) => {
-      console.log('Получены данные от сервера!')
-      console.log('Полученные сырые данные:', data)
+    function cleanup() {
+      if (connectionTimeout) clearTimeout(connectionTimeout)
+      if (responseTimeout) clearTimeout(responseTimeout)
+      if (!client.destroyed) {
+        client.destroy()
+      }
+    }
 
-      const decodedData = iconv.decode(data, 'windows-1251')
-      console.log('Декодированные данные:', decodedData)
+    function handleError(err, context) {
+      if (!isResolved) {
+        isResolved = true
+        cleanup()
+        reject(new Error(`❌ ${context}: ${err.message}`))
+      }
+    }
 
-      // Парсинг данных
-      const orders = parseOrdersData(decodedData)
-      resolve(orders)
-      client.destroy()
-    })
+    function handleSuccess(result) {
+      if (!isResolved) {
+        isResolved = true
+        cleanup()
+        resolve(result)
+      }
+    }
 
-    client.on('timeout', () => {
-      console.log('Таймаут соединения - сервер не ответил')
-      client.destroy()
-      reject(new Error('Таймаут соединения'))
-    })
+    try {
+      // Устанавливаем таймаут на сокет
+      client.setTimeout(20000) // 20 секунд общий таймаут
 
-    client.on('error', (err) => {
-      console.error(`Произошла ошибка: ${err.message}`)
-      reject(err)
-    })
+      client.connect(8240, '192.168.57.77', () => {
+        if (connectionTimeout) clearTimeout(connectionTimeout)
+        console.log('Соединение установлено с сервером.')
+        const message = `Q11\x01EB35000999\x02\t${sScan}\r`
+        console.log('Отправляем сообщение:', message)
+        console.log('Закодированное сообщение:', iconv.encode(message, 'windows-1251'))
+        client.write(iconv.encode(message, 'windows-1251'))
+      })
 
-    client.on('close', (hadError) => {
-      console.log('Соединение закрыто.', hadError ? 'С ошибкой' : 'Нормально')
-    })
+      client.on('data', (data) => {
+        if (isResolved) return
 
-    client.on('end', () => {
-      console.log('Сервер завершил соединение')
-    })
+        console.log('Получены данные от сервера!')
+        console.log('Полученные сырые данные:', data)
+
+        const decodedData = iconv.decode(data, 'windows-1251')
+        console.log('Декодированные данные:', decodedData)
+
+        // Парсинг данных
+        const orders = parseOrdersData(decodedData)
+        handleSuccess(orders)
+      })
+
+      client.on('timeout', () => {
+        handleError(new Error('Таймаут соединения'), 'Таймаут соединения')
+      })
+
+      client.on('error', (err) => {
+        handleError(err, 'Ошибка соединения')
+      })
+
+      client.on('close', (hadError) => {
+        console.log('Соединение закрыто.', hadError ? 'С ошибкой' : 'Нормально')
+        cleanup()
+      })
+
+      client.on('end', () => {
+        console.log('Сервер завершил соединение')
+      })
+    } catch (err) {
+      handleError(err, 'Ошибка выполнения функции')
+    }
   })
 }
 
@@ -400,7 +449,7 @@ function initOrders1CCron(bot, cronManager) {
     const timestamp = new Date().toISOString()
     console.log(`[CRON][V0O][${timestamp}] Старт проверки заказов 1С...`)
 
-    const TASK_TIMEOUT = 5 * 60 * 1000 // 5 минут таймаут
+    const TASK_TIMEOUT = 2 * 60 * 1000 // 2 минуты таймаут
 
     try {
       await runWithTimeout(
@@ -458,12 +507,14 @@ function initOrders1CCron(bot, cronManager) {
     const cron = require('node-cron')
     const mainJob = cron.schedule('0 9 * * *', task, {
       scheduled: true,
-      timezone: 'Europe/Moscow',
+      timezone: 'Europe/Saratov',
+      recoverMissedExecutions: true,
     })
 
     const lateResponseJob = cron.schedule('10 12 * * *', lateResponseTask, {
       scheduled: true,
-      timezone: 'Europe/Moscow',
+      timezone: 'Europe/Saratov',
+      recoverMissedExecutions: true,
     })
 
     mainJob.on('error', (error) => {

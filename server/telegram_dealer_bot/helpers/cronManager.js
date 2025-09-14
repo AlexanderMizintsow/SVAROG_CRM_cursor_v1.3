@@ -19,7 +19,8 @@ class CronManager {
       },
       {
         scheduled: true,
-        timezone: 'Europe/Moscow',
+        timezone: 'Europe/Saratov',
+        recoverMissedExecutions: true,
         ...options,
       }
     )
@@ -62,12 +63,24 @@ class CronManager {
 
     console.log(`[CRON_MANAGER][${name}] Запуск выполнения`)
 
+    // Таймаут для выполнения задачи (4 минуты)
+    const taskTimeout = setTimeout(() => {
+      if (status.isRunning) {
+        console.error(`[CRON_MANAGER][${name}] Задача превысила таймаут выполнения (4 минуты)`)
+        status.isRunning = false
+        status.lastError = new Date()
+        status.errorCount++
+      }
+    }, 4 * 60 * 1000)
+
     try {
       await task()
+      clearTimeout(taskTimeout)
       status.lastSuccess = new Date()
       status.errorCount = 0
       console.log(`[CRON_MANAGER][${name}] Выполнение завершено успешно`)
     } catch (error) {
+      clearTimeout(taskTimeout)
       status.lastError = new Date()
       status.errorCount++
       console.error(`[CRON_MANAGER][${name}] Ошибка выполнения:`, error.message)
