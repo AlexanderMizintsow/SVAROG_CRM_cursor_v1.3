@@ -578,6 +578,11 @@ async function processServerResponse(responseData, sScan) {
     console.log('Начало обработки ответа сервера', { scan: sScan })
 
     // Нормализация данных
+    if (typeof responseData !== 'string') {
+      console.log('responseData не является строкой', { scan: sScan, type: typeof responseData })
+      return '🔹 Некорректные данные получены от сервера'
+    }
+
     const cleanData = responseData.split('q11\x01')[0].trim()
     const lines = cleanData
       .split(/\r?\n/)
@@ -657,6 +662,11 @@ function parseClaimLines(lines) {
       location = parts[3] || 'не указано'
 
       // Парсим дату
+      if (typeof dateStr !== 'string') {
+        console.warn('dateStr не является строкой:', dateStr)
+        return null
+      }
+
       const [day, month, year] = dateStr.split('.')
       const claimDate = new Date(`${year}-${month}-${day}`)
 

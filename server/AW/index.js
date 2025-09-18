@@ -261,28 +261,6 @@ app.post('/app/statistics/search-orders', async (req, res) => {
   }
 })
 
-// Маршрут для получения статистики по заказам (старый)
-app.post('/app/statistics/orders', async (req, res) => {
-  try {
-    const result = await statisticsController.getOrdersStatistics(req.body)
-    res.json({ result })
-  } catch (error) {
-    console.error('Statistics error:', error)
-    res.status(500).json({ message: error.message })
-  }
-})
-
-// Маршрут для получения сводной статистики
-app.post('/app/statistics/summary', async (req, res) => {
-  try {
-    const result = await statisticsController.getSummaryStatistics(req.body)
-    res.json({ result })
-  } catch (error) {
-    console.error('Summary statistics error:', error)
-    res.status(500).json({ message: error.message })
-  }
-})
-
 // Маршрут для получения списка типов товаров
 app.get('/app/statistics/stuff-types/:year?', async (req, res) => {
   try {
@@ -291,28 +269,6 @@ app.get('/app/statistics/stuff-types/:year?', async (req, res) => {
     res.json({ result })
   } catch (error) {
     console.error('Stuff types error:', error)
-    res.status(500).json({ message: error.message })
-  }
-})
-
-// Маршрут для получения общей статистики по заказам
-app.post('/app/statistics/overview', async (req, res) => {
-  try {
-    const result = await statisticsController.getOrdersOverview(req.body)
-    res.json({ result })
-  } catch (error) {
-    console.error('Orders overview error:', error)
-    res.status(500).json({ message: error.message })
-  }
-})
-
-// Маршрут для получения статистики по материалам
-app.post('/app/statistics/materials', async (req, res) => {
-  try {
-    const result = await statisticsController.getMaterialsStatistics(req.body)
-    res.json({ result })
-  } catch (error) {
-    console.error('Materials statistics error:', error)
     res.status(500).json({ message: error.message })
   }
 })

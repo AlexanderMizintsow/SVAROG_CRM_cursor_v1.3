@@ -1,35 +1,35 @@
-# Контроллеры статистики и отчетов
+# Контроллеры поиска материалов
 
 ## Описание
 
-Модуль содержит контроллеры для работы со статистикой и отчетами по заказам. Логика разделена на отдельные файлы для лучшей организации кода.
+Модуль содержит контроллеры для работы с поиском материалов в заказах. Логика разделена на отдельные файлы для лучшей организации кода.
 
 ## Структура
 
 ```
 controllers/
-├── statisticsController.js    # Основной контроллер статистики
+├── statisticsController.js    # Основной контроллер поиска материалов
 ├── README.md                  # Документация контроллеров
 └── ...
 
 utils/
-├── statisticsUtils.js         # Утилиты для работы со статистикой
+├── statisticsUtils.js         # Утилиты для работы с поиском
 └── ...
 
 constants/
-├── statisticsConstants.js     # Константы для статистики
+├── statisticsConstants.js     # Константы для поиска
 └── ...
 ```
 
 ## StatisticsController
 
-Основной контроллер для работы со статистикой заказов.
+Основной контроллер для работы с поиском материалов в заказах.
 
 ### Методы
 
-#### `getOrdersStatistics(filters)`
+#### `getOrdersWithMaterials(filters)`
 
-Получение детальной статистики по заказам.
+Получение заказов с материалами для поиска.
 
 **Параметры:**
 
@@ -38,22 +38,11 @@ constants/
 - `filters.orderStatus` - Статус заказа (3-закрыт, 4-в производстве)
 - `filters.stuffType` - Тип товара (код)
 - `filters.materialName` - Наименование материала
+- `filters.materialMarking` - Артикул материала
+- `filters.orderNumber` - Номер заказа
 - `filters.year` - Год базы данных
 
-**Возвращает:** Promise<Array> - Массив записей статистики
-
-#### `getSummaryStatistics(filters)`
-
-Получение сводной статистики по материалам.
-
-**Параметры:**
-
-- `filters.startDate` - Дата начала
-- `filters.endDate` - Дата окончания
-- `filters.orderStatus` - Статус заказа
-- `filters.year` - Год базы данных
-
-**Возвращает:** Promise<Array> - Массив сводной статистики
+**Возвращает:** Promise<Object> - Объект с заказами и пагинацией
 
 #### `getStuffTypes(year)`
 
@@ -65,59 +54,7 @@ constants/
 
 **Возвращает:** Promise<Array> - Массив типов товаров
 
-#### `getOrdersOverview(filters)`
-
-Получение общей статистики по заказам.
-
-**Параметры:**
-
-- `filters` - Фильтры для поиска
-
-**Возвращает:** Promise<Object> - Объект с общей статистикой
-
-#### `getMaterialsStatistics(filters)`
-
-Получение статистики по материалам.
-
-**Параметры:**
-
-- `filters` - Фильтры для поиска
-
-**Возвращает:** Promise<Array> - Массив статистики по материалам
-
 ## API Endpoints
-
-### POST /app/statistics/orders
-
-Получение детальной статистики по заказам.
-
-**Тело запроса:**
-
-```json
-{
-  "startDate": "2024-01-01",
-  "endDate": "2024-12-31",
-  "orderStatus": 4,
-  "stuffType": "Profil",
-  "materialName": "сэндвич",
-  "year": "2025"
-}
-```
-
-### POST /app/statistics/summary
-
-Получение сводной статистики.
-
-**Тело запроса:**
-
-```json
-{
-  "startDate": "2024-01-01",
-  "endDate": "2024-12-31",
-  "orderStatus": 4,
-  "year": "2025"
-}
-```
 
 ### GET /app/statistics/stuff-types/:year?
 
@@ -127,13 +64,13 @@ constants/
 
 - `year` - Год базы данных (опционально)
 
-### POST /app/statistics/overview
+### POST /app/statistics/full-orders-data
 
-Получение общей статистики по заказам.
+Получение списка заказов для поиска материалов.
 
-### POST /app/statistics/materials
+### POST /app/statistics/order-materials/:orderId
 
-Получение статистики по материалам.
+Получение материалов конкретного заказа.
 
 ## Обработка ошибок
 

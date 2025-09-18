@@ -107,6 +107,11 @@ async function handleVerificationOrders(bot, chatId, userSessions, companyInn) {
   worksheetData.push(['Номер заказа', 'Наименование', 'Сумма', 'Адрес', 'Дата отгрузки'])
 
   // Парсинг данных из response и добавление в worksheetData
+  if (typeof response !== 'string') {
+    console.warn('createExcelFile: response не является строкой')
+    return
+  }
+
   const results = response.split('\n').filter((line) => line.trim() !== '')
   results.forEach((line) => {
     // Разделение строки по запятым

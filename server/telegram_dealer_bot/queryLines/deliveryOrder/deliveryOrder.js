@@ -1,8 +1,4 @@
-const {
-  getMppByCompany,
-  createReminder,
-  sendRequest1C,
-} = require('../../helpers/api')
+const { getMppByCompany, createReminder, sendRequest1C } = require('../../helpers/api')
 const { handleCancel } = require('../../helpers/buttonCancel')
 const { displayHelpMenu } = require('../../helpers/helpMenu')
 const { getRandomColors } = require('../../helpers/getRandomColors')
@@ -71,13 +67,7 @@ async function deliveryOrder(bot, chatId, userSessions, companyInn) {
 // **********************************************
 // **********************************************
 // ********************************************** На какую дату принимаете?  ************************************************************************
-async function deliveryOrderToPointDate(
-  bot,
-  chatId,
-  msg,
-  userSessions,
-  companyInn
-) {
+async function deliveryOrderToPointDate(bot, chatId, msg, userSessions, companyInn) {
   userSessions[chatId] = userSessions[chatId] || {}
   // Удаляем предыдущее сообщение при выборе расчета
   await deleteLastMessage(bot, chatId, userSessions)
@@ -412,11 +402,7 @@ async function deliveryOrderToPoint(bot, chatId, msg, userSessions) {
       },
     }
 
-    const message = await bot.sendMessage(
-      chatId,
-      'Выберите вариант доставки:',
-      options
-    )
+    const message = await bot.sendMessage(chatId, 'Выберите вариант доставки:', options)
     userSessions[chatId].messageId = message.message_id
   }
 
@@ -441,9 +427,7 @@ async function deliveryOrderToPoint(bot, chatId, msg, userSessions) {
         priority: 'высокий',
         title: `Уточнить стоимость доставки для *${
           userSessions[chatId].companyName
-        }*. Пользователь tg: (id:${chatId}) ${
-          sessionData.userName ? sessionData.userName : ''
-        }`,
+        }*. Пользователь tg: (id:${chatId}) ${sessionData.userName ? sessionData.userName : ''}`,
         tags: [
           { title: '🔴СРОЧНО', ...getRandomColors() },
           { title: 'Telegram', ...getRandomColors() },
@@ -451,10 +435,7 @@ async function deliveryOrderToPoint(bot, chatId, msg, userSessions) {
         links: [],
       })
 
-      await bot.sendMessage(
-        chatId,
-        '✅ Запрос отправлен менеджеру и находится в обработке!'
-      )
+      await bot.sendMessage(chatId, '✅ Запрос отправлен менеджеру и находится в обработке!')
       carType = ''
       handleCancel(bot, chatId, userSessions)
       // displayHelpMenu(bot, chatId, userSessions)
@@ -501,10 +482,7 @@ async function deliveryOrderTime(bot, chatId, msg, userSessions, companyInn) {
       const time = timeMatch[0] // Получаем найденное время
       await bot.sendMessage(chatId, time)
     } else {
-      await bot.sendMessage(
-        chatId,
-        `Не удалось извлечь время из ответа: "${response}"`
-      )
+      await bot.sendMessage(chatId, `Не удалось извлечь время из ответа: "${response}"`)
     }
 
     delete userSessions[chatId].awaitingDeliveryOrderTime
@@ -534,8 +512,13 @@ async function deliveryOrderDate(bot, chatId, msg, userSessions, companyInn) {
       return
     }
 
-    const date = response.split(' ')[0] // Берем первую часть строки, содержащую дату 27.01.2025 10:10:11
-    await bot.sendMessage(chatId, date)
+    // Проверяем, что response является строкой перед вызовом split
+    if (typeof response === 'string' && response.trim()) {
+      const date = response.split(' ')[0] // Берем первую часть строки, содержащую дату 27.01.2025 10:10:11
+      await bot.sendMessage(chatId, date)
+    } else {
+      await bot.sendMessage(chatId, 'Ошибка: получен некорректный ответ от сервера')
+    }
 
     delete userSessions[chatId].awaitingDeliveryOrderDate
     handleCancel(bot, chatId, userSessions)
@@ -562,9 +545,7 @@ async function deliveryOrderDriverLocation(bot, chatId, userSessions) {
       priority: 'высокий',
       title: `Уточнить местонахождение водителя для *${
         userSessions[chatId].companyName
-      }*. Пользователь tg: (id:${chatId}) ${
-        sessionData.userName ? sessionData.userName : ''
-      }`,
+      }*. Пользователь tg: (id:${chatId}) ${sessionData.userName ? sessionData.userName : ''}`,
       tags: [
         { title: '🔴СРОЧНО', ...getRandomColors() },
         { title: 'Telegram', ...getRandomColors() },
@@ -572,10 +553,7 @@ async function deliveryOrderDriverLocation(bot, chatId, userSessions) {
       links: [],
     })
 
-    await bot.sendMessage(
-      chatId,
-      '✅ Запрос отправлен менеджеру и находится в обработке!'
-    )
+    await bot.sendMessage(chatId, '✅ Запрос отправлен менеджеру и находится в обработке!')
     displayHelpMenu(bot, chatId, userSessions)
   } catch (error) {
     await bot.sendMessage(chatId, 'Произошла ошибка, попробуйте позже снова!')
@@ -610,9 +588,7 @@ async function deliveryOrderDriverDelay(bot, chatId, userSessions) {
       priority: 'высокий',
       title: `Сообщение об опоздании от *${
         userSessions[chatId].companyName
-      }*. Пользователь tg: (id:${chatId}) ${
-        sessionData.userName ? sessionData.userName : ''
-      }`,
+      }*. Пользователь tg: (id:${chatId}) ${sessionData.userName ? sessionData.userName : ''}`,
       tags: [
         { title: '🔴СРОЧНО', ...getRandomColors() },
         { title: 'Telegram', ...getRandomColors() },

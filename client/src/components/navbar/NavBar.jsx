@@ -145,11 +145,6 @@ const NavBar = () => {
       link: '/reports-dealer-ratings',
     },
     {
-      name: 'Статистика заказов',
-      icon: MdAssessment,
-      link: '/statistics-orders',
-    },
-    {
       name: 'Поиск материалов',
       icon: MdSearch,
       link: '/material-search',

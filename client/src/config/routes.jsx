@@ -22,7 +22,6 @@ import UpdatesApp from '../routes/updates/Changelog.jsx'
 import MissedCall from '../routes/asterisk/missedCall/MissedCall.jsx'
 // import { Mail } from '@mui/icons-material'
 import RatingStats from '../components/RatingStats/RatingStats.jsx'
-import StatisticsPage from '../routes/statistics/StatisticsPage.jsx'
 import MaterialSearchPage from '../routes/statistics/MaterialSearchPage.jsx'
 
 const routes = (bgSeason, roleAdministrator, isConnectBD) => [
@@ -94,7 +93,6 @@ const routes = (bgSeason, roleAdministrator, isConnectBD) => [
       { path: 'add-competitor', element: <CompetitorForm /> },
 
       { path: 'reports-dealer-ratings', element: <RatingStats /> },
-      { path: 'statistics-orders', element: <StatisticsPage /> },
       { path: 'material-search', element: <MaterialSearchPage /> },
 
       // ***

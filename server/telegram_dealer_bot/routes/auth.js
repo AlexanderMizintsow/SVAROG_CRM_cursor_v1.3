@@ -246,20 +246,22 @@ async function handleCallbackQuery(bot, chatId, callbackQuery) {
       }
 
       // Обработка оценки рекламации ***************************************************************
-      if (command.startsWith('rate_')) {
+      if (command && typeof command === 'string' && command.startsWith('rate_')) {
         const parts = command.split('_')
-        const requestNumber = parts[1]
-        const rating = parseInt(parts[2])
+        if (parts.length >= 3) {
+          const requestNumber = parts[1]
+          const rating = parseInt(parts[2])
 
-        await handleReclamationRating(
-          bot,
-          chatId,
-          callbackQuery,
-          requestNumber,
-          rating,
-          userSessions
-        )
-        return
+          await handleReclamationRating(
+            bot,
+            chatId,
+            callbackQuery,
+            requestNumber,
+            rating,
+            userSessions
+          )
+          return
+        }
       }
 
       // Обработка заказов 1С ***************************************************************

@@ -48,12 +48,7 @@ async function notifySupervisor(bot, dbPool, userId, reminder) {
   }
 }
 
-async function sendMissedCallNotifications(
-  bot,
-  dbPool,
-  client,
-  lastNotificationTime
-) {
+async function sendMissedCallNotifications(bot, dbPool, client, lastNotificationTime) {
   try {
     // Запрашиваем chatId и userId всех зарегистрированных пользователей
     const chatIdResult = await dbPool.query(
@@ -75,8 +70,7 @@ async function sendMissedCallNotifications(
         continue // Если настройки не найдены, переходим к следующему пользователю
       }
 
-      const { showcallmissedtg, showmissedcallsemployee } =
-        settingsResult.rows[0]
+      const { showcallmissedtg, showmissedcallsemployee } = settingsResult.rows[0]
 
       // Устанавливаем значение n на основе showMissedCallsEmployee
       const n = showmissedcallsemployee
@@ -87,10 +81,7 @@ async function sendMissedCallNotifications(
         : 'SELECT COUNT(*) FROM calls WHERE status = $1 AND LENGTH(caller_number) > 3'
 
       const totalCountParams = n ? ['missed'] : ['missed']
-      const totalCountResult = await client.query(
-        totalCountQuery,
-        totalCountParams
-      )
+      const totalCountResult = await client.query(totalCountQuery, totalCountParams)
       const totalCount = totalCountResult.rows[0].count
 
       // Запрос на получение всех пропущенных звонков, добавленных после последнего уведомления
@@ -98,17 +89,13 @@ async function sendMissedCallNotifications(
         ? 'SELECT * FROM calls WHERE status = $1 AND accepted_at > $2'
         : 'SELECT * FROM calls WHERE status = $1 AND accepted_at > $2 AND LENGTH(caller_number) > 3'
 
-      const resultParams = n
-        ? ['missed', lastNotificationTime]
-        : ['missed', lastNotificationTime]
+      const resultParams = n ? ['missed', lastNotificationTime] : ['missed', lastNotificationTime]
       const result = await client.query(resultQuery, resultParams)
 
       let message = `🔔 Пропущенные звонки 📞\nКоличество пропущенных звонков: ${totalCount}\n`
 
       // Определяем validCalls перед добавлением в message
-      const validCalls = result.rows.filter(
-        (call) => call.caller_number !== null
-      )
+      const validCalls = result.rows.filter((call) => call.caller_number !== null)
 
       if (validCalls.length > 0) {
         message += 'Новые пропущенные звонки:\n'
@@ -141,12 +128,7 @@ async function sendReminderNotifications(bot, dbPool) {
   try {
     const now = new Date()
     const threeMinutesAgo = new Date(now.getTime() - 2 * 60 * 1000) // 2 минуты назад
-    const excludedTypes = [
-      'calculation',
-      'delivery_order',
-      'finances',
-      'verificationFinancial',
-    ]
+    const excludedTypes = ['calculation', 'delivery_order', 'finances', 'verificationFinancial']
     // Запрашиваем все напоминания, которые еще не выполнены и время оповещение позднее 2 минут назад от настоящего времени
     // Это напоминание связано с компонентом поставить напоминание на определенную дату и время с комментарием из компонента пропущенные звонки
     // Так же ищет любые уведомления по типу type_reminders за период 2 минуты назад
@@ -159,10 +141,7 @@ AND is_completed = FALSE
 AND (type_reminders = 'call' OR type_reminders = 'calculation' OR type_reminders = 'delivery_order' OR type_reminders = 'finances' OR type_reminders = 'verificationFinancial')
 AND NOT (type_reminders IN ('calculation', 'delivery_order', 'finances', 'verificationFinancial') AND date_trunc('minute', created_at) = date_trunc('minute', date_time))
     `
-    const remindersResult = await dbPool.query(remindersQuery, [
-      now,
-      threeMinutesAgo,
-    ])
+    const remindersResult = await dbPool.query(remindersQuery, [now, threeMinutesAgo])
 
     // Группируем напоминания по user_id
     const remindersByUser = {}
@@ -186,8 +165,7 @@ AND NOT (type_reminders IN ('calculation', 'delivery_order', 'finances', 'verifi
       //    continue // Если настройки не найдены, переходим к следующему пользователю
       //   }
 
-      const { showreminderscalls, showoverduenotification } =
-        settingsResult.rows[0]
+      const { showreminderscalls, showoverduenotification } = settingsResult.rows[0]
 
       const chatIdResult = await dbPool.query(
         'SELECT chat_id FROM telegramm_registrations_chat WHERE user_id = $1',
@@ -204,9 +182,7 @@ AND NOT (type_reminders IN ('calculation', 'delivery_order', 'finances', 'verifi
               continue
             }
             let message = `🗓️  ⚠️ *Напоминание:* ⚠️\n
-            Необходимо выполнить: ${new Date(reminder.date_time).toLocaleString(
-              'ru-RU'
-            )} 
+            Необходимо выполнить: ${new Date(reminder.date_time).toLocaleString('ru-RU')} 
              Сообщение: ${reminder.comment || 'Нет комментария'} 
            `
             // Отправляем каждое сообщение
@@ -238,12 +214,7 @@ AND NOT (type_reminders IN ('calculation', 'delivery_order', 'finances', 'verifi
 }
 
 // Быстрые уведомления при создании
-async function sendGroupCreationNotification(
-  bot,
-  dbPool,
-  participantIds,
-  groupData
-) {
+async function sendGroupCreationNotification(bot, dbPool, participantIds, groupData) {
   try {
     const promises = participantIds.map(async (userId) => {
       const userChatIdResult = await dbPool.query(

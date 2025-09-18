@@ -164,6 +164,12 @@ async function getOrders1C(sScan, testMode = true) {
 
 // Парсинг данных заказов из ответа 1С
 function parseOrdersData(data) {
+  // Проверяем, что data является строкой
+  if (typeof data !== 'string') {
+    console.warn('parseOrdersData: data не является строкой')
+    return []
+  }
+
   const lines = data.split('\n').filter((line) => line.trim() !== '')
   const orders = []
 
@@ -249,6 +255,12 @@ async function checkExistingOrders(orders) {
 
 // Парсинг даты из формата DD.MM.YYYY
 function parseDate(dateStr) {
+  // Проверяем, что dateStr является строкой
+  if (typeof dateStr !== 'string') {
+    console.warn('parseDate: dateStr не является строкой')
+    return new Date()
+  }
+
   const [day, month, year] = dateStr.split('.')
   return new Date(parseInt(year), parseInt(month) - 1, parseInt(day))
 }

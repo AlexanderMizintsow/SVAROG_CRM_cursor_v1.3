@@ -25,6 +25,12 @@ async function deleteLastMessage(bot, chatId, userSessions) {
 // const messages = splitMessage(response, maxLength).
 
 function splitMessage(message, maxLength) {
+  // Проверяем, что message является строкой
+  if (typeof message !== 'string') {
+    console.warn('splitMessage: message не является строкой, возвращаем пустой массив')
+    return []
+  }
+
   const messages = []
   let currentMessage = ''
 

@@ -99,8 +99,13 @@ async function handleComplaintNewArrange(bot, chatId, msg, userSessions, company
     userSessions[chatId].awaitingComplaintNewArrange = 1
 
     // Проверяем, существует ли msg и можно ли его разбить
-    if (msg && typeof msg === 'string' && msg.split('_').length > 1) {
-      userSessions[chatId].selectedYear = msg.split('_')[1]
+    if (msg && typeof msg === 'string' && msg.includes('_')) {
+      const parts = msg.split('_')
+      if (parts.length > 1) {
+        userSessions[chatId].selectedYear = parts[1]
+      } else {
+        userSessions[chatId].selectedYear = 'bd_2025_years'.split('_')[1]
+      }
     } else {
       userSessions[chatId].selectedYear = 'bd_2025_years'.split('_')[1]
     }
