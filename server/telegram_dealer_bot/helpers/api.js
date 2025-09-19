@@ -1309,13 +1309,15 @@ function getReconciliationOrders(sScan, testMode = false) {
         inn: '7777777',
         date: '01.08.2025',
         address: '',
+        orderName: '', // Тестовые данные без наименования заказа
       },
       {
         id: '16515',
         name: 'Десять',
-        inn: '77177777',
+        inn: '7777777',
         date: '01.08.2025',
         address: 'Адрес есть я написал',
+        orderName: 'Счет-12345', // Тестовые данные с наименованием заказа
       },
     ])
   }
@@ -1463,6 +1465,7 @@ function getReconciliationOrders(sScan, testMode = false) {
               inn: parts[2]?.trim() || '',
               date: parts[3]?.trim() || '',
               address: parts[4]?.trim() || '',
+              orderName: parts[5]?.trim() || '', // Наименование заказа (новая информация)
             }
           })
 
@@ -1527,6 +1530,7 @@ function getReconciliationOrders(sScan, testMode = false) {
             inn: parts[2]?.trim() || '',
             date: parts[3]?.trim() || '',
             address: parts[4]?.trim() || '',
+            orderName: parts[5]?.trim() || '', // Наименование заказа (новая информация)
           }
         })
 
@@ -1741,6 +1745,9 @@ function formatReconciliationMessage(orders, company, meta = {}) {
   orders.forEach((order, index) => {
     message += `🔹 * ${chunkIndex * orders.length + index + 1}:*\n`
     message += `▸ Номер: ${order.id || '—'}\n`
+    if (order.orderName) {
+      message += `▸ АВ: ${order.orderName}\n`
+    }
     message += `▸ Дата отгрузки: ${order.date || 'не указана'}\n`
     if (order.address) {
       message += `▸ Адрес: ${order.address}\n`
