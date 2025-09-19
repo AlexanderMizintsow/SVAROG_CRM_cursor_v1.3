@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react'
+import { useState, useEffect } from 'react'
 import ProcessOverview from './ProcessOverview'
 import DealerStats from './DealerStats'
 import RatingDistribution from './RatingDistribution'
@@ -22,11 +22,12 @@ const PROCESS_TYPES = {
 
 const RatingStats = () => {
   const [selectedProcess, setSelectedProcess] = useState('reclamation-closure')
+  const [selectedPeriod, setSelectedPeriod] = useState(30)
   const [data, setData] = useState(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
 
-  const loadData = async (processType) => {
+  const loadData = async (processType, period) => {
     try {
       setLoading(true)
       setError(null)
@@ -36,7 +37,7 @@ const RatingStats = () => {
         throw new Error('Неизвестный тип процесса')
       }
 
-      const result = await fetchProcessRatingsStats(processConfig.endpoint)
+      const result = await fetchProcessRatingsStats(processConfig.endpoint, period)
       setData(result)
     } catch (err) {
       console.error('Ошибка загрузки данных:', err)
@@ -47,15 +48,19 @@ const RatingStats = () => {
   }
 
   useEffect(() => {
-    loadData(selectedProcess)
-  }, [selectedProcess])
+    loadData(selectedProcess, selectedPeriod)
+  }, [selectedProcess, selectedPeriod])
 
   const handleProcessChange = (processType) => {
     setSelectedProcess(processType)
   }
 
+  const handlePeriodChange = (period) => {
+    setSelectedPeriod(parseInt(period))
+  }
+
   const handleRefresh = () => {
-    loadData(selectedProcess)
+    loadData(selectedProcess, selectedPeriod)
   }
 
   if (loading) {
@@ -109,6 +114,22 @@ const RatingStats = () => {
               </option>
             ))}
           </select>
+
+          <select
+            className="rating-stats__period-selector"
+            value={selectedPeriod}
+            onChange={(e) => handlePeriodChange(e.target.value)}
+          >
+            <option value={1}>1 день</option>
+            <option value={7}>7 дней</option>
+            <option value={14}>14 дней</option>
+            <option value={30}>30 дней</option>
+            <option value={60}>60 дней</option>
+            <option value={90}>90 дней</option>
+            <option value={180}>180 дней</option>
+            <option value={365}>365 дней</option>
+          </select>
+
           <button
             onClick={handleRefresh}
             className="rating-stats__refresh-btn"

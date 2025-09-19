@@ -1116,6 +1116,19 @@ app.get('/api/settings-overdue-notification/:userId', async (req, res) => {
 // ************************************************************
 app.get('/api/reclamation-ratings-stats', async (req, res) => {
   try {
+    // Получаем параметры периода из запроса
+    const { period = '30' } = req.query
+    const periodDays = parseInt(period)
+
+    // Валидация периода
+    if (isNaN(periodDays) || periodDays < 1 || periodDays > 365) {
+      return res.status(400).json({ error: 'Некорректный период. Допустимые значения: 1-365 дней' })
+    }
+
+    const periodInterval = `${periodDays} days`
+    const periodText =
+      periodDays === 1 ? '1 день' : periodDays < 5 ? `${periodDays} дня` : `${periodDays} дней`
+
     // Получаем общую статистику по рекламациям
     const overviewQuery = `
       SELECT 
@@ -1123,17 +1136,18 @@ app.get('/api/reclamation-ratings-stats', async (req, res) => {
         AVG(rating) as average_rating,
         NOW() as last_updated
       FROM reclamation_ratings
-      WHERE rated_at >= NOW() - INTERVAL '30 days'
+      WHERE rated_at >= NOW() - INTERVAL '${periodDays} days'
     `
 
     // Получаем распределение оценок
     const ratingsQuery = `
       SELECT rating 
       FROM reclamation_ratings
-      WHERE rated_at >= NOW() - INTERVAL '30 days'
+      WHERE rated_at >= NOW() - INTERVAL '${periodDays} days'
     `
 
     // Получаем статистику по дилерам с информацией о компании
+    // Убираем условие HAVING COUNT(*) >= 3, чтобы показывать всех дилеров
     const dealersQuery = `
       SELECT 
         r.user_id,
@@ -1144,11 +1158,10 @@ app.get('/api/reclamation-ratings-stats', async (req, res) => {
       FROM reclamation_ratings r
       LEFT JOIN user_company_tg_bot uctb ON r.user_id = uctb.chat_id
       LEFT JOIN companies c ON uctb.company_id = c.id
-      WHERE r.rated_at >= NOW() - INTERVAL '30 days'
+      WHERE r.rated_at >= NOW() - INTERVAL '${periodDays} days'
       GROUP BY r.user_id, r.user_name, c.name_companies
-      HAVING COUNT(*) >= 3
-      ORDER BY AVG(r.rating) DESC
-      LIMIT 10
+      ORDER BY AVG(r.rating) DESC, COUNT(*) DESC
+      LIMIT 20
     `
 
     const [overviewResult, ratingsResult, dealersResult] = await Promise.all([
@@ -1173,7 +1186,7 @@ app.get('/api/reclamation-ratings-stats', async (req, res) => {
           rated_at,
           request_number
         FROM reclamation_ratings
-        WHERE user_id = ANY(\$1) AND rated_at >= NOW() - INTERVAL '30 days'
+        WHERE user_id = ANY(\$1) AND rated_at >= NOW() - INTERVAL '${periodDays} days'
         ORDER BY user_id, rated_at DESC
       `,
         [topDealerIds]
@@ -1200,7 +1213,7 @@ app.get('/api/reclamation-ratings-stats', async (req, res) => {
       overview: {
         totalRatings: overviewResult.rows[0]?.total_ratings || 0,
         averageRating: parseFloat(overviewResult.rows[0]?.average_rating) || 0,
-        period: '30 дней',
+        period: periodText,
         lastUpdated: overviewResult.rows[0]?.last_updated,
       },
       ratings: ratingsResult.rows.map((row) => row.rating),
@@ -1210,7 +1223,7 @@ app.get('/api/reclamation-ratings-stats', async (req, res) => {
         company_name: row.company_name,
         totalRatings: row.total_ratings,
         averageRating: parseFloat(row.average_rating),
-        period: '30 дней',
+        period: periodText,
         comments: commentsByDealer[row.user_id] || [],
       })),
     }

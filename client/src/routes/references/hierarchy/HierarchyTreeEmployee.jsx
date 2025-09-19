@@ -1,10 +1,6 @@
 import { useEffect, useState } from 'react'
 import axios from 'axios'
-import ReactFlow, {
-  useNodesState,
-  useEdgesState,
-  ReactFlowProvider,
-} from 'react-flow-renderer'
+import ReactFlow, { useNodesState, useEdgesState, ReactFlowProvider } from 'react-flow-renderer'
 import { CircularProgress } from '@mui/material'
 import { LiaSmsSolid } from 'react-icons/lia'
 import { TbPhoneCall } from 'react-icons/tb'
@@ -21,9 +17,7 @@ const HierarchyTreeEmployee = () => {
 
   const fetchEmployees = async () => {
     try {
-      const response = await axios.get(
-        `${API_BASE_URL}5000/api/employees/hierarchy`
-      )
+      const response = await axios.get(`${API_BASE_URL}5000/api/employees/hierarchy`)
       const hierarchicalData = buildHierarchy(response.data)
 
       // Загружаем аватары и строим данные для React Flow
@@ -61,9 +55,7 @@ const HierarchyTreeEmployee = () => {
     await Promise.all(
       employees.map(async (employee) => {
         try {
-          const response = await axios.get(
-            `${API_BASE_URL}5000/api/users/${employee.id}/avatar`
-          )
+          const response = await axios.get(`${API_BASE_URL}5000/api/users/${employee.id}/avatar`)
           employee.avatar = response.data.image
         } catch (error) {
           employee.avatar = null
@@ -84,9 +76,7 @@ const HierarchyTreeEmployee = () => {
     const getNode = (employee, yLevel, xOffset, isRoot = false) => {
       const supervisorId = employee.supervisor_id
       if (supervisorId && !colorMapping[supervisorId]) {
-        colorMapping[supervisorId] = `#${Math.floor(
-          Math.random() * 16777215
-        ).toString(16)}` // Генерация случайного цвета
+        colorMapping[supervisorId] = `#${Math.floor(Math.random() * 16777215).toString(16)}` // Генерация случайного цвета
       }
       const lineColor = supervisorId ? colorMapping[supervisorId] : '#000'
 
@@ -99,9 +89,7 @@ const HierarchyTreeEmployee = () => {
                 <img
                   src={
                     employee.avatar ||
-                    (employee.gender === 'Муж'
-                      ? malePlaceholder
-                      : femalePlaceholder)
+                    (employee.gender === 'Муж' ? malePlaceholder : femalePlaceholder)
                   }
                   alt="Profile"
                 />
@@ -109,21 +97,11 @@ const HierarchyTreeEmployee = () => {
               <div className="card-body">
                 <h4>{employee.name}</h4>
                 <p>{employee.job_title}</p>
-                <p>{employee.department || 'Не указан отдел'}</p>{' '}
-                {/* Добавляем отдел */}
+                <p>{employee.department || 'Не указан отдел'}</p> {/* Добавляем отдел */}
                 <div className="card-footer">
-                  <TbPhoneCall
-                    className="card-footer-icon"
-                    title="Не доступно!"
-                  />
-                  <LiaSmsSolid
-                    className="card-footer-icon"
-                    title="Не доступно!"
-                  />
-                  <IoMdVideocam
-                    className="card-footer-icon"
-                    title="Не доступно!"
-                  />
+                  <TbPhoneCall className="card-footer-icon" title="Не доступно!" />
+                  <LiaSmsSolid className="card-footer-icon" title="Не доступно!" />
+                  <IoMdVideocam className="card-footer-icon" title="Не доступно!" />
                 </div>
               </div>
             </div>
@@ -168,12 +146,7 @@ const HierarchyTreeEmployee = () => {
           height: '90vh',
         }}
       >
-        <CircularProgress
-          className="progress"
-          color="primary"
-          size={50}
-          variant="indeterminate"
-        />
+        <CircularProgress className="progress" color="primary" size={50} variant="indeterminate" />
       </div>
     )
   }
