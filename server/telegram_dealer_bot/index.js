@@ -26,6 +26,19 @@ app.use(
 )
 const token = process.env.TELEGRAM_BOT_TOKEN
 const bot = new TelegramBot(token, { polling: true })
+
+// Настройка командного меню бота
+const botCommands = [{ command: 'help', description: '🆘 Показать меню помощи' }]
+
+// Устанавливаем команды бота
+bot
+  .setMyCommands(botCommands)
+  .then(() => {
+    console.log('Команды бота успешно установлены')
+  })
+  .catch((error) => {
+    console.error('Ошибка при установке команд бота:', error)
+  })
 const upload = multer({
   storage: multer.memoryStorage(),
   fileFilter: (req, file, cb) => {
