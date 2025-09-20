@@ -249,7 +249,7 @@ CREATE TABLE companies (
     name_companies VARCHAR(255) NOT NULL UNIQUE,       -- Название компании
     status_companies VARCHAR(50),                      -- Статус компании
     seller_code VARCHAR(50),                           -- Код продавца
-    inn VARCHAR(12) UNIQUE,                            -- ИНН
+    inn VARCHAR(255) UNIQUE,                           -- ИНН
     trade_brand VARCHAR(255),                          -- Торговый бренд
     regional_manager_id INTEGER REFERENCES users(id),  -- Региональный менеджер (ссылка на id в таблице users)
     mpp_id INTEGER REFERENCES users(id),               -- МПП (ссылка на id в таблице users)
@@ -436,7 +436,7 @@ CREATE TABLE reclamation_records (
     id SERIAL PRIMARY KEY,  -- Уникальный идентификатор записи (автоинкремент) 
     claim_number VARCHAR(30) NOT NULL UNIQUE,    -- Номер рекламационной заявки (обязательное поле) 
     kontragent VARCHAR(255),  -- Наименование поставщика/контрагента 
-    inn VARCHAR(50), -- ИНН контрагента (10 или 12 цифр) 
+    inn VARCHAR(255), -- ИНН контрагента 
     defect TEXT,  -- Подробное описание дефекта/проблемы
     location TEXT,  -- Место обнаружения проблемы 
     claim_date DATE, -- Дата возникновения рекламации (из заявки) 
@@ -986,7 +986,7 @@ CREATE TABLE reclamation_records (
     id SERIAL PRIMARY KEY,  -- Уникальный идентификатор записи (автоинкремент) 
     claim_number VARCHAR(30) NOT NULL UNIQUE,    -- Номер рекламационной заявки (обязательное поле) 
     kontragent VARCHAR(255),  -- Наименование поставщика/контрагента 
-    inn VARCHAR(50), -- ИНН контрагента (10 или 12 цифр) 
+    inn VARCHAR(255), -- ИНН контрагента 
     defect TEXT,  -- Подробное описание дефекта/проблемы
     location TEXT,  -- Место обнаружения проблемы 
     claim_date DATE, -- Дата возникновения рекламации (из заявки) 
@@ -1135,7 +1135,7 @@ CREATE TABLE IF NOT EXISTS orders_1c (
     id SERIAL PRIMARY KEY,
     order_number VARCHAR(50) NOT NULL UNIQUE, -- Номер заказа
     company_name VARCHAR(255) NOT NULL, -- Название компании
-    inn VARCHAR(12), -- ИНН компании
+    inn VARCHAR(255), -- ИНН компании
     shipping_date DATE NOT NULL, -- Дата отгрузки
     address TEXT, -- Адрес доставки
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP, -- Дата создания записи

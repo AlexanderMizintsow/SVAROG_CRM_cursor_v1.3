@@ -15,8 +15,7 @@ const EditCompanyGeneralInfo = ({ companyId, companyData, onClose }) => {
     has_warehouse: companyData.has_warehouse || false,
     floorRising: {
       is_paid:
-        companyData.floor_rising_status &&
-        companyData.floor_rising_status.includes('Платно'),
+        companyData.floor_rising_status && companyData.floor_rising_status.includes('Платно'),
       comment: '', // Или добавить логику для комментария, если нужно
     },
   })
@@ -91,11 +90,7 @@ const EditCompanyGeneralInfo = ({ companyId, companyData, onClose }) => {
       <div>
         <label>
           Статус компании:{' '}
-          <select
-            name="status_companies"
-            value={formData.status_companies}
-            onChange={handleChange}
-          >
+          <select name="status_companies" value={formData.status_companies} onChange={handleChange}>
             {companyStatusOptions.map((status) => (
               <option key={status} value={status}>
                 {status}
@@ -123,6 +118,7 @@ const EditCompanyGeneralInfo = ({ companyId, companyData, onClose }) => {
             name="inn"
             value={formData.inn}
             onChange={handleChange}
+            maxLength="255"
           />
         </label>
       </div>

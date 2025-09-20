@@ -259,6 +259,7 @@ const CompanyForm = ({ onSubmit }) => {
           onChange={handleChange}
           fullWidth
           margin="normal"
+          inputProps={{ maxLength: 255 }}
         />
 
         <TextField
