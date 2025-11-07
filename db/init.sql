@@ -1248,3 +1248,422 @@ CREATE INDEX idx_calls_reminder_id ON calls(reminder_id);
 -- (триггер уже существует и будет работать автоматически)
  
 
+-- ************************************************** EDITOR HANDLE - РЕДАКТОР РУЧЕК **************************************************
+
+-- Типы створок (дверь, окно, офисная дверь, балконная дверь и т.д.)
+CREATE TABLE leaf_types (
+    id SERIAL PRIMARY KEY,
+    name VARCHAR(255) NOT NULL UNIQUE,
+    description TEXT,
+    created_at TIMESTAMP WITHOUT TIME ZONE DEFAULT NOW(),
+    updated_at TIMESTAMP WITHOUT TIME ZONE DEFAULT NOW()
+);
+
+-- Параметры (тип ручки, цвет накладок, цилиндр, ламинация и т.д.)
+CREATE TABLE parameters (
+    id SERIAL PRIMARY KEY,
+    name VARCHAR(255) NOT NULL UNIQUE,
+    description TEXT,
+    is_multiple BOOLEAN DEFAULT FALSE, -- можно ли выбирать несколько значений
+    created_at TIMESTAMP WITHOUT TIME ZONE DEFAULT NOW(),
+    updated_at TIMESTAMP WITHOUT TIME ZONE DEFAULT NOW()
+);
+
+-- Значения параметров (например, "Античная сосна", "RAL 8019" и т.д.)
+CREATE TABLE parameter_values (
+    id SERIAL PRIMARY KEY,
+    parameter_id INTEGER REFERENCES parameters(id) ON DELETE CASCADE,
+    value VARCHAR(255) NOT NULL,
+    display_order INTEGER DEFAULT 0,
+    created_at TIMESTAMP WITHOUT TIME ZONE DEFAULT NOW(),
+    updated_at TIMESTAMP WITHOUT TIME ZONE DEFAULT NOW(),
+    UNIQUE(parameter_id, value)
+);
+
+-- Ручки
+CREATE TABLE handles (
+    id SERIAL PRIMARY KEY,
+    article VARCHAR(255) NOT NULL UNIQUE,
+    name VARCHAR(500) NOT NULL,
+    description TEXT,
+    created_at TIMESTAMP WITHOUT TIME ZONE DEFAULT NOW(),
+    updated_at TIMESTAMP WITHOUT TIME ZONE DEFAULT NOW()
+);
+
+-- Правила выбора ручек
+CREATE TABLE handle_rules (
+    id SERIAL PRIMARY KEY,
+    handle_id INTEGER REFERENCES handles(id) ON DELETE CASCADE,
+    leaf_type_id INTEGER REFERENCES leaf_types(id) ON DELETE CASCADE,
+    quantity INTEGER DEFAULT 1, -- количество ручек для данного правила
+    created_at TIMESTAMP WITHOUT TIME ZONE DEFAULT NOW(),
+    updated_at TIMESTAMP WITHOUT TIME ZONE DEFAULT NOW()
+);
+
+-- Условия правил (связь параметров и их значений с правилами)
+-- Если parameter_value_id NULL, то правило подходит для любого значения этого параметра
+CREATE TABLE handle_rule_conditions (
+    id SERIAL PRIMARY KEY,
+    rule_id INTEGER REFERENCES handle_rules(id) ON DELETE CASCADE,
+    parameter_id INTEGER REFERENCES parameters(id) ON DELETE CASCADE,
+    parameter_value_id INTEGER REFERENCES parameter_values(id) ON DELETE CASCADE,
+    created_at TIMESTAMP WITHOUT TIME ZONE DEFAULT NOW(),
+    UNIQUE(rule_id, parameter_id, parameter_value_id)
+);
+
+-- История изменений
+CREATE TABLE handle_history (
+    id SERIAL PRIMARY KEY,
+    entity_type VARCHAR(50) NOT NULL, -- 'handle', 'parameter', 'rule', 'leaf_type'
+    entity_id INTEGER NOT NULL,
+    action VARCHAR(50) NOT NULL, -- 'created', 'updated', 'deleted'
+    old_data JSONB,
+    new_data JSONB,
+    changed_by INTEGER,
+    created_at TIMESTAMP WITHOUT TIME ZONE DEFAULT NOW()
+);
+
+-- Шаблоны створок для визуализации
+CREATE TABLE leaf_templates (
+    id SERIAL PRIMARY KEY,
+    leaf_type_id INTEGER REFERENCES leaf_types(id) ON DELETE CASCADE,
+    default_width INTEGER DEFAULT 970, -- ширина в мм
+    default_height INTEGER DEFAULT 1990, -- высота в мм
+    handle_position_x INTEGER DEFAULT 30, -- позиция ручки по X (в процентах от ширины)
+    handle_position_y INTEGER DEFAULT 33, -- позиция ручки по Y (в процентах от высоты)
+    created_at TIMESTAMP WITHOUT TIME ZONE DEFAULT NOW(),
+    updated_at TIMESTAMP WITHOUT TIME ZONE DEFAULT NOW()
+);
+
+-- Триггеры для обновления updated_at
+CREATE OR REPLACE FUNCTION update_leaf_types_updated_at()
+RETURNS TRIGGER AS $$
+BEGIN
+    NEW.updated_at = NOW();
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+CREATE TRIGGER update_leaf_types_updated_at_trigger
+BEFORE UPDATE ON leaf_types
+FOR EACH ROW EXECUTE FUNCTION update_leaf_types_updated_at();
+
+CREATE OR REPLACE FUNCTION update_parameters_updated_at()
+RETURNS TRIGGER AS $$
+BEGIN
+    NEW.updated_at = NOW();
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+CREATE TRIGGER update_parameters_updated_at_trigger
+BEFORE UPDATE ON parameters
+FOR EACH ROW EXECUTE FUNCTION update_parameters_updated_at();
+
+CREATE OR REPLACE FUNCTION update_parameter_values_updated_at()
+RETURNS TRIGGER AS $$
+BEGIN
+    NEW.updated_at = NOW();
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+CREATE TRIGGER update_parameter_values_updated_at_trigger
+BEFORE UPDATE ON parameter_values
+FOR EACH ROW EXECUTE FUNCTION update_parameter_values_updated_at();
+
+CREATE OR REPLACE FUNCTION update_handles_updated_at()
+RETURNS TRIGGER AS $$
+BEGIN
+    NEW.updated_at = NOW();
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+CREATE TRIGGER update_handles_updated_at_trigger
+BEFORE UPDATE ON handles
+FOR EACH ROW EXECUTE FUNCTION update_handles_updated_at();
+
+CREATE OR REPLACE FUNCTION update_handle_rules_updated_at()
+RETURNS TRIGGER AS $$
+BEGIN
+    NEW.updated_at = NOW();
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+CREATE TRIGGER update_handle_rules_updated_at_trigger
+BEFORE UPDATE ON handle_rules
+FOR EACH ROW EXECUTE FUNCTION update_handle_rules_updated_at();
+
+CREATE OR REPLACE FUNCTION update_leaf_templates_updated_at()
+RETURNS TRIGGER AS $$
+BEGIN
+    NEW.updated_at = NOW();
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+CREATE TRIGGER update_leaf_templates_updated_at_trigger
+BEFORE UPDATE ON leaf_templates
+FOR EACH ROW EXECUTE FUNCTION update_leaf_templates_updated_at();
+
+-- Индексы для оптимизации
+CREATE INDEX idx_parameter_values_parameter_id ON parameter_values(parameter_id);
+CREATE INDEX idx_handle_rules_handle_id ON handle_rules(handle_id);
+CREATE INDEX idx_handle_rules_leaf_type_id ON handle_rules(leaf_type_id);
+CREATE INDEX idx_handle_rule_conditions_rule_id ON handle_rule_conditions(rule_id);
+CREATE INDEX idx_handle_rule_conditions_parameter_id ON handle_rule_conditions(parameter_id);
+CREATE INDEX idx_handle_history_entity ON handle_history(entity_type, entity_id);
+CREATE INDEX idx_leaf_templates_leaf_type_id ON leaf_templates(leaf_type_id);
+
+-- Вставка начальных данных
+INSERT INTO leaf_types (name, description) VALUES
+    ('Дверь', 'Межкомнатная или входная дверь'),
+    ('Окно', 'Оконная створка'),
+    ('Офисная дверь', 'Дверь для офисных помещений'),
+    ('Балконная дверь', 'Дверь на балкон'),
+    ('Окно 25ДМ', 'Оконная створка типа 25ДМ')
+ON CONFLICT (name) DO NOTHING;
+
+-- Таблица для определения пользователей, которые могут подтверждать эталонность
+CREATE TABLE handle_approval_users (
+    id SERIAL PRIMARY KEY,
+    user_id INTEGER,
+    created_at TIMESTAMP WITHOUT TIME ZONE DEFAULT NOW(),
+    created_by INTEGER, -- Кто добавил пользователя (администратор)
+    UNIQUE(user_id)
+);
+
+-- Таблица подтверждений эталонности данных
+CREATE TABLE handle_approvals (
+    id SERIAL PRIMARY KEY,
+    approved_by INTEGER,
+    approved_at TIMESTAMP WITHOUT TIME ZONE DEFAULT NOW(),
+    snapshot_date DATE NOT NULL, -- Дата, на которую была подтверждена эталонность
+    is_current BOOLEAN DEFAULT TRUE, -- Текущее подтверждение
+    UNIQUE(approved_by, snapshot_date)
+);
+
+-- Таблица снапшотов данных (для отката)
+CREATE TABLE handle_snapshots (
+    id SERIAL PRIMARY KEY,
+    snapshot_date TIMESTAMP WITHOUT TIME ZONE DEFAULT NOW(),
+    description TEXT,
+    created_by INTEGER,
+    is_approved BOOLEAN DEFAULT FALSE, -- Был ли эталон подтвержден на момент создания снапшота
+    -- Снапшот данных хранится в JSON
+    leaf_types_data JSONB,
+    parameters_data JSONB,
+    parameter_values_data JSONB,
+    handles_data JSONB,
+    handle_rules_data JSONB,
+    handle_rule_conditions_data JSONB,
+    created_at TIMESTAMP WITHOUT TIME ZONE DEFAULT NOW()
+);
+
+-- Добавляем внешние ключи после создания всех таблиц
+-- ВАЖНО: Эти команды выполняются после создания всех таблиц, включая users и roles
+-- Используем DO блок для безопасного добавления ограничений
+DO $$
+BEGIN
+    -- Проверяем существование таблицы users перед добавлением внешних ключей
+    IF EXISTS (SELECT FROM pg_tables WHERE schemaname = 'public' AND tablename = 'users') THEN
+        -- Добавляем внешний ключ для handle_history
+        IF NOT EXISTS (
+            SELECT 1 FROM pg_constraint 
+            WHERE conname = 'fk_handle_history_changed_by'
+        ) THEN
+            ALTER TABLE handle_history 
+            ADD CONSTRAINT fk_handle_history_changed_by 
+            FOREIGN KEY (changed_by) REFERENCES users(id) ON DELETE SET NULL;
+        END IF;
+
+        -- Добавляем внешний ключ для handle_approvals
+        IF NOT EXISTS (
+            SELECT 1 FROM pg_constraint 
+            WHERE conname = 'fk_handle_approvals_approved_by'
+        ) THEN
+            ALTER TABLE handle_approvals 
+            ADD CONSTRAINT fk_handle_approvals_approved_by 
+            FOREIGN KEY (approved_by) REFERENCES users(id) ON DELETE SET NULL;
+        END IF;
+
+        -- Добавляем внешний ключ для handle_snapshots
+        IF NOT EXISTS (
+            SELECT 1 FROM pg_constraint 
+            WHERE conname = 'fk_handle_snapshots_created_by'
+        ) THEN
+            ALTER TABLE handle_snapshots 
+            ADD CONSTRAINT fk_handle_snapshots_created_by 
+            FOREIGN KEY (created_by) REFERENCES users(id) ON DELETE SET NULL;
+        END IF;
+
+        -- Добавляем внешние ключи для handle_approval_users
+        IF NOT EXISTS (
+            SELECT 1 FROM pg_constraint 
+            WHERE conname = 'fk_handle_approval_users_user_id'
+        ) THEN
+            ALTER TABLE handle_approval_users 
+            ADD CONSTRAINT fk_handle_approval_users_user_id 
+            FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE;
+        END IF;
+
+        IF NOT EXISTS (
+            SELECT 1 FROM pg_constraint 
+            WHERE conname = 'fk_handle_approval_users_created_by'
+        ) THEN
+            ALTER TABLE handle_approval_users 
+            ADD CONSTRAINT fk_handle_approval_users_created_by 
+            FOREIGN KEY (created_by) REFERENCES users(id) ON DELETE SET NULL;
+        END IF;
+    END IF;
+END $$;
+
+-- Индексы
+CREATE INDEX idx_handle_approvals_snapshot_date ON handle_approvals(snapshot_date);
+CREATE INDEX idx_handle_approvals_is_current ON handle_approvals(is_current);
+CREATE INDEX idx_handle_snapshots_snapshot_date ON handle_snapshots(snapshot_date);
+
+-- Создание параметров "Внешнее покрытие" и "Внутреннее покрытие" и добавление значений
+-- Сначала создаем параметры (если их еще нет)
+INSERT INTO parameters (name, description, is_multiple, created_at, updated_at)
+VALUES 
+    ('Внешнее покрытие', 'Внешний цвет окна', true, NOW(), NOW()),
+    ('Внутреннее покрытие', 'Внутренний цвет окна', true, NOW(), NOW())
+ON CONFLICT (name) DO NOTHING;
+
+-- Получаем ID созданных параметров и вставляем значения
+-- Значения отсортированы по алфавиту по наименованию
+DO $$
+DECLARE
+    vneshniy_id INTEGER;
+    vnutrenniy_id INTEGER;
+BEGIN
+    SELECT id INTO vneshniy_id FROM parameters WHERE name = 'Внешнее покрытие';
+    SELECT id INTO vnutrenniy_id FROM parameters WHERE name = 'Внутреннее покрытие';
+    
+    -- Вставляем значения для параметра "Внешнее покрытие" (в алфавитном порядке)
+    INSERT INTO parameter_values (parameter_id, value, display_order, created_at, updated_at)
+    VALUES
+        (vneshniy_id, 'Античная Сосна В2302 x46', 1, NOW(), NOW()),
+        (vneshniy_id, 'Антрацит Ульти-мат KDB 76-6H x82', 2, NOW(), NOW()),
+        (vneshniy_id, 'Антрацитово серый брашированный KDB74-34 x24', 3, NOW(), NOW()),
+        (vneshniy_id, 'Антрацитово серый гладкий KDB74-F7(стандарт) x42', 4, NOW(), NOW()),
+        (vneshniy_id, 'Африканская вишня US601 x70', 5, NOW(), NOW()),
+        (vneshniy_id, 'Базальтово серый KAEX9-Z8 x29', 6, NOW(), NOW()),
+        (vneshniy_id, 'Белый брашированный WAQ50-34 x77', 7, NOW(), NOW()),
+        (vneshniy_id, 'Блэк ульти-мат KDG62-6H x47', 8, NOW(), NOW()),
+        (vneshniy_id, 'Брашированный Золотой дуб UK117-34 x51', 9, NOW(), NOW()),
+        (vneshniy_id, 'Брашированный шоколадный KDB75-34(стандарт) x50', 10, NOW(), NOW()),
+        (vneshniy_id, 'Бургундия UJ401 x65', 11, NOW(), NOW()),
+        (vneshniy_id, 'Винтажная сосна B2303-G7 x32', 12, NOW(), NOW()),
+        (vneshniy_id, 'Виндзор YEQ31-4K x74', 13, NOW(), NOW()),
+        (vneshniy_id, 'Глубокий черный KDG62(стандарт) x39', 14, NOW(), NOW()),
+        (vneshniy_id, 'Горная сосна UR916 x12', 15, NOW(), NOW()),
+        (vneshniy_id, 'Дуб антик Z1402 x69', 16, NOW(), NOW()),
+        (vneshniy_id, 'Дуб Камарг UF711 x89', 17, NOW(), NOW()),
+        (vneshniy_id, 'Дуб шамони G3001 x56', 18, NOW(), NOW()),
+        (vneshniy_id, 'Дуб Шефилд Светлый GF402-5F x44', 19, NOW(), NOW()),
+        (vneshniy_id, 'Дуб шефилд серый GF401-5F x81', 20, NOW(), NOW()),
+        (vneshniy_id, 'Золотой дуб UK117(стандарт) x1', 21, NOW(), NOW()),
+        (vneshniy_id, 'Кадет Серый D3202 x55', 22, NOW(), NOW()),
+        (vneshniy_id, 'Какао NDY05-Z8 x73', 23, NOW(), NOW()),
+        (vneshniy_id, 'Кварцевый серый KACV8 x83', 24, NOW(), NOW()),
+        (vneshniy_id, 'Коричневый дуб UQ901(стандарт) x4', 25, NOW(), NOW()),
+        (vneshniy_id, 'Коричневый каштан NDT46 x22', 26, NOW(), NOW()),
+        (vneshniy_id, 'Коричневый мортар KDB75-6F x88', 27, NOW(), NOW()),
+        (vneshniy_id, 'Кремовый YEL88 x80', 28, NOW(), NOW()),
+        (vneshniy_id, 'Кристально-белый WAQ50 x75', 29, NOW(), NOW()),
+        (vneshniy_id, 'Махагон UJ301(стандарт) x2', 30, NOW(), NOW()),
+        (vneshniy_id, 'Мерцающий антрацит KDG14-69 x48', 31, NOW(), NOW()),
+        (vneshniy_id, 'Мерцающий черный KDG 62-69 x40', 32, NOW(), NOW()),
+        (vneshniy_id, 'Мореная сосна B2304-G7 x27', 33, NOW(), NOW()),
+        (vneshniy_id, 'Мореный дуб UR401(стандарт) x3', 34, NOW(), NOW()),
+        (vneshniy_id, 'Натуральный дуб UR001 x8', 35, NOW(), NOW()),
+        (vneshniy_id, 'Орех UK103(стандарт) x5', 36, NOW(), NOW()),
+        (vneshniy_id, 'Полосатая сосна G0502 x87', 37, NOW(), NOW()),
+        (vneshniy_id, 'Польская сосна G4301 x60', 38, NOW(), NOW()),
+        (vneshniy_id, 'Сапели UR601 x71', 39, NOW(), NOW()),
+        (vneshniy_id, 'Светлый дуб UF711 x76', 40, NOW(), NOW()),
+        (vneshniy_id, 'Серебрянное облако DJ 606 x72', 41, NOW(), NOW()),
+        (vneshniy_id, 'Сигнальный серый KAGF3-F7 x52', 42, NOW(), NOW()),
+        (vneshniy_id, 'Сиена Светлая UR102 x37', 43, NOW(), NOW()),
+        (vneshniy_id, 'Старинный дуб US805-U4 x85', 44, NOW(), NOW()),
+        (vneshniy_id, 'Темно зеленый GAP45-28 x84', 45, NOW(), NOW()),
+        (vneshniy_id, 'Темно-зеленый GAP45-Z8 x79', 46, NOW(), NOW()),
+        (vneshniy_id, 'Темно-синий BES89 x57', 47, NOW(), NOW()),
+        (vneshniy_id, 'Темный дуб G1501(стандарт) x9', 48, NOW(), NOW()),
+        (vneshniy_id, 'Темный тик US906 x67', 49, NOW(), NOW()),
+        (vneshniy_id, 'Угольно-коричневый KDB75(стандарт) x6', 50, NOW(), NOW()),
+        (vneshniy_id, 'Угольный серый KDB74(стандарт) x21', 51, NOW(), NOW()),
+        (vneshniy_id, 'Черно-коричневый KDD17 x16', 52, NOW(), NOW()),
+        (vneshniy_id, 'Шоколадная сосна UR907 x66', 53, NOW(), NOW()),
+        (vneshniy_id, 'Южный дуб UQ902 x13', 54, NOW(), NOW()),
+        (vneshniy_id, 'Ясень полярный G8101-G7 x86', 55, NOW(), NOW())
+    ON CONFLICT (parameter_id, value) DO NOTHING;
+    
+    -- Вставляем значения для параметра "Внутреннее покрытие" (в алфавитном порядке)
+    INSERT INTO parameter_values (parameter_id, value, display_order, created_at, updated_at)
+    VALUES
+        (vnutrenniy_id, 'Античная Сосна В2302 x46', 1, NOW(), NOW()),
+        (vnutrenniy_id, 'Антрацит Ульти-мат KDB 76-6H x82', 2, NOW(), NOW()),
+        (vnutrenniy_id, 'Антрацитово серый брашированный KDB74-34 x24', 3, NOW(), NOW()),
+        (vnutrenniy_id, 'Антрацитово серый гладкий KDB74-F7(стандарт) x42', 4, NOW(), NOW()),
+        (vnutrenniy_id, 'Африканская вишня US601 x70', 5, NOW(), NOW()),
+        (vnutrenniy_id, 'Базальтово серый KAEX9-Z8 x29', 6, NOW(), NOW()),
+        (vnutrenniy_id, 'Белый брашированный WAQ50-34 x77', 7, NOW(), NOW()),
+        (vnutrenniy_id, 'Блэк ульти-мат KDG62-6H x47', 8, NOW(), NOW()),
+        (vnutrenniy_id, 'Брашированный Золотой дуб UK117-34 x51', 9, NOW(), NOW()),
+        (vnutrenniy_id, 'Брашированный шоколадный KDB75-34(стандарт) x50', 10, NOW(), NOW()),
+        (vnutrenniy_id, 'Бургундия UJ401 x65', 11, NOW(), NOW()),
+        (vnutrenniy_id, 'Винтажная сосна B2303-G7 x32', 12, NOW(), NOW()),
+        (vnutrenniy_id, 'Виндзор YEQ31-4K x74', 13, NOW(), NOW()),
+        (vnutrenniy_id, 'Глубокий черный KDG62(стандарт) x39', 14, NOW(), NOW()),
+        (vnutrenniy_id, 'Горная сосна UR916 x12', 15, NOW(), NOW()),
+        (vnutrenniy_id, 'Дуб антик Z1402 x69', 16, NOW(), NOW()),
+        (vnutrenniy_id, 'Дуб Камарг UF711 x89', 17, NOW(), NOW()),
+        (vnutrenniy_id, 'Дуб шамони G3001 x56', 18, NOW(), NOW()),
+        (vnutrenniy_id, 'Дуб Шефилд Светлый GF402-5F x44', 19, NOW(), NOW()),
+        (vnutrenniy_id, 'Дуб шефилд серый GF401-5F x81', 20, NOW(), NOW()),
+        (vnutrenniy_id, 'Золотой дуб UK117(стандарт) x1', 21, NOW(), NOW()),
+        (vnutrenniy_id, 'Кадет Серый D3202 x55', 22, NOW(), NOW()),
+        (vnutrenniy_id, 'Какао NDY05-Z8 x73', 23, NOW(), NOW()),
+        (vnutrenniy_id, 'Кварцевый серый KACV8 x83', 24, NOW(), NOW()),
+        (vnutrenniy_id, 'Коричневый дуб UQ901(стандарт) x4', 25, NOW(), NOW()),
+        (vnutrenniy_id, 'Коричневый каштан NDT46 x22', 26, NOW(), NOW()),
+        (vnutrenniy_id, 'Коричневый мортар KDB75-6F x88', 27, NOW(), NOW()),
+        (vnutrenniy_id, 'Кремовый YEL88 x80', 28, NOW(), NOW()),
+        (vnutrenniy_id, 'Кристально-белый WAQ50 x75', 29, NOW(), NOW()),
+        (vnutrenniy_id, 'Махагон UJ301(стандарт) x2', 30, NOW(), NOW()),
+        (vnutrenniy_id, 'Мерцающий антрацит KDG14-69 x48', 31, NOW(), NOW()),
+        (vnutrenniy_id, 'Мерцающий черный KDG 62-69 x40', 32, NOW(), NOW()),
+        (vnutrenniy_id, 'Мореная сосна B2304-G7 x27', 33, NOW(), NOW()),
+        (vnutrenniy_id, 'Мореный дуб UR401(стандарт) x3', 34, NOW(), NOW()),
+        (vnutrenniy_id, 'Натуральный дуб UR001 x8', 35, NOW(), NOW()),
+        (vnutrenniy_id, 'Орех UK103(стандарт) x5', 36, NOW(), NOW()),
+        (vnutrenniy_id, 'Полосатая сосна G0502 x87', 37, NOW(), NOW()),
+        (vnutrenniy_id, 'Польская сосна G4301 x60', 38, NOW(), NOW()),
+        (vnutrenniy_id, 'Сапели UR601 x71', 39, NOW(), NOW()),
+        (vnutrenniy_id, 'Светлый дуб UF711 x76', 40, NOW(), NOW()),
+        (vnutrenniy_id, 'Серебрянное облако DJ 606 x72', 41, NOW(), NOW()),
+        (vnutrenniy_id, 'Сигнальный серый KAGF3-F7 x52', 42, NOW(), NOW()),
+        (vnutrenniy_id, 'Сиена Светлая UR102 x37', 43, NOW(), NOW()),
+        (vnutrenniy_id, 'Старинный дуб US805-U4 x85', 44, NOW(), NOW()),
+        (vnutrenniy_id, 'Темно зеленый GAP45-28 x84', 45, NOW(), NOW()),
+        (vnutrenniy_id, 'Темно-зеленый GAP45-Z8 x79', 46, NOW(), NOW()),
+        (vnutrenniy_id, 'Темно-синий BES89 x57', 47, NOW(), NOW()),
+        (vnutrenniy_id, 'Темный дуб G1501(стандарт) x9', 48, NOW(), NOW()),
+        (vnutrenniy_id, 'Темный тик US906 x67', 49, NOW(), NOW()),
+        (vnutrenniy_id, 'Угольно-коричневый KDB75(стандарт) x6', 50, NOW(), NOW()),
+        (vnutrenniy_id, 'Угольный серый KDB74(стандарт) x21', 51, NOW(), NOW()),
+        (vnutrenniy_id, 'Черно-коричневый KDD17 x16', 52, NOW(), NOW()),
+        (vnutrenniy_id, 'Шоколадная сосна UR907 x66', 53, NOW(), NOW()),
+        (vnutrenniy_id, 'Южный дуб UQ902 x13', 54, NOW(), NOW()),
+        (vnutrenniy_id, 'Ясень полярный G8101-G7 x86', 55, NOW(), NOW())
+    ON CONFLICT (parameter_id, value) DO NOTHING;
+END $$;
+
+
+-- ************************************************** КОНЕЦ EDITOR HANDLE **************************************************
+

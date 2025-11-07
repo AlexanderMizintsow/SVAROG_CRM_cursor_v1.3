@@ -23,7 +23,7 @@ import { PiTelegramLogoLight } from 'react-icons/pi'
 import { IoStarSharp } from 'react-icons/io5'
 import { PiLockKeyOpenFill } from 'react-icons/pi'
 import { TbApps } from 'react-icons/tb'
-import { MdAssessment, MdSearch } from 'react-icons/md'
+import { MdAssessment, MdSearch, MdEdit } from 'react-icons/md'
 
 const NavBar = () => {
   const { user } = useUserStore()
@@ -164,6 +164,11 @@ const NavBar = () => {
       name: 'Иерархия сотрудников',
       icon: VscTypeHierarchySub,
       link: '/hierarchy-tree-employee',
+    },
+    {
+      name: 'Редактор ручек',
+      icon: MdEdit,
+      link: '/editor-handle',
     },
     /* {
       name: 'Карта',

@@ -1,0 +1,97 @@
+.editor-handle {
+  padding: 24px;
+  //max-width: 1400px;
+  margin: 0 auto;
+  height: calc(100vh - 160px);
+  overflow-y: auto;
+  
+  &__loading {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    height: 100%;
+    font-size: 18px;
+    color: #666;
+  }
+
+  .MuiPaper-root {
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+  }
+
+  .MuiButton-root {
+    text-transform: none;
+  }
+
+  .MuiChip-root {
+    margin: 2px;
+  }
+
+  .parameter-section {
+    margin-bottom: 20px;
+    
+    .parameter-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 8px;
+    }
+  }
+
+  .found-handles-section {
+    margin-top: 20px;
+    
+    .handle-card {
+      padding: 12px;
+      margin-bottom: 12px;
+      border: 1px solid #ddd;
+      border-radius: 4px;
+      background-color: #f9f9f9;
+      
+      &:hover {
+        background-color: #f0f0f0;
+      }
+    }
+  }
+
+  .warnings-section {
+    margin-top: 20px;
+    
+    .MuiAlert-root {
+      margin-bottom: 8px;
+    }
+  }
+
+  .management-section {
+    .MuiTableContainer-root {
+      max-height: 400px;
+      overflow-y: auto;
+    }
+  }
+
+  // Стили для скроллбара
+  &::-webkit-scrollbar {
+    width: 8px;
+  }
+
+  &::-webkit-scrollbar-track {
+    background: #f1f1f1;
+    border-radius: 4px;
+  }
+
+  &::-webkit-scrollbar-thumb {
+    background: #c1c1c1;
+    border-radius: 4px;
+
+    &:hover {
+      background: #a8a8a8;
+    }
+  }
+
+  @media (max-width: 768px) {
+    padding: 16px;
+    height: calc(100vh - 140px);
+  }
+}
+
+
+

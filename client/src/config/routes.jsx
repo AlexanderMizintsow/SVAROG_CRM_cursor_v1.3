@@ -23,6 +23,7 @@ import MissedCall from '../routes/asterisk/missedCall/MissedCall.jsx'
 // import { Mail } from '@mui/icons-material'
 import RatingStats from '../components/RatingStats/RatingStats.jsx'
 import MaterialSearchPage from '../routes/statistics/MaterialSearchPage.jsx'
+import EditorHandle from '../routes/adminMenu/editorHandle/EditorHandle.jsx'
 
 const routes = (bgSeason, roleAdministrator, isConnectBD) => [
   {
@@ -94,6 +95,7 @@ const routes = (bgSeason, roleAdministrator, isConnectBD) => [
 
       { path: 'reports-dealer-ratings', element: <RatingStats /> },
       { path: 'material-search', element: <MaterialSearchPage /> },
+      { path: 'editor-handle', element: <EditorHandle /> },
 
       // ***
       // Отдел кадров

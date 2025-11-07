@@ -154,6 +154,45 @@ const {
   getComponents,
 } = require('./permissions/permissionsController')
 
+const {
+  getLeafTypes,
+  createLeafType,
+  updateLeafType,
+  deleteLeafType,
+  getParameters,
+  createParameter,
+  updateParameter,
+  deleteParameter,
+  getParameterValues,
+  createParameterValue,
+  updateParameterValue,
+  deleteParameterValue,
+  getHandles,
+  createHandle,
+  updateHandle,
+  deleteHandle,
+  getHandleRules,
+  getHandleRuleById,
+  createHandleRule,
+  updateHandleRule,
+  deleteHandleRule,
+  findHandlesByParameters,
+  exportRules,
+  importRules,
+  getEditorData,
+  getHandleHistory,
+  getApprovalStatus,
+  approveHandleData,
+  getApprovalUsers,
+  addApprovalUser,
+  removeApprovalUser,
+  getAllUsers,
+  createSnapshot,
+  getSnapshots,
+  restoreFromSnapshot,
+  deleteSnapshot,
+} = require('./handleController/handleController')
+
 const app = express()
 const server = http.createServer(app) // Создайте сервер с использованием http.createServer
 const io = socketIo(server, {
@@ -649,6 +688,68 @@ app.get('/api/task/uploads/:filename', (req, res) => {
   res.type(mimeType)
   res.sendFile(filePath)
 })
+
+// ==================== EDITOR HANDLE - РЕДАКТОР РУЧЕК ====================
+
+// Получение всех данных для редактора
+app.get('/api/editor-handle/data', getEditorData(dbPool))
+
+// Типы створок
+app.get('/api/editor-handle/leaf-types', getLeafTypes(dbPool))
+app.post('/api/editor-handle/leaf-types', createLeafType(dbPool))
+app.put('/api/editor-handle/leaf-types/:id', updateLeafType(dbPool))
+app.delete('/api/editor-handle/leaf-types/:id', deleteLeafType(dbPool))
+
+// Параметры
+app.get('/api/editor-handle/parameters', getParameters(dbPool))
+app.post('/api/editor-handle/parameters', createParameter(dbPool))
+app.put('/api/editor-handle/parameters/:id', updateParameter(dbPool))
+app.delete('/api/editor-handle/parameters/:id', deleteParameter(dbPool))
+
+// Значения параметров
+app.get('/api/editor-handle/parameters/:parameterId/values', getParameterValues(dbPool))
+app.post('/api/editor-handle/parameters/:parameterId/values', createParameterValue(dbPool))
+app.put('/api/editor-handle/parameter-values/:id', updateParameterValue(dbPool))
+app.delete('/api/editor-handle/parameter-values/:id', deleteParameterValue(dbPool))
+
+// Ручки
+app.get('/api/editor-handle/handles', getHandles(dbPool))
+app.post('/api/editor-handle/handles', createHandle(dbPool))
+app.put('/api/editor-handle/handles/:id', updateHandle(dbPool))
+app.delete('/api/editor-handle/handles/:id', deleteHandle(dbPool))
+
+// Правила
+app.get('/api/editor-handle/rules', getHandleRules(dbPool))
+app.get('/api/editor-handle/rules/:id', getHandleRuleById(dbPool))
+app.post('/api/editor-handle/rules', createHandleRule(dbPool))
+app.put('/api/editor-handle/rules/:id', updateHandleRule(dbPool))
+app.delete('/api/editor-handle/rules/:id', deleteHandleRule(dbPool))
+
+// Подбор ручек по параметрам
+app.post('/api/editor-handle/find-handles', findHandlesByParameters(dbPool))
+
+// Экспорт/Импорт
+app.get('/api/editor-handle/export', exportRules(dbPool))
+app.post('/api/editor-handle/import', importRules(dbPool))
+
+// История изменений
+app.get('/api/editor-handle/history', getHandleHistory(dbPool))
+
+// Подтверждение эталонности
+app.get('/api/editor-handle/approval-status', getApprovalStatus(dbPool))
+app.post('/api/editor-handle/approve', approveHandleData(dbPool))
+app.get('/api/editor-handle/approval-users', getApprovalUsers(dbPool))
+app.post('/api/editor-handle/approval-users', addApprovalUser(dbPool))
+app.delete('/api/editor-handle/approval-users/:id', removeApprovalUser(dbPool))
+app.get('/api/editor-handle/all-users', getAllUsers(dbPool))
+
+// Снапшоты и откат
+app.post('/api/editor-handle/snapshots', createSnapshot(dbPool))
+app.get('/api/editor-handle/snapshots', getSnapshots(dbPool))
+app.post('/api/editor-handle/restore', restoreFromSnapshot(dbPool))
+app.delete('/api/editor-handle/snapshots/:id', deleteSnapshot(dbPool))
+
+// ==================== КОНЕЦ EDITOR HANDLE ====================
 
 // Комнаты соккет
 io.on('connection', (socket) => {
