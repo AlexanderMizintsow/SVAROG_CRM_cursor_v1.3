@@ -1265,6 +1265,16 @@ CREATE TABLE parameters (
     name VARCHAR(255) NOT NULL UNIQUE,
     description TEXT,
     is_multiple BOOLEAN DEFAULT FALSE, -- можно ли выбирать несколько значений
+    use_categories BOOLEAN DEFAULT FALSE, -- использовать категории для группировки значений (например, для цветов)
+    created_at TIMESTAMP WITHOUT TIME ZONE DEFAULT NOW(),
+    updated_at TIMESTAMP WITHOUT TIME ZONE DEFAULT NOW()
+);
+
+-- Категории для группировки значений параметров (например, категории цветов: Коричневый, Серый и т.д.)
+CREATE TABLE parameter_value_categories (
+    id SERIAL PRIMARY KEY,
+    name VARCHAR(255) NOT NULL UNIQUE,
+    description TEXT,
     created_at TIMESTAMP WITHOUT TIME ZONE DEFAULT NOW(),
     updated_at TIMESTAMP WITHOUT TIME ZONE DEFAULT NOW()
 );
@@ -1275,6 +1285,7 @@ CREATE TABLE parameter_values (
     parameter_id INTEGER REFERENCES parameters(id) ON DELETE CASCADE,
     value VARCHAR(255) NOT NULL,
     display_order INTEGER DEFAULT 0,
+    category_id INTEGER REFERENCES parameter_value_categories(id) ON DELETE SET NULL,
     created_at TIMESTAMP WITHOUT TIME ZONE DEFAULT NOW(),
     updated_at TIMESTAMP WITHOUT TIME ZONE DEFAULT NOW(),
     UNIQUE(parameter_id, value)
@@ -1410,12 +1421,28 @@ FOR EACH ROW EXECUTE FUNCTION update_leaf_templates_updated_at();
 
 -- Индексы для оптимизации
 CREATE INDEX idx_parameter_values_parameter_id ON parameter_values(parameter_id);
+CREATE INDEX idx_parameter_values_category_id ON parameter_values(category_id);
+CREATE INDEX idx_parameter_value_categories_name ON parameter_value_categories(name);
 CREATE INDEX idx_handle_rules_handle_id ON handle_rules(handle_id);
 CREATE INDEX idx_handle_rules_leaf_type_id ON handle_rules(leaf_type_id);
 CREATE INDEX idx_handle_rule_conditions_rule_id ON handle_rule_conditions(rule_id);
 CREATE INDEX idx_handle_rule_conditions_parameter_id ON handle_rule_conditions(parameter_id);
 CREATE INDEX idx_handle_history_entity ON handle_history(entity_type, entity_id);
 CREATE INDEX idx_leaf_templates_leaf_type_id ON leaf_templates(leaf_type_id);
+CREATE INDEX idx_handle_editor_permissions_user_id ON handle_editor_permissions(user_id);
+
+-- Триггер для обновления updated_at в handle_editor_permissions
+CREATE OR REPLACE FUNCTION update_handle_editor_permissions_updated_at()
+RETURNS TRIGGER AS $$
+BEGIN
+    NEW.updated_at = NOW();
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+CREATE TRIGGER update_handle_editor_permissions_updated_at_trigger
+BEFORE UPDATE ON handle_editor_permissions
+FOR EACH ROW EXECUTE FUNCTION update_handle_editor_permissions_updated_at();
 
 -- Вставка начальных данных
 INSERT INTO leaf_types (name, description) VALUES
@@ -1432,6 +1459,18 @@ CREATE TABLE handle_approval_users (
     user_id INTEGER,
     created_at TIMESTAMP WITHOUT TIME ZONE DEFAULT NOW(),
     created_by INTEGER, -- Кто добавил пользователя (администратор)
+    UNIQUE(user_id)
+);
+
+-- Таблица прав доступа к редактору ручек для конкретных пользователей
+-- Если can_edit = true, пользователь имеет все права редактирования (кроме управления пользователями и восстановления из снапшота)
+CREATE TABLE handle_editor_permissions (
+    id SERIAL PRIMARY KEY,
+    user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    can_edit BOOLEAN DEFAULT FALSE,
+    created_at TIMESTAMP WITHOUT TIME ZONE DEFAULT NOW(),
+    updated_at TIMESTAMP WITHOUT TIME ZONE DEFAULT NOW(),
+    created_by INTEGER REFERENCES users(id) ON DELETE SET NULL, -- Кто выдал права (администратор)
     UNIQUE(user_id)
 );
 
@@ -1529,8 +1568,8 @@ CREATE INDEX idx_handle_snapshots_snapshot_date ON handle_snapshots(snapshot_dat
 -- Сначала создаем параметры (если их еще нет)
 INSERT INTO parameters (name, description, is_multiple, created_at, updated_at)
 VALUES 
-    ('Внешнее покрытие', 'Внешний цвет окна', true, NOW(), NOW()),
-    ('Внутреннее покрытие', 'Внутренний цвет окна', true, NOW(), NOW())
+    ('Внешнее покрытие изделия', 'Внешний цвет окна', true, NOW(), NOW()),
+    ('Внутреннее покрытие изделия', 'Внутренний цвет окна', true, NOW(), NOW())
 ON CONFLICT (name) DO NOTHING;
 
 -- Получаем ID созданных параметров и вставляем значения
@@ -1540,8 +1579,8 @@ DECLARE
     vneshniy_id INTEGER;
     vnutrenniy_id INTEGER;
 BEGIN
-    SELECT id INTO vneshniy_id FROM parameters WHERE name = 'Внешнее покрытие';
-    SELECT id INTO vnutrenniy_id FROM parameters WHERE name = 'Внутреннее покрытие';
+    SELECT id INTO vneshniy_id FROM parameters WHERE name = 'Внешнее покрытие изделия';
+    SELECT id INTO vnutrenniy_id FROM parameters WHERE name = 'Внутреннее покрытие изделия';
     
     -- Вставляем значения для параметра "Внешнее покрытие" (в алфавитном порядке)
     INSERT INTO parameter_values (parameter_id, value, display_order, created_at, updated_at)

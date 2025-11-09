@@ -50,6 +50,7 @@ import {
 } from '@mui/icons-material'
 import * as XLSX from 'xlsx'
 import LeafVisualizer from './LeafVisualizer'
+import ConfirmationDialog from '../../../components/confirmationDialog/ConfirmationDialog'
 import './editorHandle.scss'
 
 const EditorHandle = () => {
@@ -78,6 +79,20 @@ const EditorHandle = () => {
   const [allUsers, setAllUsers] = useState([])
   const [approvalUsers, setApprovalUsers] = useState([])
   const [searchUser, setSearchUser] = useState('')
+  const [uncoveredCombinations, setUncoveredCombinations] = useState(null)
+  const [loadingUncovered, setLoadingUncovered] = useState(false)
+  const [openUncoveredDialog, setOpenUncoveredDialog] = useState(false)
+  const [categories, setCategories] = useState([])
+  const [openCategoriesDialog, setOpenCategoriesDialog] = useState(false)
+  const [categoryForm, setCategoryForm] = useState({ name: '', description: '' })
+  const [selectedParameterForCategories, setSelectedParameterForCategories] = useState('')
+  const [parameterValuesWithCategories, setParameterValuesWithCategories] = useState([])
+  const [openSaveRuleDialog, setOpenSaveRuleDialog] = useState(false)
+  const [openApproveDialog, setOpenApproveDialog] = useState(false)
+  const [userCanEdit, setUserCanEdit] = useState(false)
+  const [openPermissionsDialog, setOpenPermissionsDialog] = useState(false)
+  const [allPermissions, setAllPermissions] = useState([])
+  const [selectedUserForPermissions, setSelectedUserForPermissions] = useState('')
 
   // Модальные окна
   const [openParameterDialog, setOpenParameterDialog] = useState(false)
@@ -92,7 +107,7 @@ const EditorHandle = () => {
   const [viewingRule, setViewingRule] = useState(null)
 
   // Формы
-  const [parameterForm, setParameterForm] = useState({ name: '', description: '', is_multiple: false })
+  const [parameterForm, setParameterForm] = useState({ name: '', description: '', is_multiple: false, use_categories: false })
   const [parameterValueForm, setParameterValueForm] = useState({ value: '', display_order: 0 })
   const [handleForm, setHandleForm] = useState({ article: '', name: '', description: '' })
   const [ruleForm, setRuleForm] = useState({ quantity: 1 })
@@ -104,8 +119,40 @@ const EditorHandle = () => {
     loadHistory()
     loadApprovalStatus()
     loadSnapshots()
+    loadCategories()
+    loadUserPermissions()
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
+
+  // Загрузка прав доступа пользователя
+  const loadUserPermissions = async () => {
+    if (!userId) return
+    
+    try {
+      const response = await axios.get(`${API_BASE_URL}5000/api/editor-handle/permissions`, {
+        params: { userId }
+      })
+      setUserCanEdit(response.data.can_edit || false)
+    } catch (error) {
+      console.error('Ошибка при загрузке прав доступа:', error)
+      setUserCanEdit(false)
+    }
+  }
+
+  // Загрузка всех прав доступа (для администратора)
+  const loadAllPermissions = async () => {
+    try {
+      const response = await axios.get(`${API_BASE_URL}5000/api/editor-handle/permissions/all`)
+      setAllPermissions(response.data)
+    } catch (error) {
+      console.error('Ошибка при загрузке всех прав доступа:', error)
+    }
+  }
+
+  // Проверка прав на редактирование (администратор всегда имеет права)
+  const canEdit = () => {
+    return isAdmin || userCanEdit
+  }
 
   const loadEditorData = async () => {
     try {
@@ -225,7 +272,8 @@ const EditorHandle = () => {
     return parts.join(' ') || user.username || `ID: ${user.id}`
   }
 
-  const handleApprove = async () => {
+  // Фактическое подтверждение эталонности
+  const performApprove = async () => {
     try {
       await axios.post(`${API_BASE_URL}5000/api/editor-handle/approve`, {
         user_id: userId
@@ -243,6 +291,11 @@ const EditorHandle = () => {
         backgroundColor: 'linear-gradient(to right, #FF5F6D, #FFC371)',
       }).showToast()
     }
+  }
+
+  // Подтверждение эталонности - показывает диалог подтверждения
+  const handleApprove = () => {
+    setOpenApproveDialog(true)
   }
 
   const handleCreateSnapshot = async () => {
@@ -408,6 +461,203 @@ const EditorHandle = () => {
     }
   }
 
+  // Поиск непокрытых комбинаций
+  const findUncoveredCombinations = async () => {
+    if (!selectedLeafType) {
+      Toastify({
+        text: 'Выберите тип створки',
+        close: true,
+        backgroundColor: 'linear-gradient(to right, #FF5F6D, #FFC371)',
+      }).showToast()
+      return
+    }
+
+    setLoadingUncovered(true)
+    try {
+      const response = await axios.post(`${API_BASE_URL}5000/api/editor-handle/find-uncovered`, {
+        leaf_type_id: parseInt(selectedLeafType),
+        parameter_ids: null, // Проверяем все параметры
+      })
+      
+      setUncoveredCombinations(response.data)
+      setOpenUncoveredDialog(true)
+      
+      if (response.data.uncovered_count === 0) {
+        Toastify({
+          text: response.data.message || 'Все комбинации покрыты правилами',
+          close: true,
+          backgroundColor: 'linear-gradient(to right, #4CAF50, #45a049)',
+        }).showToast()
+      } else {
+        Toastify({
+          text: response.data.message || `Найдено ${response.data.uncovered_count} непокрытых комбинаций`,
+          close: true,
+          backgroundColor: 'linear-gradient(to right, #FF9800, #F57C00)',
+        }).showToast()
+      }
+    } catch (error) {
+      console.error('Ошибка при поиске непокрытых комбинаций:', error)
+      Toastify({
+        text: error.response?.data?.error || 'Ошибка при поиске непокрытых комбинаций',
+        close: true,
+        backgroundColor: 'linear-gradient(to right, #FF5F6D, #FFC371)',
+      }).showToast()
+    } finally {
+      setLoadingUncovered(false)
+    }
+  }
+
+  // Загрузка категорий
+  const loadCategories = async () => {
+    try {
+      const response = await axios.get(`${API_BASE_URL}5000/api/editor-handle/categories`)
+      setCategories(response.data)
+    } catch (error) {
+      console.error('Ошибка при загрузке категорий:', error)
+    }
+  }
+
+  // Загрузка значений параметра для назначения категорий
+  const loadParameterValuesForCategories = async (parameterId) => {
+    if (!parameterId) {
+      setParameterValuesWithCategories([])
+      return
+    }
+    try {
+      const response = await axios.get(`${API_BASE_URL}5000/api/editor-handle/parameters/${parameterId}/values`)
+      setParameterValuesWithCategories(response.data)
+    } catch (error) {
+      console.error('Ошибка при загрузке значений параметра:', error)
+      Toastify({
+        text: 'Ошибка при загрузке значений параметра',
+        close: true,
+        backgroundColor: 'linear-gradient(to right, #FF5F6D, #FFC371)',
+      }).showToast()
+    }
+  }
+
+  // Назначение категории значению параметра
+  const handleAssignCategoryToValue = async (valueId, categoryId) => {
+    try {
+      await axios.put(`${API_BASE_URL}5000/api/editor-handle/parameter-values/${valueId}/category`, {
+        category_id: categoryId || null
+      })
+      // Обновляем локальное состояние
+      setParameterValuesWithCategories(prev => 
+        prev.map(val => val.id === valueId ? { ...val, category_id: categoryId, category_name: categoryId ? categories.find(c => c.id === categoryId)?.name : null } : val)
+      )
+      Toastify({
+        text: 'Категория успешно назначена',
+        close: true,
+        backgroundColor: 'linear-gradient(to right, #4CAF50, #45a049)',
+      }).showToast()
+    } catch (error) {
+      Toastify({
+        text: error.response?.data?.error || 'Ошибка при назначении категории',
+        close: true,
+        backgroundColor: 'linear-gradient(to right, #FF5F6D, #FFC371)',
+      }).showToast()
+    }
+  }
+
+  // Создание категории
+  const handleCreateCategory = async () => {
+    try {
+      await axios.post(`${API_BASE_URL}5000/api/editor-handle/categories`, categoryForm)
+      Toastify({
+        text: 'Категория успешно создана',
+        close: true,
+        backgroundColor: 'linear-gradient(to right, #4CAF50, #45a049)',
+      }).showToast()
+      setCategoryForm({ name: '', description: '' })
+      loadCategories()
+    } catch (error) {
+      Toastify({
+        text: error.response?.data?.error || 'Ошибка при создании категории',
+        close: true,
+        backgroundColor: 'linear-gradient(to right, #FF5F6D, #FFC371)',
+      }).showToast()
+    }
+  }
+
+  // Удаление категории
+  const handleDeleteCategory = async (id) => {
+    if (!window.confirm('Вы уверены, что хотите удалить эту категорию?')) return
+    try {
+      await axios.delete(`${API_BASE_URL}5000/api/editor-handle/categories/${id}`)
+      Toastify({
+        text: 'Категория успешно удалена',
+        close: true,
+        backgroundColor: 'linear-gradient(to right, #4CAF50, #45a049)',
+      }).showToast()
+      loadCategories()
+    } catch (error) {
+      Toastify({
+        text: error.response?.data?.error || 'Ошибка при удалении категории',
+        close: true,
+        backgroundColor: 'linear-gradient(to right, #FF5F6D, #FFC371)',
+      }).showToast()
+    }
+  }
+
+  // Управление правами доступа
+  const handleOpenPermissionsDialog = async () => {
+    await loadAllUsers()
+    await loadAllPermissions()
+    setOpenPermissionsDialog(true)
+  }
+
+  const handleSavePermissions = async () => {
+    if (!selectedUserForPermissions) {
+      Toastify({
+        text: 'Выберите пользователя',
+        close: true,
+        backgroundColor: 'linear-gradient(to right, #FF5F6D, #FFC371)',
+      }).showToast()
+      return
+    }
+
+    try {
+      await axios.post(`${API_BASE_URL}5000/api/editor-handle/permissions`, {
+        user_id: parseInt(selectedUserForPermissions),
+        can_edit: true,
+        created_by: userId
+      })
+      Toastify({
+        text: 'Права доступа успешно сохранены',
+        close: true,
+        backgroundColor: 'linear-gradient(to right, #00b09b, #96c93d)',
+      }).showToast()
+      loadAllPermissions()
+      setSelectedUserForPermissions('')
+    } catch (error) {
+      Toastify({
+        text: error.response?.data?.error || 'Ошибка при сохранении прав доступа',
+        close: true,
+        backgroundColor: 'linear-gradient(to right, #FF5F6D, #FFC371)',
+      }).showToast()
+    }
+  }
+
+  const handleDeletePermissions = async (id) => {
+    if (!window.confirm('Вы уверены, что хотите удалить права доступа для этого пользователя?')) return
+    try {
+      await axios.delete(`${API_BASE_URL}5000/api/editor-handle/permissions/${id}`)
+      Toastify({
+        text: 'Права доступа успешно удалены',
+        close: true,
+        backgroundColor: 'linear-gradient(to right, #00b09b, #96c93d)',
+      }).showToast()
+      loadAllPermissions()
+    } catch (error) {
+      Toastify({
+        text: error.response?.data?.error || 'Ошибка при удалении прав доступа',
+        close: true,
+        backgroundColor: 'linear-gradient(to right, #FF5F6D, #FFC371)',
+      }).showToast()
+    }
+  }
+
   // Обработка изменения параметров (поддержка множественного выбора)
   const handleParameterChange = (parameterId, valueIds) => {
     setSelectedParameters(prev => ({
@@ -429,7 +679,7 @@ const EditorHandle = () => {
         backgroundColor: 'linear-gradient(to right, #00b09b, #96c93d)',
       }).showToast()
       setOpenParameterDialog(false)
-      setParameterForm({ name: '', description: '', is_multiple: false })
+      setParameterForm({ name: '', description: '', is_multiple: false, use_categories: false })
       loadEditorData()
       loadHistory()
       loadApprovalStatus()
@@ -455,7 +705,7 @@ const EditorHandle = () => {
       }).showToast()
       setOpenParameterDialog(false)
       setEditingItem(null)
-      setParameterForm({ name: '', description: '', is_multiple: false })
+      setParameterForm({ name: '', description: '', is_multiple: false, use_categories: false })
       loadEditorData()
       loadHistory()
       loadApprovalStatus()
@@ -662,8 +912,54 @@ const EditorHandle = () => {
     }
   }
 
-  // Сохранение правила (с множественным выбором ручек)
-  const handleSaveRule = async () => {
+  // Формирование сообщения для подтверждения сохранения правила
+  const getRuleConfirmationMessage = () => {
+    if (!selectedHandles.length || !selectedLeafType) {
+      return ''
+    }
+
+    const selectedLeafTypeObj = editorData.leafTypes.find(lt => lt.id.toString() === selectedLeafType)
+    const leafTypeName = selectedLeafTypeObj ? selectedLeafTypeObj.name : 'Неизвестный тип'
+    
+    // Получаем информацию о выбранных ручках
+    const handlesInfo = selectedHandles.map(handleId => {
+      const handle = editorData.handles.find(h => h.id.toString() === handleId)
+      return handle ? `${handle.article} - ${handle.name}` : `ID: ${handleId}`
+    }).join(', ')
+
+    // Формируем информацию о параметрах
+    const parametersInfo = []
+    Object.entries(selectedParameters).forEach(([paramId, valueIds]) => {
+      const param = editorData.parameters.find(p => p.id.toString() === paramId)
+      if (param) {
+        if (valueIds && valueIds.length > 0) {
+          const values = valueIds.map(valueId => {
+            const value = param.values.find(v => v.id === valueId)
+            return value ? value.value : `ID: ${valueId}`
+          }).join(', ')
+          parametersInfo.push(`${param.name}: ${values}`)
+        } else {
+          parametersInfo.push(`${param.name}: Любое значение`)
+        }
+      }
+    })
+
+    let message = `Вы уверены, что хотите сохранить правило?\n\n`
+    message += `Тип створки: ${leafTypeName}\n`
+    message += `Ручки: ${handlesInfo}\n`
+    message += `Количество: ${ruleForm.quantity || 1}`
+    
+    if (parametersInfo.length > 0) {
+      message += `\n\nУсловия:\n${parametersInfo.join('\n')}`
+    } else {
+      message += `\n\nУсловия: Любые значения`
+    }
+
+    return message
+  }
+
+  // Фактическое сохранение правила
+  const performSaveRule = async () => {
     if (!selectedHandles.length || !selectedLeafType) {
       Toastify({
         text: 'Выберите ручки и тип створки',
@@ -722,6 +1018,20 @@ const EditorHandle = () => {
         backgroundColor: 'linear-gradient(to right, #FF5F6D, #FFC371)',
       }).showToast()
     }
+  }
+
+  // Сохранение правила (с множественным выбором ручек) - показывает диалог подтверждения
+  const handleSaveRule = () => {
+    if (!selectedHandles.length || !selectedLeafType) {
+      Toastify({
+        text: 'Выберите ручки и тип створки',
+        close: true,
+        backgroundColor: 'linear-gradient(to right, #FF5F6D, #FFC371)',
+      }).showToast()
+      return
+    }
+
+    setOpenSaveRuleDialog(true)
   }
 
   // Просмотр правила
@@ -971,22 +1281,43 @@ const EditorHandle = () => {
           >
             История изменений
           </Button>
-          <Button
-            variant="outlined"
-            onClick={() => setOpenRestoreDialog(true)}
-          >
-            Восстановить из снапшота
-          </Button>
           {isAdmin && (
+            <>
+              <Button
+                variant="outlined"
+                onClick={() => setOpenRestoreDialog(true)}
+              >
+                Восстановить из снапшота
+              </Button>
+              <Button
+                variant="outlined"
+                onClick={() => {
+                  loadAllUsers()
+                  loadApprovalUsers()
+                  setOpenApprovalUsersDialog(true)
+                }}
+              >
+                Управление пользователями подтверждения
+              </Button>
+              <Button
+                variant="outlined"
+                onClick={handleOpenPermissionsDialog}
+              >
+                Управление правами доступа
+              </Button>
+            </>
+          )}
+          {canEdit() && (
             <Button
               variant="outlined"
               onClick={() => {
-                loadAllUsers()
-                loadApprovalUsers()
-                setOpenApprovalUsersDialog(true)
+                loadCategories()
+                setSelectedParameterForCategories('')
+                setParameterValuesWithCategories([])
+                setOpenCategoriesDialog(true)
               }}
             >
-              Управление пользователями подтверждения
+              Управление категориями
             </Button>
           )}
         </Box>
@@ -1040,19 +1371,21 @@ const EditorHandle = () => {
         >
           Экспорт в Excel
         </Button>
-        <Button
-          variant="outlined"
-          component="label"
-          startIcon={<FileUploadIcon />}
-        >
-          Импорт из Excel
-          <input
-            type="file"
-            hidden
-            accept=".xlsx,.xls"
-            onChange={handleImportExcel}
-          />
-        </Button>
+        {canEdit() && (
+          <Button
+            variant="outlined"
+            component="label"
+            startIcon={<FileUploadIcon />}
+          >
+            Импорт из Excel
+            <input
+              type="file"
+              hidden
+              accept=".xlsx,.xls"
+              onChange={handleImportExcel}
+            />
+          </Button>
+        )}
       </Box>
 
       <Grid container spacing={2}>
@@ -1075,19 +1408,21 @@ const EditorHandle = () => {
                   ))}
                 </Select>
               </FormControl>
-              <Button
-                variant="outlined"
-                size="small"
-                startIcon={<AddIcon />}
-                onClick={() => {
-                  setLeafTypeForm({ name: '', description: '' })
-                  setEditingItem(null)
-                  setOpenLeafTypeDialog(true)
-                }}
-              >
-                Добавить
-              </Button>
-              {selectedLeafType && (
+              {canEdit() && (
+                <Button
+                  variant="outlined"
+                  size="small"
+                  startIcon={<AddIcon />}
+                  onClick={() => {
+                    setLeafTypeForm({ name: '', description: '' })
+                    setEditingItem(null)
+                    setOpenLeafTypeDialog(true)
+                  }}
+                >
+                  Добавить
+                </Button>
+              )}
+              {selectedLeafType && canEdit() && (
                 <IconButton
                   size="small"
                   color="error"
@@ -1110,41 +1445,44 @@ const EditorHandle = () => {
                     <Typography variant="body2" fontWeight={500}>
                       {param.name}
                     </Typography>
-                    <Box>
-                      <IconButton
-                        size="small"
-                        onClick={() => {
-                          setEditingParameterId(param.id)
-                          setParameterValueForm({ value: '', display_order: 0 })
-                          setOpenParameterValueDialog(true)
-                        }}
-                        title="Добавить значение"
-                      >
-                        <AddIcon fontSize="small" />
-                      </IconButton>
-                      <IconButton
-                        size="small"
-                        onClick={() => {
-                          setEditingItem(param)
-                          setParameterForm({
-                            name: param.name,
-                            description: param.description || '',
-                            is_multiple: param.is_multiple || false,
-                          })
-                          setOpenParameterDialog(true)
-                        }}
-                        title="Редактировать"
-                      >
-                        <EditIcon fontSize="small" />
-                      </IconButton>
-                      <IconButton
-                        size="small"
-                        onClick={() => handleDeleteParameter(param.id)}
-                        title="Удалить"
-                      >
-                        <DeleteIcon fontSize="small" />
-                      </IconButton>
-                    </Box>
+                    {canEdit() && (
+                      <Box>
+                        <IconButton
+                          size="small"
+                          onClick={() => {
+                            setEditingParameterId(param.id)
+                            setParameterValueForm({ value: '', display_order: 0 })
+                            setOpenParameterValueDialog(true)
+                          }}
+                          title="Добавить значение"
+                        >
+                          <AddIcon fontSize="small" />
+                        </IconButton>
+                        <IconButton
+                          size="small"
+                          onClick={() => {
+                            setEditingItem(param)
+                            setParameterForm({
+                              name: param.name,
+                              description: param.description || '',
+                              is_multiple: param.is_multiple || false,
+                              use_categories: param.use_categories || false
+                            })
+                            setOpenParameterDialog(true)
+                          }}
+                          title="Редактировать"
+                        >
+                          <EditIcon fontSize="small" />
+                        </IconButton>
+                        <IconButton
+                          size="small"
+                          onClick={() => handleDeleteParameter(param.id)}
+                          title="Удалить"
+                        >
+                          <DeleteIcon fontSize="small" />
+                        </IconButton>
+                      </Box>
+                    )}
                   </Box>
                   
                   <FormControl fullWidth size="small">
@@ -1194,14 +1532,36 @@ const EditorHandle = () => {
                   
                   {/* Компактный список значений */}
                   {param.values.length > 0 && (
-                    <Box sx={{ mt: 0.5, display: 'flex', flexWrap: 'wrap', gap: 0.5 }}>
+                    <Box 
+                      sx={{ 
+                        mt: 0.5, 
+                        display: 'flex', 
+                        gap: 0.5,
+                        overflowX: 'auto',
+                        overflowY: 'hidden',
+                        '&::-webkit-scrollbar': {
+                          height: '6px'
+                        },
+                        '&::-webkit-scrollbar-track': {
+                          backgroundColor: 'rgba(0,0,0,0.1)',
+                          borderRadius: '3px'
+                        },
+                        '&::-webkit-scrollbar-thumb': {
+                          backgroundColor: 'rgba(0,0,0,0.3)',
+                          borderRadius: '3px',
+                          '&:hover': {
+                            backgroundColor: 'rgba(0,0,0,0.5)'
+                          }
+                        }
+                      }}
+                    >
                       {param.values.map((value) => (
                         <Chip
                           key={value.id}
                           label={value.value}
                           size="small"
-                          onDelete={() => handleDeleteParameterValue(value.id)}
-                          sx={{ fontSize: '0.7rem', height: '20px' }}
+                          onDelete={canEdit() ? () => handleDeleteParameterValue(value.id) : undefined}
+                          sx={{ fontSize: '0.7rem', height: '20px', flexShrink: 0 }}
                         />
                       ))}
                     </Box>
@@ -1210,20 +1570,22 @@ const EditorHandle = () => {
               ))}
             </Box>
 
-            <Button
-              variant="outlined"
-              size="small"
-              startIcon={<AddIcon />}
-              onClick={() => {
-                setParameterForm({ name: '', description: '', is_multiple: true })
-                setEditingItem(null)
-                setOpenParameterDialog(true)
-              }}
-              sx={{ mt: 1.5 }}
-              fullWidth
-            >
-              Добавить параметр
-            </Button>
+            {canEdit() && (
+              <Button
+                variant="outlined"
+                size="small"
+                startIcon={<AddIcon />}
+                onClick={() => {
+                  setParameterForm({ name: '', description: '', is_multiple: true, use_categories: false })
+                  setEditingItem(null)
+                  setOpenParameterDialog(true)
+                }}
+                sx={{ mt: 1.5 }}
+                fullWidth
+              >
+                Добавить параметр
+              </Button>
+            )}
 
             {/* Кнопка подбора ручек */}
             <Button
@@ -1232,6 +1594,16 @@ const EditorHandle = () => {
               sx={{ mt: 2, width: '100%' }}
             >
               Подобрать ручки
+            </Button>
+
+            {/* Кнопка поиска непокрытых комбинаций */}
+            <Button
+              variant="outlined"
+              onClick={findUncoveredCombinations}
+              disabled={!selectedLeafType || loadingUncovered}
+              sx={{ mt: 2, width: '100%' }}
+            >
+              {loadingUncovered ? 'Поиск...' : 'Найти непокрытые комбинации'}
             </Button>
           </Paper>
 
@@ -1328,14 +1700,16 @@ const EditorHandle = () => {
               onChange={(e) => setRuleForm({ ...ruleForm, quantity: parseInt(e.target.value) || 1 })}
               sx={{ mb: 2 }}
             />
-            <Button
-              variant="contained"
-              fullWidth
-              startIcon={<SaveIcon />}
-              onClick={handleSaveRule}
-            >
-              Сохранить правило
-            </Button>
+            {canEdit() && (
+              <Button
+                variant="contained"
+                fullWidth
+                startIcon={<SaveIcon />}
+                onClick={handleSaveRule}
+              >
+                Сохранить правило
+              </Button>
+            )}
           </Paper>
 
           {/* Список правил - дерево */}
@@ -1494,23 +1868,27 @@ const EditorHandle = () => {
                                           >
                                             <VisibilityIcon sx={{ fontSize: 14 }} />
                                           </IconButton>
-                                          <IconButton
-                                            size="small"
-                                            onClick={() => handleEditRule(rule.id)}
-                                            title="Редактировать"
-                                            sx={{ p: 0.25 }}
-                                          >
-                                            <EditIcon sx={{ fontSize: 14 }} />
-                                          </IconButton>
-                                          <IconButton
-                                            size="small"
-                                            onClick={() => handleDeleteRule(rule.id)}
-                                            title="Удалить"
-                                            color="error"
-                                            sx={{ p: 0.25 }}
-                                          >
-                                            <DeleteIcon sx={{ fontSize: 14 }} />
-                                          </IconButton>
+                                          {canEdit() && (
+                                            <>
+                                              <IconButton
+                                                size="small"
+                                                onClick={() => handleEditRule(rule.id)}
+                                                title="Редактировать"
+                                                sx={{ p: 0.25 }}
+                                              >
+                                                <EditIcon sx={{ fontSize: 14 }} />
+                                              </IconButton>
+                                              <IconButton
+                                                size="small"
+                                                onClick={() => handleDeleteRule(rule.id)}
+                                                title="Удалить"
+                                                color="error"
+                                                sx={{ p: 0.25 }}
+                                              >
+                                                <DeleteIcon sx={{ fontSize: 14 }} />
+                                              </IconButton>
+                                            </>
+                                          )}
                                         </Box>
                                       </Box>
                                     )
@@ -1554,46 +1932,52 @@ const EditorHandle = () => {
                         {handle.name}
                       </TableCell>
                       <TableCell>
-                        <IconButton
-                          size="small"
-                          onClick={() => {
-                            setEditingItem(handle)
-                            setHandleForm({
-                              article: handle.article,
-                              name: handle.name,
-                              description: handle.description || '',
-                            })
-                            setOpenHandleDialog(true)
-                          }}
-                        >
-                          <EditIcon fontSize="small" />
-                        </IconButton>
-                        <IconButton
-                          size="small"
-                          onClick={() => handleDeleteHandle(handle.id)}
-                        >
-                          <DeleteIcon fontSize="small" />
-                        </IconButton>
+                        {canEdit() && (
+                          <>
+                            <IconButton
+                              size="small"
+                              onClick={() => {
+                                setEditingItem(handle)
+                                setHandleForm({
+                                  article: handle.article,
+                                  name: handle.name,
+                                  description: handle.description || '',
+                                })
+                                setOpenHandleDialog(true)
+                              }}
+                            >
+                              <EditIcon fontSize="small" />
+                            </IconButton>
+                            <IconButton
+                              size="small"
+                              onClick={() => handleDeleteHandle(handle.id)}
+                            >
+                              <DeleteIcon fontSize="small" />
+                            </IconButton>
+                          </>
+                        )}
                       </TableCell>
                     </TableRow>
                   ))}
                 </TableBody>
               </Table>
             </TableContainer>
-            <Button
-              variant="outlined"
-              size="small"
-              startIcon={<AddIcon />}
-              onClick={() => {
-                setHandleForm({ article: '', name: '', description: '' })
-                setEditingItem(null)
-                setOpenHandleDialog(true)
-              }}
-              sx={{ mt: 1 }}
-              fullWidth
-            >
-              Добавить ручку
-            </Button>
+            {canEdit() && (
+              <Button
+                variant="outlined"
+                size="small"
+                startIcon={<AddIcon />}
+                onClick={() => {
+                  setHandleForm({ article: '', name: '', description: '' })
+                  setEditingItem(null)
+                  setOpenHandleDialog(true)
+                }}
+                sx={{ mt: 1 }}
+                fullWidth
+              >
+                Добавить ручку
+              </Button>
+            )}
           </Paper>
         </Grid>
       </Grid>
@@ -1627,6 +2011,15 @@ const EditorHandle = () => {
               />
             }
             label="Множественный выбор значений (ИЛИ)"
+          />
+          <FormControlLabel
+            control={
+              <Checkbox
+                checked={parameterForm.use_categories}
+                onChange={(e) => setParameterForm({ ...parameterForm, use_categories: e.target.checked })}
+              />
+            }
+            label="Использовать категории для группировки значений (например, для цветов)"
           />
         </DialogContent>
         <DialogActions>
@@ -2134,6 +2527,396 @@ const EditorHandle = () => {
             <Button onClick={() => {
               setOpenApprovalUsersDialog(false)
               setSearchUser('')
+            }}>Закрыть</Button>
+          </DialogActions>
+        </Dialog>
+      )}
+
+      {/* Диалог непокрытых комбинаций */}
+      <Dialog
+        open={openUncoveredDialog}
+        onClose={() => setOpenUncoveredDialog(false)}
+        maxWidth="lg"
+        fullWidth
+      >
+        <DialogTitle>
+          Непокрытые комбинации параметров
+        </DialogTitle>
+        <DialogContent>
+          {uncoveredCombinations && (
+            <>
+              <Box sx={{ mb: 2 }}>
+                <Typography variant="body1" gutterBottom>
+                  <strong>Статистика:</strong>
+                </Typography>
+                <Typography variant="body2">
+                  Всего комбинаций: {uncoveredCombinations.total_combinations}
+                </Typography>
+                <Typography variant="body2" color="success.main">
+                  Покрыто правилами: {uncoveredCombinations.covered_combinations}
+                </Typography>
+                <Typography variant="body2" color="error.main">
+                  Непокрыто: {uncoveredCombinations.uncovered_count}
+                </Typography>
+                {uncoveredCombinations.parameters_checked && (
+                  <Typography variant="body2" sx={{ mt: 1 }}>
+                    <strong>Проверяемые параметры:</strong>{' '}
+                    {uncoveredCombinations.parameters_checked.map(p => p.name).join(', ')}
+                  </Typography>
+                )}
+              </Box>
+              {uncoveredCombinations.uncovered_count > 0 ? (
+                <TableContainer>
+                  <Table size="small">
+                    <TableHead>
+                      <TableRow>
+                        <TableCell><strong>Комбинация параметров</strong></TableCell>
+                      </TableRow>
+                    </TableHead>
+                    <TableBody>
+                      {uncoveredCombinations.uncovered.slice(0, 100).map((item, index) => (
+                        <TableRow key={index}>
+                          <TableCell>
+                            {Object.entries(item.combination).map(([paramName, value]) => (
+                              <Chip
+                                key={paramName}
+                                label={`${paramName}: ${value}`}
+                                size="small"
+                                sx={{ mr: 0.5, mb: 0.5 }}
+                              />
+                            ))}
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                      {uncoveredCombinations.uncovered.length > 100 && (
+                        <TableRow>
+                          <TableCell colSpan={1} align="center">
+                            <Typography variant="caption" color="text.secondary">
+                              Показано первые 100 из {uncoveredCombinations.uncovered.length} комбинаций
+                            </Typography>
+                          </TableCell>
+                        </TableRow>
+                      )}
+                    </TableBody>
+                  </Table>
+                </TableContainer>
+              ) : (
+                <Alert severity="success">
+                  Все комбинации параметров покрыты правилами!
+                </Alert>
+              )}
+            </>
+          )}
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setOpenUncoveredDialog(false)}>Закрыть</Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* Диалог управления категориями */}
+      <Dialog
+        open={openCategoriesDialog}
+        onClose={() => setOpenCategoriesDialog(false)}
+        maxWidth="md"
+        fullWidth
+      >
+        <DialogTitle>
+          Управление категориями значений параметров
+        </DialogTitle>
+        <DialogContent>
+          <Box sx={{ mb: 3 }}>
+            <Typography variant="h6" gutterBottom>
+              Создать новую категорию
+            </Typography>
+            <TextField
+              label="Название категории"
+              value={categoryForm.name}
+              onChange={(e) => setCategoryForm({ ...categoryForm, name: e.target.value })}
+              fullWidth
+              sx={{ mb: 2 }}
+            />
+            <TextField
+              label="Описание (необязательно)"
+              value={categoryForm.description}
+              onChange={(e) => setCategoryForm({ ...categoryForm, description: e.target.value })}
+              fullWidth
+              multiline
+              rows={2}
+              sx={{ mb: 2 }}
+            />
+            <Button
+              variant="contained"
+              onClick={handleCreateCategory}
+              disabled={!categoryForm.name}
+              startIcon={<AddIcon />}
+            >
+              Создать категорию
+            </Button>
+          </Box>
+
+          <Typography variant="h6" gutterBottom>
+            Существующие категории
+          </Typography>
+          <TableContainer>
+            <Table size="small">
+              <TableHead>
+                <TableRow>
+                  <TableCell><strong>Название</strong></TableCell>
+                  <TableCell><strong>Описание</strong></TableCell>
+                  <TableCell><strong>Действия</strong></TableCell>
+                </TableRow>
+              </TableHead>
+              <TableBody>
+                {categories.map((category) => (
+                  <TableRow key={category.id}>
+                    <TableCell>{category.name}</TableCell>
+                    <TableCell>{category.description || '-'}</TableCell>
+                    <TableCell>
+                      <IconButton
+                        size="small"
+                        color="error"
+                        onClick={() => handleDeleteCategory(category.id)}
+                      >
+                        <DeleteIcon fontSize="small" />
+                      </IconButton>
+                    </TableCell>
+                  </TableRow>
+                ))}
+                {categories.length === 0 && (
+                  <TableRow>
+                    <TableCell colSpan={3} align="center">
+                      Нет созданных категорий
+                    </TableCell>
+                  </TableRow>
+                )}
+              </TableBody>
+            </Table>
+          </TableContainer>
+
+          {/* Назначение категорий значениям параметров */}
+          <Box sx={{ mt: 4, mb: 2 }}>
+            <Typography variant="h6" gutterBottom>
+              Назначение категорий значениям параметров
+            </Typography>
+            <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+              Выберите параметр, для которого хотите назначить категории значениям. 
+              Это работает только для параметров, у которых включена опция &quot;Использовать категории&quot;.
+            </Typography>
+            
+            <FormControl fullWidth sx={{ mb: 2 }}>
+              <InputLabel>Выберите параметр</InputLabel>
+              <Select
+                value={selectedParameterForCategories}
+                label="Выберите параметр"
+                onChange={(e) => {
+                  setSelectedParameterForCategories(e.target.value)
+                  loadParameterValuesForCategories(e.target.value)
+                }}
+              >
+                {editorData.parameters
+                  .filter(param => param.use_categories)
+                  .map((param) => (
+                    <MenuItem key={param.id} value={param.id.toString()}>
+                      {param.name}
+                    </MenuItem>
+                  ))}
+              </Select>
+            </FormControl>
+
+            {selectedParameterForCategories && parameterValuesWithCategories.length > 0 && (
+              <TableContainer>
+                <Table size="small">
+                  <TableHead>
+                    <TableRow>
+                      <TableCell><strong>Значение параметра</strong></TableCell>
+                      <TableCell><strong>Текущая категория</strong></TableCell>
+                      <TableCell><strong>Назначить категорию</strong></TableCell>
+                    </TableRow>
+                  </TableHead>
+                  <TableBody>
+                    {parameterValuesWithCategories.map((value) => (
+                      <TableRow key={value.id}>
+                        <TableCell>{value.value}</TableCell>
+                        <TableCell>
+                          {value.category_name ? (
+                            <Chip label={value.category_name} size="small" color="primary" />
+                          ) : (
+                            <Typography variant="caption" color="text.secondary">
+                              Не назначена
+                            </Typography>
+                          )}
+                        </TableCell>
+                        <TableCell>
+                          <Select
+                            value={value.category_id || ''}
+                            onChange={(e) => handleAssignCategoryToValue(value.id, e.target.value || null)}
+                            size="small"
+                            sx={{ minWidth: 200 }}
+                            displayEmpty
+                          >
+                            <MenuItem value="">
+                              <em>Не назначена</em>
+                            </MenuItem>
+                            {categories.map((category) => (
+                              <MenuItem key={category.id} value={category.id}>
+                                {category.name}
+                              </MenuItem>
+                            ))}
+                          </Select>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </TableContainer>
+            )}
+
+            {selectedParameterForCategories && parameterValuesWithCategories.length === 0 && (
+              <Alert severity="info" sx={{ mt: 2 }}>
+                У выбранного параметра нет значений. Добавьте значения параметра в основном интерфейсе.
+              </Alert>
+            )}
+
+            {!selectedParameterForCategories && (
+              <Alert severity="info" sx={{ mt: 2 }}>
+                Выберите параметр из списка выше. Будут показаны только параметры с включенной опцией &quot;Использовать категории&quot;.
+              </Alert>
+            )}
+          </Box>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => {
+            setOpenCategoriesDialog(false)
+            setSelectedParameterForCategories('')
+            setParameterValuesWithCategories([])
+          }}>Закрыть</Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* Диалог подтверждения сохранения правила */}
+      <ConfirmationDialog
+        open={openSaveRuleDialog}
+        onClose={() => setOpenSaveRuleDialog(false)}
+        onConfirm={() => {
+          setOpenSaveRuleDialog(false)
+          performSaveRule()
+        }}
+        title="Подтверждение сохранения правила"
+        message={getRuleConfirmationMessage()}
+        btn1="Отмена"
+        btn2="Сохранить"
+      />
+
+      {/* Диалог подтверждения эталонности */}
+      <ConfirmationDialog
+        open={openApproveDialog}
+        onClose={() => setOpenApproveDialog(false)}
+        onConfirm={() => {
+          setOpenApproveDialog(false)
+          performApprove()
+        }}
+        title="Подтверждение эталонности"
+        message="Вы уверены, что хотите подтвердить эталонность данных?"
+        btn1="Отмена"
+        btn2="Подтвердить"
+      />
+
+      {/* Диалог управления правами доступа (только для администратора) */}
+      {isAdmin && (
+        <Dialog
+          open={openPermissionsDialog}
+          onClose={() => {
+            setOpenPermissionsDialog(false)
+            setSelectedUserForPermissions('')
+          }}
+          maxWidth="md"
+          fullWidth
+        >
+          <DialogTitle>Управление правами доступа к редактору ручек</DialogTitle>
+          <DialogContent>
+            <Typography variant="body2" sx={{ mb: 2, color: 'text.secondary' }}>
+              Выдайте права доступа конкретным пользователям для редактирования данных в редакторе ручек.
+              Пользователи с правами могут добавлять, редактировать и удалять данные (кроме управления пользователями и восстановления из снапшота).
+            </Typography>
+
+            {/* Форма для выдачи прав */}
+            <Box sx={{ mb: 3, p: 2, border: '1px solid', borderColor: 'divider', borderRadius: 1 }}>
+              <Typography variant="subtitle1" gutterBottom>
+                Выдать права пользователю:
+              </Typography>
+              <FormControl fullWidth sx={{ mb: 2 }}>
+                <InputLabel>Выберите пользователя</InputLabel>
+                <Select
+                  value={selectedUserForPermissions}
+                  label="Выберите пользователя"
+                  onChange={(e) => {
+                    setSelectedUserForPermissions(e.target.value)
+                  }}
+                >
+                  {allUsers.map((user) => (
+                    <MenuItem key={user.id} value={user.id.toString()}>
+                      {formatUserFullName(user)}
+                    </MenuItem>
+                  ))}
+                </Select>
+              </FormControl>
+
+              <Button
+                variant="contained"
+                onClick={handleSavePermissions}
+                disabled={!selectedUserForPermissions}
+                sx={{ mt: 2 }}
+                fullWidth
+              >
+                Выдать права доступа
+              </Button>
+            </Box>
+
+            {/* Список существующих прав */}
+            <Typography variant="subtitle1" gutterBottom>
+              Пользователи с правами доступа:
+            </Typography>
+            <TableContainer sx={{ maxHeight: 400, overflowY: 'auto' }}>
+              <Table size="small">
+                <TableHead>
+                  <TableRow>
+                    <TableCell><strong>Пользователь</strong></TableCell>
+                    <TableCell><strong>Роль</strong></TableCell>
+                    <TableCell><strong>Действия</strong></TableCell>
+                  </TableRow>
+                </TableHead>
+                <TableBody>
+                  {allPermissions.filter(p => p.can_edit).map((permission) => (
+                    <TableRow key={permission.id}>
+                      <TableCell>{formatUserFullName(permission)}</TableCell>
+                      <TableCell>{permission.role_name || '-'}</TableCell>
+                      <TableCell>
+                        <IconButton
+                          size="small"
+                          color="error"
+                          onClick={() => handleDeletePermissions(permission.id)}
+                          title="Удалить права"
+                        >
+                          <DeleteIcon fontSize="small" />
+                        </IconButton>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                  {allPermissions.filter(p => p.can_edit).length === 0 && (
+                    <TableRow>
+                      <TableCell colSpan={3} align="center">
+                        Нет пользователей с правами доступа
+                      </TableCell>
+                    </TableRow>
+                  )}
+                </TableBody>
+              </Table>
+            </TableContainer>
+          </DialogContent>
+          <DialogActions>
+            <Button onClick={() => {
+              setOpenPermissionsDialog(false)
+              setSelectedUserForPermissions('')
             }}>Закрыть</Button>
           </DialogActions>
         </Dialog>

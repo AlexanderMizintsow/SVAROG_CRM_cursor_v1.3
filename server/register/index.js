@@ -167,6 +167,11 @@ const {
   createParameterValue,
   updateParameterValue,
   deleteParameterValue,
+  getParameterValueCategories,
+  createParameterValueCategory,
+  updateParameterValueCategory,
+  deleteParameterValueCategory,
+  assignCategoryToValue,
   getHandles,
   createHandle,
   updateHandle,
@@ -177,6 +182,7 @@ const {
   updateHandleRule,
   deleteHandleRule,
   findHandlesByParameters,
+  findUncoveredCombinations,
   exportRules,
   importRules,
   getEditorData,
@@ -191,6 +197,10 @@ const {
   getSnapshots,
   restoreFromSnapshot,
   deleteSnapshot,
+  getEditorPermissions,
+  getAllEditorPermissions,
+  setEditorPermissions,
+  deleteEditorPermissions
 } = require('./handleController/handleController')
 
 const app = express()
@@ -712,6 +722,13 @@ app.post('/api/editor-handle/parameters/:parameterId/values', createParameterVal
 app.put('/api/editor-handle/parameter-values/:id', updateParameterValue(dbPool))
 app.delete('/api/editor-handle/parameter-values/:id', deleteParameterValue(dbPool))
 
+// Категории значений параметров
+app.get('/api/editor-handle/categories', getParameterValueCategories(dbPool))
+app.post('/api/editor-handle/categories', createParameterValueCategory(dbPool))
+app.put('/api/editor-handle/categories/:id', updateParameterValueCategory(dbPool))
+app.delete('/api/editor-handle/categories/:id', deleteParameterValueCategory(dbPool))
+app.put('/api/editor-handle/parameter-values/:valueId/category', assignCategoryToValue(dbPool))
+
 // Ручки
 app.get('/api/editor-handle/handles', getHandles(dbPool))
 app.post('/api/editor-handle/handles', createHandle(dbPool))
@@ -727,6 +744,7 @@ app.delete('/api/editor-handle/rules/:id', deleteHandleRule(dbPool))
 
 // Подбор ручек по параметрам
 app.post('/api/editor-handle/find-handles', findHandlesByParameters(dbPool))
+app.post('/api/editor-handle/find-uncovered', findUncoveredCombinations(dbPool))
 
 // Экспорт/Импорт
 app.get('/api/editor-handle/export', exportRules(dbPool))
@@ -748,6 +766,12 @@ app.post('/api/editor-handle/snapshots', createSnapshot(dbPool))
 app.get('/api/editor-handle/snapshots', getSnapshots(dbPool))
 app.post('/api/editor-handle/restore', restoreFromSnapshot(dbPool))
 app.delete('/api/editor-handle/snapshots/:id', deleteSnapshot(dbPool))
+
+// Права доступа к редактору ручек
+app.get('/api/editor-handle/permissions', getEditorPermissions(dbPool))
+app.get('/api/editor-handle/permissions/all', getAllEditorPermissions(dbPool))
+app.post('/api/editor-handle/permissions', setEditorPermissions(dbPool))
+app.delete('/api/editor-handle/permissions/:id', deleteEditorPermissions(dbPool))
 
 // ==================== КОНЕЦ EDITOR HANDLE ====================
 

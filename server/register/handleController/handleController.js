@@ -156,14 +156,14 @@ const getParameters = (dbPool) => async (req, res) => {
 
 // Создание параметра
 const createParameter = (dbPool) => async (req, res) => {
-  const { name, description, is_multiple, user_id } = req.body
+  const { name, description, is_multiple, use_categories, user_id } = req.body
   const client = await dbPool.connect()
   try {
     await client.query('BEGIN')
     
     const result = await client.query(
-      'INSERT INTO parameters (name, description, is_multiple) VALUES ($1, $2, $3) RETURNING *',
-      [name, description || null, is_multiple || false]
+      'INSERT INTO parameters (name, description, is_multiple, use_categories) VALUES ($1, $2, $3, $4) RETURNING *',
+      [name, description || null, is_multiple || false, use_categories || false]
     )
     
     // Логируем создание
@@ -193,7 +193,7 @@ const createParameter = (dbPool) => async (req, res) => {
 // Обновление параметра
 const updateParameter = (dbPool) => async (req, res) => {
   const { id } = req.params
-  const { name, description, is_multiple, user_id } = req.body
+  const { name, description, is_multiple, use_categories, user_id } = req.body
   const client = await dbPool.connect()
   try {
     await client.query('BEGIN')
@@ -205,8 +205,8 @@ const updateParameter = (dbPool) => async (req, res) => {
     }
     
     const result = await client.query(
-      'UPDATE parameters SET name = $1, description = $2, is_multiple = $3 WHERE id = $4 RETURNING *',
-      [name, description || null, is_multiple || false, id]
+      'UPDATE parameters SET name = $1, description = $2, is_multiple = $3, use_categories = $4 WHERE id = $5 RETURNING *',
+      [name, description || null, is_multiple || false, use_categories || false, id]
     )
     
     // Логируем изменение
@@ -270,10 +270,16 @@ const deleteParameter = (dbPool) => async (req, res) => {
 const getParameterValues = (dbPool) => async (req, res) => {
   const { parameterId } = req.params
   try {
-    const result = await dbPool.query(
-      'SELECT * FROM parameter_values WHERE parameter_id = $1 ORDER BY display_order, value',
-      [parameterId]
-    )
+    const result = await dbPool.query(`
+      SELECT 
+        pv.*,
+        pvc.id as category_id,
+        pvc.name as category_name
+      FROM parameter_values pv
+      LEFT JOIN parameter_value_categories pvc ON pv.category_id = pvc.id
+      WHERE pv.parameter_id = $1 
+      ORDER BY pv.display_order, pv.value
+    `, [parameterId])
     res.json(result.rows)
   } catch (err) {
     console.error('Ошибка при получении значений параметра:', err)
@@ -2079,6 +2085,518 @@ const getEditorData = (dbPool) => async (req, res) => {
   }
 }
 
+// ==================== КАТЕГОРИИ ЗНАЧЕНИЙ ПАРАМЕТРОВ ====================
+
+// Получение всех категорий
+const getParameterValueCategories = (dbPool) => async (req, res) => {
+  try {
+    const result = await dbPool.query(
+      'SELECT * FROM parameter_value_categories ORDER BY name'
+    )
+    res.json(result.rows)
+  } catch (err) {
+    console.error('Ошибка при получении категорий:', err)
+    res.status(500).json({ error: 'Ошибка при получении категорий' })
+  }
+}
+
+// Создание категории
+const createParameterValueCategory = (dbPool) => async (req, res) => {
+  const { name, description } = req.body
+  try {
+    const result = await dbPool.query(
+      'INSERT INTO parameter_value_categories (name, description) VALUES ($1, $2) RETURNING *',
+      [name, description || null]
+    )
+    res.json(result.rows[0])
+  } catch (err) {
+    console.error('Ошибка при создании категории:', err)
+    if (err.code === '23505') {
+      res.status(400).json({ error: 'Категория с таким именем уже существует' })
+    } else {
+      res.status(500).json({ error: 'Ошибка при создании категории' })
+    }
+  }
+}
+
+// Обновление категории
+const updateParameterValueCategory = (dbPool) => async (req, res) => {
+  const { id } = req.params
+  const { name, description } = req.body
+  try {
+    const result = await dbPool.query(
+      'UPDATE parameter_value_categories SET name = $1, description = $2 WHERE id = $3 RETURNING *',
+      [name, description || null, id]
+    )
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: 'Категория не найдена' })
+    }
+    res.json(result.rows[0])
+  } catch (err) {
+    console.error('Ошибка при обновлении категории:', err)
+    if (err.code === '23505') {
+      res.status(400).json({ error: 'Категория с таким именем уже существует' })
+    } else {
+      res.status(500).json({ error: 'Ошибка при обновлении категории' })
+    }
+  }
+}
+
+// Удаление категории
+const deleteParameterValueCategory = (dbPool) => async (req, res) => {
+  const { id } = req.params
+  try {
+    const result = await dbPool.query(
+      'DELETE FROM parameter_value_categories WHERE id = $1 RETURNING *',
+      [id]
+    )
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: 'Категория не найдена' })
+    }
+    res.json({ message: 'Категория успешно удалена' })
+  } catch (err) {
+    console.error('Ошибка при удалении категории:', err)
+    res.status(500).json({ error: 'Ошибка при удалении категории' })
+  }
+}
+
+// Назначение категории значению параметра
+const assignCategoryToValue = (dbPool) => async (req, res) => {
+  const { valueId } = req.params
+  const { category_id } = req.body
+  try {
+    const result = await dbPool.query(
+      'UPDATE parameter_values SET category_id = $1 WHERE id = $2 RETURNING *',
+      [category_id || null, valueId]
+    )
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: 'Значение параметра не найдено' })
+    }
+    res.json(result.rows[0])
+  } catch (err) {
+    console.error('Ошибка при назначении категории:', err)
+    res.status(500).json({ error: 'Ошибка при назначении категории' })
+  }
+}
+
+// Поиск непокрытых комбинаций параметров
+// Находит комбинации параметров, для которых нет подходящих правил для данного типа створки
+const findUncoveredCombinations = (dbPool) => async (req, res) => {
+  const { leaf_type_id, parameter_ids } = req.body // parameter_ids - опционально, для фильтрации параметров
+  
+  try {
+    // Получаем все параметры (или только указанные) с информацией о категориях
+    let paramsQuery = "SELECT id, name, use_categories FROM parameters WHERE name != 'Тип створки'"
+    let paramsQueryParams = []
+    
+    if (parameter_ids && parameter_ids.length > 0) {
+      paramsQuery += " AND id = ANY($1)"
+      paramsQueryParams.push(parameter_ids)
+    }
+    
+    const paramsResult = await dbPool.query(
+      paramsQuery, 
+      paramsQueryParams.length > 0 ? paramsQueryParams : null
+    )
+    const parameters = paramsResult.rows
+    
+    if (parameters.length === 0) {
+      return res.json({ 
+        uncovered: [],
+        total_combinations: 0,
+        covered_combinations: 0,
+        uncovered_count: 0,
+        message: 'Нет параметров для проверки'
+      })
+    }
+    
+    // Получаем все значения для каждого параметра
+    // Если параметр использует категории, группируем по категориям
+    const paramValuesMap = {}
+    for (const param of parameters) {
+      if (param.use_categories) {
+        // Для параметров с категориями - получаем уникальные категории
+        const categoriesResult = await dbPool.query(`
+          SELECT DISTINCT 
+            pvc.id,
+            pvc.name,
+            pvc.description
+          FROM parameter_values pv
+          INNER JOIN parameter_value_categories pvc ON pv.category_id = pvc.id
+          WHERE pv.parameter_id = $1 AND pv.category_id IS NOT NULL
+          ORDER BY pvc.name
+        `, [param.id])
+        
+        // Если есть значения без категории, добавляем их отдельно
+        const uncategorizedResult = await dbPool.query(`
+          SELECT id, value, category_id
+          FROM parameter_values
+          WHERE parameter_id = $1 AND category_id IS NULL
+          ORDER BY display_order, value
+        `, [param.id])
+        
+        // Создаем "псевдо-значения" из категорий для генерации комбинаций
+        paramValuesMap[param.id] = {
+          param: param,
+          useCategories: true,
+          categories: categoriesResult.rows,
+          uncategorized: uncategorizedResult.rows,
+          values: [
+            ...categoriesResult.rows.map(cat => ({ 
+              id: `cat_${cat.id}`, 
+              value: cat.name, 
+              isCategory: true, 
+              categoryId: cat.id,
+              displayValue: cat.name
+            })),
+            ...uncategorizedResult.rows.map(val => ({ 
+              id: val.id, 
+              value: val.value, 
+              isCategory: false,
+              displayValue: val.value
+            }))
+          ]
+        }
+      } else {
+        // Для обычных параметров - получаем все значения
+        const valuesResult = await dbPool.query(`
+          SELECT id, value, category_id
+          FROM parameter_values 
+          WHERE parameter_id = $1 
+          ORDER BY display_order, value
+        `, [param.id])
+        paramValuesMap[param.id] = {
+          param: param,
+          useCategories: false,
+          values: valuesResult.rows.map(v => ({ ...v, displayValue: v.value }))
+        }
+      }
+    }
+    
+    // Получаем все правила для данного типа створки с их условиями
+    // Для параметров с категориями нужно также получить категории значений
+    const rulesResult = await dbPool.query(`
+      SELECT 
+        hr.id,
+        hr.handle_id,
+        h.article as handle_article,
+        h.name as handle_name,
+        COALESCE(
+          json_agg(
+            json_build_object(
+              'parameter_id', hrc.parameter_id,
+              'parameter_value_id', hrc.parameter_value_id,
+              'value_category_id', pv.category_id
+            )
+            ORDER BY hrc.parameter_id, hrc.parameter_value_id
+          ) FILTER (WHERE hrc.parameter_id IS NOT NULL),
+          '[]'::json
+        ) as conditions
+      FROM handle_rules hr
+      LEFT JOIN handles h ON hr.handle_id = h.id
+      LEFT JOIN handle_rule_conditions hrc ON hr.id = hrc.rule_id
+      LEFT JOIN parameter_values pv ON hrc.parameter_value_id = pv.id
+      WHERE hr.leaf_type_id = $1
+      GROUP BY hr.id, hr.handle_id, h.article, h.name
+    `, [leaf_type_id])
+    
+    const rules = rulesResult.rows.map(rule => ({
+      id: rule.id,
+      handle_id: rule.handle_id,
+      handle_article: rule.handle_article,
+      handle_name: rule.handle_name,
+      conditions: rule.conditions || []
+    }))
+    
+    // Функция для проверки, покрывает ли правило данную комбинацию
+    // Логика полностью соответствует findHandlesByParameters:
+    // - Если параметр в комбинации - проверяем, что в правиле есть подходящее условие (значение совпадает или NULL)
+    // - Если параметра нет в комбинации - проверяем, что в правиле НЕТ условий с конкретными значениями для этого параметра (NULL разрешены)
+    const isCombinationCovered = (combination, rules) => {
+      // combination: { parameter_id: value_id } - только выбранные параметры
+      // rules: массив правил с условиями
+      
+      for (const rule of rules) {
+        let ruleMatches = true
+        
+        // Группируем условия правила по параметрам
+        const conditionsByParam = {}
+        for (const condition of rule.conditions) {
+          const paramId = condition.parameter_id.toString()
+          if (!conditionsByParam[paramId]) {
+            conditionsByParam[paramId] = []
+          }
+          conditionsByParam[paramId].push(condition)
+        }
+        
+        // Шаг 1: Проверяем каждый параметр, который ЕСТЬ в комбинации
+        for (const [paramId, valueId] of Object.entries(combination)) {
+          const paramConditions = conditionsByParam[paramId] || []
+          
+          if (paramConditions.length === 0) {
+            // В правиле нет условий для этого параметра
+            // Это нормально - правило может подойти, если для других параметров условия выполняются
+            continue
+          }
+          
+          // Проверяем, есть ли хотя бы одно условие, которое подходит
+          const paramData = paramValuesMap[paramId]
+          const hasMatchingCondition = paramConditions.some(condition => {
+            if (condition.parameter_value_id === null) {
+              return true // NULL означает любое значение
+            }
+            
+            // Если параметр использует категории и valueId - это категория
+            if (paramData && paramData.useCategories && typeof valueId === 'string' && valueId.startsWith('cat_')) {
+              const categoryId = parseInt(valueId.replace('cat_', ''))
+              // Проверяем, совпадает ли категория значения в правиле с категорией в комбинации
+              return condition.value_category_id === categoryId
+            }
+            
+            // Обычное сравнение по ID значения
+            return condition.parameter_value_id === valueId
+          })
+          
+          if (!hasMatchingCondition) {
+            // Нет подходящего условия для этого параметра
+            ruleMatches = false
+            break
+          }
+        }
+        
+        // Шаг 2: Проверяем параметры, которых НЕТ в комбинации
+        // Если в правиле есть условие с конкретным значением для невыбранного параметра - правило не подходит
+        if (ruleMatches) {
+          for (const paramId in conditionsByParam) {
+            if (!combination.hasOwnProperty(paramId)) {
+              // В правиле есть условие для параметра, которого нет в комбинации
+              const paramConditions = conditionsByParam[paramId]
+              const hasSpecificCondition = paramConditions.some(c => c.parameter_value_id !== null)
+              
+              if (hasSpecificCondition) {
+                // И это конкретное значение (не NULL)
+                // Это означает, что правило требует конкретное значение для параметра, который не указан
+                // Поэтому правило не подходит (логика как в findHandlesByParameters)
+                ruleMatches = false
+                break
+              }
+              // Если условие NULL - это нормально, оно означает "любое значение"
+            }
+          }
+        }
+        
+        if (ruleMatches) {
+          return true
+        }
+      }
+      
+      return false
+    }
+    
+    // Генерируем все возможные комбинации (декартово произведение)
+    // Ограничиваем количество для производительности
+    const MAX_COMBINATIONS = 50000 // Максимум комбинаций для проверки
+    
+    const generateCombinations = (paramValuesMap) => {
+      const paramIds = Object.keys(paramValuesMap).map(id => parseInt(id))
+      const combinations = []
+      
+      // Рекурсивная функция для генерации комбинаций
+      const generate = (currentCombination, remainingParams) => {
+        if (combinations.length >= MAX_COMBINATIONS) {
+          return // Останавливаемся при достижении лимита
+        }
+        
+        if (remainingParams.length === 0) {
+          combinations.push({ ...currentCombination })
+          return
+        }
+        
+        const currentParamId = remainingParams[0]
+        const paramData = paramValuesMap[currentParamId]
+        
+        // Для каждого значения параметра создаем комбинацию
+        for (const value of paramData.values) {
+          generate(
+            { ...currentCombination, [currentParamId]: value.id },
+            remainingParams.slice(1)
+          )
+          
+          if (combinations.length >= MAX_COMBINATIONS) {
+            return
+          }
+        }
+      }
+      
+      generate({}, paramIds)
+      return combinations
+    }
+    
+    const allCombinations = generateCombinations(paramValuesMap)
+    
+    if (allCombinations.length === 0) {
+      return res.json({
+        uncovered: [],
+        total_combinations: 0,
+        covered_combinations: 0,
+        uncovered_count: 0,
+        message: 'Нет комбинаций для проверки (нет значений параметров)'
+      })
+    }
+    
+    // Проверяем каждую комбинацию
+    const uncovered = []
+    let coveredCount = 0
+    
+    for (const combination of allCombinations) {
+      if (!isCombinationCovered(combination, rules)) {
+        // Форматируем комбинацию для отображения
+        const combinationDisplay = {}
+        for (const [paramId, valueId] of Object.entries(combination)) {
+          const paramData = paramValuesMap[parseInt(paramId)]
+          if (paramData) {
+            const value = paramData.values.find(v => {
+              // Для категорий сравниваем строковое представление
+              if (typeof valueId === 'string' && valueId.startsWith('cat_')) {
+                return v.id === valueId
+              }
+              return v.id === valueId
+            })
+            if (value) {
+              combinationDisplay[paramData.param.name] = value.displayValue || value.value
+            }
+          }
+        }
+        uncovered.push({
+          combination: combinationDisplay,
+          raw_combination: combination
+        })
+      } else {
+        coveredCount++
+      }
+    }
+    
+    res.json({
+      uncovered: uncovered,
+      total_combinations: allCombinations.length,
+      covered_combinations: coveredCount,
+      uncovered_count: uncovered.length,
+      parameters_checked: parameters.map(p => ({ id: p.id, name: p.name })),
+      leaf_type_id: leaf_type_id,
+      message: uncovered.length === 0 
+        ? 'Все комбинации покрыты правилами' 
+        : `Найдено ${uncovered.length} непокрытых комбинаций из ${allCombinations.length}`
+    })
+  } catch (err) {
+    console.error('Ошибка при поиске непокрытых комбинаций:', err)
+    res.status(500).json({ error: 'Ошибка при поиске непокрытых комбинаций', details: err.message })
+  }
+}
+
+// ==================== ПРАВА ДОСТУПА К РЕДАКТОРУ РУЧЕК ====================
+
+// Получение прав доступа пользователя
+const getEditorPermissions = (dbPool) => async (req, res) => {
+  const { userId } = req.query
+  
+  try {
+    if (!userId) {
+      return res.status(400).json({ error: 'Не указан ID пользователя' })
+    }
+    
+    const result = await dbPool.query(
+      'SELECT * FROM handle_editor_permissions WHERE user_id = $1',
+      [userId]
+    )
+    
+    if (result.rows.length === 0) {
+      // Если прав нет, возвращаем объект с false
+      return res.json({
+        user_id: parseInt(userId),
+        can_edit: false
+      })
+    }
+    
+    res.json(result.rows[0])
+  } catch (err) {
+    console.error('Ошибка при получении прав доступа:', err)
+    res.status(500).json({ error: 'Ошибка при получении прав доступа' })
+  }
+}
+
+// Получение всех прав доступа (для администратора)
+const getAllEditorPermissions = (dbPool) => async (req, res) => {
+  try {
+    const result = await dbPool.query(`
+      SELECT 
+        hep.*,
+        u.first_name,
+        u.last_name,
+        u.middle_name,
+        u.username,
+        r.name as role_name,
+        creator.first_name as creator_first_name,
+        creator.last_name as creator_last_name,
+        creator.username as creator_username
+      FROM handle_editor_permissions hep
+      INNER JOIN users u ON hep.user_id = u.id
+      LEFT JOIN roles r ON u.role_id = r.id
+      LEFT JOIN users creator ON hep.created_by = creator.id
+      ORDER BY u.last_name, u.first_name
+    `)
+    res.json(result.rows)
+  } catch (err) {
+    console.error('Ошибка при получении всех прав доступа:', err)
+    res.status(500).json({ error: 'Ошибка при получении всех прав доступа' })
+  }
+}
+
+// Создание или обновление прав доступа
+const setEditorPermissions = (dbPool) => async (req, res) => {
+  const { user_id, can_edit, created_by } = req.body
+  
+  if (!user_id) {
+    return res.status(400).json({ error: 'Не указан ID пользователя' })
+  }
+  
+  try {
+    const result = await dbPool.query(`
+      INSERT INTO handle_editor_permissions (user_id, can_edit, created_by)
+      VALUES ($1, $2, $3)
+      ON CONFLICT (user_id) DO UPDATE SET
+        can_edit = EXCLUDED.can_edit,
+        updated_at = NOW()
+      RETURNING *
+    `, [user_id, can_edit || false, created_by || null])
+    
+    res.json(result.rows[0])
+  } catch (err) {
+    console.error('Ошибка при установке прав доступа:', err)
+    res.status(500).json({ error: 'Ошибка при установке прав доступа' })
+  }
+}
+
+// Удаление прав доступа
+const deleteEditorPermissions = (dbPool) => async (req, res) => {
+  const { id } = req.params
+  
+  try {
+    const result = await dbPool.query(
+      'DELETE FROM handle_editor_permissions WHERE id = $1 RETURNING *',
+      [id]
+    )
+    
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: 'Права доступа не найдены' })
+    }
+    
+    res.json({ message: 'Права доступа успешно удалены' })
+  } catch (err) {
+    console.error('Ошибка при удалении прав доступа:', err)
+    res.status(500).json({ error: 'Ошибка при удалении прав доступа' })
+  }
+}
+
 module.exports = {
   // Типы створок
   getLeafTypes,
@@ -2098,6 +2616,13 @@ module.exports = {
   updateParameterValue,
   deleteParameterValue,
   
+  // Категории значений параметров
+  getParameterValueCategories,
+  createParameterValueCategory,
+  updateParameterValueCategory,
+  deleteParameterValueCategory,
+  assignCategoryToValue,
+  
   // Ручки
   getHandles,
   createHandle,
@@ -2113,6 +2638,7 @@ module.exports = {
   
   // Подбор ручек
   findHandlesByParameters,
+  findUncoveredCombinations,
   
   // Экспорт/Импорт
   exportRules,
@@ -2136,7 +2662,13 @@ module.exports = {
   createSnapshot,
   getSnapshots,
   restoreFromSnapshot,
-  deleteSnapshot
+  deleteSnapshot,
+  
+  // Права доступа к редактору
+  getEditorPermissions,
+  getAllEditorPermissions,
+  setEditorPermissions,
+  deleteEditorPermissions
 }
 
 
