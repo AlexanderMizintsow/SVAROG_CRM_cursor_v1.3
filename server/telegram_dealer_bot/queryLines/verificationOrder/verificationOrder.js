@@ -223,13 +223,23 @@ async function handleVerificationOrdersByDate(bot, chatId, userSessions, company
   const selectedDate = userSessions[chatId].selectedVerificationDate
   console.log(`[VERIFICATION_DATE] Выбранная дата для сверки: ${selectedDate}`)
   
-  // Форматируем дату для запроса (нужно понять формат, который ожидает 1С)
-  // Предполагаю формат DD.MM.YYYY для запроса
+  // Форматируем дату для запроса в формате DD.MM.YYYY
+  // Работаем напрямую со строкой, чтобы избежать проблем с часовыми поясами
+  // selectedDate приходит в формате YYYY-MM-DD (например, "2025-11-07")
   let formattedDate = null
   if (selectedDate) {
+    // Разбиваем строку напрямую, без создания объекта Date
+    // Это предотвращает смещение даты из-за часового пояса
     const dateParts = selectedDate.split('-')
-    formattedDate = `${dateParts[2]}.${dateParts[1]}.${dateParts[0]}` // DD.MM.YYYY
-    console.log(`[VERIFICATION_DATE] Форматированная дата для запроса: ${formattedDate}`) //07.11.2025
+    if (dateParts.length === 3) {
+      const year = dateParts[0]  // YYYY
+      const month = dateParts[1]  // MM
+      const day = dateParts[2]    // DD
+      formattedDate = `${day}.${month}.${year}` // DD.MM.YYYY
+      console.log(`[VERIFICATION_DATE] Форматированная дата для запроса: ${formattedDate}`)
+    } else {
+      console.error(`[VERIFICATION_DATE] Неверный формат даты: ${selectedDate}`)
+    }
   }
   
   // Формируем запрос с датой (нужно уточнить формат запроса к 1С)
@@ -239,12 +249,22 @@ async function handleVerificationOrdersByDate(bot, chatId, userSessions, company
   console.log(`[VERIFICATION_DATE] Строка запроса: ${verification} c датой ${formattedDate}`)
   const response = await sendRequest1C(verification, formattedDate)
   
- 
-  
   // Очищаем выбранную дату и связанные данные после использования
   delete userSessions[chatId].selectedVerificationDate
   delete userSessions[chatId].awaitingVerificationDate
   delete userSessions[chatId].verificationCompanyInn
+
+  // Проверяем, что response является строкой
+  // sendRequest1C может вернуть false, если данных нет
+  if (!response || typeof response !== 'string') {
+    console.warn('[VERIFICATION_DATE] response не является строкой или пустой:', response)
+    await bot.sendMessage(
+      chatId,
+      '⚠️ По выбранной дате не найдено заказов для сверки.'
+    )
+    await handleCancel(bot, chatId, userSessions)
+    return
+  }
 
   // Разбиение сообщения на части
   const maxLength = 4096
@@ -256,12 +276,6 @@ async function handleVerificationOrdersByDate(bot, chatId, userSessions, company
 
   // Добавление заголовков
   worksheetData.push(['Номер заказа', 'Наименование', 'Сумма', 'Адрес', 'Дата отгрузки'])
-
-  // Парсинг данных из response и добавление в worksheetData
-  if (typeof response !== 'string') {
-    console.warn('createExcelFile: response не является строкой')
-    return
-  }
 
   const results = response.split('\n').filter((line) => line.trim() !== '')
   results.forEach((line) => {
