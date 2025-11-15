@@ -78,8 +78,13 @@ function createCalendar(currentDate = new Date(), callbackPrefix = 'calendar_') 
 
   // Добавляем дни месяца
   while (dayCounter <= daysInMonth) {
-    const date = new Date(year, month, dayCounter)
-    const dateStr = date.toISOString().split('T')[0] // Формат YYYY-MM-DD
+    // Формируем строку даты напрямую, без использования toISOString()
+    // Это предотвращает смещение даты из-за часовых поясов
+    // toISOString() конвертирует в UTC, что может сдвинуть дату на день назад
+    const yearStr = year.toString()
+    const monthStr = (month + 1).toString().padStart(2, '0') // MM (в JS месяцы 0-11, поэтому +1)
+    const dayStr = dayCounter.toString().padStart(2, '0') // DD
+    const dateStr = `${yearStr}-${monthStr}-${dayStr}` // Формат YYYY-MM-DD
 
     currentRow.push({
       text: dayCounter.toString(),

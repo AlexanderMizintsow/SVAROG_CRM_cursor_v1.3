@@ -341,8 +341,14 @@ async function handleCallbackQuery(bot, chatId, callbackQuery) {
             // Продолжаем логику сверки с выбранной датой
             const verificationCompanyInn = userSessions[chatId].verificationCompanyInn || companyInn
             await handleVerificationOrdersByDate(bot, chatId, userSessions, verificationCompanyInn)
+            // Форматируем дату для отображения напрямую из строки, без создания Date объекта
+            // Это предотвращает смещение из-за часовых поясов
+            const dateParts = selectedDate.split('-')
+            const displayDate = dateParts.length === 3 
+              ? `${dateParts[2]}.${dateParts[1]}.${dateParts[0]}` 
+              : selectedDate
             await bot.answerCallbackQuery(callbackQuery.id, {
-              text: `Выбрана дата: ${new Date(selectedDate).toLocaleDateString('ru-RU')}`,
+              text: `Выбрана дата: ${displayDate}`,
             })
             return
           }
