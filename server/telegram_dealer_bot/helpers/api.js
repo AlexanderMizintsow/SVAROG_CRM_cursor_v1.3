@@ -240,13 +240,15 @@ const getTotalPriceOrderAW = async (orderNo, inn, isButton = false) => {
 // *** V6R INN - Информация о поданных рекламациях \ Имеет собственный способ форматирования строки
 // *** INN - Сверка по заказам. Показывает список заказов не отгруженных \ Имеет собственный способ форматирования строки
 
-function sendRequest1C(sScan) {
+function sendRequest1C(sScan, date = null) {
   return new Promise((resolve, reject) => {
     const client = new net.Socket()
 
     client.connect(8240, '192.168.57.77', () => {
       console.log('Соединение установлено с сервером.')
-      const message = `Q11\x01EB35000999\x02\t${sScan}\r`
+      const message = date
+        ? `Q11\x01EB35000999\x02\t${sScan}D${date}\r`
+        : `Q11\x01EB35000999\x02\t${sScan}\r`
       client.write(iconv.encode(message, 'windows-1251'))
     })
 

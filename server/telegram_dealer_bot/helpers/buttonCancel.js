@@ -8,6 +8,10 @@ async function handleCancel(bot, chatId, userSessions) {
     userSessions[chatId].awaitingCalculation = ''
     userSessions[chatId].awaitingVerificationOrdersStatus = ''
     userSessions[chatId].awaitingVerificationFinancial = ''
+    // Очищаем флаги календаря для сверки по заказам (по дате)
+    delete userSessions[chatId].awaitingVerificationDate
+    delete userSessions[chatId].selectedVerificationDate
+    delete userSessions[chatId].verificationCompanyInn
     userSessions[chatId].associatedTexts = []
     userSessions[chatId].fileIds = []
     userSessions[chatId].photoIds = []

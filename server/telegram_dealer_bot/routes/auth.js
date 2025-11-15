@@ -18,7 +18,13 @@ const {
 
 const {
   handleVerificationOrdersStatus,
+  handleVerificationOrdersByDate,
 } = require('../queryLines/verificationOrder/verificationOrder')
+const {
+  createCalendar,
+  handleCalendarNavigation,
+  extractSelectedDate,
+} = require('../helpers/calendar')
 
 // Консультация
 const { handleConsultationCalculate } = require('../queryLines/consultation/consultation')
@@ -281,6 +287,66 @@ async function handleCallbackQuery(bot, chatId, callbackQuery) {
         const selectedDate = command.replace('select_date_', '')
         await handleDateSelection(bot, chatId, callbackQuery, selectedDate, userSessions)
         return
+      }
+
+      // Игнорируем неактивные кнопки (заголовки дней недели и пустые ячейки в календаре)
+      if (command === 'ignore') {
+        await bot.answerCallbackQuery(callbackQuery.id)
+        return
+      }
+
+      // Обработка календаря для сверки по заказам (по дате)
+      if (command.startsWith('verification_date_')) {
+        // Сначала проверяем навигацию (prev_month/next_month)
+        if (command.includes('prev_month') || command.includes('next_month')) {
+          const newDate = handleCalendarNavigation(command)
+          if (newDate) {
+            const calendarButtons = createCalendar(newDate, 'verification_date_')
+            try {
+              await bot.editMessageReplyMarkup(
+                {
+                  inline_keyboard: calendarButtons,
+                },
+                {
+                  chat_id: chatId,
+                  message_id: msg.message_id,
+                }
+              )
+              await bot.answerCallbackQuery(callbackQuery.id)
+            } catch (error) {
+              console.error('Ошибка при обновлении календаря:', error)
+              await bot.answerCallbackQuery(callbackQuery.id, {
+                text: 'Ошибка при переключении месяца',
+              })
+            }
+            return
+          }
+        }
+
+        // Затем обработка выбора даты
+        if (command.includes('select_')) {
+          const selectedDate = extractSelectedDate(command)
+          if (selectedDate) {
+            console.log(`[VERIFICATION_CALENDAR] Выбрана дата: ${selectedDate}`)
+            userSessions[chatId].selectedVerificationDate = selectedDate
+            userSessions[chatId].awaitingVerificationDate = false
+
+            // Удаляем сообщение с календарем
+            try {
+              await bot.deleteMessage(chatId, msg.message_id)
+            } catch (error) {
+              console.error('Ошибка при удалении сообщения с календарем:', error)
+            }
+
+            // Продолжаем логику сверки с выбранной датой
+            const verificationCompanyInn = userSessions[chatId].verificationCompanyInn || companyInn
+            await handleVerificationOrdersByDate(bot, chatId, userSessions, verificationCompanyInn)
+            await bot.answerCallbackQuery(callbackQuery.id, {
+              text: `Выбрана дата: ${new Date(selectedDate).toLocaleDateString('ru-RU')}`,
+            })
+            return
+          }
+        }
       }
 
       if (command === 'cancel_reschedule') {

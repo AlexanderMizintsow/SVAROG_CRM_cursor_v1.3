@@ -24,6 +24,7 @@ const {
   handleVerification,
   handleVerificationFinancial,
   handleVerificationOrders,
+  handleVerificationOrdersByDate,
   handleVerificationOrdersStatus,
 } = require('../queryLines/verificationOrder/verificationOrder')
 // Калькуляция
@@ -100,6 +101,9 @@ async function handleChatCommand(
       break
     case '/verification_orders':
       await handleVerificationOrders(bot, chatId, userSessions, companyInn) // Сверка по заказам
+      break
+    case '/verification_orders_by_date':
+      await handleVerificationOrdersByDate(bot, chatId, userSessions, companyInn) // СВЕРКА ПО ЗАКАЗАМ (по дате)
       break
     case '/verification_financial':
       await handleVerificationFinancial(bot, chatId, userSessions)
