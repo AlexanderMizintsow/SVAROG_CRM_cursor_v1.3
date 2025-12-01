@@ -36,6 +36,10 @@ const menuHelp = {
     description: '💬💡 Консультация',
     usage: '/consultation',
   },
+  marketing: {
+    description: '📢 Дополнительная информация',
+    usage: 'marketing_info',
+  },
 }
 
 async function displayHelpMenu(bot, chatId, userSessions) {

@@ -66,6 +66,9 @@ const {
   handleCancelReschedule,
 } = require('../queryLines/orders1c/orderHandlers')
 
+// Маркетинг
+const { handleMarketingCallback } = require('../queryLines/marketingInfo/marketingInfo')
+
 //const { handleUserMessageAI } = require('../routes/AI')
 
 const router = express.Router()
@@ -249,6 +252,17 @@ async function handleCallbackQuery(bot, chatId, callbackQuery) {
         photoIds: [],
         userId: callbackQuery.from.id,
         userName: callbackQuery.from.username || callbackQuery.from.first_name,
+      }
+
+      // Обработка маркетинговой информации ***************************************************************
+      if (
+        command === 'marketing_info' ||
+        command.startsWith('marketing_category_') ||
+        command.startsWith('marketing_campaign_')
+      ) {
+        await handleMarketingCallback(bot, chatId, command)
+        await bot.answerCallbackQuery(callbackQuery.id)
+        return
       }
 
       // Обработка оценки рекламации ***************************************************************

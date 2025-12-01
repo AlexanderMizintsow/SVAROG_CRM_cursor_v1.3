@@ -23,7 +23,7 @@ import { PiTelegramLogoLight } from 'react-icons/pi'
 import { IoStarSharp } from 'react-icons/io5'
 import { PiLockKeyOpenFill } from 'react-icons/pi'
 import { TbApps } from 'react-icons/tb'
-import { MdAssessment, MdSearch, MdEdit } from 'react-icons/md'
+import { MdAssessment, MdSearch, MdEdit, MdCampaign } from 'react-icons/md'
 
 const NavBar = () => {
   const { user } = useUserStore()
@@ -107,6 +107,11 @@ const NavBar = () => {
       name: 'Управление доступом дилеров',
       icon: PiTelegramLogoLight,
       link: '/password-company',
+    },
+    {
+      name: 'Автоматизация маркетинга',
+      icon: MdCampaign,
+      link: '/marketing-automation',
     },
     {
       name: 'Телефония (asterisk)',

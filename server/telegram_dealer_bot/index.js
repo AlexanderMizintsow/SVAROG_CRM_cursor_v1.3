@@ -9,6 +9,7 @@ const axios = require('axios') // Импорт axios
 const FormData = require('form-data') // Импорт FormData
 const { initReclamationCron, initReconciliationCron } = require('./helpers/api')
 const { initOrders1CCron } = require('./queryLines/orders1c/orders1c')
+const { initMarketingCron } = require('./helpers/marketingCron')
 const CronManager = require('./helpers/cronManager') // Импорт нового менеджера
 const { sanitizeFilename } = require('./helpers/fileUtils') // Импорт утилиты для работы с файлами
 
@@ -19,8 +20,8 @@ app.use(express.json())
 app.use(
   cors({
     origin: ['http://localhost:5173', 'http://192.168.57.112:5173', 'http://172.26.32.1:5173'],
-    methods: ['GET', 'POST'],
-    allowedHeaders: ['Content-Type'],
+    methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+    allowedHeaders: ['Content-Type', 'Authorization'],
     credentials: true,
   })
 )
@@ -70,6 +71,12 @@ if (orders1cJobs.mainJob) {
 }
 if (orders1cJobs.lateResponseJob) {
   cronJobs.orders1c_late_response = orders1cJobs.lateResponseJob
+}
+
+// Инициализация cron-задачи для маркетинга
+const marketingJob = initMarketingCron(bot, cronManager)
+if (marketingJob) {
+  cronJobs.marketing = marketingJob
 }
 
 // Запуск всех cron-задач
@@ -163,6 +170,100 @@ app.post('/api/cron/:action', (req, res) => {
 
 // Регистрация маршрутов
 app.use('/api/auth', authRoutes(bot))
+
+// Маршруты для автоматизации маркетинга
+let marketingController
+try {
+  marketingController = require('./controllers/marketingController')
+  console.log('[MARKETING] Контроллер маркетинга загружен успешно')
+} catch (error) {
+  console.error('[MARKETING] Ошибка при загрузке контроллера маркетинга:', error)
+  // Создаем заглушку, чтобы сервер не упал
+  marketingController = {
+    getCategories: () => (req, res) => res.status(500).json({ error: 'Контроллер не загружен' }),
+    createCategory: () => (req, res) => res.status(500).json({ error: 'Контроллер не загружен' }),
+    updateCategory: () => (req, res) => res.status(500).json({ error: 'Контроллер не загружен' }),
+    deleteCategory: () => (req, res) => res.status(500).json({ error: 'Контроллер не загружен' }),
+    getCampaigns: () => (req, res) => res.status(500).json({ error: 'Контроллер не загружен' }),
+    getCampaign: () => (req, res) => res.status(500).json({ error: 'Контроллер не загружен' }),
+    createCampaign: () => (req, res) => res.status(500).json({ error: 'Контроллер не загружен' }),
+    updateCampaign: () => (req, res) => res.status(500).json({ error: 'Контроллер не загружен' }),
+    deleteCampaign: () => (req, res) => res.status(500).json({ error: 'Контроллер не загружен' }),
+    sendCampaign: () => (req, res) => res.status(500).json({ error: 'Контроллер не загружен' }),
+    checkDuplicate: () => (req, res) => res.status(500).json({ error: 'Контроллер не загружен' }),
+    getLocations: () => (req, res) => res.status(500).json({ error: 'Контроллер не загружен' }),
+    createLocation: () => (req, res) => res.status(500).json({ error: 'Контроллер не загружен' }),
+    deleteLocation: () => (req, res) => res.status(500).json({ error: 'Контроллер не загружен' }),
+    getTags: () => (req, res) => res.status(500).json({ error: 'Контроллер не загружен' }),
+    createTag: () => (req, res) => res.status(500).json({ error: 'Контроллер не загружен' }),
+    deleteTag: () => (req, res) => res.status(500).json({ error: 'Контроллер не загружен' }),
+    getDealers: () => (req, res) => res.status(500).json({ error: 'Контроллер не загружен' }),
+    getSendLog: () => (req, res) => res.status(500).json({ error: 'Контроллер не загружен' }),
+    exportSendLog: () => (req, res) => res.status(500).json({ error: 'Контроллер не загружен' }),
+    getStatistics: () => (req, res) => res.status(500).json({ error: 'Контроллер не загружен' }),
+    getUserPermissions: () => (req, res) =>
+      res.status(500).json({ error: 'Контроллер не загружен' }),
+    getAllPermissions: () => (req, res) =>
+      res.status(500).json({ error: 'Контроллер не загружен' }),
+    setPermissions: () => (req, res) => res.status(500).json({ error: 'Контроллер не загружен' }),
+    deletePermissions: () => (req, res) =>
+      res.status(500).json({ error: 'Контроллер не загружен' }),
+    upload: { fields: () => (req, res, next) => next() },
+  }
+}
+
+// Категории
+app.get('/api/marketing/categories', marketingController.getCategories(dbPool))
+app.post('/api/marketing/categories', marketingController.createCategory(dbPool))
+app.put('/api/marketing/categories/:id', marketingController.updateCategory(dbPool))
+app.delete('/api/marketing/categories/:id', marketingController.deleteCategory(dbPool))
+
+// Кампании
+app.get('/api/marketing/campaigns', marketingController.getCampaigns(dbPool))
+app.get('/api/marketing/campaigns/:id', marketingController.getCampaign(dbPool))
+app.post(
+  '/api/marketing/campaigns',
+  marketingController.upload.fields([
+    { name: 'images', maxCount: 10 },
+    { name: 'attachments', maxCount: 5 },
+  ]),
+  marketingController.createCampaign(dbPool)
+)
+app.put(
+  '/api/marketing/campaigns/:id',
+  marketingController.upload.fields([
+    { name: 'images', maxCount: 10 },
+    { name: 'attachments', maxCount: 5 },
+  ]),
+  marketingController.updateCampaign(dbPool)
+)
+app.delete('/api/marketing/campaigns/:id', marketingController.deleteCampaign(dbPool))
+app.get('/api/marketing/campaigns/:id/recipients', marketingController.getCampaignRecipients(dbPool))
+app.post('/api/marketing/campaigns/:id/send', marketingController.sendCampaign(dbPool, bot))
+app.get('/api/marketing/campaigns/:id/duplicate-check', marketingController.checkDuplicate(dbPool))
+
+// Справочники
+app.get('/api/marketing/locations', marketingController.getLocations(dbPool))
+app.post('/api/marketing/locations', marketingController.createLocation(dbPool))
+app.post('/api/marketing/locations/create-from-companies', marketingController.createLocationsFromCompanies(dbPool))
+app.delete('/api/marketing/locations/:id', marketingController.deleteLocation(dbPool))
+app.get('/api/marketing/tags', marketingController.getTags(dbPool))
+app.post('/api/marketing/tags', marketingController.createTag(dbPool))
+app.delete('/api/marketing/tags/:id', marketingController.deleteTag(dbPool))
+app.get('/api/marketing/companies', marketingController.getCompanies(dbPool))
+
+// Журнал отправок
+app.get('/api/marketing/send-log', marketingController.getSendLog(dbPool))
+app.get('/api/marketing/send-log/export', marketingController.exportSendLog(dbPool))
+
+// Статистика
+app.get('/api/marketing/statistics', marketingController.getStatistics(dbPool))
+
+// Права доступа
+app.get('/api/marketing/permissions', marketingController.getUserPermissions(dbPool))
+app.get('/api/marketing/permissions/all', marketingController.getAllPermissions(dbPool))
+app.post('/api/marketing/permissions', marketingController.setPermissions(dbPool))
+app.delete('/api/marketing/permissions/:id', marketingController.deletePermissions(dbPool))
 
 // Новый маршрут для отправки файлов
 app.post(
@@ -381,6 +482,10 @@ function gracefulShutdown() {
   ) {
     cronJobs.orders1c_late_response.stop()
     console.log('Cron-задача orders1c_late_response остановлена')
+  }
+  if (cronJobs.marketing && typeof cronJobs.marketing.stop === 'function') {
+    cronJobs.marketing.stop()
+    console.log('Cron-задача marketing остановлена')
   }
 
   // Закрытие пула соединений

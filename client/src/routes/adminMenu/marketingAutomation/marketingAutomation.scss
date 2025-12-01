@@ -1,0 +1,139 @@
+.marketing-automation {
+  padding: 20px;
+  max-width: 1400px;
+  margin: 0 auto;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+
+  &__header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 30px;
+    padding-bottom: 20px;
+    border-bottom: 2px solid #e0e0e0;
+    flex-shrink: 0;
+  }
+
+  &__title {
+    font-size: 28px;
+    font-weight: 600;
+    color: #333;
+    margin: 0;
+  }
+
+  &__actions {
+    display: flex;
+    gap: 10px;
+  }
+
+  &__btn {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 10px 20px;
+    border: none;
+    border-radius: 8px;
+    font-size: 14px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.3s ease;
+
+    &--primary {
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      color: white;
+
+      &:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4);
+      }
+    }
+
+    &-icon {
+      font-size: 18px;
+      font-weight: bold;
+    }
+  }
+
+  &__tabs {
+    display: flex;
+    gap: 10px;
+    margin-bottom: 30px;
+    border-bottom: 2px solid #e0e0e0;
+    flex-shrink: 0;
+  }
+
+  &__tab {
+    padding: 12px 24px;
+    border: none;
+    background: transparent;
+    font-size: 15px;
+    font-weight: 500;
+    color: #666;
+    cursor: pointer;
+    border-bottom: 3px solid transparent;
+    transition: all 0.3s ease;
+    position: relative;
+    top: 2px;
+
+    &:hover {
+      color: #667eea;
+    }
+
+    &.active {
+      color: #667eea;
+      border-bottom-color: #667eea;
+    }
+  }
+
+  &__content {
+    flex: 1;
+    min-height: 0;
+    overflow-y: auto;
+    overflow-x: hidden;
+  }
+
+  // Стили для скроллбара
+  &__content::-webkit-scrollbar {
+    width: 8px;
+  }
+
+  &__content::-webkit-scrollbar-track {
+    background: #f1f1f1;
+    border-radius: 4px;
+  }
+
+  &__content::-webkit-scrollbar-thumb {
+    background: #c1c1c1;
+    border-radius: 4px;
+
+    &:hover {
+      background: #a8a8a8;
+    }
+  }
+}
+
+// Адаптивность
+@media (max-width: 768px) {
+  .marketing-automation {
+    padding: 15px;
+
+    &__header {
+      flex-direction: column;
+      align-items: flex-start;
+      gap: 15px;
+    }
+
+    &__tabs {
+      flex-wrap: wrap;
+      gap: 5px;
+    }
+
+    &__tab {
+      padding: 8px 16px;
+      font-size: 14px;
+    }
+  }
+}

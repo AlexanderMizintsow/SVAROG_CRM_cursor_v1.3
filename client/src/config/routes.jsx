@@ -24,6 +24,7 @@ import MissedCall from '../routes/asterisk/missedCall/MissedCall.jsx'
 import RatingStats from '../components/RatingStats/RatingStats.jsx'
 import MaterialSearchPage from '../routes/statistics/MaterialSearchPage.jsx'
 import EditorHandle from '../routes/adminMenu/editorHandle/EditorHandle.jsx'
+import MarketingAutomation from '../routes/adminMenu/marketingAutomation/MarketingAutomation.jsx'
 
 const routes = (bgSeason, roleAdministrator, isConnectBD) => [
   {
@@ -96,6 +97,7 @@ const routes = (bgSeason, roleAdministrator, isConnectBD) => [
       { path: 'reports-dealer-ratings', element: <RatingStats /> },
       { path: 'material-search', element: <MaterialSearchPage /> },
       { path: 'editor-handle', element: <EditorHandle /> },
+      { path: 'marketing-automation', element: <MarketingAutomation /> },
 
       // ***
       // Отдел кадров
