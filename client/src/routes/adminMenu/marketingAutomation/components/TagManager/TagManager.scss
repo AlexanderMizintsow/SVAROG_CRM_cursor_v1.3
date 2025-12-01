@@ -1,4 +1,4 @@
-.category-manager {
+.tag-manager {
   &__header {
     display: flex;
     justify-content: space-between;
@@ -17,6 +17,20 @@
     padding: 40px;
     color: #999;
     font-size: 16px;
+  }
+
+  &__info {
+    margin-bottom: 20px;
+    padding: 15px;
+    background: #f5f5f5;
+    border-radius: 8px;
+  }
+
+  &__description {
+    margin: 0;
+    color: #666;
+    font-size: 14px;
+    line-height: 1.5;
   }
 
   &__btn {
@@ -63,15 +77,12 @@
     flex: 1;
   }
 
-  &__item-icon {
-    font-size: 32px;
-    width: 50px;
-    height: 50px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    background: #f5f5f5;
-    border-radius: 10px;
+  &__item-color {
+    width: 24px;
+    height: 24px;
+    border-radius: 4px;
+    flex-shrink: 0;
+    border: 2px solid rgba(0, 0, 0, 0.1);
   }
 
   &__item-info {
@@ -79,41 +90,15 @@
   }
 
   &__item-name {
-    margin: 0 0 5px 0;
+    margin: 0;
     font-size: 18px;
     font-weight: 600;
     color: #333;
   }
 
-  &__item-description {
-    margin: 0 0 5px 0;
-    color: #666;
-    font-size: 14px;
-  }
-
-  &__item-order {
-    font-size: 12px;
-    color: #999;
-  }
-
   &__item-actions {
     display: flex;
     gap: 10px;
-  }
-
-  &__btn-edit {
-    padding: 8px 16px;
-    background: #4a90e2;
-    color: white;
-    border: none;
-    border-radius: 6px;
-    font-size: 14px;
-    cursor: pointer;
-    transition: all 0.3s ease;
-
-    &:hover {
-      background: #357abd;
-    }
   }
 
   &__btn-delete {
@@ -178,8 +163,7 @@
       color: #333;
     }
 
-    input,
-    textarea {
+    input {
       padding: 10px;
       border: 1px solid #ddd;
       border-radius: 6px;
@@ -192,10 +176,24 @@
         box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
       }
     }
+  }
 
-    textarea {
-      resize: vertical;
-      min-height: 80px;
+  &__color-input {
+    display: flex;
+    gap: 10px;
+    align-items: center;
+
+    input[type='color'] {
+      width: 60px;
+      height: 40px;
+      padding: 0;
+      border: 1px solid #ddd;
+      border-radius: 6px;
+      cursor: pointer;
+    }
+
+    input[type='text'] {
+      flex: 1;
     }
   }
 
@@ -241,7 +239,7 @@
 }
 
 @media (max-width: 768px) {
-  .category-manager {
+  .tag-manager {
     &__item {
       flex-direction: column;
       align-items: flex-start;
@@ -254,3 +252,4 @@
     }
   }
 }
+

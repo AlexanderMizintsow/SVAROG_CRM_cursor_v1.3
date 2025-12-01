@@ -4,6 +4,7 @@
 const multer = require('multer')
 const path = require('path')
 const fs = require('fs')
+const { sanitizeFilename } = require('../helpers/fileUtils')
 
 // Настройка multer для загрузки файлов
 const storage = multer.diskStorage({
@@ -155,10 +156,10 @@ const deleteCategory = (dbPool) => async (req, res) => {
 // Получение всех кампаний с фильтрами
 const getCampaigns = (dbPool) => async (req, res) => {
   try {
-    const { category_id, status, search } = req.query
+    const { category_id, status, search, tag_id } = req.query
 
     let query = `
-      SELECT 
+      SELECT DISTINCT
         c.*,
         cat.name as category_name,
         cat.icon as category_icon,
@@ -189,11 +190,44 @@ const getCampaigns = (dbPool) => async (req, res) => {
       paramIndex++
     }
 
+    // Фильтр по тегам
+    if (tag_id) {
+      query += ` AND EXISTS (
+        SELECT 1 FROM marketing_campaign_tags mct 
+        WHERE mct.campaign_id = c.id AND mct.tag_id = $${paramIndex}
+      )`
+      params.push(tag_id)
+      paramIndex++
+    }
+
     query += ' ORDER BY c.created_at DESC'
 
     const result = await dbPool.query(query, params)
 
-    // Формируем объекты категорий для удобства
+    // Получаем теги для каждой кампании
+    const campaignIds = result.rows.map((row) => row.id)
+    let tagsMap = {}
+    if (campaignIds.length > 0) {
+      const tagsResult = await dbPool.query(
+        `SELECT mct.campaign_id, mt.id, mt.name, mt.color
+         FROM marketing_campaign_tags mct
+         JOIN marketing_tags mt ON mt.id = mct.tag_id
+         WHERE mct.campaign_id = ANY($1)`,
+        [campaignIds]
+      )
+      tagsResult.rows.forEach((row) => {
+        if (!tagsMap[row.campaign_id]) {
+          tagsMap[row.campaign_id] = []
+        }
+        tagsMap[row.campaign_id].push({
+          id: row.id,
+          name: row.name,
+          color: row.color,
+        })
+      })
+    }
+
+    // Формируем объекты категорий и тегов для удобства
     const campaigns = result.rows.map((row) => ({
       ...row,
       category: row.category_name
@@ -203,6 +237,7 @@ const getCampaigns = (dbPool) => async (req, res) => {
             icon: row.category_icon,
           }
         : null,
+      tags: tagsMap[row.id] || [],
     }))
 
     res.json(campaigns)
@@ -402,10 +437,11 @@ const createCampaign = (dbPool) => async (req, res) => {
       const images = Array.isArray(req.files.images) ? req.files.images : [req.files.images]
       for (let i = 0; i < images.length; i++) {
         const image = images[i]
+        const originalName = image.originalname || image.filename
         await client.query(
-          `INSERT INTO marketing_campaign_images (campaign_id, file_path, file_name, file_size, display_order)
-           VALUES ($1, $2, $3, $4, $5)`,
-          [campaignId, image.path, image.filename, image.size, i]
+          `INSERT INTO marketing_campaign_images (campaign_id, file_path, file_name, original_name, file_size, display_order)
+           VALUES ($1, $2, $3, $4, $5, $6)`,
+          [campaignId, image.path, image.filename, originalName, image.size, i]
         )
       }
     }
@@ -417,13 +453,15 @@ const createCampaign = (dbPool) => async (req, res) => {
         : [req.files.attachments]
       for (let i = 0; i < attachments.length; i++) {
         const attachment = attachments[i]
+        const originalName = attachment.originalname || attachment.filename
         await client.query(
-          `INSERT INTO marketing_campaign_attachments (campaign_id, file_path, file_name, file_size, file_type, display_order)
-           VALUES ($1, $2, $3, $4, $5, $6)`,
+          `INSERT INTO marketing_campaign_attachments (campaign_id, file_path, file_name, original_name, file_size, file_type, display_order)
+           VALUES ($1, $2, $3, $4, $5, $6, $7)`,
           [
             campaignId,
             attachment.path,
             attachment.filename,
+            originalName,
             attachment.size,
             attachment.mimetype,
             i,
@@ -556,10 +594,11 @@ const updateCampaign = (dbPool) => async (req, res) => {
       const currentCount = parseInt(existingImages.rows[0].count)
       for (let i = 0; i < images.length; i++) {
         const image = images[i]
+        const originalName = image.originalname || image.filename
         await client.query(
-          `INSERT INTO marketing_campaign_images (campaign_id, file_path, file_name, file_size, display_order)
-           VALUES ($1, $2, $3, $4, $5)`,
-          [id, image.path, image.filename, image.size, currentCount + i]
+          `INSERT INTO marketing_campaign_images (campaign_id, file_path, file_name, original_name, file_size, display_order)
+           VALUES ($1, $2, $3, $4, $5, $6)`,
+          [id, image.path, image.filename, originalName, image.size, currentCount + i]
         )
       }
     }
@@ -576,13 +615,15 @@ const updateCampaign = (dbPool) => async (req, res) => {
       const currentCount = parseInt(existingAttachments.rows[0].count)
       for (let i = 0; i < attachments.length; i++) {
         const attachment = attachments[i]
+        const originalName = attachment.originalname || attachment.filename
         await client.query(
-          `INSERT INTO marketing_campaign_attachments (campaign_id, file_path, file_name, file_size, file_type, display_order)
-           VALUES ($1, $2, $3, $4, $5, $6)`,
+          `INSERT INTO marketing_campaign_attachments (campaign_id, file_path, file_name, original_name, file_size, file_type, display_order)
+           VALUES ($1, $2, $3, $4, $5, $6, $7)`,
           [
             id,
             attachment.path,
             attachment.filename,
+            originalName,
             attachment.size,
             attachment.mimetype,
             currentCount + i,
@@ -928,8 +969,22 @@ const sendCampaign = (dbPool, bot) => async (req, res) => {
                   attachment.file_name
                 )
                 if (fs.existsSync(attachmentPath)) {
+                  // Используем оригинальное имя файла, если оно есть, иначе извлекаем из file_name
+                  let displayName = attachment.original_name || attachment.file_name
+                  // Если file_name содержит префикс timestamp, извлекаем оригинальное имя
+                  if (!attachment.original_name && attachment.file_name.includes('-')) {
+                    const parts = attachment.file_name.split('-')
+                    if (parts.length >= 3) {
+                      // Пропускаем первые две части (timestamp и random) и объединяем остальное
+                      displayName = parts.slice(2).join('-')
+                    }
+                  }
+                  // Обрабатываем имя файла для корректной кодировки
+                  displayName = sanitizeFilename(displayName)
+
                   await bot.sendDocument(company.chat_id, fs.createReadStream(attachmentPath), {
-                    caption: attachment.file_name,
+                    filename: displayName,
+                    caption: displayName,
                   })
                   // Небольшая задержка между отправками файлов
                   await new Promise((resolve) => setTimeout(resolve, 100))

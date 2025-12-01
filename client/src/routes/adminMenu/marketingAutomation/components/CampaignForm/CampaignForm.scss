@@ -104,6 +104,43 @@
     }
   }
 
+  &__label-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 8px;
+  }
+
+  &__help-text {
+    font-size: 16px;
+    color: #667eea;
+    cursor: help;
+    opacity: 0.7;
+    transition: opacity 0.2s;
+
+    &:hover {
+      opacity: 1;
+    }
+  }
+
+  &__field-description {
+    font-size: 12px;
+    color: #666;
+    margin: 0 0 12px 0;
+    line-height: 1.5;
+    font-style: italic;
+  }
+
+  &__empty-state {
+    font-size: 13px;
+    color: #999;
+    font-style: italic;
+    padding: 12px;
+    background: #f5f5f5;
+    border-radius: 6px;
+    margin: 0;
+  }
+
   &__input,
   &__select,
   &__textarea {

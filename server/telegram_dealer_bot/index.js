@@ -25,6 +25,10 @@ app.use(
     credentials: true,
   })
 )
+
+// Статические файлы для uploads
+const path = require('path')
+app.use('/uploads', express.static(path.join(__dirname, '../../uploads')))
 const token = process.env.TELEGRAM_BOT_TOKEN
 const bot = new TelegramBot(token, { polling: true })
 

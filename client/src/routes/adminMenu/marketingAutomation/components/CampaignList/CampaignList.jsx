@@ -1,8 +1,10 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import axios from 'axios'
 import Toastify from 'toastify-js'
+import * as XLSX from 'xlsx'
 import { API_BASE_URL } from '../../../../../../config'
 import ConfirmationDialog from '../../../../../components/confirmationDialog/ConfirmationDialog'
+import CampaignPreview from '../CampaignPreview/CampaignPreview'
 import './CampaignList.scss'
 
 const CampaignList = ({ onEdit, canEdit, refreshKey }) => {
@@ -13,8 +15,11 @@ const CampaignList = ({ onEdit, canEdit, refreshKey }) => {
     category_id: '',
     status: '',
     search: '',
+    tag_id: '',
   })
+  const [searchInput, setSearchInput] = useState('')
   const [categories, setCategories] = useState([])
+  const [tags, setTags] = useState([])
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
   const [campaignToDelete, setCampaignToDelete] = useState(null)
   const [deleting, setDeleting] = useState(false)
@@ -22,12 +27,64 @@ const CampaignList = ({ onEdit, canEdit, refreshKey }) => {
   const [campaignToSend, setCampaignToSend] = useState(null)
   const [recipients, setRecipients] = useState([])
   const [loadingRecipients, setLoadingRecipients] = useState(false)
+  const [previewCampaignId, setPreviewCampaignId] = useState(null)
+  const searchTimeoutRef = useRef(null)
+  const searchInputRef = useRef(null)
+  const shouldRestoreFocus = useRef(false)
 
+  // Загрузка категорий и тегов при монтировании
   useEffect(() => {
     loadCategories()
+    loadTags()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
+  // Загрузка кампаний при изменении фильтров (кроме поиска) и refreshKey
+  useEffect(() => {
     loadCampaigns()
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [refreshKey, filters])
+  }, [refreshKey, filters.category_id, filters.status, filters.tag_id])
+
+  // Debounce для поиска
+  useEffect(() => {
+    // Очищаем предыдущий таймер
+    if (searchTimeoutRef.current) {
+      clearTimeout(searchTimeoutRef.current)
+    }
+
+    // Устанавливаем новый таймер
+    searchTimeoutRef.current = setTimeout(() => {
+      // Проверяем, есть ли фокус на инпуте
+      if (searchInputRef.current === document.activeElement) {
+        shouldRestoreFocus.current = true
+      }
+      setFilters((prev) => ({ ...prev, search: searchInput }))
+    }, 500) // Задержка 500мс
+
+    // Очистка при размонтировании
+    return () => {
+      if (searchTimeoutRef.current) {
+        clearTimeout(searchTimeoutRef.current)
+      }
+    }
+  }, [searchInput])
+
+  // Загрузка кампаний при изменении поиска
+  useEffect(() => {
+    loadCampaigns()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [filters.search])
+
+  // Восстановление фокуса после загрузки данных
+  useEffect(() => {
+    if (!loading && shouldRestoreFocus.current && searchInputRef.current) {
+      searchInputRef.current.focus()
+      // Восстанавливаем позицию курсора в конце текста
+      const length = searchInputRef.current.value.length
+      searchInputRef.current.setSelectionRange(length, length)
+      shouldRestoreFocus.current = false
+    }
+  }, [loading])
 
   const loadCategories = async () => {
     try {
@@ -38,6 +95,15 @@ const CampaignList = ({ onEdit, canEdit, refreshKey }) => {
     }
   }
 
+  const loadTags = async () => {
+    try {
+      const response = await axios.get(`${API_BASE_URL}5778/api/marketing/tags`)
+      setTags(response.data)
+    } catch (error) {
+      console.error('Ошибка при загрузке тегов:', error)
+    }
+  }
+
   const loadCampaigns = async () => {
     try {
       setLoading(true)
@@ -45,6 +111,7 @@ const CampaignList = ({ onEdit, canEdit, refreshKey }) => {
       if (filters.category_id) params.category_id = filters.category_id
       if (filters.status) params.status = filters.status
       if (filters.search) params.search = filters.search
+      if (filters.tag_id) params.tag_id = filters.tag_id
 
       const response = await axios.get(`${API_BASE_URL}5778/api/marketing/campaigns`, { params })
       setCampaigns(response.data)
@@ -234,20 +301,170 @@ const CampaignList = ({ onEdit, canEdit, refreshKey }) => {
     }
   }
 
+  const handleExportExcel = async () => {
+    try {
+      // Загружаем все кампании без фильтров для полного экспорта
+      const response = await axios.get(`${API_BASE_URL}5778/api/marketing/campaigns`)
+      const allCampaigns = response.data
+
+      // Подготавливаем данные для Excel
+      const excelData = allCampaigns.map((campaign) => {
+        const statusText =
+          campaign.status === 'draft'
+            ? 'Черновик'
+            : campaign.status === 'active'
+            ? 'Активна'
+            : campaign.status === 'inactive'
+            ? 'Деактивна'
+            : campaign.status
+
+        const periodTypeText =
+          campaign.period_type === 'unlimited'
+            ? 'Бессрочная'
+            : campaign.period_type === 'date'
+            ? 'По дате'
+            : campaign.period_type === 'period'
+            ? 'По периоду'
+            : campaign.period_type || '-'
+
+        const formatDateForExcel = (dateString) => {
+          if (!dateString) return '-'
+          return new Date(dateString).toLocaleDateString('ru-RU', {
+            year: 'numeric',
+            month: '2-digit',
+            day: '2-digit',
+          })
+        }
+
+        const formatDateTimeForExcel = (dateString) => {
+          if (!dateString) return '-'
+          return new Date(dateString).toLocaleString('ru-RU', {
+            year: 'numeric',
+            month: '2-digit',
+            day: '2-digit',
+            hour: '2-digit',
+            minute: '2-digit',
+          })
+        }
+
+        const tagsText =
+          campaign.tags && campaign.tags.length > 0
+            ? campaign.tags.map((tag) => tag.name).join(', ')
+            : '-'
+
+        let channelsText = '-'
+        if (campaign.delivery_channels) {
+          try {
+            const deliveryChannels =
+              typeof campaign.delivery_channels === 'string'
+                ? JSON.parse(campaign.delivery_channels)
+                : campaign.delivery_channels
+            if (Array.isArray(deliveryChannels) && deliveryChannels.length > 0) {
+              channelsText = deliveryChannels.join(', ')
+            }
+          } catch (e) {
+            // Если не удалось распарсить, используем как строку
+            channelsText = campaign.delivery_channels
+          }
+        }
+
+        return {
+          ID: campaign.id,
+          Название: campaign.name || '-',
+          Статус: statusText,
+          Категория: campaign.category?.name || '-',
+          Теги: tagsText,
+          'Тип периода': periodTypeText,
+          'Дата отправки': formatDateForExcel(campaign.send_date),
+          'Период начала': formatDateForExcel(campaign.period_start),
+          'Период окончания': formatDateForExcel(campaign.period_end),
+          'Автоматическая отправка': campaign.auto_send ? 'Да' : 'Нет',
+          'Время отправки': campaign.send_time || '-',
+          'Срок блокировки (дни)': campaign.blocking_period_days || '-',
+          'Контактное лицо': campaign.contact_person_name || '-',
+          'Показывать контактное лицо': campaign.show_contact_person ? 'Да' : 'Нет',
+          Примечания: campaign.notes || '-',
+          'Каналы доставки': channelsText,
+          'Создано пользователем': campaign.created_by_name || '-',
+          'Дата создания': formatDateTimeForExcel(campaign.created_at),
+        }
+      })
+
+      // Создаем рабочую книгу Excel
+      const worksheet = XLSX.utils.json_to_sheet(excelData)
+      const workbook = XLSX.utils.book_new()
+      XLSX.utils.book_append_sheet(workbook, worksheet, 'Кампании')
+
+      // Настраиваем ширину колонок
+      const columnWidths = [
+        { wch: 8 }, // ID
+        { wch: 30 }, // Название
+        { wch: 12 }, // Статус
+        { wch: 20 }, // Категория
+        { wch: 25 }, // Теги
+        { wch: 15 }, // Тип периода
+        { wch: 15 }, // Дата отправки
+        { wch: 15 }, // Период начала
+        { wch: 15 }, // Период окончания
+        { wch: 20 }, // Автоматическая отправка
+        { wch: 15 }, // Время отправки
+        { wch: 20 }, // Срок блокировки
+        { wch: 25 }, // Контактное лицо
+        { wch: 25 }, // Показывать контактное лицо
+        { wch: 40 }, // Примечания
+        { wch: 20 }, // Каналы доставки
+        { wch: 25 }, // Создано пользователем
+        { wch: 20 }, // Дата создания
+      ]
+      worksheet['!cols'] = columnWidths
+
+      // Сохраняем файл
+      const fileName = `кампании_${new Date().toISOString().split('T')[0]}.xlsx`
+      XLSX.writeFile(workbook, fileName)
+
+      Toastify({
+        text: `Экспорт завершен. Экспортировано кампаний: ${allCampaigns.length}`,
+        close: true,
+        style: {
+          background: 'linear-gradient(to right, #00b09b, #96c93d)',
+        },
+      }).showToast()
+    } catch (error) {
+      console.error('Ошибка при экспорте кампаний:', error)
+      Toastify({
+        text: 'Ошибка при экспорте кампаний: ' + (error.response?.data?.error || error.message),
+        close: true,
+        style: {
+          background: 'linear-gradient(to right, #FF5F6D, #FFC371)',
+        },
+      }).showToast()
+    }
+  }
+
   if (loading) {
     return <div className="campaign-list__loading">Загрузка...</div>
   }
 
   return (
     <div className="campaign-list">
+      <div className="campaign-list__header">
+        <h2>Кампании</h2>
+        <div className="campaign-list__export-buttons">
+          <button className="campaign-list__btn-export" onClick={handleExportExcel}>
+            Экспорт Excel
+          </button>
+        </div>
+      </div>
+
       <div className="campaign-list__filters">
         <div className="campaign-list__filter-group">
           <label>Поиск</label>
           <input
+            ref={searchInputRef}
             type="text"
             placeholder="Поиск по названию..."
-            value={filters.search}
-            onChange={(e) => setFilters({ ...filters, search: e.target.value })}
+            value={searchInput}
+            onChange={(e) => setSearchInput(e.target.value)}
           />
         </div>
         <div className="campaign-list__filter-group">
@@ -276,6 +493,20 @@ const CampaignList = ({ onEdit, canEdit, refreshKey }) => {
             <option value="inactive">Деактивна</option>
           </select>
         </div>
+        <div className="campaign-list__filter-group">
+          <label>Тег</label>
+          <select
+            value={filters.tag_id}
+            onChange={(e) => setFilters({ ...filters, tag_id: e.target.value })}
+          >
+            <option value="">Все теги</option>
+            {tags.map((tag) => (
+              <option key={tag.id} value={tag.id}>
+                {tag.name}
+              </option>
+            ))}
+          </select>
+        </div>
       </div>
 
       <div className="campaign-list__items">
@@ -298,6 +529,22 @@ const CampaignList = ({ onEdit, canEdit, refreshKey }) => {
                       {campaign.category.icon} {campaign.category.name}
                     </div>
                   )}
+                  {campaign.tags && campaign.tags.length > 0 && (
+                    <div className="campaign-list__item-tags">
+                      {campaign.tags.map((tag) => (
+                        <span
+                          key={tag.id}
+                          className="campaign-list__tag"
+                          style={{
+                            backgroundColor: tag.color || '#667eea',
+                            color: '#fff',
+                          }}
+                        >
+                          {tag.name}
+                        </span>
+                      ))}
+                    </div>
+                  )}
                 </div>
 
                 <div className="campaign-list__item-info">
@@ -318,6 +565,12 @@ const CampaignList = ({ onEdit, canEdit, refreshKey }) => {
                 </div>
 
                 <div className="campaign-list__item-actions">
+                  <button
+                    className="campaign-list__btn-preview"
+                    onClick={() => setPreviewCampaignId(campaign.id)}
+                  >
+                    Просмотр
+                  </button>
                   {canEdit && (
                     <>
                       <button className="campaign-list__btn-edit" onClick={() => onEdit(campaign)}>
@@ -378,6 +631,13 @@ const CampaignList = ({ onEdit, canEdit, refreshKey }) => {
         btn1="Отмена"
         btn2="Отправить"
       />
+
+      {previewCampaignId && (
+        <CampaignPreview
+          campaignId={previewCampaignId}
+          onClose={() => setPreviewCampaignId(null)}
+        />
+      )}
     </div>
   )
 }

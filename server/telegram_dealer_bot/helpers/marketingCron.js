@@ -228,7 +228,7 @@ async function sendCampaignToCompanies(client, bot, campaign) {
       if (parseInt(duplicateCheck.rows[0].count) > 0) {
         skipped++
         const skipMessage = `Пропущено: кампания уже была отправлена в период блокировки (${blockingPeriod} дней)`
-        
+
         console.log(
           `[CRON][MARKETING] Пропуск компании ${company.company_id}: дублирование (отправлено в последние ${blockingPeriod} дней)`
         )
@@ -239,7 +239,7 @@ async function sendCampaignToCompanies(client, bot, campaign) {
            VALUES ($1, $2, 'skipped', 'auto', 'telegram', $3)`,
           [campaign.id, company.company_id, skipMessage]
         )
-        
+
         continue
       }
 
@@ -451,8 +451,23 @@ async function sendCampaignToCompanies(client, bot, campaign) {
               attachment.file_name
             )
             if (fs.existsSync(attachmentPath)) {
+              // Используем оригинальное имя файла, если оно есть, иначе извлекаем из file_name
+              let displayName = attachment.original_name || attachment.file_name
+              // Если file_name содержит префикс timestamp, извлекаем оригинальное имя
+              if (!attachment.original_name && attachment.file_name.includes('-')) {
+                const parts = attachment.file_name.split('-')
+                if (parts.length >= 3) {
+                  // Пропускаем первые две части (timestamp и random) и объединяем остальное
+                  displayName = parts.slice(2).join('-')
+                }
+              }
+              // Обрабатываем имя файла для корректной кодировки
+              const { sanitizeFilename } = require('../helpers/fileUtils')
+              displayName = sanitizeFilename(displayName)
+
               await bot.sendDocument(company.chat_id, fs.createReadStream(attachmentPath), {
-                caption: attachment.file_name,
+                filename: displayName,
+                caption: displayName,
               })
               // Небольшая задержка между отправками файлов
               await new Promise((resolve) => setTimeout(resolve, 100))

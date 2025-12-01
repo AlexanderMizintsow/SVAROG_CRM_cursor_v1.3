@@ -587,12 +587,10 @@ const CampaignForm = ({ campaign, onClose, onSave }) => {
                       Каждый перенос будет отображаться в Telegram
                     </li>
                     <li>
-                      <strong>Жирный текст:</strong> Выделите текст и нажмите <strong>B</strong> или
-                      используйте <code>*текст*</code>
+                      <strong>Жирный текст:</strong> Выделите текст и нажмите <strong>B</strong>
                     </li>
                     <li>
-                      <strong>Курсив:</strong> Выделите текст и нажмите <em>I</em> или используйте{' '}
-                      <code>_текст_</code>
+                      <strong>Курсив:</strong> Выделите текст и нажмите <em>I</em>
                     </li>
                     <li>
                       <strong>Эмодзи:</strong> Можно использовать любые эмодзи, например: 📢 🎉 💰
@@ -962,8 +960,20 @@ const CampaignForm = ({ campaign, onClose, onSave }) => {
 
           {/* Тэги */}
           <div className="campaign-form__section">
-            <label className="campaign-form__label">Тэги</label>
-            {tags.length > 0 && (
+            <div className="campaign-form__label-row">
+              <label className="campaign-form__label">Тэги</label>
+              <span
+                className="campaign-form__help-text"
+                title="Тэги используются для организации и категоризации кампаний. Они не влияют на выбор получателей рассылки."
+              >
+                ℹ️
+              </span>
+            </div>
+            <p className="campaign-form__field-description">
+              Тэги помогают организовать и категоризировать кампании для удобного поиска и
+              фильтрации. Они не влияют на выбор получателей рассылки.
+            </p>
+            {tags.length > 0 ? (
               <div className="campaign-form__multi-select">
                 {tags.map((tag) => (
                   <label key={tag.id} className="campaign-form__checkbox-item">
@@ -992,6 +1002,10 @@ const CampaignForm = ({ campaign, onClose, onSave }) => {
                   </label>
                 ))}
               </div>
+            ) : (
+              <p className="campaign-form__empty-state">
+                Нет доступных тегов. Создайте теги в разделе управления справочниками.
+              </p>
             )}
           </div>
 
@@ -1059,15 +1073,6 @@ const CampaignForm = ({ campaign, onClose, onSave }) => {
                   disabled
                 />
                 Email (в разработке)
-              </label>
-              <label>
-                <input
-                  type="checkbox"
-                  checked={formData.delivery_channels.includes('sms')}
-                  onChange={() => handleDeliveryChannelChange('sms')}
-                  disabled
-                />
-                SMS (в разработке)
               </label>
             </div>
             {errors.delivery_channels && (

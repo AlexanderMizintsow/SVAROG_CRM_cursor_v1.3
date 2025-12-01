@@ -1,52 +1,99 @@
-import { useState } from "react";
-import { API_BASE_URL, appTypeBuild } from "../../../config";
-import useUserStore from "../../store/userStore";
-import useVersionInfo from "../../store/useVersionInfo";
-import { MdOutlineBrowserUpdated } from "react-icons/md";
-import { FcInfo } from "react-icons/fc";
-import axios from "axios";
-import versionTitle from "../../assets/img/dealers.jpg";
-import quest from "../../assets/img/help/quest.png";
-import svarog_notifications_bot from "../../assets/img/help/svarog_notifications_bot.png";
-import volga_window_factory_bot from "../../assets/img/help/volga_window_factory_bot.png";
-import menu_tg_bot from "../../assets/img/help/menu_tg_bot.png";
-import dealer_name from "../../assets/img/help/dealer_name.png";
-import top_menu from "../../assets/img/help/top_menu.png";
-import top from "../../assets/img/help/top.png";
-import schedule from "../../assets/img/help/schedule.png";
-import add_task from "../../assets/img/help/add_task.png";
-import task_KB from "../../assets/img/help/task_KB.png";
-import task_icon_list from "../../assets/img/help/task_icon_list.png";
-import approver_list from "../../assets/img/help/approver_list.png";
-import autor_list from "../../assets/img/help/autor_list.png";
-import notification_task from "../../assets/img/help/notification_task.png";
-import global_message from "../../assets/img/help/global_message.png";
-import project_btn from "../../assets/img/help/project_btn.png";
-import dextopSvarog from "../../assets/img/dextop.ico";
-import d1 from "../../assets/img/help/d1.png";
-import d2 from "../../assets/img/help/d2.png";
-import d3 from "../../assets/img/help/d3.png";
-import d4 from "../../assets/img/help/d4.png";
-import subTask from "../../assets/img/help/subTask.png";
-import subTask2 from "../../assets/img/help/subTask2.png";
-import timeTask from "../../assets/img/help/timeTask.png";
-import timeTaskAlertAuthor from "../../assets/img/help/timeTaskAlertAuthor.png";
-import subTaskModal from "../../assets/img/help/subTaskModal.png";
-import in_call from "../../assets/img/help/in_call.png";
-import call_off from "../../assets/img/help/call_off.png";
-import all_info_card from "../../assets/img/help/all_info_card.png";
+import { useState } from 'react'
+import { API_BASE_URL, appTypeBuild } from '../../../config'
+import useUserStore from '../../store/userStore'
+import useVersionInfo from '../../store/useVersionInfo'
+import { MdOutlineBrowserUpdated } from 'react-icons/md'
+import { FcInfo } from 'react-icons/fc'
+import axios from 'axios'
+import versionTitle from '../../assets/img/dealers.jpg'
+import quest from '../../assets/img/help/quest.png'
+import svarog_notifications_bot from '../../assets/img/help/svarog_notifications_bot.png'
+import volga_window_factory_bot from '../../assets/img/help/volga_window_factory_bot.png'
+import menu_tg_bot from '../../assets/img/help/menu_tg_bot.png'
+import dealer_name from '../../assets/img/help/dealer_name.png'
+import top_menu from '../../assets/img/help/top_menu.png'
+import top from '../../assets/img/help/top.png'
+import schedule from '../../assets/img/help/schedule.png'
+import add_task from '../../assets/img/help/add_task.png'
+import task_KB from '../../assets/img/help/task_KB.png'
+import task_icon_list from '../../assets/img/help/task_icon_list.png'
+import approver_list from '../../assets/img/help/approver_list.png'
+import autor_list from '../../assets/img/help/autor_list.png'
+import notification_task from '../../assets/img/help/notification_task.png'
+import global_message from '../../assets/img/help/global_message.png'
+import project_btn from '../../assets/img/help/project_btn.png'
+import dextopSvarog from '../../assets/img/dextop.ico'
+import d1 from '../../assets/img/help/d1.png'
+import d2 from '../../assets/img/help/d2.png'
+import d3 from '../../assets/img/help/d3.png'
+import d4 from '../../assets/img/help/d4.png'
+import subTask from '../../assets/img/help/subTask.png'
+import subTask2 from '../../assets/img/help/subTask2.png'
+import timeTask from '../../assets/img/help/timeTask.png'
+import timeTaskAlertAuthor from '../../assets/img/help/timeTaskAlertAuthor.png'
+import subTaskModal from '../../assets/img/help/subTaskModal.png'
+import in_call from '../../assets/img/help/in_call.png'
+import call_off from '../../assets/img/help/call_off.png'
+import all_info_card from '../../assets/img/help/all_info_card.png'
 // Изображения для версии 1.2.5 будут добавлены позже
 
-import "./changelog.scss";
+import './changelog.scss'
 const Changelog = () => {
-  const { user } = useUserStore();
-  const { setVersions } = useVersionInfo();
+  const { user } = useUserStore()
+  const { setVersions } = useVersionInfo()
 
   // Установите статичные изменения
   const [updates] = useState([
     {
-      title: "Версия 1.3.5",
-      date: "31.08.2025г.",
+      title: 'Версия 1.3.6',
+      date: '07.12.2025г.',
+      description: `Комопонент - "Автоматизация маркетинга".<br />
+
+      <br/>-*** ✅ Система уведомлений о входящих звонках<br /><br />
+      ✏️*** Модуль для создания, управления и автоматической отправки маркетинговых кампаний дилерам через Telegram. 
+       Централизует управление акциями, технической информацией и другими материалами.<br /><br />
+
+       Основные возможности:<br /><br />
+Создание и управление кампаниями:<br />
+Создание кампаний с текстом, изображениями и файлами
+Редактор с форматированием для Telegram (Markdown)
+Организация по категориям (Акции, Техническая информация и др.)
+Теги для дополнительной категоризации и фильтрации <br /><br />
+Статусы: <br />
+Черновик, Активна, Деактивна
+Настройка получателей:<br />
+Выбор конкретных компаний или отправка всем дилерам
+Фильтрация по локациям (городам)
+Автоматический отбор компаний с подключенным Telegram <br /><br />
+Отправка кампаний:<br />
+Ручная отправка с подтверждением и списком получателей
+Автоматическая отправка по расписанию (время и период действия)
+Защита от дублирования (период блокировки повторной отправки)
+Формирование сообщений: текст, изображения, файлы, контактное лицо <br /><br />
+Контроль и аналитика:<br />
+Журнал отправок с фильтрацией по статусам (Отправлено, Ошибка, Пропущено, Нет ТГ)
+Статистика по кампаниям
+Экспорт данных в Excel
+Просмотр кампании перед отправкой (превью в формате Telegram) <br /><br />
+Управление справочниками:<br />
+Управление категориями кампаний
+Управление тегами для организации кампаний
+Настройка прав доступа пользователей <br /><br />
+Преимущества:<br />
+Централизованное управление маркетинговыми коммуникациями
+Автоматизация регулярных рассылок
+Контроль доставки и статусов отправки
+Гибкая настройка получателей и периодов действия
+Защита от дублирования отправок
+Полная история всех отправок в журнале <br /><br />
+Применение:
+Используется для информирования дилеров о новых акциях, технических обновлениях, изменениях в работе, специальных предложениях и другой маркетинговой информации через Telegram.
+ `,
+      images: [versionTitle],
+    },
+    {
+      title: 'Версия 1.3.5',
+      date: '31.08.2025г.',
       description: `Создание CRM системы с управлением звонками, задачами и уведомлениями.<br />
 
       <br/>-*** ✅ Система уведомлений о входящих звонках<br /><br />
@@ -166,8 +213,8 @@ const Changelog = () => {
       images: [versionTitle],
     },
     {
-      title: "Версия 1.2.4",
-      date: "27.06.2025г.",
+      title: 'Версия 1.2.4',
+      date: '27.06.2025г.',
       description: `Добавление иерархии задач, продление сроков исполнения задачи.<br />
 
          <br/>-*** ✅ На карточке задач появилась возможность создать связанную с основной задачу. <br /><br /> 
@@ -188,8 +235,8 @@ const Changelog = () => {
       images: [subTaskModal],
     },
     {
-      title: "Версия 1.2.3",
-      date: "09.06.2025г.",
+      title: 'Версия 1.2.3',
+      date: '09.06.2025г.',
       description: `Дополнительное декстопное приложение.<br />
       
        <br/>-*** ✅ Декстопное приложение можно скачать в на нижней панели приложения, в крайней левой ее части. <br /><br /> 
@@ -206,8 +253,8 @@ const Changelog = () => {
       images: [dextopSvarog],
     },
     {
-      title: "Версия 1.2.2",
-      date: "20.05.2025г.",
+      title: 'Версия 1.2.2',
+      date: '20.05.2025г.',
       description: `Новый компонент(модуль) "Проекты" и дополнительные функции.<br />
 
       <br/>-*** ✅ Обновление панели уведомлений для задач <br /><br />
@@ -268,8 +315,8 @@ const Changelog = () => {
     },
 
     {
-      title: "Версия 1.1.2",
-      date: "18.05.2025г.",
+      title: 'Версия 1.1.2',
+      date: '18.05.2025г.',
       description: `Новый компонент(модуль) "Задачи" и дополнительные функции.<br />
   
   <br/>-*** ✅ Карточка уведомлений от дилеров:<br />
@@ -365,8 +412,8 @@ const Changelog = () => {
       images: [versionTitle],
     },
     {
-      title: "Версия 1.0.1",
-      date: "21.04.2025г.",
+      title: 'Версия 1.0.1',
+      date: '21.04.2025г.',
       description: `Реализованы новые функции для улучшения оповещений и автоматизации работы приложения.<br />
   
   <br/>-*** ✅ Добавлен планировщик для просроченных уведомлений:<br />
@@ -399,8 +446,8 @@ const Changelog = () => {
       images: [versionTitle],
     },
     {
-      title: "Версия 1.0.0",
-      date: "01.04.2025г.",
+      title: 'Версия 1.0.0',
+      date: '01.04.2025г.',
       description: `Первый релиз приложения с основными функциями, где определена общая стилистика приложения и его архитектура.<br />
       В данном приложении представлены компоненты, которые располагаются в левом боковм меню.
       Меню состоит из разделов и подменю, некоторые из которых в будущем будут отображаться только для определенных отделов.
@@ -477,49 +524,46 @@ const Changelog = () => {
       `,
       images: [versionTitle],
     },
-  ]);
+  ])
 
-  const [isModalOpen, setIsModalOpen] = useState(false);
-  const [currentImage, setCurrentImage] = useState("");
+  const [isModalOpen, setIsModalOpen] = useState(false)
+  const [currentImage, setCurrentImage] = useState('')
 
   const openModal = (image) => {
-    setCurrentImage(image);
-    setIsModalOpen(true);
-    console.log("Opening modal with image:", image);
-  };
+    setCurrentImage(image)
+    setIsModalOpen(true)
+    console.log('Opening modal with image:', image)
+  }
 
   const closeModal = () => {
-    setIsModalOpen(false);
-  };
+    setIsModalOpen(false)
+  }
 
   const handleUpdateShowVersion = async () => {
     await axios
       .delete(`${API_BASE_URL}5000/api/introduction/show/version`)
       .then((response) => {
-        setVersions(response.data);
+        setVersions(response.data)
       })
 
       .catch((error) => {
-        console.error(
-          "Ошибка при удалении:",
-          error.response ? error.response.data : error.message
-        );
-      });
-  };
+        console.error('Ошибка при удалении:', error.response ? error.response.data : error.message)
+      })
+  }
 
   const handleUpdateAPP = async () => {
     try {
-      const response = await axios.post(`${API_BASE_URL}5000/api/update-app`);
-      alert(response.data);
+      const response = await axios.post(`${API_BASE_URL}5000/api/update-app`)
+      alert(response.data)
     } catch (error) {
-      console.error("Ошибка обновления:", error);
-      alert("Ошибка обновления приложения");
+      console.error('Ошибка обновления:', error)
+      alert('Ошибка обновления приложения')
     }
-  };
+  }
 
   return (
     <div className="container changelog">
-      {user?.role_name === "Администратор" && (
+      {user?.role_name === 'Администратор' && (
         <div className="changelog-control-icon">
           <FcInfo
             className="icon icon-update"
@@ -577,7 +621,7 @@ const Changelog = () => {
         </div>
       )}
     </div>
-  );
-};
+  )
+}
 
-export default Changelog;
+export default Changelog

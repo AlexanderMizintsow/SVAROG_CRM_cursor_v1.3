@@ -1,14 +1,17 @@
 import { useState, useEffect } from 'react'
 import axios from 'axios'
 import Toastify from 'toastify-js'
+import { MdContactSupport } from 'react-icons/md'
 import useUserStore from '../../../store/userStore'
 import { API_BASE_URL } from '../../../../config'
 import CategoryManager from './components/CategoryManager/CategoryManager'
+import TagManager from './components/TagManager/TagManager'
 import CampaignList from './components/CampaignList/CampaignList'
 import CampaignForm from './components/CampaignForm/CampaignForm'
 import SendLog from './components/SendLog/SendLog'
 import Statistics from './components/Statistics/Statistics'
 import PermissionsManager from './components/PermissionsManager/PermissionsManager'
+import HelpModalMarketingAutomation from './components/HelpModalMarketingAutomation/HelpModalMarketingAutomation'
 import './marketingAutomation.scss'
 
 const MarketingAutomation = () => {
@@ -22,6 +25,7 @@ const MarketingAutomation = () => {
   const [openCampaignForm, setOpenCampaignForm] = useState(false)
   const [editingCampaign, setEditingCampaign] = useState(null)
   const [refreshKey, setRefreshKey] = useState(0)
+  const [openHelpModal, setOpenHelpModal] = useState(false)
 
   // Загрузка прав доступа пользователя
   useEffect(() => {
@@ -85,6 +89,14 @@ const MarketingAutomation = () => {
         )}
       </div>
 
+      <div className="marketing-automation__help">
+        <MdContactSupport
+          className="help-icon"
+          onClick={() => setOpenHelpModal(true)}
+          title="Справка по автоматизации маркетинга"
+        />
+      </div>
+
       <div className="marketing-automation__tabs">
         <button
           className={`marketing-automation__tab ${activeTab === 'campaigns' ? 'active' : ''}`}
@@ -97,6 +109,12 @@ const MarketingAutomation = () => {
           onClick={() => setActiveTab('categories')}
         >
           Категории
+        </button>
+        <button
+          className={`marketing-automation__tab ${activeTab === 'tags' ? 'active' : ''}`}
+          onClick={() => setActiveTab('tags')}
+        >
+          Теги
         </button>
         <button
           className={`marketing-automation__tab ${activeTab === 'send-log' ? 'active' : ''}`}
@@ -122,20 +140,15 @@ const MarketingAutomation = () => {
 
       <div className="marketing-automation__content">
         {activeTab === 'campaigns' && (
-          <CampaignList
-            onEdit={handleEditCampaign}
-            canEdit={canEdit()}
-            refreshKey={refreshKey}
-          />
+          <CampaignList onEdit={handleEditCampaign} canEdit={canEdit()} refreshKey={refreshKey} />
         )}
         {activeTab === 'categories' && (
           <CategoryManager canEdit={canEdit()} refreshKey={refreshKey} />
         )}
+        {activeTab === 'tags' && <TagManager canEdit={canEdit()} refreshKey={refreshKey} />}
         {activeTab === 'send-log' && <SendLog />}
         {activeTab === 'statistics' && <Statistics />}
-        {activeTab === 'permissions' && isAdmin && (
-          <PermissionsManager refreshKey={refreshKey} />
-        )}
+        {activeTab === 'permissions' && isAdmin && <PermissionsManager refreshKey={refreshKey} />}
       </div>
 
       {openCampaignForm && (
@@ -145,9 +158,13 @@ const MarketingAutomation = () => {
           onSave={handleCloseCampaignForm}
         />
       )}
+
+      <HelpModalMarketingAutomation
+        isOpen={openHelpModal}
+        onClose={() => setOpenHelpModal(false)}
+      />
     </div>
   )
 }
 
 export default MarketingAutomation
-
