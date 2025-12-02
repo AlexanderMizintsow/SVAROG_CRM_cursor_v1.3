@@ -6,7 +6,7 @@ const path = require('path')
 const fs = require('fs')
 
 // Главное меню маркетинговой информации
-async function showMarketingMenu(bot, chatId) {
+async function showMarketingMenu(bot, chatId, userSessions) {
   try {
     // Получаем company_id для фильтрации
     const companyResult = await dbPool.query(
@@ -88,17 +88,43 @@ async function showMarketingMenu(bot, chatId) {
     }
 
     const keyboard = {
-      inline_keyboard: categoriesResult.rows.map((category) => [
-        {
-          text: `${category.icon || '📁'} ${category.name}`,
-          callback_data: `marketing_category_${category.id}`,
-        },
-      ]),
+      inline_keyboard: [
+        ...categoriesResult.rows.map((category) => [
+          {
+            text: `${category.icon || '📁'} ${category.name}`,
+            callback_data: `marketing_category_${category.id}`,
+          },
+        ]),
+        [
+          {
+            text: '🔙 Назад',
+            callback_data: 'back_to_help_menu',
+          },
+        ],
+      ],
     }
 
-    await bot.sendMessage(chatId, '📋 Выберите категорию:', {
+    // Инициализация userSessions[chatId]
+    if (!userSessions) {
+      userSessions = {}
+    }
+    userSessions[chatId] = userSessions[chatId] || {}
+
+    // Удаляем предыдущее сообщение меню, если оно есть
+    if (userSessions[chatId].marketingMenuMessageId) {
+      try {
+        await bot.deleteMessage(chatId, userSessions[chatId].marketingMenuMessageId)
+      } catch (error) {
+        console.error(`Не удалось удалить предыдущее сообщение меню: ${error.message}`)
+      }
+    }
+
+    const message = await bot.sendMessage(chatId, '📋 Выберите категорию:', {
       reply_markup: keyboard,
     })
+
+    // Сохраняем ID сообщения для последующего удаления
+    userSessions[chatId].marketingMenuMessageId = message.message_id
   } catch (error) {
     console.error('Ошибка при показе меню маркетинга:', error)
     await bot.sendMessage(chatId, '❌ Ошибка при загрузке информации')
@@ -106,7 +132,7 @@ async function showMarketingMenu(bot, chatId) {
 }
 
 // Показ кампаний категории
-async function showCategoryCampaigns(bot, chatId, categoryId, page = 0) {
+async function showCategoryCampaigns(bot, chatId, categoryId, page = 0, userSessions) {
   try {
     const pageSize = 5
     const offset = page * pageSize
@@ -248,9 +274,27 @@ async function showCategoryCampaigns(bot, chatId, categoryId, page = 0) {
       },
     ])
 
-    await bot.sendMessage(chatId, `📋 Кампании (страница ${page + 1}):`, {
+    // Инициализация userSessions[chatId]
+    if (!userSessions) {
+      userSessions = {}
+    }
+    userSessions[chatId] = userSessions[chatId] || {}
+
+    // Удаляем предыдущее сообщение меню, если оно есть
+    if (userSessions[chatId].marketingMenuMessageId) {
+      try {
+        await bot.deleteMessage(chatId, userSessions[chatId].marketingMenuMessageId)
+      } catch (error) {
+        console.error(`Не удалось удалить предыдущее сообщение меню: ${error.message}`)
+      }
+    }
+
+    const message = await bot.sendMessage(chatId, `📋 Кампании (страница ${page + 1}):`, {
       reply_markup: keyboard,
     })
+
+    // Сохраняем ID сообщения для последующего удаления
+    userSessions[chatId].marketingMenuMessageId = message.message_id
   } catch (error) {
     console.error('Ошибка при показе кампаний категории:', error)
     await bot.sendMessage(chatId, '❌ Ошибка при загрузке кампаний')
@@ -258,7 +302,7 @@ async function showCategoryCampaigns(bot, chatId, categoryId, page = 0) {
 }
 
 // Показ деталей кампании
-async function showCampaignDetails(bot, chatId, campaignId) {
+async function showCampaignDetails(bot, chatId, campaignId, userSessions) {
   try {
     const client = await dbPool.connect()
     try {
@@ -346,9 +390,6 @@ async function showCampaignDetails(bot, chatId, campaignId) {
 
       if (campaign.contact_person_name && campaign.show_contact_person) {
         message += `\n\n📞 Контактное лицо: ${campaign.contact_person_name}`
-        if (campaign.contact_person_email) {
-          message += `\n📧 ${campaign.contact_person_email}`
-        }
       }
 
       // Получаем изображения
@@ -526,7 +567,27 @@ async function showCampaignDetails(bot, chatId, campaignId) {
         ],
       }
 
-      await bot.sendMessage(chatId, 'Выберите действие:', { reply_markup: keyboard })
+      // Инициализация userSessions[chatId]
+      if (!userSessions) {
+        userSessions = {}
+      }
+      userSessions[chatId] = userSessions[chatId] || {}
+
+      // Удаляем предыдущее сообщение меню, если оно есть
+      if (userSessions[chatId].marketingMenuMessageId) {
+        try {
+          await bot.deleteMessage(chatId, userSessions[chatId].marketingMenuMessageId)
+        } catch (error) {
+          console.error(`Не удалось удалить предыдущее сообщение меню: ${error.message}`)
+        }
+      }
+
+      const actionMessage = await bot.sendMessage(chatId, 'Выберите действие:', {
+        reply_markup: keyboard,
+      })
+
+      // Сохраняем ID сообщения для последующего удаления
+      userSessions[chatId].marketingMenuMessageId = actionMessage.message_id
     } finally {
       client.release()
     }
@@ -537,22 +598,22 @@ async function showCampaignDetails(bot, chatId, campaignId) {
 }
 
 // Обработка callback запросов
-async function handleMarketingCallback(bot, chatId, callbackData) {
+async function handleMarketingCallback(bot, chatId, callbackData, userSessions) {
   if (callbackData === 'marketing_info') {
-    await showMarketingMenu(bot, chatId)
+    await showMarketingMenu(bot, chatId, userSessions)
   } else if (callbackData.startsWith('marketing_category_')) {
     const parts = callbackData.split('_')
     if (parts.length === 3) {
       const categoryId = parseInt(parts[2])
-      await showCategoryCampaigns(bot, chatId, categoryId, 0)
+      await showCategoryCampaigns(bot, chatId, categoryId, 0, userSessions)
     } else if (parts.length === 5 && parts[3] === 'page') {
       const categoryId = parseInt(parts[2])
       const page = parseInt(parts[4])
-      await showCategoryCampaigns(bot, chatId, categoryId, page)
+      await showCategoryCampaigns(bot, chatId, categoryId, page, userSessions)
     }
   } else if (callbackData.startsWith('marketing_campaign_')) {
     const campaignId = parseInt(callbackData.replace('marketing_campaign_', ''))
-    await showCampaignDetails(bot, chatId, campaignId)
+    await showCampaignDetails(bot, chatId, campaignId, userSessions)
   }
 }
 

@@ -173,11 +173,13 @@ const PermissionsManager = ({ refreshKey }) => {
 
       {deletePermissionId && (
         <ConfirmationDialog
-          isOpen={!!deletePermissionId}
+          open={!!deletePermissionId}
           onClose={() => setDeletePermissionId(null)}
           onConfirm={confirmDelete}
           title="Удаление прав доступа"
           message="Вы уверены, что хотите удалить права доступа для этого пользователя?"
+          btn1="Отмена"
+          btn2="Удалить"
         />
       )}
     </div>

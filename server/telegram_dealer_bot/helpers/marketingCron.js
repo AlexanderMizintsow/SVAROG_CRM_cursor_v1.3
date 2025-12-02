@@ -315,15 +315,12 @@ async function sendCampaignToCompanies(client, bot, campaign) {
       // Контактное лицо
       if (campaign.show_contact_person && campaign.contact_person_id) {
         const contactResult = await client.query(
-          "SELECT first_name || ' ' || last_name as name, email FROM users WHERE id = $1",
+          "SELECT first_name || ' ' || last_name as name FROM users WHERE id = $1",
           [campaign.contact_person_id]
         )
         if (contactResult.rows.length > 0) {
           const contact = contactResult.rows[0]
           message += `\n\n📞 Контактное лицо: ${contact.name}`
-          if (contact.email) {
-            message += `\n📧 ${contact.email}`
-          }
         }
       }
 

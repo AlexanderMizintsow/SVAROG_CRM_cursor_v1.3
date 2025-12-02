@@ -2,8 +2,21 @@
   &__header {
     display: flex;
     justify-content: space-between;
-    align-items: center;
+    align-items: flex-start;
     margin-bottom: 20px;
+    gap: 20px;
+  }
+
+  &__header-content {
+    flex: 1;
+  }
+
+  &__description {
+    margin: 10px 0 0 0;
+    color: #666;
+    font-size: 14px;
+    line-height: 1.5;
+    max-width: 800px;
   }
 
   &__loading {

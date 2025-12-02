@@ -107,7 +107,12 @@ const EditorHandle = () => {
   const [viewingRule, setViewingRule] = useState(null)
 
   // Формы
-  const [parameterForm, setParameterForm] = useState({ name: '', description: '', is_multiple: false, use_categories: false })
+  const [parameterForm, setParameterForm] = useState({
+    name: '',
+    description: '',
+    is_multiple: false,
+    use_categories: false,
+  })
   const [parameterValueForm, setParameterValueForm] = useState({ value: '', display_order: 0 })
   const [handleForm, setHandleForm] = useState({ article: '', name: '', description: '' })
   const [ruleForm, setRuleForm] = useState({ quantity: 1 })
@@ -127,10 +132,10 @@ const EditorHandle = () => {
   // Загрузка прав доступа пользователя
   const loadUserPermissions = async () => {
     if (!userId) return
-    
+
     try {
       const response = await axios.get(`${API_BASE_URL}5000/api/editor-handle/permissions`, {
-        params: { userId }
+        params: { userId },
       })
       setUserCanEdit(response.data.can_edit || false)
     } catch (error) {
@@ -159,7 +164,7 @@ const EditorHandle = () => {
       setLoading(true)
       const response = await axios.get(`${API_BASE_URL}5000/api/editor-handle/data`)
       setEditorData(response.data)
-      
+
       if (response.data.leafTypes.length > 0 && !selectedLeafType) {
         setSelectedLeafType(response.data.leafTypes[0].id.toString())
       }
@@ -224,7 +229,7 @@ const EditorHandle = () => {
     try {
       await axios.post(`${API_BASE_URL}5000/api/editor-handle/approval-users`, {
         user_id: userIdToAdd,
-        created_by: userId // ID администратора, который добавляет пользователя
+        created_by: userId, // ID администратора, который добавляет пользователя
       })
       Toastify({
         text: 'Пользователь успешно добавлен',
@@ -243,8 +248,9 @@ const EditorHandle = () => {
   }
 
   const handleRemoveApprovalUser = async (id) => {
-    if (!window.confirm('Вы уверены, что хотите удалить этого пользователя из списка разрешенных?')) return
-    
+    if (!window.confirm('Вы уверены, что хотите удалить этого пользователя из списка разрешенных?'))
+      return
+
     try {
       await axios.delete(`${API_BASE_URL}5000/api/editor-handle/approval-users/${id}`)
       Toastify({
@@ -276,7 +282,7 @@ const EditorHandle = () => {
   const performApprove = async () => {
     try {
       await axios.post(`${API_BASE_URL}5000/api/editor-handle/approve`, {
-        user_id: userId
+        user_id: userId,
       })
       Toastify({
         text: 'Эталонность подтверждена',
@@ -302,7 +308,7 @@ const EditorHandle = () => {
     try {
       await axios.post(`${API_BASE_URL}5000/api/editor-handle/snapshots`, {
         description: `Снапшот от ${new Date().toLocaleString('ru-RU')}`,
-        user_id: userId
+        user_id: userId,
       })
       Toastify({
         text: 'Снапшот успешно создан',
@@ -320,31 +326,32 @@ const EditorHandle = () => {
   }
 
   const handleRestoreSnapshot = async (snapshotId) => {
-    const snapshot = snapshots.find(s => s.id === snapshotId)
+    const snapshot = snapshots.find((s) => s.id === snapshotId)
     const wasApproved = snapshot?.is_approved
-    
-    let confirmMessage = 'Вы уверены, что хотите восстановить данные из этого снапшота? Все текущие изменения будут потеряны!'
+
+    let confirmMessage =
+      'Вы уверены, что хотите восстановить данные из этого снапшота? Все текущие изменения будут потеряны!'
     if (wasApproved) {
       confirmMessage += ' Эталонность будет автоматически восстановлена.'
     } else {
       confirmMessage += ' После восстановления потребуется подтверждение эталонности.'
     }
-    
+
     if (!window.confirm(confirmMessage)) return
-    
+
     try {
       await axios.post(`${API_BASE_URL}5000/api/editor-handle/restore`, {
         snapshot_id: snapshotId,
-        user_id: userId
+        user_id: userId,
       })
-      
+
       let successMessage = 'Данные успешно восстановлены.'
       if (wasApproved) {
         successMessage += ' Эталонность восстановлена автоматически.'
       } else {
         successMessage += ' Требуется подтверждение эталонности.'
       }
-      
+
       Toastify({
         text: successMessage,
         close: true,
@@ -364,8 +371,11 @@ const EditorHandle = () => {
   }
 
   const handleDeleteSnapshot = async (snapshotId) => {
-    if (!window.confirm('Вы уверены, что хотите удалить этот снапшот? Это действие нельзя отменить.')) return
-    
+    if (
+      !window.confirm('Вы уверены, что хотите удалить этот снапшот? Это действие нельзя отменить.')
+    )
+      return
+
     try {
       await axios.delete(`${API_BASE_URL}5000/api/editor-handle/snapshots/${snapshotId}`)
       Toastify({
@@ -386,14 +396,16 @@ const EditorHandle = () => {
   // Проверка, может ли пользователь подтверждать
   const canApprove = () => {
     if (!approvalStatus || !userId) return false
-    
+
     // Пользователь должен быть в списке тех, кто может подтверждать
-    const canUserApprove = approvalStatus.requiredUsers.some(user => user.id === userId)
+    const canUserApprove = approvalStatus.requiredUsers.some((user) => user.id === userId)
     if (!canUserApprove) return false
-    
+
     // Пользователь не должен был уже подтвердить на текущую дату
-    const hasAlreadyApproved = approvalStatus.approvals.some(approval => approval.approved_by === userId)
-    
+    const hasAlreadyApproved = approvalStatus.approvals.some(
+      (approval) => approval.approved_by === userId
+    )
+
     // Кнопка показывается если:
     // 1. Пользователь еще не подтвердил ИЛИ
     // 2. Есть изменения после подтверждения (требуется повторное подтверждение)
@@ -402,13 +414,14 @@ const EditorHandle = () => {
 
   // Фильтрация пользователей для выбора
   const getFilteredUsers = () => {
-    if (!searchUser) return allUsers.filter(user => !approvalUsers.some(au => au.user_id === user.id))
-    
+    if (!searchUser)
+      return allUsers.filter((user) => !approvalUsers.some((au) => au.user_id === user.id))
+
     const searchLower = searchUser.toLowerCase()
-    return allUsers.filter(user => {
-      const isAlreadyAdded = approvalUsers.some(au => au.user_id === user.id)
+    return allUsers.filter((user) => {
+      const isAlreadyAdded = approvalUsers.some((au) => au.user_id === user.id)
       if (isAlreadyAdded) return false
-      
+
       const fullName = formatUserFullName(user).toLowerCase()
       const username = (user.username || '').toLowerCase()
       return fullName.includes(searchLower) || username.includes(searchLower)
@@ -435,15 +448,15 @@ const EditorHandle = () => {
           filteredParameters[paramId] = valueIds
         }
       })
-      
+
       const response = await axios.post(`${API_BASE_URL}5000/api/editor-handle/find-handles`, {
         leaf_type_id: parseInt(selectedLeafType),
         parameters: filteredParameters,
       })
-      
+
       setFoundHandles(response.data.handles || [])
       setWarnings(response.data.warnings || [])
-      
+
       if (response.data.handles.length === 0) {
         Toastify({
           text: 'Ручки не найдены для данной комбинации параметров',
@@ -478,10 +491,10 @@ const EditorHandle = () => {
         leaf_type_id: parseInt(selectedLeafType),
         parameter_ids: null, // Проверяем все параметры
       })
-      
+
       setUncoveredCombinations(response.data)
       setOpenUncoveredDialog(true)
-      
+
       if (response.data.uncovered_count === 0) {
         Toastify({
           text: response.data.message || 'Все комбинации покрыты правилами',
@@ -490,7 +503,9 @@ const EditorHandle = () => {
         }).showToast()
       } else {
         Toastify({
-          text: response.data.message || `Найдено ${response.data.uncovered_count} непокрытых комбинаций`,
+          text:
+            response.data.message ||
+            `Найдено ${response.data.uncovered_count} непокрытых комбинаций`,
           close: true,
           backgroundColor: 'linear-gradient(to right, #FF9800, #F57C00)',
         }).showToast()
@@ -524,7 +539,9 @@ const EditorHandle = () => {
       return
     }
     try {
-      const response = await axios.get(`${API_BASE_URL}5000/api/editor-handle/parameters/${parameterId}/values`)
+      const response = await axios.get(
+        `${API_BASE_URL}5000/api/editor-handle/parameters/${parameterId}/values`
+      )
       setParameterValuesWithCategories(response.data)
     } catch (error) {
       console.error('Ошибка при загрузке значений параметра:', error)
@@ -539,12 +556,25 @@ const EditorHandle = () => {
   // Назначение категории значению параметра
   const handleAssignCategoryToValue = async (valueId, categoryId) => {
     try {
-      await axios.put(`${API_BASE_URL}5000/api/editor-handle/parameter-values/${valueId}/category`, {
-        category_id: categoryId || null
-      })
+      await axios.put(
+        `${API_BASE_URL}5000/api/editor-handle/parameter-values/${valueId}/category`,
+        {
+          category_id: categoryId || null,
+        }
+      )
       // Обновляем локальное состояние
-      setParameterValuesWithCategories(prev => 
-        prev.map(val => val.id === valueId ? { ...val, category_id: categoryId, category_name: categoryId ? categories.find(c => c.id === categoryId)?.name : null } : val)
+      setParameterValuesWithCategories((prev) =>
+        prev.map((val) =>
+          val.id === valueId
+            ? {
+                ...val,
+                category_id: categoryId,
+                category_name: categoryId
+                  ? categories.find((c) => c.id === categoryId)?.name
+                  : null,
+              }
+            : val
+        )
       )
       Toastify({
         text: 'Категория успешно назначена',
@@ -621,7 +651,7 @@ const EditorHandle = () => {
       await axios.post(`${API_BASE_URL}5000/api/editor-handle/permissions`, {
         user_id: parseInt(selectedUserForPermissions),
         can_edit: true,
-        created_by: userId
+        created_by: userId,
       })
       Toastify({
         text: 'Права доступа успешно сохранены',
@@ -640,7 +670,8 @@ const EditorHandle = () => {
   }
 
   const handleDeletePermissions = async (id) => {
-    if (!window.confirm('Вы уверены, что хотите удалить права доступа для этого пользователя?')) return
+    if (!window.confirm('Вы уверены, что хотите удалить права доступа для этого пользователя?'))
+      return
     try {
       await axios.delete(`${API_BASE_URL}5000/api/editor-handle/permissions/${id}`)
       Toastify({
@@ -660,9 +691,9 @@ const EditorHandle = () => {
 
   // Обработка изменения параметров (поддержка множественного выбора)
   const handleParameterChange = (parameterId, valueIds) => {
-    setSelectedParameters(prev => ({
+    setSelectedParameters((prev) => ({
       ...prev,
-      [parameterId]: Array.isArray(valueIds) ? valueIds : (valueIds ? [valueIds] : []),
+      [parameterId]: Array.isArray(valueIds) ? valueIds : valueIds ? [valueIds] : [],
     }))
   }
 
@@ -720,10 +751,10 @@ const EditorHandle = () => {
 
   const handleDeleteParameter = async (id) => {
     if (!window.confirm('Вы уверены, что хотите удалить этот параметр?')) return
-    
+
     try {
       await axios.delete(`${API_BASE_URL}5000/api/editor-handle/parameters/${id}`, {
-        data: { user_id: userId }
+        data: { user_id: userId },
       })
       Toastify({
         text: 'Параметр успешно удален',
@@ -768,7 +799,7 @@ const EditorHandle = () => {
 
   const handleDeleteParameterValue = async (id) => {
     if (!window.confirm('Вы уверены, что хотите удалить это значение?')) return
-    
+
     try {
       await axios.delete(`${API_BASE_URL}5000/api/editor-handle/parameter-values/${id}`)
       Toastify({
@@ -840,10 +871,10 @@ const EditorHandle = () => {
 
   const handleDeleteHandle = async (id) => {
     if (!window.confirm('Вы уверены, что хотите удалить эту ручку?')) return
-    
+
     try {
       await axios.delete(`${API_BASE_URL}5000/api/editor-handle/handles/${id}`, {
-        data: { user_id: userId }
+        data: { user_id: userId },
       })
       Toastify({
         text: 'Ручка успешно удалена',
@@ -890,10 +921,10 @@ const EditorHandle = () => {
 
   const handleDeleteLeafType = async (id) => {
     if (!window.confirm('Вы уверены, что хотите удалить этот тип створки?')) return
-    
+
     try {
       await axios.delete(`${API_BASE_URL}5000/api/editor-handle/leaf-types/${id}`, {
-        data: { user_id: userId }
+        data: { user_id: userId },
       })
       Toastify({
         text: 'Тип створки успешно удален',
@@ -918,25 +949,31 @@ const EditorHandle = () => {
       return ''
     }
 
-    const selectedLeafTypeObj = editorData.leafTypes.find(lt => lt.id.toString() === selectedLeafType)
+    const selectedLeafTypeObj = editorData.leafTypes.find(
+      (lt) => lt.id.toString() === selectedLeafType
+    )
     const leafTypeName = selectedLeafTypeObj ? selectedLeafTypeObj.name : 'Неизвестный тип'
-    
+
     // Получаем информацию о выбранных ручках
-    const handlesInfo = selectedHandles.map(handleId => {
-      const handle = editorData.handles.find(h => h.id.toString() === handleId)
-      return handle ? `${handle.article} - ${handle.name}` : `ID: ${handleId}`
-    }).join(', ')
+    const handlesInfo = selectedHandles
+      .map((handleId) => {
+        const handle = editorData.handles.find((h) => h.id.toString() === handleId)
+        return handle ? `${handle.article} - ${handle.name}` : `ID: ${handleId}`
+      })
+      .join(', ')
 
     // Формируем информацию о параметрах
     const parametersInfo = []
     Object.entries(selectedParameters).forEach(([paramId, valueIds]) => {
-      const param = editorData.parameters.find(p => p.id.toString() === paramId)
+      const param = editorData.parameters.find((p) => p.id.toString() === paramId)
       if (param) {
         if (valueIds && valueIds.length > 0) {
-          const values = valueIds.map(valueId => {
-            const value = param.values.find(v => v.id === valueId)
-            return value ? value.value : `ID: ${valueId}`
-          }).join(', ')
+          const values = valueIds
+            .map((valueId) => {
+              const value = param.values.find((v) => v.id === valueId)
+              return value ? value.value : `ID: ${valueId}`
+            })
+            .join(', ')
           parametersInfo.push(`${param.name}: ${values}`)
         } else {
           parametersInfo.push(`${param.name}: Любое значение`)
@@ -948,7 +985,7 @@ const EditorHandle = () => {
     message += `Тип створки: ${leafTypeName}\n`
     message += `Ручки: ${handlesInfo}\n`
     message += `Количество: ${ruleForm.quantity || 1}`
-    
+
     if (parametersInfo.length > 0) {
       message += `\n\nУсловия:\n${parametersInfo.join('\n')}`
     } else {
@@ -976,7 +1013,7 @@ const EditorHandle = () => {
       Object.entries(selectedParameters).forEach(([paramId, valueIds]) => {
         if (valueIds && valueIds.length > 0) {
           // Для каждого выбранного значения создаем отдельное условие (ИЛИ)
-          valueIds.forEach(valueId => {
+          valueIds.forEach((valueId) => {
             conditions.push({
               parameter_id: parseInt(paramId),
               parameter_value_id: parseInt(valueId),
@@ -992,19 +1029,19 @@ const EditorHandle = () => {
       })
 
       const response = await axios.post(`${API_BASE_URL}5000/api/editor-handle/rules`, {
-        handle_ids: selectedHandles.map(id => parseInt(id)),
+        handle_ids: selectedHandles.map((id) => parseInt(id)),
         leaf_type_id: parseInt(selectedLeafType),
         quantity: ruleForm.quantity || 1,
         conditions: conditions,
         user_id: userId,
       })
-      
+
       Toastify({
         text: response.data.message || 'Правило успешно сохранено',
         close: true,
         backgroundColor: 'linear-gradient(to right, #00b09b, #96c93d)',
       }).showToast()
-      
+
       setRuleForm({ quantity: 1 })
       setSelectedHandles([])
       setSelectedParameters({})
@@ -1054,15 +1091,15 @@ const EditorHandle = () => {
     try {
       const response = await axios.get(`${API_BASE_URL}5000/api/editor-handle/rules/${ruleId}`)
       const rule = response.data
-      
+
       // Заполняем форму
       setSelectedLeafType(rule.leaf_type_id.toString())
       setSelectedHandles([rule.handle_id.toString()])
       setRuleForm({ quantity: rule.quantity || 1 })
-      
+
       // Заполняем параметры из условий
       const params = {}
-      rule.conditions.forEach(condition => {
+      rule.conditions.forEach((condition) => {
         if (!params[condition.parameter_id]) {
           params[condition.parameter_id] = []
         }
@@ -1071,7 +1108,7 @@ const EditorHandle = () => {
         }
       })
       setSelectedParameters(params)
-      
+
       setEditingItem(rule)
       setOpenRuleEditDialog(true)
     } catch (error) {
@@ -1091,7 +1128,7 @@ const EditorHandle = () => {
       const conditions = []
       Object.entries(selectedParameters).forEach(([paramId, valueIds]) => {
         if (valueIds && valueIds.length > 0) {
-          valueIds.forEach(valueId => {
+          valueIds.forEach((valueId) => {
             conditions.push({
               parameter_id: parseInt(paramId),
               parameter_value_id: parseInt(valueId),
@@ -1112,13 +1149,13 @@ const EditorHandle = () => {
         conditions: conditions,
         user_id: userId,
       })
-      
+
       Toastify({
         text: 'Правило успешно обновлено',
         close: true,
         backgroundColor: 'linear-gradient(to right, #00b09b, #96c93d)',
       }).showToast()
-      
+
       setOpenRuleEditDialog(false)
       setEditingItem(null)
       setRuleForm({ quantity: 1 })
@@ -1139,10 +1176,10 @@ const EditorHandle = () => {
   // Удаление правила
   const handleDeleteRule = async (ruleId) => {
     if (!window.confirm('Вы уверены, что хотите удалить это правило?')) return
-    
+
     try {
       await axios.delete(`${API_BASE_URL}5000/api/editor-handle/rules/${ruleId}`, {
-        data: { user_id: userId }
+        data: { user_id: userId },
       })
       Toastify({
         text: 'Правило успешно удалено',
@@ -1168,7 +1205,7 @@ const EditorHandle = () => {
       const worksheet = XLSX.utils.aoa_to_sheet(response.data.data)
       XLSX.utils.book_append_sheet(workbook, worksheet, 'Правила ручек')
       XLSX.writeFile(workbook, 'правила_ручек.xlsx')
-      
+
       Toastify({
         text: 'Данные успешно экспортированы',
         close: true,
@@ -1195,19 +1232,21 @@ const EditorHandle = () => {
         const workbook = XLSX.read(data, { type: 'array' })
         const firstSheet = workbook.Sheets[workbook.SheetNames[0]]
         const jsonData = XLSX.utils.sheet_to_json(firstSheet, { header: 1, defval: '' })
-        
-        const response = await axios.post(`${API_BASE_URL}5000/api/editor-handle/import`, { data: jsonData })
-        
+
+        const response = await axios.post(`${API_BASE_URL}5000/api/editor-handle/import`, {
+          data: jsonData,
+        })
+
         Toastify({
           text: `Импорт завершен: создано ${response.data.created}, обновлено ${response.data.updated}`,
           close: true,
           backgroundColor: 'linear-gradient(to right, #00b09b, #96c93d)',
         }).showToast()
-        
+
         if (response.data.errors && response.data.errors.length > 0) {
           console.error('Ошибки импорта:', response.data.errors)
         }
-        
+
         loadEditorData()
         loadHistory()
       } catch (error) {
@@ -1243,7 +1282,13 @@ const EditorHandle = () => {
 
   const getUserName = (historyItem) => {
     if (historyItem.first_name || historyItem.last_name) {
-      return `${historyItem.last_name || ''} ${historyItem.first_name || ''} ${historyItem.middle_name || ''}`.trim() || historyItem.username || `ID: ${historyItem.changed_by}`
+      return (
+        `${historyItem.last_name || ''} ${historyItem.first_name || ''} ${
+          historyItem.middle_name || ''
+        }`.trim() ||
+        historyItem.username ||
+        `ID: ${historyItem.changed_by}`
+      )
     }
     return historyItem.username || `ID: ${historyItem.changed_by}`
   }
@@ -1267,9 +1312,7 @@ const EditorHandle = () => {
   return (
     <Box className="editor-handle">
       <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
-        <Typography variant="h4">
-          Редактор ручек для створок
-        </Typography>
+        <Typography variant="h4">Редактор ручек для створок</Typography>
         <Box sx={{ display: 'flex', gap: 1 }}>
           <Button
             variant="outlined"
@@ -1283,10 +1326,7 @@ const EditorHandle = () => {
           </Button>
           {isAdmin && (
             <>
-              <Button
-                variant="outlined"
-                onClick={() => setOpenRestoreDialog(true)}
-              >
+              <Button variant="outlined" onClick={() => setOpenRestoreDialog(true)}>
                 Восстановить из снапшота
               </Button>
               <Button
@@ -1299,10 +1339,7 @@ const EditorHandle = () => {
               >
                 Управление пользователями подтверждения
               </Button>
-              <Button
-                variant="outlined"
-                onClick={handleOpenPermissionsDialog}
-              >
+              <Button variant="outlined" onClick={handleOpenPermissionsDialog}>
                 Управление правами доступа
               </Button>
             </>
@@ -1325,7 +1362,7 @@ const EditorHandle = () => {
 
       {/* Статус эталонности */}
       {approvalStatus && (
-        <Alert 
+        <Alert
           severity={approvalStatus.isApproved ? 'success' : 'error'}
           sx={{ mb: 2 }}
           action={
@@ -1342,7 +1379,7 @@ const EditorHandle = () => {
             </Typography>
             {approvalStatus.isApproved && approvalStatus.approvals.length > 0 && (
               <Typography variant="body2" sx={{ mt: 0.5 }}>
-                Подтверждено: {approvalStatus.approvals.map(a => formatUserName(a)).join(', ')}
+                Подтверждено: {approvalStatus.approvals.map((a) => formatUserName(a)).join(', ')}
               </Typography>
             )}
             {approvalStatus.hasChanges && (
@@ -1350,40 +1387,29 @@ const EditorHandle = () => {
                 Внимание: После подтверждения были внесены изменения
               </Typography>
             )}
-            {approvalStatus.approvals.length > 0 && approvalStatus.approvals.length < approvalStatus.requiredUsers.length && (
-              <Typography variant="body2" sx={{ mt: 0.5 }}>
-                Ожидается подтверждение от: {approvalStatus.requiredUsers
-                  .filter(u => !approvalStatus.approvals.some(a => a.approved_by === u.id))
-                  .map(u => formatUserName(u))
-                  .join(', ')}
-              </Typography>
-            )}
+            {approvalStatus.approvals.length > 0 &&
+              approvalStatus.approvals.length < approvalStatus.requiredUsers.length && (
+                <Typography variant="body2" sx={{ mt: 0.5 }}>
+                  Ожидается подтверждение от:{' '}
+                  {approvalStatus.requiredUsers
+                    .filter((u) => !approvalStatus.approvals.some((a) => a.approved_by === u.id))
+                    .map((u) => formatUserName(u))
+                    .join(', ')}
+                </Typography>
+              )}
           </Box>
         </Alert>
       )}
 
       {/* Экспорт/Импорт */}
       <Box sx={{ mb: 2, display: 'flex', gap: 2 }}>
-        <Button
-          variant="outlined"
-          startIcon={<FileDownloadIcon />}
-          onClick={handleExportExcel}
-        >
+        <Button variant="outlined" startIcon={<FileDownloadIcon />} onClick={handleExportExcel}>
           Экспорт в Excel
         </Button>
         {canEdit() && (
-          <Button
-            variant="outlined"
-            component="label"
-            startIcon={<FileUploadIcon />}
-          >
+          <Button variant="outlined" component="label" startIcon={<FileUploadIcon />}>
             Импорт из Excel
-            <input
-              type="file"
-              hidden
-              accept=".xlsx,.xls"
-              onChange={handleImportExcel}
-            />
+            <input type="file" hidden accept=".xlsx,.xls" onChange={handleImportExcel} />
           </Button>
         )}
       </Box>
@@ -1441,7 +1467,14 @@ const EditorHandle = () => {
             <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1.5 }}>
               {editorData.parameters.map((param) => (
                 <Card key={param.id} variant="outlined" sx={{ p: 1 }}>
-                  <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 0.5 }}>
+                  <Box
+                    sx={{
+                      display: 'flex',
+                      justifyContent: 'space-between',
+                      alignItems: 'center',
+                      mb: 0.5,
+                    }}
+                  >
                     <Typography variant="body2" fontWeight={500}>
                       {param.name}
                     </Typography>
@@ -1466,7 +1499,7 @@ const EditorHandle = () => {
                               name: param.name,
                               description: param.description || '',
                               is_multiple: param.is_multiple || false,
-                              use_categories: param.use_categories || false
+                              use_categories: param.use_categories || false,
                             })
                             setOpenParameterDialog(true)
                           }}
@@ -1484,7 +1517,7 @@ const EditorHandle = () => {
                       </Box>
                     )}
                   </Box>
-                  
+
                   <FormControl fullWidth size="small">
                     {param.is_multiple ? (
                       <Select
@@ -1494,7 +1527,7 @@ const EditorHandle = () => {
                         renderValue={(selected) => (
                           <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5 }}>
                             {selected.map((valueId) => {
-                              const value = param.values.find(v => v.id === valueId)
+                              const value = param.values.find((v) => v.id === valueId)
                               return value ? (
                                 <Chip key={valueId} label={value.value} size="small" />
                               ) : null
@@ -1508,7 +1541,11 @@ const EditorHandle = () => {
                         ) : (
                           param.values.map((value) => (
                             <MenuItem key={value.id} value={value.id}>
-                              <Checkbox checked={(selectedParameters[param.id] || []).indexOf(value.id) > -1} />
+                              <Checkbox
+                                checked={
+                                  (selectedParameters[param.id] || []).indexOf(value.id) > -1
+                                }
+                              />
                               {value.value}
                             </MenuItem>
                           ))
@@ -1517,7 +1554,9 @@ const EditorHandle = () => {
                     ) : (
                       <Select
                         value={selectedParameters[param.id]?.[0] || ''}
-                        onChange={(e) => handleParameterChange(param.id, e.target.value ? [e.target.value] : [])}
+                        onChange={(e) =>
+                          handleParameterChange(param.id, e.target.value ? [e.target.value] : [])
+                        }
                         displayEmpty
                       >
                         <MenuItem value="">Не выбрано</MenuItem>
@@ -1529,30 +1568,30 @@ const EditorHandle = () => {
                       </Select>
                     )}
                   </FormControl>
-                  
+
                   {/* Компактный список значений */}
                   {param.values.length > 0 && (
-                    <Box 
-                      sx={{ 
-                        mt: 0.5, 
-                        display: 'flex', 
+                    <Box
+                      sx={{
+                        mt: 0.5,
+                        display: 'flex',
                         gap: 0.5,
                         overflowX: 'auto',
                         overflowY: 'hidden',
                         '&::-webkit-scrollbar': {
-                          height: '6px'
+                          height: '6px',
                         },
                         '&::-webkit-scrollbar-track': {
                           backgroundColor: 'rgba(0,0,0,0.1)',
-                          borderRadius: '3px'
+                          borderRadius: '3px',
                         },
                         '&::-webkit-scrollbar-thumb': {
                           backgroundColor: 'rgba(0,0,0,0.3)',
                           borderRadius: '3px',
                           '&:hover': {
-                            backgroundColor: 'rgba(0,0,0,0.5)'
-                          }
-                        }
+                            backgroundColor: 'rgba(0,0,0,0.5)',
+                          },
+                        },
                       }}
                     >
                       {param.values.map((value) => (
@@ -1560,7 +1599,9 @@ const EditorHandle = () => {
                           key={value.id}
                           label={value.value}
                           size="small"
-                          onDelete={canEdit() ? () => handleDeleteParameterValue(value.id) : undefined}
+                          onDelete={
+                            canEdit() ? () => handleDeleteParameterValue(value.id) : undefined
+                          }
                           sx={{ fontSize: '0.7rem', height: '20px', flexShrink: 0 }}
                         />
                       ))}
@@ -1576,7 +1617,12 @@ const EditorHandle = () => {
                 size="small"
                 startIcon={<AddIcon />}
                 onClick={() => {
-                  setParameterForm({ name: '', description: '', is_multiple: true, use_categories: false })
+                  setParameterForm({
+                    name: '',
+                    description: '',
+                    is_multiple: true,
+                    use_categories: false,
+                  })
                   setEditingItem(null)
                   setOpenParameterDialog(true)
                 }}
@@ -1588,11 +1634,7 @@ const EditorHandle = () => {
             )}
 
             {/* Кнопка подбора ручек */}
-            <Button
-              variant="contained"
-              onClick={findHandles}
-              sx={{ mt: 2, width: '100%' }}
-            >
+            <Button variant="contained" onClick={findHandles} sx={{ mt: 2, width: '100%' }}>
               Подобрать ручки
             </Button>
 
@@ -1675,7 +1717,7 @@ const EditorHandle = () => {
                 renderValue={(selected) => (
                   <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5 }}>
                     {selected.map((handleId) => {
-                      const handle = editorData.handles.find(h => h.id.toString() === handleId)
+                      const handle = editorData.handles.find((h) => h.id.toString() === handleId)
                       return handle ? (
                         <Chip key={handleId} label={`${handle.article}`} size="small" />
                       ) : null
@@ -1697,7 +1739,9 @@ const EditorHandle = () => {
               label="Количество"
               type="number"
               value={ruleForm.quantity}
-              onChange={(e) => setRuleForm({ ...ruleForm, quantity: parseInt(e.target.value) || 1 })}
+              onChange={(e) =>
+                setRuleForm({ ...ruleForm, quantity: parseInt(e.target.value) || 1 })
+              }
               sx={{ mb: 2 }}
             />
             {canEdit() && (
@@ -1721,94 +1765,115 @@ const EditorHandle = () => {
               {(() => {
                 // Группируем правила по типу створки, затем по ручке
                 const groupedRules = {}
-                
-                editorData.rules.forEach(rule => {
+
+                editorData.rules.forEach((rule) => {
                   const leafTypeId = rule.leaf_type_id
                   const leafTypeName = rule.leaf_type_name || 'Без типа'
                   const handleId = rule.handle_id
-                  const handle = editorData.handles.find(h => h.id === handleId)
-                  
+                  const handle = editorData.handles.find((h) => h.id === handleId)
+
                   if (!handle) return
-                  
+
                   // Инициализация уровня типа створки
                   if (!groupedRules[leafTypeId]) {
                     groupedRules[leafTypeId] = {
                       leafTypeName,
-                      handles: {}
+                      handles: {},
                     }
                   }
-                  
+
                   // Инициализация уровня ручки
                   if (!groupedRules[leafTypeId].handles[handleId]) {
                     groupedRules[leafTypeId].handles[handleId] = {
                       handle: {
                         article: handle.article,
-                        name: handle.name
+                        name: handle.name,
                       },
-                      rules: []
+                      rules: [],
                     }
                   }
-                  
+
                   groupedRules[leafTypeId].handles[handleId].rules.push(rule)
                 })
-                
+
                 // Сортируем по названию типа створки
-                const sortedLeafTypes = Object.keys(groupedRules).sort((a, b) => 
+                const sortedLeafTypes = Object.keys(groupedRules).sort((a, b) =>
                   groupedRules[a].leafTypeName.localeCompare(groupedRules[b].leafTypeName)
                 )
-                
+
                 return sortedLeafTypes.length > 0 ? (
-                  sortedLeafTypes.map(leafTypeId => {
+                  sortedLeafTypes.map((leafTypeId) => {
                     const leafTypeData = groupedRules[leafTypeId]
                     const sortedHandles = Object.keys(leafTypeData.handles).sort((a, b) => {
                       const handleA = leafTypeData.handles[a].handle
                       const handleB = leafTypeData.handles[b].handle
                       return (handleA.article || '').localeCompare(handleB.article || '')
                     })
-                    
+
                     return (
-                      <Accordion key={leafTypeId} defaultExpanded={false} sx={{ mb: 0.5, '&:before': { display: 'none' } }}>
+                      <Accordion
+                        key={leafTypeId}
+                        defaultExpanded={false}
+                        sx={{ mb: 0.5, '&:before': { display: 'none' } }}
+                      >
                         <AccordionSummary
                           expandIcon={<ExpandMoreIcon sx={{ fontSize: 18 }} />}
-                          sx={{ 
+                          sx={{
                             minHeight: 32,
                             '& .MuiAccordionSummary-content': { my: 0.25 },
                             backgroundColor: 'primary.light',
                             color: 'primary.contrastText',
-                            '&:hover': { backgroundColor: 'primary.main' }
+                            '&:hover': { backgroundColor: 'primary.main' },
                           }}
                         >
-                          <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, width: '100%' }}>
+                          <Box
+                            sx={{ display: 'flex', alignItems: 'center', gap: 0.5, width: '100%' }}
+                          >
                             <Typography variant="body2" fontWeight={600}>
                               {leafTypeData.leafTypeName}
                             </Typography>
-                            <Chip 
+                            <Chip
                               label={sortedHandles.length}
-                              size="small" 
-                              sx={{ ml: 'auto', height: 18, fontSize: '0.65rem', backgroundColor: 'rgba(255,255,255,0.2)' }}
+                              size="small"
+                              sx={{
+                                ml: 'auto',
+                                height: 18,
+                                fontSize: '0.65rem',
+                                backgroundColor: 'rgba(255,255,255,0.2)',
+                              }}
                             />
                           </Box>
                         </AccordionSummary>
                         <AccordionDetails sx={{ p: 0, py: 0.25 }}>
-                          {sortedHandles.map(handleId => {
+                          {sortedHandles.map((handleId) => {
                             const handleData = leafTypeData.handles[handleId]
                             return (
-                              <Accordion key={handleId} sx={{ boxShadow: 'none', '&:before': { display: 'none' } }}>
+                              <Accordion
+                                key={handleId}
+                                sx={{ boxShadow: 'none', '&:before': { display: 'none' } }}
+                              >
                                 <AccordionSummary
                                   expandIcon={<ExpandMoreIcon sx={{ fontSize: 16 }} />}
-                                  sx={{ 
+                                  sx={{
                                     minHeight: 28,
                                     '& .MuiAccordionSummary-content': { my: 0 },
                                     backgroundColor: 'grey.100',
                                     pl: 1.5,
-                                    '&:hover': { backgroundColor: 'grey.200' }
+                                    '&:hover': { backgroundColor: 'grey.200' },
                                   }}
                                 >
-                                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, width: '100%' }}>
+                                  <Box
+                                    sx={{
+                                      display: 'flex',
+                                      alignItems: 'center',
+                                      gap: 0.5,
+                                      width: '100%',
+                                    }}
+                                  >
                                     <Typography variant="caption" fontWeight={500}>
                                       {handleData.handle.article} - {handleData.handle.name}
                                     </Typography>
-                                    <Chip 
+                                    <Chip
                                       label={handleData.rules.length}
                                       size="small"
                                       sx={{ ml: 'auto', height: 16, fontSize: '0.6rem' }}
@@ -1818,14 +1883,17 @@ const EditorHandle = () => {
                                 <AccordionDetails sx={{ p: 0.5, pl: 2 }}>
                                   {handleData.rules.map((rule, index) => {
                                     const conditions = rule.conditions || []
-                                    const conditionsText = conditions.length > 0
-                                      ? conditions.map(c => {
-                                          const paramName = c.parameter_name || 'Параметр'
-                                          const value = c.parameter_value || 'Любое значение'
-                                          return `${paramName}: ${value}`
-                                        }).join('; ')
-                                      : 'Любые значения'
-                                    
+                                    const conditionsText =
+                                      conditions.length > 0
+                                        ? conditions
+                                            .map((c) => {
+                                              const paramName = c.parameter_name || 'Параметр'
+                                              const value = c.parameter_value || 'Любое значение'
+                                              return `${paramName}: ${value}`
+                                            })
+                                            .join('; ')
+                                        : 'Любые значения'
+
                                     return (
                                       <Box
                                         key={rule.id}
@@ -1842,20 +1910,35 @@ const EditorHandle = () => {
                                           fontSize: '0.75rem',
                                           '&:hover': {
                                             backgroundColor: 'grey.50',
-                                            borderColor: 'primary.main'
-                                          }
+                                            borderColor: 'primary.main',
+                                          },
                                         }}
                                       >
-                                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, flex: 1 }}>
-                                          <Typography variant="caption" fontWeight={500} sx={{ minWidth: 24 }}>
+                                        <Box
+                                          sx={{
+                                            display: 'flex',
+                                            alignItems: 'center',
+                                            gap: 0.5,
+                                            flex: 1,
+                                          }}
+                                        >
+                                          <Typography
+                                            variant="caption"
+                                            fontWeight={500}
+                                            sx={{ minWidth: 24 }}
+                                          >
                                             #{index + 1}
                                           </Typography>
-                                          <Chip 
-                                            label={`×${rule.quantity}`} 
+                                          <Chip
+                                            label={`×${rule.quantity}`}
                                             size="small"
                                             sx={{ height: 16, fontSize: '0.6rem' }}
                                           />
-                                          <Typography variant="caption" color="text.secondary" sx={{ fontSize: '0.7rem', ml: 0.5 }}>
+                                          <Typography
+                                            variant="caption"
+                                            color="text.secondary"
+                                            sx={{ fontSize: '0.7rem', ml: 0.5 }}
+                                          >
                                             {conditionsText}
                                           </Typography>
                                         </Box>
@@ -1902,7 +1985,11 @@ const EditorHandle = () => {
                     )
                   })
                 ) : (
-                  <Typography variant="caption" color="text.secondary" sx={{ p: 1, textAlign: 'center', display: 'block' }}>
+                  <Typography
+                    variant="caption"
+                    color="text.secondary"
+                    sx={{ p: 1, textAlign: 'center', display: 'block' }}
+                  >
                     Нет правил
                   </Typography>
                 )
@@ -1928,7 +2015,9 @@ const EditorHandle = () => {
                   {editorData.handles.map((handle) => (
                     <TableRow key={handle.id}>
                       <TableCell>{handle.article}</TableCell>
-                      <TableCell sx={{ maxWidth: 200, overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                      <TableCell
+                        sx={{ maxWidth: 200, overflow: 'hidden', textOverflow: 'ellipsis' }}
+                      >
                         {handle.name}
                       </TableCell>
                       <TableCell>
@@ -1948,10 +2037,7 @@ const EditorHandle = () => {
                             >
                               <EditIcon fontSize="small" />
                             </IconButton>
-                            <IconButton
-                              size="small"
-                              onClick={() => handleDeleteHandle(handle.id)}
-                            >
+                            <IconButton size="small" onClick={() => handleDeleteHandle(handle.id)}>
                               <DeleteIcon fontSize="small" />
                             </IconButton>
                           </>
@@ -1983,7 +2069,12 @@ const EditorHandle = () => {
       </Grid>
 
       {/* Диалог создания/редактирования параметра */}
-      <Dialog open={openParameterDialog} onClose={() => setOpenParameterDialog(false)} maxWidth="sm" fullWidth>
+      <Dialog
+        open={openParameterDialog}
+        onClose={() => setOpenParameterDialog(false)}
+        maxWidth="sm"
+        fullWidth
+      >
         <DialogTitle>{editingItem ? 'Редактировать параметр' : 'Создать параметр'}</DialogTitle>
         <DialogContent>
           <TextField
@@ -2007,7 +2098,7 @@ const EditorHandle = () => {
               <Checkbox
                 checked={parameterForm.is_multiple}
                 disabled
-              //  onChange={(e) => setParameterForm({ ...parameterForm, is_multiple: e.target.checked })}
+                //  onChange={(e) => setParameterForm({ ...parameterForm, is_multiple: e.target.checked })}
               />
             }
             label="Множественный выбор значений (ИЛИ)"
@@ -2016,7 +2107,9 @@ const EditorHandle = () => {
             control={
               <Checkbox
                 checked={parameterForm.use_categories}
-                onChange={(e) => setParameterForm({ ...parameterForm, use_categories: e.target.checked })}
+                onChange={(e) =>
+                  setParameterForm({ ...parameterForm, use_categories: e.target.checked })
+                }
               />
             }
             label="Использовать категории для группировки значений (например, для цветов)"
@@ -2024,21 +2117,31 @@ const EditorHandle = () => {
         </DialogContent>
         <DialogActions>
           <Button onClick={() => setOpenParameterDialog(false)}>Отмена</Button>
-          <Button onClick={editingItem ? handleUpdateParameter : handleCreateParameter} variant="contained">
+          <Button
+            onClick={editingItem ? handleUpdateParameter : handleCreateParameter}
+            variant="contained"
+          >
             {editingItem ? 'Сохранить' : 'Создать'}
           </Button>
         </DialogActions>
       </Dialog>
 
       {/* Диалог создания значения параметра */}
-      <Dialog open={openParameterValueDialog} onClose={() => setOpenParameterValueDialog(false)} maxWidth="sm" fullWidth>
+      <Dialog
+        open={openParameterValueDialog}
+        onClose={() => setOpenParameterValueDialog(false)}
+        maxWidth="sm"
+        fullWidth
+      >
         <DialogTitle>Добавить значение параметра</DialogTitle>
         <DialogContent>
           <TextField
             fullWidth
             label="Значение"
             value={parameterValueForm.value}
-            onChange={(e) => setParameterValueForm({ ...parameterValueForm, value: e.target.value })}
+            onChange={(e) =>
+              setParameterValueForm({ ...parameterValueForm, value: e.target.value })
+            }
             sx={{ mb: 2, mt: 2 }}
           />
           <TextField
@@ -2046,7 +2149,12 @@ const EditorHandle = () => {
             label="Порядок отображения"
             type="number"
             value={parameterValueForm.display_order}
-            onChange={(e) => setParameterValueForm({ ...parameterValueForm, display_order: parseInt(e.target.value) || 0 })}
+            onChange={(e) =>
+              setParameterValueForm({
+                ...parameterValueForm,
+                display_order: parseInt(e.target.value) || 0,
+              })
+            }
           />
         </DialogContent>
         <DialogActions>
@@ -2058,7 +2166,12 @@ const EditorHandle = () => {
       </Dialog>
 
       {/* Диалог создания/редактирования ручки */}
-      <Dialog open={openHandleDialog} onClose={() => setOpenHandleDialog(false)} maxWidth="sm" fullWidth>
+      <Dialog
+        open={openHandleDialog}
+        onClose={() => setOpenHandleDialog(false)}
+        maxWidth="sm"
+        fullWidth
+      >
         <DialogTitle>{editingItem ? 'Редактировать ручку' : 'Создать ручку'}</DialogTitle>
         <DialogContent>
           <TextField
@@ -2086,14 +2199,22 @@ const EditorHandle = () => {
         </DialogContent>
         <DialogActions>
           <Button onClick={() => setOpenHandleDialog(false)}>Отмена</Button>
-          <Button onClick={editingItem ? handleUpdateHandle : handleCreateHandle} variant="contained">
+          <Button
+            onClick={editingItem ? handleUpdateHandle : handleCreateHandle}
+            variant="contained"
+          >
             {editingItem ? 'Сохранить' : 'Создать'}
           </Button>
         </DialogActions>
       </Dialog>
 
       {/* Диалог создания типа створки */}
-      <Dialog open={openLeafTypeDialog} onClose={() => setOpenLeafTypeDialog(false)} maxWidth="sm" fullWidth>
+      <Dialog
+        open={openLeafTypeDialog}
+        onClose={() => setOpenLeafTypeDialog(false)}
+        maxWidth="sm"
+        fullWidth
+      >
         <DialogTitle>Создать тип створки</DialogTitle>
         <DialogContent>
           <TextField
@@ -2121,7 +2242,12 @@ const EditorHandle = () => {
       </Dialog>
 
       {/* Диалог просмотра правила */}
-      <Dialog open={openRuleViewDialog} onClose={() => setOpenRuleViewDialog(false)} maxWidth="md" fullWidth>
+      <Dialog
+        open={openRuleViewDialog}
+        onClose={() => setOpenRuleViewDialog(false)}
+        maxWidth="md"
+        fullWidth
+      >
         <DialogTitle>
           Правило: {viewingRule?.handle_article} - {viewingRule?.leaf_type_name}
         </DialogTitle>
@@ -2172,7 +2298,12 @@ const EditorHandle = () => {
       </Dialog>
 
       {/* Диалог редактирования правила */}
-      <Dialog open={openRuleEditDialog} onClose={() => setOpenRuleEditDialog(false)} maxWidth="md" fullWidth>
+      <Dialog
+        open={openRuleEditDialog}
+        onClose={() => setOpenRuleEditDialog(false)}
+        maxWidth="md"
+        fullWidth
+      >
         <DialogTitle>Редактировать правило</DialogTitle>
         <DialogContent>
           <FormControl fullWidth sx={{ mb: 2, mt: 2 }}>
@@ -2212,7 +2343,7 @@ const EditorHandle = () => {
                   renderValue={(selected) => (
                     <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5 }}>
                       {selected.map((valueId) => {
-                        const value = param.values.find(v => v.id === valueId)
+                        const value = param.values.find((v) => v.id === valueId)
                         return value ? (
                           <Chip key={valueId} label={value.value} size="small" />
                         ) : null
@@ -2222,7 +2353,9 @@ const EditorHandle = () => {
                 >
                   {param.values.map((value) => (
                     <MenuItem key={value.id} value={value.id}>
-                      <Checkbox checked={(selectedParameters[param.id] || []).indexOf(value.id) > -1} />
+                      <Checkbox
+                        checked={(selectedParameters[param.id] || []).indexOf(value.id) > -1}
+                      />
                       {value.value}
                     </MenuItem>
                   ))}
@@ -2230,7 +2363,9 @@ const EditorHandle = () => {
               ) : (
                 <Select
                   value={selectedParameters[param.id]?.[0] || ''}
-                  onChange={(e) => handleParameterChange(param.id, e.target.value ? [e.target.value] : [])}
+                  onChange={(e) =>
+                    handleParameterChange(param.id, e.target.value ? [e.target.value] : [])
+                  }
                   label={param.name}
                 >
                   <MenuItem value="">Не выбрано</MenuItem>
@@ -2253,7 +2388,12 @@ const EditorHandle = () => {
       </Dialog>
 
       {/* Диалог истории изменений */}
-      <Dialog open={openHistoryDialog} onClose={() => setOpenHistoryDialog(false)} maxWidth="lg" fullWidth>
+      <Dialog
+        open={openHistoryDialog}
+        onClose={() => setOpenHistoryDialog(false)}
+        maxWidth="lg"
+        fullWidth
+      >
         <DialogTitle>История изменений</DialogTitle>
         <DialogContent>
           <Tabs value={historyTab} onChange={(e, v) => setHistoryTab(v)} sx={{ mb: 2 }}>
@@ -2276,7 +2416,7 @@ const EditorHandle = () => {
               </TableHead>
               <TableBody>
                 {history
-                  .filter(item => {
+                  .filter((item) => {
                     if (historyTab === 0) return true
                     if (historyTab === 1) return item.entity_type === 'rule'
                     if (historyTab === 2) return item.entity_type === 'handle'
@@ -2286,34 +2426,35 @@ const EditorHandle = () => {
                   })
                   .map((item) => (
                     <TableRow key={item.id}>
-                      <TableCell>
-                        {new Date(item.created_at).toLocaleString('ru-RU')}
-                      </TableCell>
+                      <TableCell>{new Date(item.created_at).toLocaleString('ru-RU')}</TableCell>
                       <TableCell>{formatHistoryEntity(item.entity_type)}</TableCell>
                       <TableCell>{formatHistoryAction(item.action)}</TableCell>
                       <TableCell>{getUserName(item)}</TableCell>
                       <TableCell>
                         <Box sx={{ maxWidth: 300, overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                          {item.action === 'created' && item.new_data && (() => {
-                            try {
-                              const data = typeof item.new_data === 'string' 
-                                ? JSON.parse(item.new_data) 
-                                : item.new_data
-                              return (
-                                <Typography variant="caption">
-                                  {JSON.stringify(data, null, 2).substring(0, 100)}...
-                                </Typography>
-                              )
-                            } catch (e) {
-                              return (
-                                <Typography variant="caption">
-                                  {typeof item.new_data === 'string' 
-                                    ? item.new_data.substring(0, 100) 
-                                    : 'Создано'}
-                                </Typography>
-                              )
-                            }
-                          })()}
+                          {item.action === 'created' &&
+                            item.new_data &&
+                            (() => {
+                              try {
+                                const data =
+                                  typeof item.new_data === 'string'
+                                    ? JSON.parse(item.new_data)
+                                    : item.new_data
+                                return (
+                                  <Typography variant="caption">
+                                    {JSON.stringify(data, null, 2).substring(0, 100)}...
+                                  </Typography>
+                                )
+                              } catch (e) {
+                                return (
+                                  <Typography variant="caption">
+                                    {typeof item.new_data === 'string'
+                                      ? item.new_data.substring(0, 100)
+                                      : 'Создано'}
+                                  </Typography>
+                                )
+                              }
+                            })()}
                           {item.action === 'updated' && (
                             <Typography variant="caption" color="text.secondary">
                               Изменено
@@ -2338,11 +2479,17 @@ const EditorHandle = () => {
       </Dialog>
 
       {/* Диалог восстановления из снапшота */}
-      <Dialog open={openRestoreDialog} onClose={() => setOpenRestoreDialog(false)} maxWidth="md" fullWidth>
+      <Dialog
+        open={openRestoreDialog}
+        onClose={() => setOpenRestoreDialog(false)}
+        maxWidth="md"
+        fullWidth
+      >
         <DialogTitle>Восстановление из снапшота</DialogTitle>
         <DialogContent>
           <Typography variant="body2" color="error" sx={{ mb: 2 }}>
-            Внимание: Восстановление данных удалит все текущие изменения. Убедитесь, что вы сохранили важные данные.
+            Внимание: Восстановление данных удалит все текущие изменения. Убедитесь, что вы
+            сохранили важные данные.
           </Typography>
           <TableContainer sx={{ maxHeight: 400, overflowY: 'auto' }}>
             <Table size="small" stickyHeader>
@@ -2364,23 +2511,21 @@ const EditorHandle = () => {
                     <TableCell>{snapshot.description || 'Без описания'}</TableCell>
                     <TableCell>
                       {snapshot.is_approved ? (
-                        <Chip 
-                          label="Эталон подтвержден" 
-                          color="success" 
+                        <Chip
+                          label="Эталон подтвержден"
+                          color="success"
                           size="small"
                           icon={<CheckCircleIcon />}
                         />
                       ) : (
-                        <Chip 
-                          label="Эталон не подтвержден" 
-                          color="default" 
-                          size="small"
-                        />
+                        <Chip label="Эталон не подтвержден" color="default" size="small" />
                       )}
                     </TableCell>
                     <TableCell>
                       {snapshot.first_name || snapshot.last_name
-                        ? `${snapshot.last_name || ''} ${snapshot.first_name || ''} ${snapshot.middle_name || ''}`.trim()
+                        ? `${snapshot.last_name || ''} ${snapshot.first_name || ''} ${
+                            snapshot.middle_name || ''
+                          }`.trim()
                         : snapshot.username || 'Неизвестно'}
                     </TableCell>
                     <TableCell>
@@ -2417,11 +2562,7 @@ const EditorHandle = () => {
         </DialogContent>
         <DialogActions>
           <Button onClick={() => setOpenRestoreDialog(false)}>Отмена</Button>
-          <Button
-            variant="contained"
-            onClick={handleCreateSnapshot}
-            startIcon={<AddIcon />}
-          >
+          <Button variant="contained" onClick={handleCreateSnapshot} startIcon={<AddIcon />}>
             Создать снапшот
           </Button>
         </DialogActions>
@@ -2429,14 +2570,19 @@ const EditorHandle = () => {
 
       {/* Диалог управления пользователями подтверждения (только для администратора) */}
       {isAdmin && (
-        <Dialog open={openApprovalUsersDialog} onClose={() => setOpenApprovalUsersDialog(false)} maxWidth="md" fullWidth>
+        <Dialog
+          open={openApprovalUsersDialog}
+          onClose={() => setOpenApprovalUsersDialog(false)}
+          maxWidth="md"
+          fullWidth
+        >
           <DialogTitle>Управление пользователями для подтверждения эталонности</DialogTitle>
           <DialogContent>
             <Typography variant="body2" sx={{ mb: 2, color: 'text.secondary' }}>
-              Выберите пользователей, которые смогут подтверждать эталонность данных. 
-              После подтверждения всеми выбранными пользователями, данные будут считаться эталонными.
+              Выберите пользователей, которые смогут подтверждать эталонность данных. После
+              подтверждения всеми выбранными пользователями, данные будут считаться эталонными.
             </Typography>
-            
+
             <Typography variant="subtitle1" gutterBottom sx={{ mt: 2 }}>
               Разрешенные пользователи:
             </Typography>
@@ -2524,10 +2670,14 @@ const EditorHandle = () => {
             </TableContainer>
           </DialogContent>
           <DialogActions>
-            <Button onClick={() => {
-              setOpenApprovalUsersDialog(false)
-              setSearchUser('')
-            }}>Закрыть</Button>
+            <Button
+              onClick={() => {
+                setOpenApprovalUsersDialog(false)
+                setSearchUser('')
+              }}
+            >
+              Закрыть
+            </Button>
           </DialogActions>
         </Dialog>
       )}
@@ -2539,9 +2689,7 @@ const EditorHandle = () => {
         maxWidth="lg"
         fullWidth
       >
-        <DialogTitle>
-          Непокрытые комбинации параметров
-        </DialogTitle>
+        <DialogTitle>Непокрытые комбинации параметров</DialogTitle>
         <DialogContent>
           {uncoveredCombinations && (
             <>
@@ -2561,7 +2709,7 @@ const EditorHandle = () => {
                 {uncoveredCombinations.parameters_checked && (
                   <Typography variant="body2" sx={{ mt: 1 }}>
                     <strong>Проверяемые параметры:</strong>{' '}
-                    {uncoveredCombinations.parameters_checked.map(p => p.name).join(', ')}
+                    {uncoveredCombinations.parameters_checked.map((p) => p.name).join(', ')}
                   </Typography>
                 )}
               </Box>
@@ -2570,7 +2718,9 @@ const EditorHandle = () => {
                   <Table size="small">
                     <TableHead>
                       <TableRow>
-                        <TableCell><strong>Комбинация параметров</strong></TableCell>
+                        <TableCell>
+                          <strong>Комбинация параметров</strong>
+                        </TableCell>
                       </TableRow>
                     </TableHead>
                     <TableBody>
@@ -2592,7 +2742,8 @@ const EditorHandle = () => {
                         <TableRow>
                           <TableCell colSpan={1} align="center">
                             <Typography variant="caption" color="text.secondary">
-                              Показано первые 100 из {uncoveredCombinations.uncovered.length} комбинаций
+                              Показано первые 100 из {uncoveredCombinations.uncovered.length}{' '}
+                              комбинаций
                             </Typography>
                           </TableCell>
                         </TableRow>
@@ -2601,9 +2752,7 @@ const EditorHandle = () => {
                   </Table>
                 </TableContainer>
               ) : (
-                <Alert severity="success">
-                  Все комбинации параметров покрыты правилами!
-                </Alert>
+                <Alert severity="success">Все комбинации параметров покрыты правилами!</Alert>
               )}
             </>
           )}
@@ -2620,9 +2769,8 @@ const EditorHandle = () => {
         maxWidth="md"
         fullWidth
       >
-        <DialogTitle>
-          Управление категориями значений параметров
-        </DialogTitle>
+        <DialogTitle>Управление категориями значений параметров</DialogTitle>
+
         <DialogContent>
           <Box sx={{ mb: 3 }}>
             <Typography variant="h6" gutterBottom>
@@ -2661,9 +2809,15 @@ const EditorHandle = () => {
             <Table size="small">
               <TableHead>
                 <TableRow>
-                  <TableCell><strong>Название</strong></TableCell>
-                  <TableCell><strong>Описание</strong></TableCell>
-                  <TableCell><strong>Действия</strong></TableCell>
+                  <TableCell>
+                    <strong>Название</strong>
+                  </TableCell>
+                  <TableCell>
+                    <strong>Описание</strong>
+                  </TableCell>
+                  <TableCell>
+                    <strong>Действия</strong>
+                  </TableCell>
                 </TableRow>
               </TableHead>
               <TableBody>
@@ -2699,10 +2853,10 @@ const EditorHandle = () => {
               Назначение категорий значениям параметров
             </Typography>
             <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-              Выберите параметр, для которого хотите назначить категории значениям. 
-              Это работает только для параметров, у которых включена опция &quot;Использовать категории&quot;.
+              Выберите параметр, для которого хотите назначить категории значениям. Это работает
+              только для параметров, у которых включена опция &quot;Использовать категории&quot;.
             </Typography>
-            
+
             <FormControl fullWidth sx={{ mb: 2 }}>
               <InputLabel>Выберите параметр</InputLabel>
               <Select
@@ -2714,7 +2868,7 @@ const EditorHandle = () => {
                 }}
               >
                 {editorData.parameters
-                  .filter(param => param.use_categories)
+                  .filter((param) => param.use_categories)
                   .map((param) => (
                     <MenuItem key={param.id} value={param.id.toString()}>
                       {param.name}
@@ -2728,9 +2882,15 @@ const EditorHandle = () => {
                 <Table size="small">
                   <TableHead>
                     <TableRow>
-                      <TableCell><strong>Значение параметра</strong></TableCell>
-                      <TableCell><strong>Текущая категория</strong></TableCell>
-                      <TableCell><strong>Назначить категорию</strong></TableCell>
+                      <TableCell>
+                        <strong>Значение параметра</strong>
+                      </TableCell>
+                      <TableCell>
+                        <strong>Текущая категория</strong>
+                      </TableCell>
+                      <TableCell>
+                        <strong>Назначить категорию</strong>
+                      </TableCell>
                     </TableRow>
                   </TableHead>
                   <TableBody>
@@ -2749,7 +2909,9 @@ const EditorHandle = () => {
                         <TableCell>
                           <Select
                             value={value.category_id || ''}
-                            onChange={(e) => handleAssignCategoryToValue(value.id, e.target.value || null)}
+                            onChange={(e) =>
+                              handleAssignCategoryToValue(value.id, e.target.value || null)
+                            }
                             size="small"
                             sx={{ minWidth: 200 }}
                             displayEmpty
@@ -2773,23 +2935,29 @@ const EditorHandle = () => {
 
             {selectedParameterForCategories && parameterValuesWithCategories.length === 0 && (
               <Alert severity="info" sx={{ mt: 2 }}>
-                У выбранного параметра нет значений. Добавьте значения параметра в основном интерфейсе.
+                У выбранного параметра нет значений. Добавьте значения параметра в основном
+                интерфейсе.
               </Alert>
             )}
 
             {!selectedParameterForCategories && (
               <Alert severity="info" sx={{ mt: 2 }}>
-                Выберите параметр из списка выше. Будут показаны только параметры с включенной опцией &quot;Использовать категории&quot;.
+                Выберите параметр из списка выше. Будут показаны только параметры с включенной
+                опцией &quot;Использовать категории&quot;.
               </Alert>
             )}
           </Box>
         </DialogContent>
         <DialogActions>
-          <Button onClick={() => {
-            setOpenCategoriesDialog(false)
-            setSelectedParameterForCategories('')
-            setParameterValuesWithCategories([])
-          }}>Закрыть</Button>
+          <Button
+            onClick={() => {
+              setOpenCategoriesDialog(false)
+              setSelectedParameterForCategories('')
+              setParameterValuesWithCategories([])
+            }}
+          >
+            Закрыть
+          </Button>
         </DialogActions>
       </Dialog>
 
@@ -2835,8 +3003,9 @@ const EditorHandle = () => {
           <DialogTitle>Управление правами доступа к редактору ручек</DialogTitle>
           <DialogContent>
             <Typography variant="body2" sx={{ mb: 2, color: 'text.secondary' }}>
-              Выдайте права доступа конкретным пользователям для редактирования данных в редакторе ручек.
-              Пользователи с правами могут добавлять, редактировать и удалять данные (кроме управления пользователями и восстановления из снапшота).
+              Выдайте права доступа конкретным пользователям для редактирования данных в редакторе
+              ручек. Пользователи с правами могут добавлять, редактировать и удалять данные (кроме
+              управления пользователями и восстановления из снапшота).
             </Typography>
 
             {/* Форма для выдачи прав */}
@@ -2880,29 +3049,37 @@ const EditorHandle = () => {
               <Table size="small">
                 <TableHead>
                   <TableRow>
-                    <TableCell><strong>Пользователь</strong></TableCell>
-                    <TableCell><strong>Роль</strong></TableCell>
-                    <TableCell><strong>Действия</strong></TableCell>
+                    <TableCell>
+                      <strong>Пользователь</strong>
+                    </TableCell>
+                    <TableCell>
+                      <strong>Роль</strong>
+                    </TableCell>
+                    <TableCell>
+                      <strong>Действия</strong>
+                    </TableCell>
                   </TableRow>
                 </TableHead>
                 <TableBody>
-                  {allPermissions.filter(p => p.can_edit).map((permission) => (
-                    <TableRow key={permission.id}>
-                      <TableCell>{formatUserFullName(permission)}</TableCell>
-                      <TableCell>{permission.role_name || '-'}</TableCell>
-                      <TableCell>
-                        <IconButton
-                          size="small"
-                          color="error"
-                          onClick={() => handleDeletePermissions(permission.id)}
-                          title="Удалить права"
-                        >
-                          <DeleteIcon fontSize="small" />
-                        </IconButton>
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                  {allPermissions.filter(p => p.can_edit).length === 0 && (
+                  {allPermissions
+                    .filter((p) => p.can_edit)
+                    .map((permission) => (
+                      <TableRow key={permission.id}>
+                        <TableCell>{formatUserFullName(permission)}</TableCell>
+                        <TableCell>{permission.role_name || '-'}</TableCell>
+                        <TableCell>
+                          <IconButton
+                            size="small"
+                            color="error"
+                            onClick={() => handleDeletePermissions(permission.id)}
+                            title="Удалить права"
+                          >
+                            <DeleteIcon fontSize="small" />
+                          </IconButton>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  {allPermissions.filter((p) => p.can_edit).length === 0 && (
                     <TableRow>
                       <TableCell colSpan={3} align="center">
                         Нет пользователей с правами доступа
@@ -2914,10 +3091,14 @@ const EditorHandle = () => {
             </TableContainer>
           </DialogContent>
           <DialogActions>
-            <Button onClick={() => {
-              setOpenPermissionsDialog(false)
-              setSelectedUserForPermissions('')
-            }}>Закрыть</Button>
+            <Button
+              onClick={() => {
+                setOpenPermissionsDialog(false)
+                setSelectedUserForPermissions('')
+              }}
+            >
+              Закрыть
+            </Button>
           </DialogActions>
         </Dialog>
       )}

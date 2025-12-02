@@ -585,7 +585,7 @@ const CampaignList = ({ onEdit, canEdit, refreshKey }) => {
                       </button>
                     </>
                   )}
-                  {campaign.status === 'active' && (
+                  {canEdit && campaign.status === 'active' && (
                     <button
                       className="campaign-list__btn-send"
                       onClick={() => handleSendClick(campaign)}

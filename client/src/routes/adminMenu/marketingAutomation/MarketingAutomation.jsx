@@ -75,7 +75,14 @@ const MarketingAutomation = () => {
   return (
     <div className="marketing-automation">
       <div className="marketing-automation__header">
-        <h1 className="marketing-automation__title">Автоматизация маркетинга</h1>
+        <div className="marketing-automation__title-wrapper">
+          <h1 className="marketing-automation__title">Автоматизация маркетинга</h1>
+          <MdContactSupport
+            className="marketing-automation__help-icon"
+            onClick={() => setOpenHelpModal(true)}
+            title="Справка по автоматизации маркетинга"
+          />
+        </div>
         {canEdit() && (
           <div className="marketing-automation__actions">
             <button
@@ -87,14 +94,6 @@ const MarketingAutomation = () => {
             </button>
           </div>
         )}
-      </div>
-
-      <div className="marketing-automation__help">
-        <MdContactSupport
-          className="help-icon"
-          onClick={() => setOpenHelpModal(true)}
-          title="Справка по автоматизации маркетинга"
-        />
       </div>
 
       <div className="marketing-automation__tabs">

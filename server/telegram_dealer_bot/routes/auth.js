@@ -254,13 +254,29 @@ async function handleCallbackQuery(bot, chatId, callbackQuery) {
         userName: callbackQuery.from.username || callbackQuery.from.first_name,
       }
 
+      // Обработка возврата к главному меню
+      if (command === 'back_to_help_menu') {
+        // Удаляем сообщение с меню маркетинга, если оно есть
+        if (userSessions[chatId]?.marketingMenuMessageId) {
+          try {
+            await bot.deleteMessage(chatId, userSessions[chatId].marketingMenuMessageId)
+            delete userSessions[chatId].marketingMenuMessageId
+          } catch (error) {
+            console.error(`Не удалось удалить сообщение меню маркетинга: ${error.message}`)
+          }
+        }
+        await displayHelpMenu(bot, chatId, userSessions)
+        await bot.answerCallbackQuery(callbackQuery.id)
+        return
+      }
+
       // Обработка маркетинговой информации ***************************************************************
       if (
         command === 'marketing_info' ||
         command.startsWith('marketing_category_') ||
         command.startsWith('marketing_campaign_')
       ) {
-        await handleMarketingCallback(bot, chatId, command)
+        await handleMarketingCallback(bot, chatId, command, userSessions)
         await bot.answerCallbackQuery(callbackQuery.id)
         return
       }
@@ -358,9 +374,10 @@ async function handleCallbackQuery(bot, chatId, callbackQuery) {
             // Форматируем дату для отображения напрямую из строки, без создания Date объекта
             // Это предотвращает смещение из-за часовых поясов
             const dateParts = selectedDate.split('-')
-            const displayDate = dateParts.length === 3 
-              ? `${dateParts[2]}.${dateParts[1]}.${dateParts[0]}` 
-              : selectedDate
+            const displayDate =
+              dateParts.length === 3
+                ? `${dateParts[2]}.${dateParts[1]}.${dateParts[0]}`
+                : selectedDate
             await bot.answerCallbackQuery(callbackQuery.id, {
               text: `Выбрана дата: ${displayDate}`,
             })

@@ -133,7 +133,17 @@ const CategoryManager = ({ canEdit, refreshKey }) => {
   return (
     <div className="category-manager">
       <div className="category-manager__header">
-        <h2>Управление категориями</h2>
+        <div className="category-manager__header-content">
+          <div>
+            <h2>Управление категориями</h2>
+            <p className="category-manager__description">
+              Категории будут отображаться у дилера в чат-боте в виде кнопок. При нажатии на кнопку
+              категории будут отображаться существующие в этой категории кампании. Если в категории
+              кампании отсутствуют, то кнопка отображаться не будет.
+            </p>
+          </div>
+        </div>
+
         {canEdit && (
           <button className="category-manager__btn" onClick={handleCreate}>
             + Создать категорию
@@ -244,11 +254,13 @@ const CategoryManager = ({ canEdit, refreshKey }) => {
 
       {deleteCategoryId && (
         <ConfirmationDialog
-          isOpen={!!deleteCategoryId}
+          open={!!deleteCategoryId}
           onClose={() => setDeleteCategoryId(null)}
           onConfirm={confirmDelete}
           title="Удаление категории"
           message="Вы уверены, что хотите удалить эту категорию? Все связанные кампании будут сохранены."
+          btn1="Отмена"
+          btn2="Удалить"
         />
       )}
     </div>
@@ -256,4 +268,3 @@ const CategoryManager = ({ canEdit, refreshKey }) => {
 }
 
 export default CategoryManager
-
