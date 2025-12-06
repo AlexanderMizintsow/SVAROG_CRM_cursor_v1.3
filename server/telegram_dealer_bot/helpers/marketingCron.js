@@ -78,7 +78,7 @@ async function processMarketingCampaigns(bot) {
          AND (
            c.period_type = 'unlimited'
            OR (c.period_type = 'date' AND c.send_date = CURRENT_DATE)
-           OR (c.period_type = 'period' AND CURRENT_DATE = c.period_start::date)
+           OR (c.period_type = 'period' AND CURRENT_DATE BETWEEN c.period_start::date AND c.period_end::date)
          )
        ORDER BY c.created_at`
     )
@@ -86,14 +86,29 @@ async function processMarketingCampaigns(bot) {
     const campaigns = campaignsResult.rows
     console.log(`[CRON][MARKETING] Найдено кампаний для обработки: ${campaigns.length}`)
 
+    if (campaigns.length === 0) {
+      console.log('[CRON][MARKETING] Нет активных кампаний для отправки')
+      await client.query('COMMIT')
+      return
+    }
+
     let totalSent = 0
     let totalErrors = 0
     let totalSkipped = 0
     const errors = []
+    const sentCompanies = []
+    const skippedCompanies = []
 
     for (const campaign of campaigns) {
       try {
-        const result = await sendCampaignToCompanies(client, bot, campaign)
+        console.log(`[CRON][MARKETING] Обработка кампании: "${campaign.name}" (ID: ${campaign.id})`)
+        const result = await sendCampaignToCompanies(
+          client,
+          bot,
+          campaign,
+          sentCompanies,
+          skippedCompanies
+        )
         totalSent += result.sent
         totalErrors += result.errors
         totalSkipped += result.skipped
@@ -106,7 +121,10 @@ async function processMarketingCampaigns(bot) {
           })
         }
       } catch (error) {
-        console.error(`[CRON][MARKETING] Ошибка при обработке кампании ${campaign.id}:`, error)
+        console.error(
+          `[CRON][MARKETING] Ошибка при обработке кампании ${campaign.id}:`,
+          error.message
+        )
         totalErrors++
         errors.push({
           campaign_id: campaign.id,
@@ -118,17 +136,51 @@ async function processMarketingCampaigns(bot) {
 
     await client.query('COMMIT')
 
-    // Формируем отчет
-    const report = {
-      timestamp: new Date().toISOString(),
-      campaigns_processed: campaigns.length,
-      total_sent: totalSent,
-      total_errors: totalErrors,
-      total_skipped: totalSkipped,
-      errors: errors,
+    // Итоговый отчет
+    console.log('='.repeat(80))
+    console.log('[CRON][MARKETING] ===== ИТОГИ ОТПРАВКИ =====')
+    console.log(`[CRON][MARKETING] Обработано кампаний: ${campaigns.length}`)
+    console.log(`[CRON][MARKETING] Отправлено: ${totalSent}`)
+    console.log(`[CRON][MARKETING] Пропущено: ${totalSkipped}`)
+    console.log(`[CRON][MARKETING] Ошибок: ${totalErrors}`)
+
+    if (sentCompanies.length > 0) {
+      console.log(`[CRON][MARKETING] Отправлено компаниям (${sentCompanies.length}):`)
+      sentCompanies.forEach((company, index) => {
+        console.log(`[CRON][MARKETING]   ${index + 1}. ${company.name} (ID: ${company.id})`)
+      })
     }
 
-    console.log('[CRON][MARKETING] Отчет:', JSON.stringify(report, null, 2))
+    if (skippedCompanies.length > 0) {
+      console.log(`[CRON][MARKETING] Пропущено компаний (${skippedCompanies.length}):`)
+      skippedCompanies.forEach((company, index) => {
+        console.log(
+          `[CRON][MARKETING]   ${index + 1}. ${company.name} (ID: ${company.id}) - ${
+            company.reason
+          }`
+        )
+      })
+    }
+
+    if (errors.length > 0) {
+      console.log(`[CRON][MARKETING] Ошибки (${errors.length}):`)
+      errors.forEach((error, index) => {
+        console.log(
+          `[CRON][MARKETING]   ${index + 1}. Кампания "${error.campaign_name}" (ID: ${
+            error.campaign_id
+          })`
+        )
+        if (error.errors) {
+          error.errors.forEach((err) => {
+            console.log(`[CRON][MARKETING]      - ${err.company_name}: ${err.error}`)
+          })
+        } else {
+          console.log(`[CRON][MARKETING]      - ${error.error}`)
+        }
+      })
+    }
+
+    console.log('='.repeat(80))
 
     // TODO: Отправить отчет администраторам (можно через бот или записать в БД)
   } catch (error) {
@@ -140,7 +192,13 @@ async function processMarketingCampaigns(bot) {
 }
 
 // Отправка кампании дилерам
-async function sendCampaignToCompanies(client, bot, campaign) {
+async function sendCampaignToCompanies(
+  client,
+  bot,
+  campaign,
+  sentCompanies = [],
+  skippedCompanies = []
+) {
   let sent = 0
   let errors = 0
   let skipped = 0
@@ -230,8 +288,14 @@ async function sendCampaignToCompanies(client, bot, campaign) {
         const skipMessage = `Пропущено: кампания уже была отправлена в период блокировки (${blockingPeriod} дней)`
 
         console.log(
-          `[CRON][MARKETING] Пропуск компании ${company.company_id}: дублирование (отправлено в последние ${blockingPeriod} дней)`
+          `[CRON][MARKETING] ⚠ Пропуск: ${company.company_name} (ID: ${company.company_id}) - дублирование (отправлено в последние ${blockingPeriod} дней)`
         )
+
+        skippedCompanies.push({
+          id: company.company_id,
+          name: company.company_name,
+          reason: `Дублирование (отправлено в последние ${blockingPeriod} дней)`,
+        })
 
         // Логируем пропуск
         await client.query(
@@ -490,8 +554,13 @@ async function sendCampaignToCompanies(client, bot, campaign) {
 
       sent++
       console.log(
-        `[CRON][MARKETING] Отправлено компании ${company.company_id} (${company.company_name})`
+        `[CRON][MARKETING] ✓ Отправлено: ${company.company_name} (ID: ${company.company_id})`
       )
+
+      sentCompanies.push({
+        id: company.company_id,
+        name: company.company_name,
+      })
 
       // Задержка между отправками (100ms)
       await new Promise((resolve) => setTimeout(resolve, 100))
@@ -503,7 +572,9 @@ async function sendCampaignToCompanies(client, bot, campaign) {
         error: error.message,
       })
 
-      console.error(`[CRON][MARKETING] Ошибка при отправке компании ${company.company_id}:`, error)
+      console.error(
+        `[CRON][MARKETING] ✗ Ошибка отправки: ${company.company_name} (ID: ${company.company_id}) - ${error.message}`
+      )
 
       // Логируем ошибку
       await client.query(

@@ -242,14 +242,20 @@ app.put(
   marketingController.updateCampaign(dbPool)
 )
 app.delete('/api/marketing/campaigns/:id', marketingController.deleteCampaign(dbPool))
-app.get('/api/marketing/campaigns/:id/recipients', marketingController.getCampaignRecipients(dbPool))
+app.get(
+  '/api/marketing/campaigns/:id/recipients',
+  marketingController.getCampaignRecipients(dbPool)
+)
 app.post('/api/marketing/campaigns/:id/send', marketingController.sendCampaign(dbPool, bot))
 app.get('/api/marketing/campaigns/:id/duplicate-check', marketingController.checkDuplicate(dbPool))
 
 // Справочники
 app.get('/api/marketing/locations', marketingController.getLocations(dbPool))
 app.post('/api/marketing/locations', marketingController.createLocation(dbPool))
-app.post('/api/marketing/locations/create-from-companies', marketingController.createLocationsFromCompanies(dbPool))
+app.post(
+  '/api/marketing/locations/create-from-companies',
+  marketingController.createLocationsFromCompanies(dbPool)
+)
 app.delete('/api/marketing/locations/:id', marketingController.deleteLocation(dbPool))
 app.get('/api/marketing/tags', marketingController.getTags(dbPool))
 app.post('/api/marketing/tags', marketingController.createTag(dbPool))

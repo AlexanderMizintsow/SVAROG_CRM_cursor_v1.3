@@ -517,8 +517,8 @@ const CampaignForm = ({ campaign, onClose, onSave }) => {
   }
 
   return (
-    <div className="campaign-form__overlay" onClick={onClose}>
-      <div className="campaign-form" onClick={(e) => e.stopPropagation()}>
+    <div className="campaign-form__overlay">
+      <div className="campaign-form">
         <div className="campaign-form__header">
           <h2>{isEditMode ? 'Редактировать кампанию' : 'Создать кампанию'}</h2>
           <button className="campaign-form__close" onClick={onClose}>
