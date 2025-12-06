@@ -45,22 +45,22 @@ function initMarketingCron(bot, cronManager) {
   }
 
   if (cronManager) {
-    return cronManager.addJob(
-      'marketing',
-      '0 8 * * *', // Каждый день в 8:00
-      task,
-      {
-        timezone: 'Europe/Saratov',
-      }
-    )
-  }
+    return cronManager.addJob('marketing', '0 8 * * *', task) // Каждый день в 8:00
+  } else {
+    // Fallback к старому способу если CronManager не доступен
+    const cron = require('node-cron')
+    const job = cron.schedule('0 8 * * *', task, {
+      scheduled: true,
+      timezone: 'Europe/Saratov',
+      recoverMissedExecutions: true,
+    })
 
-  // Fallback на обычный cron, если cronManager не передан
-  const cron = require('node-cron')
-  return cron.schedule('0 8 * * *', task, {
-    scheduled: true,
-    timezone: 'Europe/Saratov',
-  })
+    job.on('error', (error) => {
+      console.error('[CRON][MARKETING][CRON_ERROR] Ошибка в cron-задаче:', error)
+    })
+
+    return job
+  }
 }
 
 // Обработка маркетинговых кампаний
