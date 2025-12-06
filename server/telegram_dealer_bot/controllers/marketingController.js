@@ -160,7 +160,13 @@ const getCampaigns = (dbPool) => async (req, res) => {
 
     let query = `
       SELECT DISTINCT
-        c.*,
+        c.id, c.category_id, c.name, c.content, c.status, c.period_type,
+        c.send_date::text as send_date,
+        c.period_start::text as period_start,
+        c.period_end::text as period_end,
+        c.auto_send, c.blocking_period_days, c.contact_person_id,
+        c.show_contact_person, c.notes, c.delivery_channels,
+        c.created_by, c.created_at, c.updated_at,
         cat.name as category_name,
         cat.icon as category_icon,
         u.first_name || ' ' || u.last_name as created_by_name
@@ -257,7 +263,13 @@ const getCampaign = (dbPool) => async (req, res) => {
       // Основная информация о кампании
       const campaignResult = await client.query(
         `SELECT 
-          c.*,
+          c.id, c.category_id, c.name, c.content, c.status, c.period_type,
+          c.send_date::text as send_date,
+          c.period_start::text as period_start,
+          c.period_end::text as period_end,
+          c.auto_send, c.blocking_period_days, c.contact_person_id,
+          c.show_contact_person, c.notes, c.delivery_channels,
+          c.created_by, c.created_at, c.updated_at,
           cat.name as category_name,
           cat.icon as category_icon,
           u.first_name || ' ' || u.last_name as created_by_name,

@@ -1429,20 +1429,6 @@ CREATE INDEX idx_handle_rule_conditions_rule_id ON handle_rule_conditions(rule_i
 CREATE INDEX idx_handle_rule_conditions_parameter_id ON handle_rule_conditions(parameter_id);
 CREATE INDEX idx_handle_history_entity ON handle_history(entity_type, entity_id);
 CREATE INDEX idx_leaf_templates_leaf_type_id ON leaf_templates(leaf_type_id);
-CREATE INDEX idx_handle_editor_permissions_user_id ON handle_editor_permissions(user_id);
-
--- Триггер для обновления updated_at в handle_editor_permissions
-CREATE OR REPLACE FUNCTION update_handle_editor_permissions_updated_at()
-RETURNS TRIGGER AS $$
-BEGIN
-    NEW.updated_at = NOW();
-    RETURN NEW;
-END;
-$$ LANGUAGE plpgsql;
-
-CREATE TRIGGER update_handle_editor_permissions_updated_at_trigger
-BEFORE UPDATE ON handle_editor_permissions
-FOR EACH ROW EXECUTE FUNCTION update_handle_editor_permissions_updated_at();
 
 -- Вставка начальных данных
 INSERT INTO leaf_types (name, description) VALUES
@@ -1473,6 +1459,22 @@ CREATE TABLE handle_editor_permissions (
     created_by INTEGER REFERENCES users(id) ON DELETE SET NULL, -- Кто выдал права (администратор)
     UNIQUE(user_id)
 );
+
+-- Триггер для обновления updated_at в handle_editor_permissions
+CREATE OR REPLACE FUNCTION update_handle_editor_permissions_updated_at()
+RETURNS TRIGGER AS $$
+BEGIN
+    NEW.updated_at = NOW();
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+CREATE TRIGGER update_handle_editor_permissions_updated_at_trigger
+BEFORE UPDATE ON handle_editor_permissions
+FOR EACH ROW EXECUTE FUNCTION update_handle_editor_permissions_updated_at();
+
+-- Индекс для handle_editor_permissions
+CREATE INDEX idx_handle_editor_permissions_user_id ON handle_editor_permissions(user_id);
 
 -- Таблица подтверждений эталонности данных
 CREATE TABLE handle_approvals (

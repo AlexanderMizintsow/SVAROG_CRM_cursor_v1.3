@@ -167,9 +167,21 @@ const CampaignForm = ({ campaign, onClose, onSave }) => {
         category_id: data.category_id || '',
         status: data.status || 'draft',
         period_type: data.period_type || 'unlimited',
-        send_date: data.send_date ? data.send_date.split('T')[0] : '',
-        period_start: data.period_start ? data.period_start.split('T')[0] : '',
-        period_end: data.period_end ? data.period_end.split('T')[0] : '',
+        send_date: data.send_date
+          ? typeof data.send_date === 'string'
+            ? data.send_date.split('T')[0]
+            : new Date(data.send_date).toISOString().split('T')[0]
+          : '',
+        period_start: data.period_start
+          ? typeof data.period_start === 'string'
+            ? data.period_start.split('T')[0]
+            : new Date(data.period_start).toISOString().split('T')[0]
+          : '',
+        period_end: data.period_end
+          ? typeof data.period_end === 'string'
+            ? data.period_end.split('T')[0]
+            : new Date(data.period_end).toISOString().split('T')[0]
+          : '',
         auto_send: data.auto_send || false,
         blocking_period_days: data.blocking_period_days || 30,
         contact_person_id: data.contact_person_id || '',
@@ -430,8 +442,24 @@ const CampaignForm = ({ campaign, onClose, onSave }) => {
       const content = editor.getHTML()
 
       // Подготовка данных
+      // Обрабатываем даты: если это строка в формате YYYY-MM-DD, оставляем как есть
+      // Это предотвращает сдвиг даты из-за timezone
+      const processedFormData = { ...formData }
+
+      // Для дат без времени просто передаем строку как есть
+      if (processedFormData.send_date) {
+        // Если дата уже в формате YYYY-MM-DD, оставляем как есть
+        processedFormData.send_date = processedFormData.send_date.split('T')[0]
+      }
+      if (processedFormData.period_start) {
+        processedFormData.period_start = processedFormData.period_start.split('T')[0]
+      }
+      if (processedFormData.period_end) {
+        processedFormData.period_end = processedFormData.period_end.split('T')[0]
+      }
+
       const campaignData = {
-        ...formData,
+        ...processedFormData,
         content,
         locations: allLocationsSelected ? [] : selectedLocations.map((l) => l.id),
         tags: selectedTags.map((t) => t.id),
