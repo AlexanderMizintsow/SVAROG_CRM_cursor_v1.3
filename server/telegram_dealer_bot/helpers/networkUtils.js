@@ -207,8 +207,38 @@ async function checkServerHealth(host = '192.168.57.77', port = 8240, timeout = 
   })
 }
 
+// Функция для выполнения задачи с таймаутом (для CRON задач)
+async function runWithTimeout(fn, timeoutMs, taskName) {
+  let timeout
+  let isCompleted = false
+
+  try {
+    const taskPromise = fn()
+    const timeoutPromise = new Promise((_, reject) => {
+      timeout = setTimeout(() => {
+        if (!isCompleted) {
+          isCompleted = true
+          reject(new Error(`Таймаут выполнения задачи ${taskName} (${timeoutMs}ms)`))
+        }
+      }, timeoutMs)
+    })
+
+    const result = await Promise.race([taskPromise, timeoutPromise])
+    isCompleted = true
+    return result
+  } catch (error) {
+    isCompleted = true
+    throw error
+  } finally {
+    if (timeout) {
+      clearTimeout(timeout)
+    }
+  }
+}
+
 module.exports = {
   createProtectedSocket,
   executeWithRetry,
   checkServerHealth,
+  runWithTimeout,
 }

@@ -195,12 +195,12 @@ const createReminder = async ({
 //*********************************************************************************************************************************** */
 
 // Функция для получения элементов заказа
-const getOrderItemsAW = async (orderNo, inn, year = 2025) => {
+const getOrderItemsAW = async (orderNo, inn, year = 2026) => {
   try {
-    // Формируем URL (не включаем год, если это 2025)
+    // Формируем URL (не включаем год, если это 2026)
     console.log('year', year)
     const url =
-      year === 2025
+      year === 2026
         ? `${API_BASE_URL}5005/app/order/items/${orderNo}/${inn}`
         : `${API_BASE_URL}5005/app/order/items/${orderNo}/${inn}/${year}`
 

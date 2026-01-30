@@ -1,5 +1,15 @@
 // tasksController.js
 const { DateTime } = require('luxon')
+const axios = require('axios')
+
+function notifyBpeTaskUpdated(taskId) {
+  const bpeUrl = process.env.BPE_API_URL || process.env.BPE_WEBHOOK_URL
+  if (!bpeUrl || !taskId) return
+  const url = `${bpeUrl.replace(/\/$/, '')}/api/bp/webhooks/task-updated`
+  axios.post(url, { task_id: taskId }, { timeout: 5000 }).catch((err) => {
+    console.warn('BPE webhook task-updated:', err.message)
+  })
+}
 
 // Функция для форматирования даты
 function formatDeadline(dateString) {
@@ -62,6 +72,7 @@ function createTask(dbPool, io) {
       global_task_id,
       parent_id,
       root_id,
+      business_process_instance_id: bpInstanceIdFromBody,
     } = req.body
 
     const deadlineValue = deadline === '' ? null : deadline
@@ -73,14 +84,22 @@ function createTask(dbPool, io) {
       // Определяем root_id: если он не передан, используем parent_id или null
       const finalRootId = root_id || parent_id || null
 
-      console.log(root_id)
-      console.log(parent_id)
+      let businessProcessInstanceId = bpInstanceIdFromBody != null ? bpInstanceIdFromBody : null
+      if (parent_id && businessProcessInstanceId == null) {
+        const parentRow = await dbPool.query(
+          'SELECT business_process_instance_id FROM tasks WHERE id = $1',
+          [parent_id]
+        )
+        if (parentRow.rows.length && parentRow.rows[0].business_process_instance_id != null) {
+          businessProcessInstanceId = parentRow.rows[0].business_process_instance_id
+        }
+      }
 
       const result = await dbPool.query(
         `INSERT INTO tasks (
           title, description, created_by, deadline, priority, 
-          tags, status, global_task_id, parent_id, root_id
-        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10) RETURNING *`,
+          tags, status, global_task_id, parent_id, root_id, business_process_instance_id
+        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11) RETURNING *`,
         [
           title,
           description,
@@ -92,6 +111,7 @@ function createTask(dbPool, io) {
           global_task_id,
           parent_id || null, // parent_id может быть null
           finalRootId, // root_id
+          businessProcessInstanceId,
         ]
       )
       const task = result.rows[0]
@@ -552,6 +572,7 @@ function updateTaskStatus(dbPool, io) {
         }
       }
 
+      notifyBpeTaskUpdated(Number(id))
       res.json(result.rows[0])
     } catch (error) {
       console.error('Ошибка при обновлении статуса задачи:', error)
@@ -651,6 +672,8 @@ function updateTaskAccept(dbPool, io) {
       }
 
       io.emit('taskAccept')
+
+      notifyBpeTaskUpdated(Number(taskId))
 
       // Добавления истории для подзадач
 

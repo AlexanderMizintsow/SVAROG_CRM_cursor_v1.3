@@ -26,7 +26,7 @@ async function handleCancel(bot, chatId, userSessions) {
     userSessions[chatId].complaintDetails = ''
     userSessions[chatId].complaintDetailsAllItem = ''
     userSessions[chatId].OrderNo = ''
-    userSessions[chatId].selectedYear = 'bd_2025_years'.split('_')[1]
+    userSessions[chatId].selectedYear = 'bd_2026_years'.split('_')[1]
     // Доставка
     userSessions[chatId].awaitingDeliveryOrderTime = ''
     userSessions[chatId].awaitingDeliveryOrderDate = ''

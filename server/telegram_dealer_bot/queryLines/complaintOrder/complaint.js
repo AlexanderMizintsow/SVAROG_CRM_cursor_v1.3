@@ -68,9 +68,9 @@ async function handleComplaintNewArrange(bot, chatId, msg, userSessions, company
     userSessions[chatId].awaitingComplaintNewArrange = 0.5
     //await bot.sendMessage(chatId, 'Введите номер заказа 1С', keyboardCancel)
 
-    if (!userSessions[chatId].selectedYear || userSessions[chatId].selectedYear != '2025') {
+    if (!userSessions[chatId].selectedYear || userSessions[chatId].selectedYear != '2026') {
       // Устанавливаем год по умолчанию
-      userSessions[chatId].selectedYear = 'bd_2025_years'.split('_')[1]
+      userSessions[chatId].selectedYear = 'bd_2026_years'.split('_')[1]
     }
 
     const message = await bot.sendMessage(
@@ -80,10 +80,10 @@ async function handleComplaintNewArrange(bot, chatId, msg, userSessions, company
         reply_markup: {
           inline_keyboard: [
             [
+              { text: '2025', callback_data: 'bd_2025_years' },
               { text: '2024', callback_data: 'bd_2024_years' },
               { text: '2023', callback_data: 'bd_2023_years' },
               { text: '2022', callback_data: 'bd_2022_years' },
-              { text: '2021', callback_data: 'bd_2021_years' },
             ],
             [{ text: '❌ Отмена', callback_data: '/cancel' }],
           ],
@@ -104,10 +104,10 @@ async function handleComplaintNewArrange(bot, chatId, msg, userSessions, company
       if (parts.length > 1) {
         userSessions[chatId].selectedYear = parts[1]
       } else {
-        userSessions[chatId].selectedYear = 'bd_2025_years'.split('_')[1]
+        userSessions[chatId].selectedYear = 'bd_2026_years'.split('_')[1]
       }
     } else {
-      userSessions[chatId].selectedYear = 'bd_2025_years'.split('_')[1]
+      userSessions[chatId].selectedYear = 'bd_2026_years'.split('_')[1]
     }
 
     const message = await bot.sendMessage(

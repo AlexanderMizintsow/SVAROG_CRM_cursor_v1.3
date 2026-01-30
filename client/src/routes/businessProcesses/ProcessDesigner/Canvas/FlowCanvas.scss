@@ -1,0 +1,27 @@
+.flow-canvas {
+  width: 100%;
+  height: 100%;
+  min-height: 400px;
+}
+
+.flow-canvas__react-flow {
+  width: 100%;
+  height: 100%;
+}
+
+.flow-canvas__controls {
+  button {
+    background: var(--bg-card, #fff) !important;
+    border: 1px solid var(--border, #e2e8f0) !important;
+    color: var(--text-primary, #1e293b) !important;
+    border-radius: 6px !important;
+
+    &:hover {
+      background: var(--bg-hover, #f1f5f9) !important;
+    }
+  }
+}
+
+.flow-canvas__background {
+  color: var(--border, #e2e8f0);
+}

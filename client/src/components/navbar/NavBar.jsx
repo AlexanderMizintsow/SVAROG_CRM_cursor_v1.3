@@ -24,6 +24,7 @@ import { IoStarSharp } from 'react-icons/io5'
 import { PiLockKeyOpenFill } from 'react-icons/pi'
 import { TbApps } from 'react-icons/tb'
 import { MdAssessment, MdSearch, MdEdit, MdCampaign } from 'react-icons/md'
+import { FcFlowChart } from 'react-icons/fc'
 
 const NavBar = () => {
   const { user } = useUserStore()
@@ -49,6 +50,11 @@ const NavBar = () => {
       name: 'Рабочие группы',
       icon: GiTeamIdea,
       link: '/work-groups',
+    },
+    {
+      name: 'Бизнес-процессы',
+      icon: FcFlowChart,
+      link: '/business-processes',
     },
   ]
 

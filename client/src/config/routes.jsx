@@ -25,6 +25,7 @@ import RatingStats from '../components/RatingStats/RatingStats.jsx'
 import MaterialSearchPage from '../routes/statistics/MaterialSearchPage.jsx'
 import EditorHandle from '../routes/adminMenu/editorHandle/EditorHandle.jsx'
 import MarketingAutomation from '../routes/adminMenu/marketingAutomation/MarketingAutomation.jsx'
+import BusinessProcesses from '../routes/businessProcesses/BusinessProcesses.jsx'
 
 const routes = (bgSeason, roleAdministrator, isConnectBD) => [
   {
@@ -63,6 +64,22 @@ const routes = (bgSeason, roleAdministrator, isConnectBD) => [
         ),
       },
       { path: 'work-groups', element: <WorkGroup /> },
+      {
+        path: 'business-processes',
+        element: (
+          <div
+            style={{
+              overflowY: 'auto',
+              height: '100%',
+              backgroundImage: `url(${bgSeason})`,
+              backgroundSize: 'cover',
+              backgroundPosition: 'center',
+            }}
+          >
+            <BusinessProcesses />
+          </div>
+        ),
+      },
       // Приложения
       /* {
         path: 'application-mail',

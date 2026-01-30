@@ -578,7 +578,7 @@ class StatisticsController {
       try {
         console.log(`Loading materials for order ID: ${orderId} with filters:`, filters)
 
-        const currentDbOptions = this.getDbOptions(filters.year || '2025')
+        const currentDbOptions = this.getDbOptions(filters.year || '2026')
 
         Firebird.attach(currentDbOptions, (err, db) => {
           if (err) {

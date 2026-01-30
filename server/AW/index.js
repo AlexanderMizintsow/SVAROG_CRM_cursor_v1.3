@@ -54,7 +54,7 @@ app.get('/app/order/items/:orderNo/:inn/:year?', (req, res) => {
     }
 
     console.log(
-      `Executing query with ORDERNO: ${orderNo}, INN: ${inn}, YEAR: ${year || 'default (2025)'}`
+      `Executing query with ORDERNO: ${orderNo}, INN: ${inn}, YEAR: ${year || 'default (2026)'}`
     )
 
     const query = `
