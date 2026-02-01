@@ -1,11 +1,11 @@
 import { useCallback } from 'react'
 import Toastify from 'toastify-js'
-import useBusinessProcessStore from '../../../store/useBusinessProcessStore'
-import { createProcess, updateProcess } from '../../../api/businessProcessApi'
-import Palette from './Palette/Palette'
-import FlowCanvas from './Canvas/FlowCanvas'
-import PropertiesPanel from './PropertiesPanel/PropertiesPanel'
-import DesignerToolbar from './DesignerToolbar'
+import useBusinessProcessStore from '../../../store/useBusinessProcessStore.js'
+import { createProcess, updateProcess, deleteProcess } from '../../../api/businessProcessApi.js'
+import Palette from './Palette/Palette.jsx'
+import FlowCanvas from './Canvas/FlowCanvas.jsx'
+import PropertiesPanel from './PropertiesPanel/PropertiesPanel.jsx'
+import DesignerToolbar from './DesignerToolbar.jsx'
 import './ProcessDesigner.scss'
 
 const ProcessDesigner = () => {
@@ -18,7 +18,6 @@ const ProcessDesigner = () => {
     setProcessName,
     setProcessDescription,
     setIsDraft,
-    setScheme,
     resetDesigner,
   } = useBusinessProcessStore()
 
@@ -111,18 +110,39 @@ const ProcessDesigner = () => {
     }
   }, [validateScheme, selectedProcess, processName, processDescription, scheme, resetDesigner])
 
+  const handleDeleteProcess = useCallback(async () => {
+    if (!selectedProcess?.id) return
+    const name = selectedProcess?.name || processName || 'Без названия'
+    const ok = window.confirm(`Удалить процесс «${name}»?`)
+    if (!ok) return
+    try {
+      await deleteProcess(selectedProcess.id)
+      Toastify({ text: 'Процесс удалён', close: true, backgroundColor: '#059669' }).showToast()
+      resetDesigner()
+    } catch (e) {
+      console.error(e)
+      Toastify({
+        text: e.response?.data?.error || 'Не удалось удалить процесс',
+        close: true,
+        backgroundColor: '#b91c1c',
+      }).showToast()
+    }
+  }, [selectedProcess?.id, selectedProcess?.name, processName, resetDesigner])
+
   return (
     <div className="process-designer">
       <DesignerToolbar
         processName={processName}
         processDescription={processDescription}
         isDraft={isDraft}
+        canDelete={!!selectedProcess?.id}
         onProcessNameChange={setProcessName}
         onProcessDescriptionChange={setProcessDescription}
         onIsDraftChange={setIsDraft}
         onSaveDraft={handleSaveDraft}
         onPublish={handlePublish}
         onNewProcess={resetDesigner}
+        onDelete={handleDeleteProcess}
       />
 
       <div className="process-designer__body">

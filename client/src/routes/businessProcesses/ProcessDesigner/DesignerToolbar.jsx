@@ -1,17 +1,20 @@
 import { IoDocumentTextOutline, IoCreateOutline } from 'react-icons/io5'
 import { MdSave, MdPublish } from 'react-icons/md'
+import { IoTrashOutline } from 'react-icons/io5'
 import './DesignerToolbar.scss'
 
 const DesignerToolbar = ({
   processName,
   processDescription,
   isDraft,
+  canDelete,
   onProcessNameChange,
   onProcessDescriptionChange,
   onIsDraftChange,
   onSaveDraft,
   onPublish,
   onNewProcess,
+  onDelete,
 }) => {
   return (
     <div className="designer-toolbar">
@@ -54,6 +57,16 @@ const DesignerToolbar = ({
         >
           <IoCreateOutline /> Новый процесс
         </button>
+        {canDelete && (
+          <button
+            type="button"
+            className="designer-toolbar__btn designer-toolbar__btn--danger"
+            onClick={onDelete}
+            title="Удалить процесс полностью"
+          >
+            <IoTrashOutline /> Удалить
+          </button>
+        )}
         <button
           type="button"
           className="designer-toolbar__btn designer-toolbar__btn--secondary"

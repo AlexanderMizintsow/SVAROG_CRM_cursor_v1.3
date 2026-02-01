@@ -29,6 +29,7 @@ const AddModal = ({
   parentTaskId,
   rootTaskId,
   initialTaskData: externalInitialTaskData,
+  businessProcessInstanceId,
 }) => {
   const defaultInitialTaskData = {
     title: "",
@@ -79,6 +80,8 @@ const AddModal = ({
   const [fileComments, setFileComments] = useState({});
 
   const quillRef = useRef(null);
+  const initialDataAppliedRef = useRef(false);
+  const quillInitialSetRef = useRef(false);
 
   const {
     handleFileChange,
@@ -125,10 +128,15 @@ const AddModal = ({
     }
   }, [userId, users]);
 
-  // Обновляем taskData при изменении externalInitialTaskData
+  // Применяем initialTaskData только при первом открытии модалки, чтобы опрос родителя (например, BPE) не сбрасывал ввод
   useEffect(() => {
     if (isOpen && externalInitialTaskData) {
-      setTaskData(initialTaskData);
+      if (!initialDataAppliedRef.current) {
+        setTaskData(initialTaskData);
+        initialDataAppliedRef.current = true;
+      }
+    } else if (!isOpen) {
+      initialDataAppliedRef.current = false;
     }
   }, [isOpen, externalInitialTaskData]);
 
@@ -144,16 +152,22 @@ const AddModal = ({
     }
   }, [isOpen, quillInstance]);
 
-  // Обновление содержимого Quill при изменении externalInitialTaskData
+  // Подставляем описание в Quill только при первом открытии, чтобы не затирать ввод при ре-рендере родителя
   useEffect(() => {
+    if (!isOpen) {
+      quillInitialSetRef.current = false;
+      return;
+    }
     if (
       quillInstance &&
       externalInitialTaskData &&
-      externalInitialTaskData.description
+      externalInitialTaskData.description &&
+      !quillInitialSetRef.current
     ) {
       quillInstance.root.innerHTML = externalInitialTaskData.description;
+      quillInitialSetRef.current = true;
     }
-  }, [quillInstance, externalInitialTaskData]);
+  }, [isOpen, quillInstance, externalInitialTaskData]);
 
   useEffect(() => {
     const fetchUsers = async () => {
@@ -218,6 +232,9 @@ const AddModal = ({
             parent_id: parentTaskId || null,
             root_id: rootTaskId || parentTaskId || null,
           };
+          if (businessProcessInstanceId) {
+            taskToSubmit.business_process_instance_id = businessProcessInstanceId;
+          }
 
           const response = await axios.post(
             `${API_BASE_URL}5000/api/tasks/create`,

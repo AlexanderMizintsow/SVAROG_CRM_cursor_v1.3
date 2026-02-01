@@ -9,6 +9,7 @@ const taskTemplatesRoutes = require('./routes/taskTemplates')
 const referencesRoutes = require('./routes/references')
 const webhooksRoutes = require('./routes/webhooks')
 const analyticsRoutes = require('./routes/analytics')
+const notificationsRoutes = require('./routes/notifications')
 const { startTimerWorker } = require('./engine/workers/timerWorker')
 
 const app = express()
@@ -21,6 +22,7 @@ app.use('/api/bp/task-templates', taskTemplatesRoutes(pool))
 app.use('/api/bp/references', referencesRoutes())
 app.use('/api/bp/webhooks', webhooksRoutes(pool))
 app.use('/api/bp/analytics', analyticsRoutes(pool))
+app.use('/api/bp/notifications', notificationsRoutes(pool))
 
 app.get('/api/bp/health', (req, res) => {
   res.json({ status: 'ok', service: 'business_process_engine' })

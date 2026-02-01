@@ -5,7 +5,7 @@ import {
   getReferencesRoles,
   getTaskTemplates,
 } from '../../../../api/businessProcessApi.js'
-import { ASSIGNEE_SOURCES } from '../../constants/blockTypes'
+import { ASSIGNEE_SOURCES, CREATE_TASK_MODES } from '../../constants/blockTypes'
 import './PropertiesPanel.scss'
 
 const CreateTaskNodeProps = ({ node, onUpdate }) => {
@@ -55,10 +55,30 @@ const CreateTaskNodeProps = ({ node, onUpdate }) => {
     { value: 'высокий', label: 'Высокий' },
   ]
 
+  const createMode = settings.createMode ?? 'prepared'
+
   return (
     <div className="properties-panel__fields">
       <div className="properties-panel__field">
-        <label className="properties-panel__label">Шаблон задачи</label>
+        <label className="properties-panel__label">Режим создания задачи</label>
+        <select
+          className="properties-panel__select"
+          value={createMode}
+          onChange={(e) => handleChange('createMode', e.target.value)}
+        >
+          {CREATE_TASK_MODES.map((opt) => (
+            <option key={opt.value} value={opt.value}>{opt.label}</option>
+          ))}
+        </select>
+        <p className="properties-panel__hint">
+          {createMode === 'prepared'
+            ? 'Задача создаётся сразу при прохождении процесса по данным шаблона ниже.'
+            : 'При запуске процесса пользователю откроется окно создания задачи (как в Менеджере задач) с подставленными данными шаблона.'}
+        </p>
+      </div>
+
+      <div className="properties-panel__field">
+        <label className="properties-panel__label">Шаблон задачи (BPE)</label>
         <select
           className="properties-panel__select"
           value={settings.templateId ?? ''}
@@ -69,17 +89,31 @@ const CreateTaskNodeProps = ({ node, onUpdate }) => {
             <option key={t.id} value={t.id}>{t.name}</option>
           ))}
         </select>
+        <p className="properties-panel__hint">Базовые значения названия, приоритета, дедлайна (если заданы в шаблоне)</p>
       </div>
+
       <div className="properties-panel__field">
-        <label className="properties-panel__label">Название задачи (переопределение)</label>
+        <label className="properties-panel__label">Название задачи (шаблон)</label>
         <input
           type="text"
           className="properties-panel__input"
           value={settings.title ?? ''}
           onChange={(e) => handleChange('title', e.target.value)}
-          placeholder="Оставьте пустым для шаблона"
+          placeholder="Подставится при создании задачи"
         />
       </div>
+
+      <div className="properties-panel__field">
+        <label className="properties-panel__label">Описание (шаблон, HTML)</label>
+        <textarea
+          className="properties-panel__input properties-panel__textarea"
+          value={settings.description ?? ''}
+          onChange={(e) => handleChange('description', e.target.value)}
+          placeholder="Текст/HTML как в Менеджере задач"
+          rows={3}
+        />
+      </div>
+
       <div className="properties-panel__field">
         <label className="properties-panel__label">Приоритет</label>
         <select
@@ -92,6 +126,7 @@ const CreateTaskNodeProps = ({ node, onUpdate }) => {
           ))}
         </select>
       </div>
+
       <div className="properties-panel__field">
         <label className="properties-panel__label">Автор задачи</label>
         <select
@@ -120,6 +155,7 @@ const CreateTaskNodeProps = ({ node, onUpdate }) => {
           </select>
         </div>
       )}
+
       <div className="properties-panel__field">
         <label className="properties-panel__label">Исполнители</label>
         <select
@@ -183,6 +219,47 @@ const CreateTaskNodeProps = ({ node, onUpdate }) => {
           </select>
         </div>
       )}
+
+      <div className="properties-panel__field">
+        <label className="properties-panel__label">Утверждающие (шаблон)</label>
+        <select
+          className="properties-panel__select"
+          multiple
+          value={settings.approverUserIds || []}
+          onChange={(e) => {
+            const selected = Array.from(e.target.selectedOptions, (o) => Number(o.value))
+            handleChange('approverUserIds', selected)
+          }}
+        >
+          {users.map((u) => (
+            <option key={u.id} value={u.id}>
+              {[u.first_name, u.last_name].filter(Boolean).join(' ') || u.username}
+            </option>
+          ))}
+        </select>
+        <small className="properties-panel__hint">Ctrl+клик для нескольких</small>
+      </div>
+
+      <div className="properties-panel__field">
+        <label className="properties-panel__label">Наблюдатели (шаблон)</label>
+        <select
+          className="properties-panel__select"
+          multiple
+          value={settings.viewerUserIds || []}
+          onChange={(e) => {
+            const selected = Array.from(e.target.selectedOptions, (o) => Number(o.value))
+            handleChange('viewerUserIds', selected)
+          }}
+        >
+          {users.map((u) => (
+            <option key={u.id} value={u.id}>
+              {[u.first_name, u.last_name].filter(Boolean).join(' ') || u.username}
+            </option>
+          ))}
+        </select>
+        <small className="properties-panel__hint">Ctrl+клик для нескольких</small>
+      </div>
+
       <div className="properties-panel__field">
         <label className="properties-panel__label">Дедлайн (смещение в днях)</label>
         <input
@@ -194,6 +271,10 @@ const CreateTaskNodeProps = ({ node, onUpdate }) => {
           min={0}
         />
       </div>
+
+      <p className="properties-panel__hint" style={{ marginTop: '0.5rem' }}>
+        Задача из этого блока отслеживается по выполнению, срокам и статусу — условия можно задать в блоке «Развилка».
+      </p>
     </div>
   )
 }

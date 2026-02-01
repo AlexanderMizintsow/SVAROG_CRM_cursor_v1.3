@@ -1,6 +1,6 @@
 import { useMemo } from 'react'
 import useBusinessProcessStore from '../../../../store/useBusinessProcessStore'
-import { BLOCK_TYPES } from '../../constants/blockTypes'
+import { BLOCK_TYPES, BLOCK_LABELS } from '../../constants/blockTypes'
 import StartNodeProps from './StartNodeProps'
 import EndNodeProps from './EndNodeProps'
 import CreateTaskNodeProps from './CreateTaskNodeProps'
@@ -38,22 +38,32 @@ const PropertiesPanel = () => {
   }
 
   const NodePropsComponent = NODE_PROPS_MAP[selectedNode.type]
-  if (!NodePropsComponent) {
-    return (
-      <div className="properties-panel">
-        <h3 className="properties-panel__title">{selectedNode.label}</h3>
-        <p className="properties-panel__hint">Настройки для этого типа блока пока не реализованы.</p>
-      </div>
-    )
-  }
 
   return (
     <div className="properties-panel">
-      <h3 className="properties-panel__title">{selectedNode.label}</h3>
-      <NodePropsComponent
-        node={selectedNode}
-        onUpdate={(updates) => updateNodeInScheme(selectedNode.id, updates)}
-      />
+      <h3 className="properties-panel__title">{BLOCK_LABELS[selectedNode.type] || selectedNode.type}</h3>
+
+      <div className="properties-panel__fields">
+        <div className="properties-panel__field">
+          <label className="properties-panel__label">Название блока на схеме</label>
+          <input
+            type="text"
+            className="properties-panel__input"
+            value={selectedNode.label || ''}
+            onChange={(e) => updateNodeInScheme(selectedNode.id, { label: e.target.value })}
+            placeholder={BLOCK_LABELS[selectedNode.type]}
+          />
+        </div>
+      </div>
+
+      {NodePropsComponent ? (
+        <NodePropsComponent
+          node={selectedNode}
+          onUpdate={(updates) => updateNodeInScheme(selectedNode.id, updates)}
+        />
+      ) : (
+        <p className="properties-panel__hint">Настройки для этого типа блока пока не реализованы.</p>
+      )}
     </div>
   )
 }

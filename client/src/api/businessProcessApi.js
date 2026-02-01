@@ -36,8 +36,17 @@ export const getInstances = (params = {}) =>
 export const getInstance = (id) =>
   bpeClient.get(`/instances/${id}`).then((res) => res.data)
 
+export const getInstancesOverview = (params = {}) =>
+  bpeClient.get('/instances/overview', { params }).then((res) => res.data)
+
 export const cancelInstance = (id) =>
   bpeClient.post(`/instances/${id}/cancel`).then((res) => res.data)
+
+export const deleteInstance = (id) =>
+  bpeClient.delete(`/instances/${id}`).then((res) => res.data)
+
+export const completeTaskCreation = (instanceId, body) =>
+  bpeClient.post(`/instances/${instanceId}/complete-task-creation`, body).then((res) => res.data)
 
 // Шаблоны задач
 export const getTaskTemplates = () =>
@@ -65,3 +74,10 @@ export const getReferencesRoles = () =>
 // Аналитика
 export const getAnalytics = (processId) =>
   bpeClient.get(`/analytics/process/${processId}`).then((res) => res.data)
+
+// In-app уведомления BPE (для AlertBanner)
+export const getBpNotifications = (userId) =>
+  bpeClient.get('/notifications', { params: { user_id: userId } }).then((res) => res.data)
+
+export const markBpNotificationRead = (id) =>
+  bpeClient.post(`/notifications/${id}/read`).then((res) => res.data)

@@ -62,7 +62,22 @@ async function runProcessFromStart(dbPool, instanceId) {
 
   await logEnter(dbPool, instanceId, currentNodeId)
 
+  // Защита от бесконечных циклов/зависаний схемы
+  // Циклы допускаются (например, через Таймер + Развилка), но должны быть ограничены разумным числом шагов.
+  let steps = 0
+  const MAX_STEPS = 500
+
   while (currentNodeId) {
+    steps += 1
+    if (steps > MAX_STEPS) {
+      await logExit(dbPool, instanceId, currentNodeId, 'error', { error: 'Превышен лимит шагов выполнения (циклическая схема)' })
+      await dbPool.query(
+        `UPDATE bp_process_instances SET status = 'failed', error_message = $1, finished_at = NOW() WHERE id = $2`,
+        ['Превышен лимит шагов выполнения (возможен бесконечный цикл)', instanceId]
+      )
+      return
+    }
+
     const node = getNodeById(scheme, currentNodeId)
     if (!node) {
       await logExit(dbPool, instanceId, currentNodeId, 'error', { error: 'Узел не найден' })
@@ -137,8 +152,17 @@ async function runProcessFromStart(dbPool, instanceId) {
       return
     }
 
+    if (result.waitUserInput) {
+      await logExit(dbPool, instanceId, currentNodeId, 'waiting_user_input', {})
+      return
+    }
+
     if (result.end) {
-      await logExit(dbPool, instanceId, currentNodeId, 'success', { end: true })
+      await logExit(dbPool, instanceId, currentNodeId, 'success', {
+        end: true,
+        outcome: result.outcome || 'SUCCESS',
+        comment: result.comment || '',
+      })
       await dbPool.query(
         `UPDATE bp_process_instances SET status = 'completed', finished_at = NOW(), current_node_id = NULL WHERE id = $1`,
         [instanceId]
@@ -159,15 +183,59 @@ async function runProcessFromStart(dbPool, instanceId) {
   }
 }
 
+async function runProcessFromTaskCreation(dbPool, instanceId, taskId) {
+  const instResult = await dbPool.query(
+    'SELECT * FROM bp_process_instances WHERE id = $1 AND status = $2',
+    [instanceId, 'waiting_user_input']
+  )
+  if (instResult.rows.length === 0) return
+
+  const instance = instResult.rows[0]
+  const context = typeof instance.context === 'object' ? instance.context : (instance.context ? JSON.parse(instance.context) : {})
+  const pending = context.pending_task_creation
+  if (!pending || !pending.nodeId) return
+
+  const nodeId = pending.nodeId
+
+  await dbPool.query(
+    'INSERT INTO bp_task_process_links (task_id, process_instance_id, node_id) VALUES ($1, $2, $3)',
+    [taskId, instanceId, nodeId]
+  )
+
+  const blockOutputs = context.block_outputs || {}
+  blockOutputs[nodeId] = { task_id: taskId }
+  const newContext = { ...context, last_task_id: taskId, block_outputs: blockOutputs }
+  delete newContext.pending_task_creation
+
+  const defResult = await dbPool.query(
+    'SELECT scheme FROM bp_process_definitions WHERE id = $1',
+    [instance.process_id]
+  )
+  if (defResult.rows.length === 0) return
+
+  const scheme = typeof defResult.rows[0].scheme === 'object'
+    ? defResult.rows[0].scheme
+    : JSON.parse(defResult.rows[0].scheme)
+  const edges = (scheme.edges || []).filter((e) => e.source === nodeId)
+  const nextEdge = edges[0]
+  if (!nextEdge) return
+
+  await dbPool.query(
+    'UPDATE bp_process_instances SET context = $1, status = $2, current_node_id = $3 WHERE id = $4',
+    [JSON.stringify(newContext), 'running', nextEdge.target, instanceId]
+  )
+  await runProcessFromStart(dbPool, instanceId)
+}
+
 async function runProcessFromGateway(dbPool, taskId) {
   const links = await dbPool.query(
-    'SELECT process_instance_id, node_id FROM bp_gateway_waiting WHERE task_id = $1',
+    'SELECT instance_id, node_id FROM bp_gateway_waiting WHERE task_id = $1',
     [taskId]
   )
   if (links.rows.length === 0) return
 
   for (const row of links.rows) {
-    const instanceId = row.process_instance_id
+    const instanceId = row.instance_id
     const gatewayNodeId = row.node_id
 
     const instResult = await dbPool.query(
@@ -192,22 +260,28 @@ async function runProcessFromGateway(dbPool, taskId) {
     const handler = getHandler('gateway')
     if (!handler || !handler.handle) continue
 
+    // Маркер: развилка выполняется по событию изменения задачи (вебхук)
+    instance.__bpe_resume_reason = 'task_updated'
     const result = await handler.handle(instance, node, scheme, integrations, dbPool)
 
-    await dbPool.query('DELETE FROM bp_gateway_waiting WHERE instance_id = $1 AND node_id = $2', [instanceId, gatewayNodeId])
-
     if (result.nextNodeId) {
+      // Условие совпало — снимаем ожидание и продолжаем выполнение.
+      await dbPool.query('DELETE FROM bp_gateway_waiting WHERE instance_id = $1 AND node_id = $2', [instanceId, gatewayNodeId])
       await dbPool.query(
         'UPDATE bp_process_instances SET status = $1, current_node_id = $2 WHERE id = $3',
         ['running', result.nextNodeId, instanceId]
       )
       await runProcessFromStart(dbPool, instanceId)
-      return
+      continue
     }
+
+    // Если условие не подошло — продолжаем ожидать (НЕ удаляем запись ожидания).
+    // Следующий task-updated по этой же задаче снова вызовет runProcessFromGateway.
   }
 }
 
 module.exports = {
   runProcessFromStart,
   runProcessFromGateway,
+  runProcessFromTaskCreation,
 }

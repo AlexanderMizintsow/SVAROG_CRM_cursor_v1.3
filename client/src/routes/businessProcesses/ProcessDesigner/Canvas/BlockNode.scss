@@ -3,9 +3,10 @@
   border-radius: 8px;
   border: 2px solid var(--block-color, #94a3b8);
   background: var(--bg-card, #fff);
-  min-width: 120px;
+  min-width: 140px;
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
   transition: box-shadow 0.2s;
+  position: relative;
 
   &--selected {
     box-shadow: 0 0 0 2px var(--block-color);
@@ -30,34 +31,52 @@
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
-  max-width: 140px;
+  max-width: 180px;
 }
 
+/* Явные, но компактные входы/выходы */
 .block-node__handle {
-  width: 10px;
-  height: 10px;
+  width: 12px;
+  height: 12px;
   background: var(--block-color);
-  border: 2px solid #fff;
+  border: 3px solid #fff;
+  transition: all 0.2s ease;
+  cursor: pointer;
+
+  &:hover {
+    width: 16px;
+    height: 16px;
+    border-width: 2px;
+    box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.3);
+  }
 }
 
-.block-node--start .block-node__body {
-  justify-content: center;
+/* Разные цвета вход/выход */
+.block-node__handle[data-handlepos='left'] {
+  background: #3b82f6;
 }
 
+.block-node__handle[data-handlepos='right'],
+.block-node__handle--gateway {
+  background: #10b981;
+}
+
+.block-node--start .block-node__body,
 .block-node--end .block-node__body {
   justify-content: center;
 }
 
-.block-node--gateway .block-node__body {
-  transform: rotate(0deg);
+/* Развилка (gateway) как прямоугольник, но с множественными выходами */
+.block-node__gateway-sources {
+  position: absolute;
+  right: -6px;
+  top: 50%;
+  transform: translateY(-50%);
+  display: block;
+  z-index: 2;
 }
 
-.block-node--gateway {
-  transform: rotate(-45deg);
-  min-width: 80px;
-}
-
-.block-node--gateway .block-node__label {
-  transform: rotate(45deg);
-  display: inline-block;
+.block-node__handle--gateway {
+  position: absolute;
+  right: 0;
 }

@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef } from 'react'
+import { useCallback, useEffect, useMemo, useRef } from 'react'
 import ReactFlow, {
   ReactFlowProvider,
   useNodesState,
@@ -27,18 +27,23 @@ const schemeToFlow = (scheme) => {
       settings: n.settings,
     },
   }))
+
   const edges = (Array.isArray(schemeData.edges) ? schemeData.edges : []).map((e, i) => ({
     id: e.id || `e-${e.source}-${e.target}-${i}`,
     source: e.source,
     target: e.target,
-    ...(e.condition != null && { condition: e.condition }),
+    ...(e.sourceHandle ? { sourceHandle: e.sourceHandle } : {}),
+    ...(e.targetHandle ? { targetHandle: e.targetHandle } : {}),
+    ...(e.condition != null ? { condition: e.condition } : {}),
   }))
+
   return { nodes, edges }
 }
 
 const flowToScheme = (nodes, edges) => {
   const nodesList = Array.isArray(nodes) ? nodes : []
   const edgesList = Array.isArray(edges) ? edges : []
+
   const schemeNodes = nodesList.map((n) => ({
     id: n.id,
     type: n.data?.nodeType || 'create_task',
@@ -46,20 +51,32 @@ const flowToScheme = (nodes, edges) => {
     label: n.data?.label,
     settings: n.data?.settings || {},
   }))
+
   const schemeEdges = edgesList.map((e) => ({
     id: e.id,
     source: e.source,
     target: e.target,
-    ...(e.condition != null && { condition: e.condition }),
+    ...(e.sourceHandle ? { sourceHandle: e.sourceHandle } : {}),
+    ...(e.targetHandle ? { targetHandle: e.targetHandle } : {}),
+    ...(e.condition != null ? { condition: e.condition } : {}),
   }))
+
   return { nodes: schemeNodes, edges: schemeEdges }
 }
 
 function FlowCanvasInner() {
-  const { scheme, setScheme, setSelectedNodeId } = useBusinessProcessStore()
-  const initial = schemeToFlow(scheme)
+  const {
+    scheme,
+    selectedNodeId,
+    setScheme,
+    setSelectedNodeId,
+    removeNodeFromScheme,
+  } = useBusinessProcessStore()
+
+  const initial = useMemo(() => schemeToFlow(scheme), [])
   const [nodes, setNodes, onNodesChange] = useNodesState(initial.nodes)
   const [edges, setEdges, onEdgesChange] = useEdgesState(initial.edges)
+
   const nodesRef = useRef(nodes)
   const edgesRef = useRef(edges)
   nodesRef.current = nodes
@@ -69,7 +86,23 @@ function FlowCanvasInner() {
     const flow = schemeToFlow(scheme)
     setNodes(flow.nodes)
     setEdges(flow.edges)
-  }, [scheme])
+  }, [scheme, setNodes, setEdges])
+
+  useEffect(() => {
+    const handleKeyDown = (event) => {
+      if ((event.key !== 'Delete' && event.key !== 'Backspace') || !selectedNodeId) return
+      event.preventDefault()
+
+      const nodesList = Array.isArray(scheme?.nodes) ? scheme.nodes : []
+      const node = nodesList.find((n) => n.id === selectedNodeId)
+      if (node?.type === 'start') {
+        return
+      }
+      removeNodeFromScheme(selectedNodeId)
+    }
+    document.addEventListener('keydown', handleKeyDown)
+    return () => document.removeEventListener('keydown', handleKeyDown)
+  }, [selectedNodeId, scheme?.nodes, removeNodeFromScheme])
 
   const onConnect = useCallback(
     (params) => {
@@ -78,9 +111,7 @@ function FlowCanvasInner() {
         id: params.id || `e-${params.source}-${params.target}-${uuidv4().slice(0, 8)}`,
       }
       setEdges((eds) => addEdge(newEdge, eds))
-      setScheme(
-        flowToScheme(nodesRef.current, [...edgesRef.current, newEdge])
-      )
+      setScheme(flowToScheme(nodesRef.current, [...edgesRef.current, newEdge]))
     },
     [setEdges, setScheme]
   )

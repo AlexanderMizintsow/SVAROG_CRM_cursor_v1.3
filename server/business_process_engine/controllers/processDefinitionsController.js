@@ -119,12 +119,19 @@ async function deleteProcess(dbPool, req, res) {
       return res.status(403).json({ error: 'Нет прав на удаление процессов' })
     }
     const { id } = req.params
-    const running = await dbPool.query(
-      'SELECT 1 FROM bp_process_instances WHERE process_id = $1 AND status NOT IN ($2, $3, $4)',
-      [id, 'completed', 'failed', 'cancelled']
-    )
-    if (running.rows.length > 0) {
-      return res.status(400).json({ error: 'Есть запущенные экземпляры процесса. Сначала дождитесь их завершения или отмените.' })
+    const force = String(req.query.force || '').toLowerCase()
+    const isForce = force === 'true' || force === '1' || force === 'yes'
+
+    if (!isForce) {
+      const running = await dbPool.query(
+        'SELECT 1 FROM bp_process_instances WHERE process_id = $1 AND status NOT IN ($2, $3, $4)',
+        [id, 'completed', 'failed', 'cancelled']
+      )
+      if (running.rows.length > 0) {
+        return res.status(400).json({
+          error: 'Есть запущенные экземпляры процесса. Сначала дождитесь их завершения или отмените. Для принудительного удаления используйте force=true.',
+        })
+      }
     }
     await dbPool.query('DELETE FROM bp_process_definitions WHERE id = $1', [id])
     res.status(204).send()

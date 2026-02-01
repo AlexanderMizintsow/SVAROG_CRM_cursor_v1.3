@@ -66,8 +66,19 @@ async function handle(instance, node, scheme, integrations, dbPool) {
         }
       }
       if (channels.inApp) {
-        // in-app: можно вызывать register API создания напоминания, если такой эндпоинт есть
-        // Пока оставляем только Telegram; при появлении API напоминаний — добавить вызов сюда
+        // in-app: пишем в таблицу BPE и показываем в AlertBanner как «БП»
+        try {
+          const title = settings.title || 'Уведомление (БП)'
+          for (const uid of userIds) {
+            await dbPool.query(
+              `INSERT INTO bp_in_app_notifications (user_id, title, message, process_instance_id, node_id)
+               VALUES ($1, $2, $3, $4, $5)`,
+              [uid, title, messageText, instance.id, node.id]
+            )
+          }
+        } catch (e) {
+          console.warn('notification inApp insert:', e.message)
+        }
       }
     }
   }

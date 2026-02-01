@@ -1,8 +1,8 @@
 import { FcFlowChart } from 'react-icons/fc'
-import { IoPlay } from 'react-icons/io5'
+import { IoPlay, IoCreateOutline, IoTrashOutline } from 'react-icons/io5'
 import './ProcessCard.scss'
 
-const ProcessCard = ({ process, onStart }) => {
+const ProcessCard = ({ process, onStart, onEdit, onDelete }) => {
   return (
     <div className="process-card">
       <div className="process-card__header">
@@ -20,6 +20,26 @@ const ProcessCard = ({ process, onStart }) => {
         >
           <IoPlay className="process-card__btn-icon" />
           Запустить
+        </button>
+
+        <button
+          type="button"
+          className="process-card__btn-edit"
+          onClick={onEdit}
+          title="Редактировать"
+        >
+          <IoCreateOutline className="process-card__btn-icon" />
+          Редактировать
+        </button>
+
+        <button
+          type="button"
+          className="process-card__btn-delete"
+          onClick={onDelete}
+          title="Удалить"
+        >
+          <IoTrashOutline className="process-card__btn-icon" />
+          Удалить
         </button>
       </div>
     </div>

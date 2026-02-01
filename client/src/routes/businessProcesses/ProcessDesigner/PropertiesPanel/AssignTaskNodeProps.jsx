@@ -44,6 +44,9 @@ const AssignTaskNodeProps = ({ node, onUpdate }) => {
 
   return (
     <div className="properties-panel__fields">
+      <p className="properties-panel__hint" style={{ marginBottom: '0.5rem' }}>
+        Блок «Назначить задачу» считается устаревшим. В большинстве сценариев достаточно настроить исполнителей прямо в блоке «Создать задачу».
+      </p>
       <div className="properties-panel__field">
         <label className="properties-panel__label">Задача из блока</label>
         <select

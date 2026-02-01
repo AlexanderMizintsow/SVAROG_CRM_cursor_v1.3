@@ -28,8 +28,50 @@ const StartNodeProps = ({ node, onUpdate }) => {
     onUpdate({ settings: { ...settings, [key]: value } })
   }
 
+  const allowAllLaunchers = settings.allowAllLaunchers !== false
+
   return (
     <div className="properties-panel__fields">
+      <div className="properties-panel__field">
+        <label className="properties-panel__label">Кто может запускать процесс</label>
+        <label className="properties-panel__hint" style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
+          <input
+            type="checkbox"
+            checked={allowAllLaunchers}
+            onChange={(e) => {
+              const nextAllowAll = e.target.checked
+              handleChange('allowAllLaunchers', nextAllowAll)
+              if (nextAllowAll) {
+                handleChange('allowedLauncherUserIds', [])
+              }
+            }}
+          />
+          Разрешить запуск всем
+        </label>
+        {!allowAllLaunchers && (
+          <>
+            <p className="properties-panel__hint" style={{ marginTop: '0.25rem' }}>
+              Если список пуст — запуск будет запрещён всем.
+            </p>
+            <select
+              className="properties-panel__select"
+              multiple
+              value={settings.allowedLauncherUserIds || []}
+              onChange={(e) => {
+                const selected = Array.from(e.target.selectedOptions, (o) => Number(o.value))
+                handleChange('allowedLauncherUserIds', selected)
+              }}
+            >
+              {users.map((u) => (
+                <option key={u.id} value={u.id}>
+                  {[u.first_name, u.last_name].filter(Boolean).join(' ') || u.username}
+                </option>
+              ))}
+            </select>
+          </>
+        )}
+      </div>
+
       <div className="properties-panel__field">
         <label className="properties-panel__label">Инициатор процесса</label>
         <select

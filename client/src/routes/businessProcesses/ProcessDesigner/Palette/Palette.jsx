@@ -4,20 +4,18 @@ import {
   IoPlayCircle,
   IoStopCircle,
   IoDocumentText,
-  IoPeople,
   IoNotifications,
   IoGitBranch,
   IoTime,
 } from 'react-icons/io5'
-import useBusinessProcessStore from '../../../../store/useBusinessProcessStore'
-import { BLOCK_TYPES, BLOCK_LABELS } from '../../constants/blockTypes'
+import useBusinessProcessStore from '../../../../store/useBusinessProcessStore.js'
+import { BLOCK_TYPES, BLOCK_LABELS } from '../../constants/blockTypes.js'
 import './Palette.scss'
 
 const PALETTE_ITEMS = [
   { type: BLOCK_TYPES.START, icon: IoPlayCircle, color: '#22c55e' },
   { type: BLOCK_TYPES.END, icon: IoStopCircle, color: '#94a3b8' },
   { type: BLOCK_TYPES.CREATE_TASK, icon: IoDocumentText, color: '#3b82f6' },
-  { type: BLOCK_TYPES.ASSIGN_TASK, icon: IoPeople, color: '#8b5cf6' },
   { type: BLOCK_TYPES.NOTIFICATION, icon: IoNotifications, color: '#f59e0b' },
   { type: BLOCK_TYPES.GATEWAY, icon: IoGitBranch, color: '#e11d48' },
   { type: BLOCK_TYPES.TIMER, icon: IoTime, color: '#0ea5e9' },
@@ -62,10 +60,7 @@ const Palette = () => {
               onClick={() => handleAddBlock(item.type)}
               title={BLOCK_LABELS[item.type]}
             >
-              <item.icon
-                className="palette__icon"
-                style={{ color: item.color }}
-              />
+              <item.icon className="palette__icon" style={{ color: item.color }} />
               <span className="palette__label">{BLOCK_LABELS[item.type]}</span>
             </button>
           </li>
@@ -78,24 +73,24 @@ const Palette = () => {
 function getDefaultSettings(type) {
   switch (type) {
     case BLOCK_TYPES.START:
-      return { initiatorType: 'current_user' }
+      return { initiatorType: 'current_user', allowAllLaunchers: true, allowedLauncherUserIds: [] }
     case BLOCK_TYPES.END:
-      return { label: '' }
+      return { outcome: 'SUCCESS', comment: '' }
     case BLOCK_TYPES.CREATE_TASK:
       return {
+        createMode: 'prepared',
         templateId: null,
         title: '',
         description: '',
         priority: 'низкий',
+        initialStatus: 'backlog',
         authorSource: 'initiator',
         assigneeSource: 'users',
         assigneeUserIds: [],
-        approvers: [],
-        viewers: [],
+        approverUserIds: [],
+        viewerUserIds: [],
         deadlineOffsetDays: null,
       }
-    case BLOCK_TYPES.ASSIGN_TASK:
-      return { sourceNodeId: null, assigneeSource: 'users', assigneeUserIds: [] }
     case BLOCK_TYPES.NOTIFICATION:
       return {
         recipientSource: 'users',
@@ -105,7 +100,13 @@ function getDefaultSettings(type) {
         priority: 'normal',
       }
     case BLOCK_TYPES.GATEWAY:
-      return { taskSourceNodeId: null, edges: [] }
+      return {
+        sourceType: 'auto',
+        waitMode: 'event',
+        outgoingCount: 3,
+        taskSourceNodeId: null,
+        edges: [],
+      }
     case BLOCK_TYPES.TIMER:
       return {
         type: 'interval',
@@ -119,3 +120,4 @@ function getDefaultSettings(type) {
 }
 
 export default Palette
+

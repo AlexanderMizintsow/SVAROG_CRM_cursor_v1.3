@@ -7,6 +7,7 @@ import GlobalTaskChat from '../../routes/kanbanBoard/globalTask/subcomponents/gl
 import { AiOutlineFileDone } from 'react-icons/ai'
 import { MdHistoryEdu } from 'react-icons/md'
 import { GiConfirmed } from 'react-icons/gi'
+import { FcFlowChart } from 'react-icons/fc'
 import {
   requestNotificationPermission,
   sendCustomNotification,
@@ -21,6 +22,7 @@ import useExtensionRequestsNotifications from './subcomponents/ExtensionRequests
 import './alertBanner.scss'
 import useNotificationsTask from './subcomponents/TaskNotifications'
 import ReactDOM from 'react-dom'
+import { getBpNotifications, markBpNotificationRead } from '../../api/businessProcessApi'
 
 const AlertBanner = () => {
   // ==================== Инициализация состояний и хуков ====================
@@ -38,7 +40,25 @@ const AlertBanner = () => {
   const [prevNotificationsCount, setPrevNotificationsCount] = useState(0)
   const [openConfirmationDialog, setOpenConfirmationDialog] = useState(false)
   const [currentTaskId, setCurrentTaskId] = useState(null)
+  const [bpNotifications, setBpNotifications] = useState([])
   const notifications = []
+
+  // Уведомления БП (in-app)
+  if (currentUserId && Array.isArray(bpNotifications) && bpNotifications.length > 0) {
+    bpNotifications.forEach((n) => {
+      notifications.push({
+        key: `bp-${n.id}`,
+        text: (
+          <span>
+            <b>БП</b>
+            {n.title ? `: ${n.title}. ` : ': '}
+            {n.message}
+          </span>
+        ),
+        icon: <FcFlowChart style={{ fontSize: '16px' }} />,
+      })
+    })
+  }
 
   // ==================== Получение данных из store ====================
   const removeTask = useTaskStateTracker((state) => state.removeTask)
@@ -70,6 +90,29 @@ const AlertBanner = () => {
   })
 
   // ==================== Эффекты ====================
+
+  // BPE in-app уведомления (показываем в AlertBanner с пометкой «БП»)
+  useEffect(() => {
+    if (!currentUserId) return
+    let cancelled = false
+
+    const load = async () => {
+      try {
+        const list = await getBpNotifications(currentUserId)
+        if (cancelled) return
+        setBpNotifications(Array.isArray(list) ? list : [])
+      } catch (e) {
+        // не ломаем AlertBanner из-за проблем BPE
+      }
+    }
+
+    load()
+    const t = setInterval(load, 15000)
+    return () => {
+      cancelled = true
+      clearInterval(t)
+    }
+  }, [currentUserId])
 
   useEffect(() => {
     if (currentUserId) {
@@ -230,6 +273,17 @@ const AlertBanner = () => {
   })
 
   const allNotifications = [...notifications, ...taskNotifications, ...extensionNotifications]
+
+  const handleBpNotificationClick = async (key) => {
+    const id = Number(String(key).replace('bp-', ''))
+    if (!id) return
+    try {
+      await markBpNotificationRead(id)
+    } catch (e) {
+      // даже если не отметилось, локально убираем, чтобы не мешало
+    }
+    setBpNotifications((prev) => (Array.isArray(prev) ? prev.filter((n) => n.id !== id) : []))
+  }
 
   useEffect(() => {
     const totalNotifications = allNotifications.length
@@ -404,6 +458,8 @@ const AlertBanner = () => {
                 onClick={() => {
                   if (key.startsWith('global-')) {
                     handleGlobalNotificationClick({ taskId, title })
+                  } else if (key.startsWith('bp-')) {
+                    handleBpNotificationClick(key)
                   } else if (key.startsWith('authorMessage-')) {
                     handleAuthorNotificationClick(taskId)
                     setMessageType('authorMessage-')

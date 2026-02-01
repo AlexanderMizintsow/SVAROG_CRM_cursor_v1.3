@@ -1,9 +1,5 @@
--- =============================================================================
--- ДВИЖОК БИЗНЕС-ПРОЦЕССОВ (BPE) — ЗАПРОСЫ ДЛЯ РУЧНОГО ВЫПОЛНЕНИЯ В БД SVAROG_DB
--- Выполняйте по порядку. Таблицы users и tasks должны уже существовать.
--- =============================================================================
-
--- 1. Определения процессов
+```sql
+-- 1) Определения процессов
 CREATE TABLE bp_process_definitions (
   id SERIAL PRIMARY KEY,
   name VARCHAR(255) NOT NULL,
@@ -19,8 +15,7 @@ CREATE TABLE bp_process_definitions (
 CREATE INDEX idx_bp_process_definitions_is_draft ON bp_process_definitions(is_draft);
 CREATE INDEX idx_bp_process_definitions_created_by ON bp_process_definitions(created_by);
 
-
--- 2. Экземпляры процессов
+-- 2) Экземпляры процессов
 CREATE TABLE bp_process_instances (
   id SERIAL PRIMARY KEY,
   process_id INT NOT NULL REFERENCES bp_process_definitions(id) ON DELETE CASCADE,
@@ -40,12 +35,7 @@ CREATE INDEX idx_bp_process_instances_initiator_id ON bp_process_instances(initi
 CREATE INDEX idx_bp_process_instances_started_at ON bp_process_instances(started_at);
 CREATE INDEX idx_bp_process_instances_waiting_timer ON bp_process_instances(status) WHERE status = 'waiting_timer';
 
--- Если таблица bp_process_instances уже создана без waiting_user_input — выполните:
--- ALTER TABLE bp_process_instances DROP CONSTRAINT IF EXISTS bp_process_instances_status_check;
--- ALTER TABLE bp_process_instances ADD CONSTRAINT bp_process_instances_status_check CHECK (status IN ('running', 'waiting_gateway', 'waiting_timer', 'waiting_user_input', 'completed', 'failed', 'cancelled'));
-
-
--- 3. Лог прохода по узлам
+-- 3) Лог прохода по узлам
 CREATE TABLE bp_node_execution_log (
   id SERIAL PRIMARY KEY,
   instance_id INT NOT NULL REFERENCES bp_process_instances(id) ON DELETE CASCADE,
@@ -56,16 +46,11 @@ CREATE TABLE bp_node_execution_log (
   payload JSONB
 );
 
--- Если таблица bp_node_execution_log уже создана без outcome 'waiting_user_input' — выполните:
--- ALTER TABLE bp_node_execution_log DROP CONSTRAINT IF EXISTS bp_node_execution_log_outcome_check;
--- ALTER TABLE bp_node_execution_log ADD CONSTRAINT bp_node_execution_log_outcome_check CHECK (outcome IN ('success', 'condition_met', 'error', 'timer_scheduled', 'waiting_user_input'));
-
 CREATE INDEX idx_bp_node_execution_log_instance_id ON bp_node_execution_log(instance_id);
 CREATE INDEX idx_bp_node_execution_log_node_id ON bp_node_execution_log(node_id);
 CREATE INDEX idx_bp_node_execution_log_entered_at ON bp_node_execution_log(entered_at);
 
-
--- 4. Связь задач с процессами
+-- 4) Связь задач с процессами
 CREATE TABLE bp_task_process_links (
   id SERIAL PRIMARY KEY,
   task_id INT NOT NULL,
@@ -77,8 +62,7 @@ CREATE TABLE bp_task_process_links (
 CREATE INDEX idx_bp_task_process_links_task_id ON bp_task_process_links(task_id);
 CREATE INDEX idx_bp_task_process_links_instance_id ON bp_task_process_links(process_instance_id);
 
-
--- 5. Ожидание таймера
+-- 5) Ожидание таймера
 CREATE TABLE bp_timer_waiting (
   id SERIAL PRIMARY KEY,
   instance_id INT NOT NULL UNIQUE REFERENCES bp_process_instances(id) ON DELETE CASCADE,
@@ -89,8 +73,7 @@ CREATE TABLE bp_timer_waiting (
 
 CREATE INDEX idx_bp_timer_waiting_resume_at ON bp_timer_waiting(resume_at);
 
-
--- 6. Ожидание развилки по задаче
+-- 6) Ожидание развилки по задаче
 CREATE TABLE bp_gateway_waiting (
   id SERIAL PRIMARY KEY,
   instance_id INT NOT NULL REFERENCES bp_process_instances(id) ON DELETE CASCADE,
@@ -102,8 +85,7 @@ CREATE TABLE bp_gateway_waiting (
 CREATE INDEX idx_bp_gateway_waiting_task_id ON bp_gateway_waiting(task_id);
 CREATE INDEX idx_bp_gateway_waiting_instance_id ON bp_gateway_waiting(instance_id);
 
-
--- 7. Шаблоны задач
+-- 7) Шаблоны задач
 CREATE TABLE bp_task_templates (
   id SERIAL PRIMARY KEY,
   name VARCHAR(255) NOT NULL,
@@ -119,26 +101,16 @@ CREATE TABLE bp_task_templates (
 
 CREATE INDEX idx_bp_task_templates_is_active ON bp_task_templates(is_active);
 
-
--- =============================================================================
--- 8. Связь таблицы tasks (register) с процессами
--- Выполнять после создания bp_process_instances.
--- Если колонка уже есть — первый запрос можно пропустить.
--- =============================================================================
-
+-- 8) Связь таблицы tasks с процессами
 ALTER TABLE tasks ADD COLUMN IF NOT EXISTS business_process_instance_id INT NULL;
 
--- Если ограничение уже есть — команда выдаст ошибку; тогда выполните только CREATE INDEX.
 ALTER TABLE tasks DROP CONSTRAINT IF EXISTS fk_tasks_bp_instance;
 ALTER TABLE tasks ADD CONSTRAINT fk_tasks_bp_instance
   FOREIGN KEY (business_process_instance_id) REFERENCES bp_process_instances(id) ON DELETE SET NULL;
 
 CREATE INDEX IF NOT EXISTS idx_tasks_business_process_instance_id ON tasks(business_process_instance_id);
 
--- =============================================================================
--- 9. In-app уведомления BPE (для AlertBanner, пометка «БП»)
--- =============================================================================
-
+-- 9) In-app уведомления (для AlertBanner, пометка «БП»)
 CREATE TABLE bp_in_app_notifications (
   id SERIAL PRIMARY KEY,
   user_id INT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
@@ -153,3 +125,4 @@ CREATE TABLE bp_in_app_notifications (
 CREATE INDEX idx_bp_in_app_notifications_user_id ON bp_in_app_notifications(user_id);
 CREATE INDEX idx_bp_in_app_notifications_is_read ON bp_in_app_notifications(user_id, is_read);
 CREATE INDEX idx_bp_in_app_notifications_created_at ON bp_in_app_notifications(created_at);
+```

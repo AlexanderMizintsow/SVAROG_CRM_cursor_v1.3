@@ -51,6 +51,9 @@
   margin-top: auto;
   padding-top: 0.75rem;
   border-top: 1px solid var(--border, #e2e8f0);
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
 }
 
 .process-card__btn-start {
@@ -73,4 +76,40 @@
 
 .process-card__btn-icon {
   font-size: 1rem;
+}
+
+.process-card__btn-edit {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.5rem 1rem;
+  border: 1px solid var(--border, #e2e8f0);
+  border-radius: 8px;
+  background: var(--bg-card, #fff);
+  color: var(--text-primary, #1e293b);
+  font-size: 0.95rem;
+  cursor: pointer;
+  transition: background 0.2s;
+
+  &:hover {
+    background: var(--bg-hover, #f1f5f9);
+  }
+}
+
+.process-card__btn-delete {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.5rem 1rem;
+  border: 1px solid #fecaca;
+  border-radius: 8px;
+  background: #fff;
+  color: #b91c1c;
+  font-size: 0.95rem;
+  cursor: pointer;
+  transition: background 0.2s;
+
+  &:hover {
+    background: #fef2f2;
+  }
 }

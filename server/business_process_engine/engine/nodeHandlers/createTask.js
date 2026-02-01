@@ -1,9 +1,26 @@
 /**
- * Узел Создать задачу: вызов register createTask, assignment/add, запись в bp_task_process_links, обновление context.
+ * Узел Создать задачу:
+ * - prepared: создать задачу сразу в register
+ * - modal_at_runtime: поставить экземпляр на waiting_user_input и отдать templateData на клиент
+ *
+ * Важно: статусы задач нормализуются под статусы канбана SVAROG:
+ * backlog / todo / wait / doing / done / pause (+ алиасы pending/in_progress/completed/on_hold/cancelled).
  */
 function getOutgoingEdges(scheme, nodeId) {
   const edges = scheme.edges || []
   return edges.filter((e) => e.source === nodeId)
+}
+
+function normalizeStatus(raw) {
+  const s = raw != null ? String(raw) : ''
+  if (!s) return ''
+  const v = s.toLowerCase()
+  if (v === 'pending') return 'wait'
+  if (v === 'in_progress') return 'doing'
+  if (v === 'completed') return 'done'
+  if (v === 'on_hold') return 'pause'
+  if (v === 'cancelled') return 'cancelled'
+  return v
 }
 
 async function resolveUserIds(settings, context, registerClient) {
@@ -13,14 +30,14 @@ async function resolveUserIds(settings, context, registerClient) {
   }
   if (source === 'department' && settings.departmentId) {
     const deps = await registerClient.getDepartments()
-    const dep = (deps || []).find((d) => d.id === settings.departmentId)
+    const dep = (deps || []).find((d) => Number(d.id) === Number(settings.departmentId))
     if (dep && dep.user_ids && dep.user_ids.length) return dep.user_ids
     const users = await registerClient.getUsers()
-    return (users || []).filter((u) => u.department_id === settings.departmentId).map((u) => u.id)
+    return (users || []).filter((u) => Number(u.department_id) === Number(settings.departmentId)).map((u) => u.id)
   }
   if (source === 'role' && settings.roleId) {
     const users = await registerClient.getUsers()
-    return (users || []).filter((u) => u.role_id === settings.roleId).map((u) => u.id)
+    return (users || []).filter((u) => Number(u.role_id) === Number(settings.roleId)).map((u) => u.id)
   }
   return []
 }
@@ -28,7 +45,12 @@ async function resolveUserIds(settings, context, registerClient) {
 async function handle(instance, node, scheme, integrations, dbPool) {
   const { registerClient: reg } = integrations
   const settings = node.settings || {}
-  const context = typeof instance.context === 'object' ? instance.context : (instance.context ? JSON.parse(instance.context) : {})
+  const context =
+    typeof instance.context === 'object'
+      ? instance.context
+      : instance.context
+        ? JSON.parse(instance.context)
+        : {}
 
   let title = settings.title || 'Задача из процесса'
   let description = settings.description || ''
@@ -36,6 +58,7 @@ async function handle(instance, node, scheme, integrations, dbPool) {
   let tags = settings.tags
   let deadlineOffsetDays = settings.deadlineOffsetDays != null ? settings.deadlineOffsetDays : null
 
+  // Если выбран BPE-шаблон — используем его как базу, но поля блока имеют приоритет
   if (settings.templateId) {
     const templateResult = await dbPool.query('SELECT * FROM bp_task_templates WHERE id = $1', [settings.templateId])
     if (templateResult.rows.length) {
@@ -48,11 +71,34 @@ async function handle(instance, node, scheme, integrations, dbPool) {
     }
   }
 
+  const createMode = settings.createMode || 'prepared'
+  if (createMode === 'modal_at_runtime') {
+    const templateData = {
+      title,
+      description,
+      priority: priority || 'низкий',
+      assigneeUserIds: settings.assigneeUserIds || [],
+      approverUserIds: settings.approverUserIds || [],
+      viewerUserIds: settings.viewerUserIds || [],
+      deadlineOffsetDays: deadlineOffsetDays != null ? deadlineOffsetDays : null,
+    }
+    const pending = { nodeId: node.id, templateData }
+    const newContext = { ...context, pending_task_creation: pending }
+    await dbPool.query('UPDATE bp_process_instances SET context = $1, status = $2 WHERE id = $3', [
+      JSON.stringify(newContext),
+      'waiting_user_input',
+      instance.id,
+    ])
+    return { waitUserInput: true }
+  }
+
+  // Автор задачи
   let createdBy = context.initiator_id
-  if (settings.authorSource === 'fixed_user' && settings.authorUserId) {
+  if (settings.authorSource === 'fixed' && settings.authorUserId) {
     createdBy = settings.authorUserId
   }
 
+  // Дедлайн
   let deadline = null
   if (deadlineOffsetDays != null) {
     const d = new Date()
@@ -60,7 +106,15 @@ async function handle(instance, node, scheme, integrations, dbPool) {
     deadline = d.toISOString()
   }
 
-  const tagsValue = Array.isArray(tags) ? tags : (typeof tags === 'string' ? (tags ? JSON.parse(tags) : []) : [])
+  // Статус
+  const allowedStatuses = new Set(['backlog', 'todo', 'wait', 'doing', 'done', 'pause', 'cancelled'])
+  const initialStatusRaw = settings.initialStatus != null ? settings.initialStatus : 'backlog'
+  const normalized = normalizeStatus(initialStatusRaw) || 'backlog'
+  const initialStatus = allowedStatuses.has(normalized) ? normalized : 'backlog'
+
+  // Теги
+  const tagsValue = Array.isArray(tags) ? tags : typeof tags === 'string' ? (tags ? JSON.parse(tags) : []) : []
+
   const payload = {
     title,
     description,
@@ -68,7 +122,7 @@ async function handle(instance, node, scheme, integrations, dbPool) {
     deadline: deadline || undefined,
     priority: priority || 'низкий',
     tags: tagsValue,
-    status: 'новая',
+    status: initialStatus,
     business_process_instance_id: instance.id,
   }
 
@@ -77,7 +131,7 @@ async function handle(instance, node, scheme, integrations, dbPool) {
     task = await reg.createTask(payload)
   } catch (err) {
     console.error('createTask node register createTask:', err)
-    return { fail: err.message || 'Ошибка создания задачи в register' }
+    return { fail: `Не удалось создать задачу в register: ${err.message || 'ошибка'}` }
   }
 
   const taskId = task.id
@@ -90,6 +144,7 @@ async function handle(instance, node, scheme, integrations, dbPool) {
       console.warn('addTaskAssignment', taskId, uid, e.message)
     }
   }
+
   const approverIds = settings.approverUserIds || []
   for (const uid of approverIds) {
     try {
@@ -98,6 +153,7 @@ async function handle(instance, node, scheme, integrations, dbPool) {
       console.warn('addTaskApproval', taskId, uid, e.message)
     }
   }
+
   const viewerIds = settings.viewerUserIds || []
   for (const uid of viewerIds) {
     try {
@@ -107,26 +163,22 @@ async function handle(instance, node, scheme, integrations, dbPool) {
     }
   }
 
-  await dbPool.query(
-    'INSERT INTO bp_task_process_links (task_id, process_instance_id, node_id) VALUES ($1, $2, $3)',
-    [taskId, instance.id, node.id]
-  )
+  await dbPool.query('INSERT INTO bp_task_process_links (task_id, process_instance_id, node_id) VALUES ($1, $2, $3)', [
+    taskId,
+    instance.id,
+    node.id,
+  ])
 
   const blockOutputs = context.block_outputs || {}
   blockOutputs[node.id] = { task_id: taskId }
   const newContext = { ...context, last_task_id: taskId, block_outputs: blockOutputs }
-
-  await dbPool.query(
-    'UPDATE bp_process_instances SET context = $1 WHERE id = $2',
-    [JSON.stringify(newContext), instance.id]
-  )
+  await dbPool.query('UPDATE bp_process_instances SET context = $1 WHERE id = $2', [JSON.stringify(newContext), instance.id])
 
   const edges = getOutgoingEdges(scheme, node.id)
   const nextEdge = edges[0]
-  if (!nextEdge) {
-    return { fail: 'У узла Создать задачу нет исходящего ребра' }
-  }
+  if (!nextEdge) return { fail: 'У узла Создать задачу нет исходящего ребра' }
   return { nextNodeId: nextEdge.target }
 }
 
 module.exports = { handle }
+

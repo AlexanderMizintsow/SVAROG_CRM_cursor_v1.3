@@ -1,0 +1,55 @@
+let missingTableWarned = false
+
+async function getNotifications(dbPool, req, res) {
+  try {
+    const { user_id } = req.query
+    const userId = user_id ? Number(user_id) : null
+    if (!userId) {
+      return res.status(400).json({ error: 'Не указан user_id' })
+    }
+    const result = await dbPool.query(
+      `SELECT id, user_id, title, message, process_instance_id, node_id, created_at
+       FROM bp_in_app_notifications
+       WHERE user_id = $1 AND is_read = false
+       ORDER BY created_at DESC
+       LIMIT 50`,
+      [userId]
+    )
+    res.json(result.rows || [])
+  } catch (err) {
+    // Если таблица ещё не создана в БД (ручные SQL), не ломаем приложение и не спамим логами.
+    if (err && err.code === '42P01') {
+      if (!missingTableWarned) {
+        missingTableWarned = true
+        console.warn('getNotifications: таблица bp_in_app_notifications не создана. Выполните SQL из docs/BPE_DB_MANUAL_SCRIPTS.md (п.9).')
+      }
+      return res.json([])
+    }
+    console.error('getNotifications:', err)
+    res.status(500).json({ error: 'Ошибка при получении уведомлений' })
+  }
+}
+
+async function markRead(dbPool, req, res) {
+  try {
+    const { id } = req.params
+    const notifId = Number(id)
+    if (!notifId) {
+      return res.status(400).json({ error: 'Некорректный id' })
+    }
+    await dbPool.query('UPDATE bp_in_app_notifications SET is_read = true WHERE id = $1', [notifId])
+    res.json({ success: true })
+  } catch (err) {
+    if (err && err.code === '42P01') {
+      return res.json({ success: true })
+    }
+    console.error('markRead:', err)
+    res.status(500).json({ error: 'Ошибка при отметке прочитанным' })
+  }
+}
+
+module.exports = {
+  getNotifications,
+  markRead,
+}
+

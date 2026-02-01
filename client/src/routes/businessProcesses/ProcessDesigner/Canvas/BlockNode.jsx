@@ -1,4 +1,4 @@
-import { memo } from 'react'
+import { memo, useMemo } from 'react'
 import { Handle, Position } from 'react-flow-renderer'
 import {
   IoPlayCircle,
@@ -32,13 +32,27 @@ const COLORS = {
   [BLOCK_TYPES.TIMER]: '#0ea5e9',
 }
 
+function clampInt(v, min, max) {
+  const n = Number(v)
+  if (!Number.isFinite(n)) return min
+  return Math.max(min, Math.min(max, Math.round(n)))
+}
+
 const BlockNode = ({ data, selected }) => {
-  const nodeType = data?.nodeType || 'create_task'
+  const nodeType = data?.nodeType || BLOCK_TYPES.CREATE_TASK
   const label = data?.label || BLOCK_LABELS[nodeType] || nodeType
+  const settings = data?.settings || {}
   const Icon = ICONS[nodeType] || IoDocumentText
   const color = COLORS[nodeType] || '#64748b'
+
   const isStart = nodeType === BLOCK_TYPES.START
   const isEnd = nodeType === BLOCK_TYPES.END
+  const isGateway = nodeType === BLOCK_TYPES.GATEWAY
+
+  const gatewayOutgoingCount = useMemo(() => {
+    if (!isGateway) return 0
+    return clampInt(settings.outgoingCount ?? 3, 1, 10)
+  }, [isGateway, settings.outgoingCount])
 
   return (
     <div
@@ -48,12 +62,32 @@ const BlockNode = ({ data, selected }) => {
       {!isStart && (
         <Handle type="target" position={Position.Left} className="block-node__handle" />
       )}
+
       <div className="block-node__body">
         <Icon className="block-node__icon" style={{ color }} />
         <span className="block-node__label">{label}</span>
       </div>
-      {!isEnd && (
+
+      {!isEnd && !isGateway && (
         <Handle type="source" position={Position.Right} className="block-node__handle" />
+      )}
+
+      {!isEnd && isGateway && (
+        <div className="block-node__gateway-sources">
+          {Array.from({ length: gatewayOutgoingCount }).map((_, idx) => {
+            const offset = (idx - (gatewayOutgoingCount - 1) / 2) * 16
+            return (
+              <Handle
+                key={idx + 1}
+                id={`out-${idx + 1}`}
+                type="source"
+                position={Position.Right}
+                className="block-node__handle block-node__handle--gateway"
+                style={{ top: `calc(50% + ${offset}px)` }}
+              />
+            )
+          })}
+        </div>
       )}
     </div>
   )

@@ -1,9 +1,12 @@
-const { runProcessFromStart } = require('../engine/runner')
+const { runProcessFromStart, runProcessFromTaskCreation } = require('../engine/runner')
 
 async function startProcess(dbPool, req, res) {
   try {
     const processId = req.params.id
     const { initiator_id, launched_by_user_id } = req.body
+    if (!launched_by_user_id) {
+      return res.status(400).json({ error: 'Не указан launched_by_user_id' })
+    }
     const defResult = await dbPool.query(
       'SELECT id, name, scheme FROM bp_process_definitions WHERE id = $1 AND is_draft = false',
       [processId]
@@ -17,6 +20,20 @@ async function startProcess(dbPool, req, res) {
     if (!startNode) {
       return res.status(400).json({ error: 'В схеме нет узла Старт' })
     }
+
+    // Права на запуск процесса (настраиваются в блоке Старт)
+    const startSettings = startNode.settings || {}
+    const allowAllLaunchers = startSettings.allowAllLaunchers !== false
+    const allowedLauncherUserIds = Array.isArray(startSettings.allowedLauncherUserIds)
+      ? startSettings.allowedLauncherUserIds.map((x) => Number(x)).filter((x) => Number.isFinite(x))
+      : []
+    if (!allowAllLaunchers) {
+      const allowed = allowedLauncherUserIds.includes(Number(launched_by_user_id))
+      if (!allowed) {
+        return res.status(403).json({ error: 'У вас нет прав на запуск этого процесса' })
+      }
+    }
+
     let initiatorId = initiator_id || launched_by_user_id
     if (!initiatorId && startNode.settings) {
       if (startNode.settings.initiatorType === 'fixed_user' && startNode.settings.fixedUserId) {
@@ -92,11 +109,34 @@ async function getInstanceById(dbPool, req, res) {
   }
 }
 
+async function completeTaskCreation(dbPool, req, res) {
+  try {
+    const { id } = req.params
+    const { task_id: taskId } = req.body
+    if (!taskId) {
+      return res.status(400).json({ error: 'Не указан task_id' })
+    }
+    const result = await dbPool.query(
+      'SELECT id FROM bp_process_instances WHERE id = $1 AND status = $2',
+      [id, 'waiting_user_input']
+    )
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: 'Экземпляр не найден или не ожидает создания задачи' })
+    }
+    await runProcessFromTaskCreation(dbPool, id, taskId)
+    const updated = await dbPool.query('SELECT id, status, current_node_id FROM bp_process_instances WHERE id = $1', [id])
+    res.json(updated.rows[0] || { success: true })
+  } catch (err) {
+    console.error('completeTaskCreation:', err)
+    res.status(500).json({ error: 'Ошибка при завершении создания задачи' })
+  }
+}
+
 async function cancelInstance(dbPool, req, res) {
   try {
     const { id } = req.params
     const result = await dbPool.query(
-      `UPDATE bp_process_instances SET status = 'cancelled', finished_at = NOW() WHERE id = $1 AND status IN ('running', 'waiting_gateway', 'waiting_timer') RETURNING id`,
+      `UPDATE bp_process_instances SET status = 'cancelled', finished_at = NOW() WHERE id = $1 AND status IN ('running', 'waiting_gateway', 'waiting_timer', 'waiting_user_input') RETURNING id`,
       [id]
     )
     if (result.rows.length === 0) {
@@ -111,9 +151,144 @@ async function cancelInstance(dbPool, req, res) {
   }
 }
 
+function safeParseContext(ctx) {
+  if (!ctx) return {}
+  if (typeof ctx === 'object') return ctx
+  try {
+    return JSON.parse(ctx)
+  } catch (e) {
+    return {}
+  }
+}
+
+async function getInstancesOverview(dbPool, req, res) {
+  try {
+    const limitRaw = req.query.limit != null ? Number(req.query.limit) : 200
+    const limit = Number.isFinite(limitRaw) ? Math.max(1, Math.min(1000, Math.round(limitRaw))) : 200
+
+    const r = await dbPool.query(
+      `SELECT
+         i.id,
+         i.process_id,
+         i.started_at,
+         i.finished_at,
+         i.initiator_id,
+         i.launched_by_user_id,
+         i.current_node_id,
+         i.status,
+         i.context,
+         i.error_message,
+         gw.task_id AS waiting_task_id,
+         tw.resume_at AS waiting_resume_at
+       FROM bp_process_instances i
+       LEFT JOIN bp_gateway_waiting gw ON gw.instance_id = i.id
+       LEFT JOIN bp_timer_waiting tw ON tw.instance_id = i.id
+       ORDER BY i.started_at DESC
+       LIMIT $1`,
+      [limit]
+    )
+
+    const rows = r.rows || []
+    const processIds = Array.from(new Set(rows.map((x) => Number(x.process_id)).filter((x) => Number.isFinite(x))))
+    let defsById = {}
+    if (processIds.length) {
+      const defs = await dbPool.query(
+        'SELECT id, name, scheme FROM bp_process_definitions WHERE id = ANY($1::int[])',
+        [processIds]
+      )
+      defsById = (defs.rows || []).reduce((acc, d) => {
+        const scheme = typeof d.scheme === 'object' ? d.scheme : safeParseContext(d.scheme)
+        const nodes = Array.isArray(scheme.nodes) ? scheme.nodes : []
+        const nodesById = nodes.reduce((m, n) => {
+          m[n.id] = n.label || n.type || n.id
+          return m
+        }, {})
+        acc[d.id] = { id: d.id, name: d.name, nodesById }
+        return acc
+      }, {})
+    }
+
+    const out = rows.map((row) => {
+      const ctx = safeParseContext(row.context)
+      const def = defsById[row.process_id] || null
+      const nodeId = row.current_node_id || null
+      const nodeLabel = def && nodeId ? (def.nodesById[nodeId] || nodeId) : nodeId
+
+      let waiting = null
+      if (row.status === 'waiting_gateway') {
+        const dbgAll = ctx.gateway_debug && typeof ctx.gateway_debug === 'object' ? ctx.gateway_debug : null
+        const dbg = dbgAll && nodeId ? dbgAll[nodeId] : null
+        waiting = {
+          type: 'gateway',
+          task_id: row.waiting_task_id || null,
+          last_status: dbg && typeof dbg === 'object' ? (dbg.status_norm || null) : null,
+          last_status_raw: dbg && typeof dbg === 'object' ? (dbg.status_raw || null) : null,
+          last_checked_at: dbg && typeof dbg === 'object' ? (dbg.checked_at || null) : null,
+          last_resume_reason: dbg && typeof dbg === 'object' ? (dbg.resume_reason || null) : null,
+        }
+      } else if (row.status === 'waiting_timer') {
+        waiting = { type: 'timer', resume_at: row.waiting_resume_at || null }
+      } else if (row.status === 'waiting_user_input') {
+        const pending = ctx.pending_task_creation || null
+        waiting = { type: 'user_input', node_id: pending?.nodeId || null }
+      }
+
+      return {
+        id: row.id,
+        process_id: row.process_id,
+        process_name: def ? def.name : null,
+        started_at: row.started_at,
+        finished_at: row.finished_at,
+        initiator_id: row.initiator_id,
+        launched_by_user_id: row.launched_by_user_id,
+        status: row.status,
+        current_node_id: nodeId,
+        current_node_label: nodeLabel,
+        waiting,
+        last_task_id: ctx.last_task_id || null,
+        error_message: row.error_message || null,
+      }
+    })
+
+    res.json(out)
+  } catch (err) {
+    console.error('getInstancesOverview:', err)
+    res.status(500).json({ error: 'Ошибка при получении обзора экземпляров' })
+  }
+}
+
+async function deleteInstance(dbPool, req, res) {
+  try {
+    const { id } = req.params
+    const instId = Number(id)
+    if (!instId) {
+      return res.status(400).json({ error: 'Некорректный id' })
+    }
+
+    const r = await dbPool.query('SELECT id, status FROM bp_process_instances WHERE id = $1', [instId])
+    if (r.rows.length === 0) {
+      return res.status(404).json({ error: 'Экземпляр не найден' })
+    }
+    const status = r.rows[0].status
+    const isFinal = status === 'completed' || status === 'failed' || status === 'cancelled'
+    if (!isFinal) {
+      return res.status(400).json({ error: 'Экземпляр активен. Сначала отмените его, затем удалите.' })
+    }
+
+    await dbPool.query('DELETE FROM bp_process_instances WHERE id = $1', [instId])
+    res.json({ success: true })
+  } catch (err) {
+    console.error('deleteInstance:', err)
+    res.status(500).json({ error: 'Ошибка при удалении экземпляра' })
+  }
+}
+
 module.exports = {
   startProcess,
   getInstances,
+  getInstancesOverview,
   getInstanceById,
   cancelInstance,
+  deleteInstance,
+  completeTaskCreation,
 }

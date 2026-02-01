@@ -2,9 +2,14 @@
 const { DateTime } = require('luxon')
 const axios = require('axios')
 
+let _warnedMissingBpeUrl = false
 function notifyBpeTaskUpdated(taskId) {
-  const bpeUrl = process.env.BPE_API_URL || process.env.BPE_WEBHOOK_URL
-  if (!bpeUrl || !taskId) return
+  const bpeUrl = process.env.BPE_API_URL || process.env.BPE_WEBHOOK_URL || 'http://localhost:5010'
+  if (!taskId) return
+  if (!_warnedMissingBpeUrl && !(process.env.BPE_API_URL || process.env.BPE_WEBHOOK_URL)) {
+    _warnedMissingBpeUrl = true
+    console.warn('BPE webhook: не задан BPE_API_URL/BPE_WEBHOOK_URL, использую fallback http://localhost:5010')
+  }
   const url = `${bpeUrl.replace(/\/$/, '')}/api/bp/webhooks/task-updated`
   axios.post(url, { task_id: taskId }, { timeout: 5000 }).catch((err) => {
     console.warn('BPE webhook task-updated:', err.message)
@@ -118,6 +123,12 @@ function createTask(dbPool, io) {
       task.tags = JSON.parse(task.tags)
 
       res.status(201).json(task)
+
+      // Если задача создана из бизнес-процесса — уведомляем BPE (событийные развилки).
+      // Это позволит сразу же обработать условия развилки без таймеров.
+      if (businessProcessInstanceId != null) {
+        notifyBpeTaskUpdated(Number(task.id))
+      }
 
       if (global_task_id) {
         await insertTaskHistory(

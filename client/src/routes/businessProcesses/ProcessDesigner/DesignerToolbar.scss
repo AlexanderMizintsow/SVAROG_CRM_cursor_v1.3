@@ -95,4 +95,15 @@
       background: var(--primary-dark, #1d4ed8);
     }
   }
+
+  &--danger {
+    border-color: #fecaca;
+    background: #fff;
+    color: #b91c1c;
+
+    &:hover {
+      background: #fef2f2;
+      border-color: #fca5a5;
+    }
+  }
 }
