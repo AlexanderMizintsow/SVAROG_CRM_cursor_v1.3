@@ -1,10 +1,11 @@
 import { FcFlowChart } from 'react-icons/fc'
-import { IoPlay, IoCreateOutline, IoTrashOutline } from 'react-icons/io5'
+import { IoPlay, IoCreateOutline, IoTrashOutline, IoPersonOutline  } from 'react-icons/io5'
 import './ProcessCard.scss'
 
-const ProcessCard = ({ process, onStart, onEdit, onDelete }) => {
+const ProcessCard = ({ process, isDraft = false, onStart, onPublish, onEdit, onDelete }) => {
   return (
     <div className="process-card">
+      {isDraft && <span className="process-card__badge">Черновик</span>}
       <div className="process-card__header">
         <FcFlowChart className="process-card__icon" />
         <h3 className="process-card__title">{process.name || 'Без названия'}</h3>
@@ -13,14 +14,27 @@ const ProcessCard = ({ process, onStart, onEdit, onDelete }) => {
         <p className="process-card__description">{process.description}</p>
       )}
       <div className="process-card__actions">
-        <button
-          type="button"
-          className="process-card__btn-start"
-          onClick={onStart}
-        >
-          <IoPlay className="process-card__btn-icon" />
-          Запустить
-        </button>
+        {isDraft ? (
+          typeof onPublish === 'function' && (
+            <button
+              type="button"
+              className="process-card__btn-publish"
+              onClick={onPublish}
+            >
+              <IoPersonOutline  className="process-card__btn-icon" />
+              Опубликовать
+            </button>
+          )
+        ) : (
+          <button
+            type="button"
+            className="process-card__btn-start"
+            onClick={onStart}
+          >
+            <IoPlay className="process-card__btn-icon" />
+            Запустить
+          </button>
+        )}
 
         <button
           type="button"

@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { getReferencesUsers, getReferencesRoles } from '../../../../api/businessProcessApi.js'
 import { INITIATOR_TYPES } from '../../constants/blockTypes'
+import UserCheckboxList from './UserCheckboxList'
 import './PropertiesPanel.scss'
 
 const StartNodeProps = ({ node, onUpdate }) => {
@@ -40,10 +41,14 @@ const StartNodeProps = ({ node, onUpdate }) => {
             checked={allowAllLaunchers}
             onChange={(e) => {
               const nextAllowAll = e.target.checked
-              handleChange('allowAllLaunchers', nextAllowAll)
-              if (nextAllowAll) {
-                handleChange('allowedLauncherUserIds', [])
-              }
+              // Один вызов onUpdate с обоими полями, чтобы избежать перезаписи при батчинге
+              onUpdate({
+                settings: {
+                  ...settings,
+                  allowAllLaunchers: nextAllowAll,
+                  ...(nextAllowAll ? { allowedLauncherUserIds: [] } : {}),
+                },
+              })
             }}
           />
           Разрешить запуск всем
@@ -53,21 +58,11 @@ const StartNodeProps = ({ node, onUpdate }) => {
             <p className="properties-panel__hint" style={{ marginTop: '0.25rem' }}>
               Если список пуст — запуск будет запрещён всем.
             </p>
-            <select
-              className="properties-panel__select"
-              multiple
-              value={settings.allowedLauncherUserIds || []}
-              onChange={(e) => {
-                const selected = Array.from(e.target.selectedOptions, (o) => Number(o.value))
-                handleChange('allowedLauncherUserIds', selected)
-              }}
-            >
-              {users.map((u) => (
-                <option key={u.id} value={u.id}>
-                  {[u.first_name, u.last_name].filter(Boolean).join(' ') || u.username}
-                </option>
-              ))}
-            </select>
+            <UserCheckboxList
+              users={users}
+              selectedIds={settings.allowedLauncherUserIds || []}
+              onChange={(ids) => handleChange('allowedLauncherUserIds', ids)}
+            />
           </>
         )}
       </div>

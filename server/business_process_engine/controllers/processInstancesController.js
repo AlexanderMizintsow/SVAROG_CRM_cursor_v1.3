@@ -1,4 +1,4 @@
-const { runProcessFromStart, runProcessFromTaskCreation } = require('../engine/runner')
+const { runProcessFromStart, runProcessFromTaskCreation, runProcessFromDecision } = require('../engine/runner')
 
 async function startProcess(dbPool, req, res) {
   try {
@@ -132,17 +132,65 @@ async function completeTaskCreation(dbPool, req, res) {
   }
 }
 
+async function respondDecision(dbPool, req, res) {
+  try {
+    const { id } = req.params
+    const { node_id: nodeId, button_id: buttonId } = req.body
+    if (!nodeId || !buttonId) {
+      return res.status(400).json({ error: 'Не указаны node_id или button_id' })
+    }
+    const instResult = await dbPool.query(
+      'SELECT id FROM bp_process_instances WHERE id = $1 AND status = $2',
+      [id, 'waiting_decision']
+    )
+    if (instResult.rows.length === 0) {
+      return res.status(404).json({ error: 'Экземпляр не найден или не ожидает решения' })
+    }
+    const userId = req.body.user_id ?? req.headers['x-user-id']
+    if (!userId) {
+      return res.status(400).json({ error: 'Не указан user_id (текущий пользователь)' })
+    }
+    const r = await dbPool.query(
+      'SELECT id FROM bp_decision_requests WHERE instance_id = $1 AND node_id = $2 AND user_id = $3 AND responded_at IS NULL',
+      [id, nodeId, userId]
+    )
+    if (r.rows.length === 0) {
+      return res.status(403).json({ error: 'Запрос на решение не найден или уже обработан' })
+    }
+    await dbPool.query(
+      'UPDATE bp_decision_requests SET selected_button_id = $1, responded_at = NOW() WHERE instance_id = $2 AND node_id = $3 AND user_id = $4',
+      [buttonId, id, nodeId, userId]
+    )
+    await runProcessFromDecision(dbPool, Number(id), nodeId, buttonId)
+    const updated = await dbPool.query('SELECT id, status, current_node_id FROM bp_process_instances WHERE id = $1', [id])
+    res.json(updated.rows[0] || { success: true })
+  } catch (err) {
+    console.error('respondDecision:', err)
+    res.status(500).json({ error: 'Ошибка при принятии решения' })
+  }
+}
+
 async function cancelInstance(dbPool, req, res) {
   try {
     const { id } = req.params
     const result = await dbPool.query(
-      `UPDATE bp_process_instances SET status = 'cancelled', finished_at = NOW() WHERE id = $1 AND status IN ('running', 'waiting_gateway', 'waiting_timer', 'waiting_user_input') RETURNING id`,
+      `UPDATE bp_process_instances SET status = 'cancelled', finished_at = NOW() WHERE id = $1 AND status IN ('running', 'waiting_gateway', 'waiting_timer', 'waiting_user_input', 'waiting_decision', 'waiting_join') RETURNING id`,
       [id]
     )
     if (result.rows.length === 0) {
       return res.status(404).json({ error: 'Экземпляр не найден или уже завершён' })
     }
     await dbPool.query('DELETE FROM bp_gateway_waiting WHERE instance_id = $1', [id])
+    try {
+      await dbPool.query('UPDATE bp_decision_requests SET responded_at = NOW() WHERE instance_id = $1 AND responded_at IS NULL', [id])
+    } catch (e) {
+      if (e?.code !== '42P01') throw e
+    }
+    try {
+      await dbPool.query('DELETE FROM bp_gateway_join_waiting WHERE instance_id = $1', [id])
+    } catch (e) {
+      if (e?.code !== '42P01') throw e
+    }
     await dbPool.query('DELETE FROM bp_timer_waiting WHERE instance_id = $1', [id])
     res.json({ success: true })
   } catch (err) {
@@ -231,6 +279,8 @@ async function getInstancesOverview(dbPool, req, res) {
       } else if (row.status === 'waiting_user_input') {
         const pending = ctx.pending_task_creation || null
         waiting = { type: 'user_input', node_id: pending?.nodeId || null }
+      } else if (row.status === 'waiting_join') {
+        waiting = { type: 'join', node_id: row.current_node_id || null }
       }
 
       return {
@@ -291,4 +341,5 @@ module.exports = {
   cancelInstance,
   deleteInstance,
   completeTaskCreation,
+  respondDecision,
 }

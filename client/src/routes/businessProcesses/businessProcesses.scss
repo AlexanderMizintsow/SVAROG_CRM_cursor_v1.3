@@ -70,6 +70,46 @@
   font-size: 1.1rem;
 }
 
+.business-processes__sub-tabs {
+  display: flex;
+  gap: 0.5rem;
+  margin-bottom: 1rem;
+  flex-wrap: wrap;
+}
+
+.business-processes__sub-tab {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.4rem 0.85rem;
+  border: 1px solid var(--border, #e2e8f0);
+  border-radius: 6px;
+  background: var(--bg-secondary, #f8fafc);
+  color: var(--text-secondary, #64748b);
+  cursor: pointer;
+  font-size: 0.9rem;
+  transition: background 0.2s, border-color 0.2s, color 0.2s;
+
+  &:hover {
+    background: var(--bg-hover, #f1f5f9);
+    border-color: var(--border-hover, #cbd5e1);
+  }
+}
+
+.business-processes__sub-tab--active {
+  background: var(--primary-light, rgba(37, 99, 235, 0.1));
+  border-color: var(--primary, #2563eb);
+  color: var(--primary, #2563eb);
+
+  &:hover {
+    background: rgba(37, 99, 235, 0.15);
+  }
+}
+
+.business-processes__sub-tab-icon {
+  font-size: 1rem;
+}
+
 .business-processes__content {
   flex: 1;
   min-height: 0;

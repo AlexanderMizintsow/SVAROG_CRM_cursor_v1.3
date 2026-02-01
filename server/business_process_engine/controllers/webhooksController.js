@@ -1,4 +1,4 @@
-const { runProcessFromGateway } = require('../engine/runner')
+const { runProcessFromGateway, runProcessFromGatewayJoin } = require('../engine/runner')
 
 async function taskUpdated(dbPool, req, res) {
   try {
@@ -7,8 +7,12 @@ async function taskUpdated(dbPool, req, res) {
       return res.status(400).json({ error: 'Не указан task_id' })
     }
     res.status(202).json({ accepted: true })
-    runProcessFromGateway(dbPool, Number(task_id)).catch((err) => {
+    const taskId = Number(task_id)
+    runProcessFromGateway(dbPool, taskId).catch((err) => {
       console.error('runProcessFromGateway error:', err)
+    })
+    runProcessFromGatewayJoin(dbPool, taskId).catch((err) => {
+      console.error('runProcessFromGatewayJoin error:', err)
     })
   } catch (err) {
     console.error('taskUpdated webhook:', err)

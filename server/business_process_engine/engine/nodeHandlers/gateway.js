@@ -19,6 +19,39 @@ function getConfigForEdge(settings, edgeId) {
   return found && typeof found.config === 'object' ? found.config : {}
 }
 
+function getEdgeMeta(settings, edgeId) {
+  const list = settings.edges || []
+  return list.find((e) => e.edgeId === edgeId) || null
+}
+
+function matchTimeConstraint(timeConstraint, now) {
+  if (!timeConstraint || !timeConstraint.type || !timeConstraint.value) return true
+  const type = String(timeConstraint.type)
+  const val = String(timeConstraint.value).trim()
+  if (!val) return true
+
+  if (type === 'time_before' || type === 'time_after') {
+    const m = val.match(/^(\d{1,2}):(\d{2})$/)
+    if (!m) return true
+    const h = Number(m[1]) || 0
+    const min = Number(m[2]) || 0
+    const limitMinutes = h * 60 + min
+    const nowMinutes = now.getHours() * 60 + now.getMinutes()
+    if (type === 'time_before') return nowMinutes < limitMinutes
+    return nowMinutes >= limitMinutes
+  }
+  if (type === 'date_before' || type === 'date_after') {
+    const limitDate = new Date(val)
+    if (Number.isNaN(limitDate.getTime())) return true
+    limitDate.setHours(0, 0, 0, 0)
+    const nowDate = new Date(now)
+    nowDate.setHours(0, 0, 0, 0)
+    if (type === 'date_before') return nowDate < limitDate
+    return nowDate >= limitDate
+  }
+  return true
+}
+
 function getIncomingEdge(scheme, nodeId) {
   const edges = scheme.edges || []
   return edges.find((e) => e.target === nodeId) || null
@@ -79,12 +112,63 @@ async function handle(instance, node, scheme, integrations, dbPool) {
   const settings = node.settings || {}
   const context = typeof instance.context === 'object' ? instance.context : (instance.context ? JSON.parse(instance.context) : {})
   const blockOutputs = context.block_outputs || {}
+  const decisionOutputs = context.decision_outputs || {}
 
-  // Источник данных для условий: auto (по предыдущему узлу), initiator или task
+  // Источник данных для условий: auto (по предыдущему узлу), initiator, task или decision
   const incoming = getIncomingEdge(scheme, node.id)
   const predecessor = incoming ? getNodeById(scheme, incoming.source) : null
-  const defaultSourceType = predecessor && predecessor.type === 'start' ? 'initiator' : 'task'
+  let defaultSourceType = 'task'
+  if (predecessor && predecessor.type === 'start') defaultSourceType = 'initiator'
+  else if (predecessor && predecessor.type === 'decision') defaultSourceType = 'decision'
   const sourceType = settings.sourceType && settings.sourceType !== 'auto' ? settings.sourceType : defaultSourceType
+
+  // Источник «Принятие решения» — используем last_decision из context, ожидание не нужно
+  if (sourceType === 'decision') {
+    const lastDecision = context.last_decision
+    if (!lastDecision || !lastDecision.nodeId) {
+      return { fail: 'Не получен ответ от блока «Принятие решения» (проверьте, что пользователь нажал кнопку)' }
+    }
+    // Проверяем условия (decision_button_clicked и др.) — сразу переходим к нужной ветке
+    const edges = getOutgoingEdges(scheme, node.id)
+    const now = new Date()
+    const matchEdgeCondition = async (edge) => {
+      const meta = getEdgeMeta(settings, edge.id)
+      const cond = meta?.condition ?? getConditionForEdge(settings, edge.id)
+      if (cond === 'else') return false
+      if (meta && meta.timeConstraint && !matchTimeConstraint(meta.timeConstraint, now)) return false
+      if (meta?.conditionMode === 'multiple' && meta.conditions && Array.isArray(meta.conditions.items) && meta.conditions.items.length > 0) {
+        const results = await Promise.all(
+          meta.conditions.items.filter((item) => item.condition && item.condition !== 'else').map((item) => {
+            if (item.condition === 'decision_button_clicked') {
+              const buttonId = (item.config || {}).buttonId ? String((item.config || {}).buttonId) : null
+              return buttonId && String(lastDecision.buttonId) === buttonId
+            }
+            return false
+          })
+        )
+        const op = meta.conditions.type === 'and' ? 'and' : 'or'
+        return op === 'and' ? results.every(Boolean) : results.some(Boolean)
+      }
+      if (cond === 'decision_button_clicked') {
+        const cfg = meta?.config ?? getConfigForEdge(settings, edge.id)
+        const buttonId = cfg && cfg.buttonId ? String(cfg.buttonId) : null
+        return buttonId && String(lastDecision.buttonId) === buttonId
+      }
+      return false
+    }
+    let chosenEdge = null
+    for (const edge of edges) {
+      if (await matchEdgeCondition(edge)) {
+        chosenEdge = edge
+        break
+      }
+    }
+    if (chosenEdge) return { nextNodeId: chosenEdge.target }
+    const elseEdge = edges.find((e) => getConditionForEdge(settings, e.id) === 'else')
+    if (elseEdge) return { nextNodeId: elseEdge.target }
+    if (edges.length === 1) return { nextNodeId: edges[0].target }
+    return { fail: 'Не удалось выбрать ветку развилки после «Принятие решения»: задайте условие «Иначе» или «Нажата кнопка ответа»' }
+  }
 
   let taskId = null
   let task = null
@@ -162,6 +246,13 @@ async function handle(instance, node, scheme, integrations, dbPool) {
       const initiator = (users || []).find((u) => Number(u.id) === Number(context.initiator_id))
       return initiator && Number(initiator.department_id) === departmentId
     }
+    if (cond === 'initiator_has_position') {
+      const positionId = cfg && cfg.positionId != null ? Number(cfg.positionId) : null
+      if (!positionId || !context.initiator_id) return false
+      const users = await reg.getUsers().catch(() => [])
+      const initiator = (users || []).find((u) => Number(u.id) === Number(context.initiator_id))
+      return initiator && Number(initiator.position_id) === positionId
+    }
 
     // Статус (поддерживаем и старые значения условий)
     if (cond === 'status_backlog' && status === 'backlog') return true
@@ -194,6 +285,17 @@ async function handle(instance, node, scheme, integrations, dbPool) {
     if (cond === 'priority_medium' && (priority === 'средний' || priority === 'medium' || priority === 'нормальный' || priority === 'normal')) return true
     if (cond === 'priority_low' && (priority === 'низкий' || priority === 'low')) return true
 
+    // После блока «Принятие решения»: проверяем, что предшественник — Decision и нажата нужная кнопка
+    if (cond === 'decision_button_clicked') {
+      const buttonId = cfg && cfg.buttonId ? String(cfg.buttonId) : null
+      if (!buttonId) return false
+      const lastDecision = context.last_decision
+      if (!lastDecision || !lastDecision.nodeId) return false
+      if (predecessor && predecessor.type !== 'decision') return false
+      if (predecessor && lastDecision.nodeId !== predecessor.id) return false
+      return String(lastDecision.buttonId) === buttonId
+    }
+
     // Исполнители
     if (cond === 'assignee_contains_user') {
       const userId = cfg && cfg.userId != null ? Number(cfg.userId) : null
@@ -206,12 +308,34 @@ async function handle(instance, node, scheme, integrations, dbPool) {
     return false
   }
 
+  const matchEdgeCondition = async (edge) => {
+    const meta = getEdgeMeta(settings, edge.id)
+    const cond = meta?.condition ?? getConditionForEdge(settings, edge.id)
+    if (cond === 'else') return false
+
+    if (meta && meta.timeConstraint && !matchTimeConstraint(meta.timeConstraint, now)) return false
+
+    if (meta?.conditionMode === 'multiple' && meta.conditions && Array.isArray(meta.conditions.items) && meta.conditions.items.length > 0) {
+      const results = await Promise.all(
+        meta.conditions.items.filter((item) => item.condition && item.condition !== 'else').map((item) => matchCondition(item.condition, item.config || {}))
+      )
+      if (results.length === 0) return false
+      const op = meta.conditions.type === 'and' ? 'and' : 'or'
+      if (op === 'and') return results.every(Boolean)
+      return results.some(Boolean)
+    }
+
+    const cfg = meta?.config ?? getConfigForEdge(settings, edge.id)
+    return matchCondition(cond, cfg)
+  }
+
   let chosenEdge = null
   for (const edge of edges) {
     const cond = getConditionForEdge(settings, edge.id)
-    if (cond === 'else') continue
-    const cfg = getConfigForEdge(settings, edge.id)
-    if (await matchCondition(cond, cfg)) {
+    const meta = getEdgeMeta(settings, edge.id)
+    const effectiveCond = meta?.condition ?? cond
+    if (effectiveCond === 'else') continue
+    if (await matchEdgeCondition(edge)) {
       chosenEdge = edge
       break
     }

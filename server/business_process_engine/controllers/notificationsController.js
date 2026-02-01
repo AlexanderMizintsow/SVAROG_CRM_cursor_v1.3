@@ -30,6 +30,37 @@ async function getNotifications(dbPool, req, res) {
   }
 }
 
+let missingDecisionTableWarned = false
+
+async function getDecisionRequests(dbPool, req, res) {
+  try {
+    const { user_id } = req.query
+    const userId = user_id ? Number(user_id) : null
+    if (!userId) {
+      return res.status(400).json({ error: 'Не указан user_id' })
+    }
+    const result = await dbPool.query(
+      `SELECT id, instance_id, node_id, user_id, process_name, message, buttons, initiator_name, created_at
+       FROM bp_decision_requests
+       WHERE user_id = $1 AND responded_at IS NULL
+       ORDER BY created_at DESC
+       LIMIT 50`,
+      [userId]
+    )
+    res.json(result.rows || [])
+  } catch (err) {
+    if (err && err.code === '42P01') {
+      if (!missingDecisionTableWarned) {
+        missingDecisionTableWarned = true
+        console.warn('getDecisionRequests: таблица bp_decision_requests не создана. Выполните SQL из docs/BPE_DB_MANUAL_SCRIPTS.md (п.10).')
+      }
+      return res.json([])
+    }
+    console.error('getDecisionRequests:', err)
+    res.status(500).json({ error: 'Ошибка при получении запросов на решение' })
+  }
+}
+
 async function markRead(dbPool, req, res) {
   try {
     const { id } = req.params
@@ -51,5 +82,6 @@ async function markRead(dbPool, req, res) {
 module.exports = {
   getNotifications,
   markRead,
+  getDecisionRequests,
 }
 

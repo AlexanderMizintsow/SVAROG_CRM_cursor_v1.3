@@ -6,6 +6,7 @@ import {
   getTaskTemplates,
 } from '../../../../api/businessProcessApi.js'
 import { ASSIGNEE_SOURCES, CREATE_TASK_MODES } from '../../constants/blockTypes'
+import UserCheckboxList from './UserCheckboxList'
 import './PropertiesPanel.scss'
 
 const CreateTaskNodeProps = ({ node, onUpdate }) => {
@@ -171,22 +172,11 @@ const CreateTaskNodeProps = ({ node, onUpdate }) => {
       {settings.assigneeSource === 'users' && (
         <div className="properties-panel__field">
           <label className="properties-panel__label">Пользователи (исполнители)</label>
-          <select
-            className="properties-panel__select"
-            multiple
-            value={settings.assigneeUserIds || []}
-            onChange={(e) => {
-              const selected = Array.from(e.target.selectedOptions, (o) => Number(o.value))
-              handleChange('assigneeUserIds', selected)
-            }}
-          >
-            {users.map((u) => (
-              <option key={u.id} value={u.id}>
-                {[u.first_name, u.last_name].filter(Boolean).join(' ') || u.username}
-              </option>
-            ))}
-          </select>
-          <small className="properties-panel__hint">Ctrl+клик для нескольких</small>
+          <UserCheckboxList
+            users={users}
+            selectedIds={settings.assigneeUserIds || []}
+            onChange={(ids) => handleChange('assigneeUserIds', ids)}
+          />
         </div>
       )}
       {settings.assigneeSource === 'department' && (
@@ -222,42 +212,20 @@ const CreateTaskNodeProps = ({ node, onUpdate }) => {
 
       <div className="properties-panel__field">
         <label className="properties-panel__label">Утверждающие (шаблон)</label>
-        <select
-          className="properties-panel__select"
-          multiple
-          value={settings.approverUserIds || []}
-          onChange={(e) => {
-            const selected = Array.from(e.target.selectedOptions, (o) => Number(o.value))
-            handleChange('approverUserIds', selected)
-          }}
-        >
-          {users.map((u) => (
-            <option key={u.id} value={u.id}>
-              {[u.first_name, u.last_name].filter(Boolean).join(' ') || u.username}
-            </option>
-          ))}
-        </select>
-        <small className="properties-panel__hint">Ctrl+клик для нескольких</small>
+        <UserCheckboxList
+          users={users}
+          selectedIds={settings.approverUserIds || []}
+          onChange={(ids) => handleChange('approverUserIds', ids)}
+        />
       </div>
 
       <div className="properties-panel__field">
         <label className="properties-panel__label">Наблюдатели (шаблон)</label>
-        <select
-          className="properties-panel__select"
-          multiple
-          value={settings.viewerUserIds || []}
-          onChange={(e) => {
-            const selected = Array.from(e.target.selectedOptions, (o) => Number(o.value))
-            handleChange('viewerUserIds', selected)
-          }}
-        >
-          {users.map((u) => (
-            <option key={u.id} value={u.id}>
-              {[u.first_name, u.last_name].filter(Boolean).join(' ') || u.username}
-            </option>
-          ))}
-        </select>
-        <small className="properties-panel__hint">Ctrl+клик для нескольких</small>
+        <UserCheckboxList
+          users={users}
+          selectedIds={settings.viewerUserIds || []}
+          onChange={(ids) => handleChange('viewerUserIds', ids)}
+        />
       </div>
 
       <div className="properties-panel__field">

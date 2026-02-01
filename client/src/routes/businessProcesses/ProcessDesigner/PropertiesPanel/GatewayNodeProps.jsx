@@ -1,10 +1,11 @@
 import { useEffect, useMemo, useState } from 'react'
 import useBusinessProcessStore from '../../../../store/useBusinessProcessStore'
-import { GATEWAY_CONDITIONS } from '../../constants/blockTypes'
+import GatewayEdgeConditionEditor from './GatewayEdgeConditionEditor'
 import {
   getReferencesUsers,
   getReferencesDepartments,
   getReferencesRoles,
+  getReferencesPositions,
 } from '../../../../api/businessProcessApi.js'
 import './PropertiesPanel.scss'
 
@@ -14,6 +15,7 @@ const GatewayNodeProps = ({ node, onUpdate }) => {
   const [users, setUsers] = useState([])
   const [departments, setDepartments] = useState([])
   const [roles, setRoles] = useState([])
+  const [positions, setPositions] = useState([])
 
   const nodesList = Array.isArray(scheme?.nodes) ? scheme.nodes : []
   const edgesList = Array.isArray(scheme?.edges) ? scheme.edges : []
@@ -25,19 +27,22 @@ const GatewayNodeProps = ({ node, onUpdate }) => {
   const incomingEdges = edgesList.filter((e) => e.target === node.id)
   const firstIncoming = incomingEdges[0]
   const predecessorNode = firstIncoming ? nodesList.find((n) => n.id === firstIncoming.source) : null
+  const decisionButtons = predecessorNode?.type === 'decision' ? (predecessorNode.settings?.buttons || []) : []
   const predecessorType = predecessorNode?.type || null
 
   useEffect(() => {
     const load = async () => {
       try {
-        const [u, d, r] = await Promise.all([
+        const [u, d, r, p] = await Promise.all([
           getReferencesUsers().catch(() => []),
           getReferencesDepartments().catch(() => []),
           getReferencesRoles().catch(() => []),
+          getReferencesPositions().catch(() => []),
         ])
         setUsers(Array.isArray(u) ? u : [])
         setDepartments(Array.isArray(d) ? d : [])
         setRoles(Array.isArray(r) ? r : [])
+        setPositions(Array.isArray(p) ? p : [])
       } catch (e) {
         console.error(e)
       }
@@ -81,7 +86,7 @@ const GatewayNodeProps = ({ node, onUpdate }) => {
     const prev = list.find((e) => e.edgeId === edgeId) || null
     const nextList = list.filter((e) => e.edgeId !== edgeId)
     if (condition) {
-      nextList.push({ edgeId, condition, config: prev?.config || {} })
+      nextList.push({ edgeId, condition, config: prev?.config || {}, conditionMode: prev?.conditionMode || 'single' })
     }
     onUpdate({ settings: { ...settings, edges: nextList } })
   }
@@ -100,7 +105,16 @@ const GatewayNodeProps = ({ node, onUpdate }) => {
     onUpdate({ settings: { ...settings, edges: next } })
   }
 
-  const sourceTypeDefault = predecessorType === 'start' ? 'initiator' : 'task'
+  const updateEdgeFull = (edgeId, fullMeta) => {
+    const list = Array.isArray(settings.edges) ? settings.edges : []
+    const exists = list.some((e) => e.edgeId === edgeId)
+    const nextList = exists
+      ? list.map((e) => (e.edgeId === edgeId ? { ...fullMeta, edgeId } : e))
+      : [...list, { ...fullMeta, edgeId }]
+    onUpdate({ settings: { ...settings, edges: nextList } })
+  }
+
+  const sourceTypeDefault = predecessorType === 'start' ? 'initiator' : (predecessorType === 'decision' ? 'decision' : 'task')
   const sourceType = settings.sourceType || 'auto'
   const resolvedSourceType = sourceType === 'auto' ? sourceTypeDefault : sourceType
   const waitMode = settings.waitMode || 'event'
@@ -138,6 +152,7 @@ const GatewayNodeProps = ({ node, onUpdate }) => {
           <option value="auto">Авто (наследовать от предыдущего блока)</option>
           <option value="initiator">Инициатор процесса</option>
           <option value="task">Задача (по данным блока «Создать задачу»)</option>
+          <option value="decision">Ответ из блока «Принятие решения»</option>
         </select>
         <p className="properties-panel__hint">
           Сейчас предыдущий блок: <b>{predecessorNode?.label || predecessorType || 'не определён'}</b>. Будет использован источник: <b>{resolvedSourceType}</b>.
@@ -151,12 +166,17 @@ const GatewayNodeProps = ({ node, onUpdate }) => {
           value={waitMode}
           onChange={(e) => handleChange('waitMode', e.target.value)}
           disabled={resolvedSourceType !== 'task'}
+          style={{ opacity: resolvedSourceType === 'task' ? 1 : 0.7 }}
         >
           <option value="event">Ожидать события по задаче (рекомендуется)</option>
           <option value="default">Использовать «Иначе» / продолжить по схеме</option>
         </select>
         {resolvedSourceType !== 'task' && (
-          <p className="properties-panel__hint">Режим ожидания доступен только для условий по задаче.</p>
+          <p className="properties-panel__hint">
+            {resolvedSourceType === 'decision'
+              ? 'При источнике «Принятие решения» ветка выбирается сразу по нажатой кнопке.'
+              : 'Режим ожидания доступен только для условий по задаче.'}
+          </p>
         )}
       </div>
 
@@ -167,6 +187,7 @@ const GatewayNodeProps = ({ node, onUpdate }) => {
           value={settings.taskSourceNodeId ?? ''}
           onChange={(e) => handleChange('taskSourceNodeId', e.target.value || null)}
           disabled={resolvedSourceType !== 'task'}
+          style={{ opacity: resolvedSourceType === 'task' ? 1 : 0.7 }}
         >
           <option value="">— Последняя созданная в процессе —</option>
           {taskSourceNodes.map((n) => (
@@ -174,7 +195,9 @@ const GatewayNodeProps = ({ node, onUpdate }) => {
           ))}
         </select>
         {resolvedSourceType !== 'task' && (
-          <p className="properties-panel__hint">Отключено, т.к. выбран источник «Инициатор».</p>
+          <p className="properties-panel__hint">
+            Отключено, т.к. выбран источник «{resolvedSourceType === 'initiator' ? 'Инициатор' : 'Принятие решения'}».
+          </p>
         )}
       </div>
       {outgoingEdges.length > 0 && (
@@ -186,83 +209,23 @@ const GatewayNodeProps = ({ node, onUpdate }) => {
           {outgoingEdges.map((edge) => {
             const targetNode = nodesList.find((n) => n.id === edge.target)
             const targetLabel = targetNode?.label || edge.target
-            const meta = getEdgeMeta(edge.id)
-            const condition = meta?.condition ?? ''
-            const config = meta?.config || {}
+            const meta = getEdgeMeta(edge.id) || { edgeId: edge.id, condition: '', config: {}, conditionMode: 'single' }
             return (
-              <div key={edge.id} className="properties-panel__field" style={{ marginTop: '0.5rem' }}>
-                <span className="properties-panel__label">→ {targetLabel}</span>
-                <select
-                  className="properties-panel__select"
-                  value={condition}
-                  onChange={(e) => handleEdgeCondition(edge.id, e.target.value || null)}
-                >
-                  <option value="">— Не задано —</option>
-                  {GATEWAY_CONDITIONS.map((opt) => (
-                    <option key={opt.value} value={opt.value}>{opt.label}</option>
-                  ))}
-                </select>
-
-                {condition === 'initiator_is_user' && (
-                  <select
-                    className="properties-panel__select"
-                    value={config.userId ?? ''}
-                    onChange={(e) => updateEdgeConfig(edge.id, { userId: e.target.value ? Number(e.target.value) : null })}
-                    style={{ marginTop: '0.25rem' }}
-                  >
-                    <option value="">— Выберите пользователя —</option>
-                    {users.map((u) => (
-                      <option key={u.id} value={u.id}>
-                        {[u.first_name, u.last_name].filter(Boolean).join(' ') || u.username}
-                      </option>
-                    ))}
-                  </select>
-                )}
-
-                {condition === 'initiator_has_role' && (
-                  <select
-                    className="properties-panel__select"
-                    value={config.roleId ?? ''}
-                    onChange={(e) => updateEdgeConfig(edge.id, { roleId: e.target.value ? Number(e.target.value) : null })}
-                    style={{ marginTop: '0.25rem' }}
-                  >
-                    <option value="">— Выберите роль —</option>
-                    {roles.map((r) => (
-                      <option key={r.id} value={r.id}>{r.name}</option>
-                    ))}
-                  </select>
-                )}
-
-                {condition === 'initiator_in_department' && (
-                  <select
-                    className="properties-panel__select"
-                    value={config.departmentId ?? ''}
-                    onChange={(e) => updateEdgeConfig(edge.id, { departmentId: e.target.value ? Number(e.target.value) : null })}
-                    style={{ marginTop: '0.25rem' }}
-                  >
-                    <option value="">— Выберите отдел —</option>
-                    {departments.map((d) => (
-                      <option key={d.id} value={d.id}>{d.name}</option>
-                    ))}
-                  </select>
-                )}
-
-                {condition === 'assignee_contains_user' && (
-                  <select
-                    className="properties-panel__select"
-                    value={config.userId ?? ''}
-                    onChange={(e) => updateEdgeConfig(edge.id, { userId: e.target.value ? Number(e.target.value) : null })}
-                    style={{ marginTop: '0.25rem' }}
-                  >
-                    <option value="">— Выберите пользователя —</option>
-                    {users.map((u) => (
-                      <option key={u.id} value={u.id}>
-                        {[u.first_name, u.last_name].filter(Boolean).join(' ') || u.username}
-                      </option>
-                    ))}
-                  </select>
-                )}
-              </div>
+              <GatewayEdgeConditionEditor
+                key={edge.id}
+                edge={edge}
+                targetLabel={targetLabel}
+                meta={meta}
+                getEdgeMeta={getEdgeMeta}
+                handleEdgeCondition={handleEdgeCondition}
+                updateEdgeConfig={updateEdgeConfig}
+                updateEdgeFull={updateEdgeFull}
+                users={users}
+                roles={roles}
+                departments={departments}
+                positions={positions}
+                decisionButtons={decisionButtons}
+              />
             )
           })}
         </div>

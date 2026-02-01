@@ -71,6 +71,9 @@ export const getReferencesDepartments = () =>
 export const getReferencesRoles = () =>
   bpeClient.get('/references/roles').then((res) => res.data)
 
+export const getReferencesPositions = () =>
+  bpeClient.get('/references/positions').then((res) => res.data)
+
 // Аналитика
 export const getAnalytics = (processId) =>
   bpeClient.get(`/analytics/process/${processId}`).then((res) => res.data)
@@ -81,3 +84,9 @@ export const getBpNotifications = (userId) =>
 
 export const markBpNotificationRead = (id) =>
   bpeClient.post(`/notifications/${id}/read`).then((res) => res.data)
+
+export const getDecisionRequests = (userId) =>
+  bpeClient.get('/notifications/decisions', { params: { user_id: userId } }).then((res) => res.data)
+
+export const respondDecision = (instanceId, body) =>
+  bpeClient.post(`/instances/${instanceId}/respond-decision`, body).then((res) => res.data)

@@ -1,15 +1,19 @@
+/**
+ * Свойства блока «Принятие решения».
+ * Похож на Уведомление, но ожидает возврата решения (нажатия кнопки) от пользователя.
+ */
 import { useState, useEffect } from 'react'
 import {
   getReferencesUsers,
   getReferencesDepartments,
   getReferencesRoles,
 } from '../../../../api/businessProcessApi.js'
-import { RECIPIENT_SOURCES, PRIORITY_OPTIONS } from '../../constants/blockTypes'
+import { RECIPIENT_SOURCES } from '../../constants/blockTypes'
 import useBusinessProcessStore from '../../../../store/useBusinessProcessStore'
 import UserCheckboxList from './UserCheckboxList'
 import './PropertiesPanel.scss'
 
-const NotificationNodeProps = ({ node, onUpdate }) => {
+const DecisionNodeProps = ({ node, onUpdate }) => {
   const settings = node.settings || {}
   const { scheme } = useBusinessProcessStore()
   const [users, setUsers] = useState([])
@@ -43,13 +47,31 @@ const NotificationNodeProps = ({ node, onUpdate }) => {
     onUpdate({ settings: { ...settings, [key]: value } })
   }
 
-  const handleChannelsChange = (channel, checked) => {
-    const channels = { ...(settings.channels || { inApp: true, telegram: false }), [channel]: checked }
-    onUpdate({ settings: { ...settings, channels } })
+  const buttons = Array.isArray(settings.buttons) ? settings.buttons : [{ id: 'approve', label: 'Принять' }, { id: 'reject', label: 'Отклонить' }]
+
+  const handleButtonChange = (idx, field, val) => {
+    const next = [...buttons]
+    while (next.length <= idx) next.push({ id: `btn_${idx}`, label: '' })
+    next[idx] = { ...next[idx], [field]: val }
+    handleChange('buttons', next)
+  }
+
+  const addButton = () => {
+    const id = `btn_${buttons.length}_${Date.now().toString(36)}`
+    handleChange('buttons', [...buttons, { id, label: 'Новая кнопка' }])
+  }
+
+  const removeButton = (idx) => {
+    const next = buttons.filter((_, i) => i !== idx)
+    if (next.length === 0) next.push({ id: 'approve', label: 'Принять' })
+    handleChange('buttons', next)
   }
 
   return (
     <div className="properties-panel__fields">
+      <p className="properties-panel__hint" style={{ marginBottom: '0.5rem' }}>
+        Блок ожидает нажатия одной из кнопок от получателя. Варианты ответа определяются ниже и могут использоваться в развилке для ветвления.
+      </p>
       <div className="properties-panel__field">
         <label className="properties-panel__label">Получатели</label>
         <select
@@ -118,50 +140,45 @@ const NotificationNodeProps = ({ node, onUpdate }) => {
         </div>
       )}
       <div className="properties-panel__field">
-        <label className="properties-panel__label">Каналы</label>
-        <div className="properties-panel__checkbox-row">
-          <input
-            type="checkbox"
-            id="notif-inapp"
-            checked={settings.channels?.inApp !== false}
-            onChange={(e) => handleChannelsChange('inApp', e.target.checked)}
-          />
-          <label htmlFor="notif-inapp">В приложении</label>
-        </div>
-        <div className="properties-panel__checkbox-row">
-          <input
-            type="checkbox"
-            id="notif-telegram"
-            checked={!!settings.channels?.telegram}
-            onChange={(e) => handleChannelsChange('telegram', e.target.checked)}
-          />
-          <label htmlFor="notif-telegram">Telegram</label>
-        </div>
-      </div>
-      <div className="properties-panel__field">
         <label className="properties-panel__label">Текст сообщения</label>
         <textarea
           className="properties-panel__textarea"
           value={settings.messageText ?? ''}
           onChange={(e) => handleChange('messageText', e.target.value)}
-          placeholder="Подстановки: {инициатор}, {название_задачи}, {дедлайн}, {статус}"
+          placeholder="Подстановки: {инициатор}, {название_процесса}"
           rows={4}
         />
       </div>
       <div className="properties-panel__field">
-        <label className="properties-panel__label">Приоритет</label>
-        <select
-          className="properties-panel__select"
-          value={settings.priority ?? 'normal'}
-          onChange={(e) => handleChange('priority', e.target.value)}
-        >
-          {PRIORITY_OPTIONS.map((opt) => (
-            <option key={opt.value} value={opt.value}>{opt.label}</option>
-          ))}
-        </select>
+        <label className="properties-panel__label">Варианты ответа (кнопки)</label>
+        <p className="properties-panel__hint" style={{ marginBottom: '0.35rem' }}>
+          ID кнопки используется в развилке для условия «Нажата кнопка ответа».
+        </p>
+        {buttons.map((btn, idx) => (
+          <div key={idx} style={{ display: 'flex', gap: '0.35rem', alignItems: 'center', marginBottom: '0.35rem' }}>
+            <input
+              type="text"
+              className="properties-panel__input"
+              value={btn.id || ''}
+              onChange={(e) => handleButtonChange(idx, 'id', e.target.value)}
+              placeholder="ID (латиница)"
+              style={{ flex: '0 0 120px' }}
+            />
+            <input
+              type="text"
+              className="properties-panel__input"
+              value={btn.label || ''}
+              onChange={(e) => handleButtonChange(idx, 'label', e.target.value)}
+              placeholder="Текст на кнопке"
+              style={{ flex: 1 }}
+            />
+            <button type="button" className="properties-panel__btn-remove" onClick={() => removeButton(idx)} title="Удалить">−</button>
+          </div>
+        ))}
+        <button type="button" className="properties-panel__btn-add" onClick={addButton}>+ Добавить кнопку</button>
       </div>
     </div>
   )
 }
 
-export default NotificationNodeProps
+export default DecisionNodeProps

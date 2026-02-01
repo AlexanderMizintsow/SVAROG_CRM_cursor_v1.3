@@ -6,7 +6,9 @@ import EndNodeProps from './EndNodeProps'
 import CreateTaskNodeProps from './CreateTaskNodeProps'
 import AssignTaskNodeProps from './AssignTaskNodeProps'
 import NotificationNodeProps from './NotificationNodeProps'
+import DecisionNodeProps from './DecisionNodeProps'
 import GatewayNodeProps from './GatewayNodeProps'
+import GatewayJoinNodeProps from './GatewayJoinNodeProps'
 import TimerNodeProps from './TimerNodeProps'
 import './PropertiesPanel.scss'
 
@@ -16,7 +18,9 @@ const NODE_PROPS_MAP = {
   [BLOCK_TYPES.CREATE_TASK]: CreateTaskNodeProps,
   [BLOCK_TYPES.ASSIGN_TASK]: AssignTaskNodeProps,
   [BLOCK_TYPES.NOTIFICATION]: NotificationNodeProps,
+  [BLOCK_TYPES.DECISION]: DecisionNodeProps,
   [BLOCK_TYPES.GATEWAY]: GatewayNodeProps,
+  [BLOCK_TYPES.GATEWAY_JOIN]: GatewayJoinNodeProps,
   [BLOCK_TYPES.TIMER]: TimerNodeProps,
 }
 

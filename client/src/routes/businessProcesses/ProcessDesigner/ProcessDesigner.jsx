@@ -21,8 +21,9 @@ const ProcessDesigner = () => {
     resetDesigner,
   } = useBusinessProcessStore()
 
-  const validateScheme = useCallback(() => {
+  const validateScheme = useCallback((forPublish = false) => {
     const nodes = Array.isArray(scheme?.nodes) ? scheme.nodes : []
+    const edges = Array.isArray(scheme?.edges) ? scheme.edges : []
     const startCount = nodes.filter((n) => n.type === 'start').length
     if (startCount === 0) {
       return 'Добавьте блок «Старт» (ровно один).'
@@ -37,6 +38,78 @@ const ProcessDesigner = () => {
     if (!processName?.trim()) {
       return 'Укажите название процесса.'
     }
+
+    // При публикации — проверки обязательных полей и связности
+    if (forPublish) {
+      const targetIds = new Set(edges.map((e) => e.target))
+
+      for (const node of nodes) {
+        if (node.type === 'start') continue
+        if (!targetIds.has(node.id)) {
+          const label = node.label || node.type || node.id
+          return `Блок «${label}» не связан со схемой. У каждого блока (кроме Старт) должен быть хотя бы один вход.`
+        }
+        if (node.type === 'gateway_join') {
+          const incomingFrom = edges.filter((e) => e.target === node.id).map((e) => nodes.find((n) => n.id === e.source)?.type).filter(Boolean)
+          const allowed = ['create_task', 'assign_task', 'decision']
+          const hasAllowed = incomingFrom.some((t) => allowed.includes(t))
+          if (!hasAllowed) {
+            const label = node.label || node.type || node.id
+            return `Блок «Развилка-Слияние» («${label}»): подключите хотя бы один входящий блок «Создать задачу», «Назначить задачу» или «Принятие решения».`
+          }
+        }
+      }
+
+      for (const node of nodes) {
+        const s = node.settings || {}
+        const label = node.label || node.type
+
+        if (node.type === 'create_task' && (s.createMode || 'prepared') === 'prepared') {
+          if (!(s.title || '').trim()) {
+            return `Блок «Создать задачу» («${label}»): заполните «Название задачи (шаблон)».`
+          }
+          if (!(s.description || '').trim()) {
+            return `Блок «Создать задачу» («${label}»): заполните «Описание (шаблон, HTML)».`
+          }
+          const assigneeSource = s.assigneeSource || 'users'
+          if (assigneeSource === 'users') {
+            const ids = s.assigneeUserIds || []
+            if (!Array.isArray(ids) || ids.length === 0) {
+              return `Блок «Создать задачу» («${label}»): выберите хотя бы одного исполнителя.`
+            }
+          } else if (assigneeSource === 'department' && !s.departmentId) {
+            return `Блок «Создать задачу» («${label}»): выберите отдел для исполнителей.`
+          } else if (assigneeSource === 'role' && !s.roleId) {
+            return `Блок «Создать задачу» («${label}»): выберите роль для исполнителей.`
+          }
+        }
+
+        if (node.type === 'notification') {
+          const ch = s.channels || {}
+          const hasChannel = ch.inApp !== false || ch.telegram === true
+          if (!hasChannel) {
+            return `Блок «Уведомление» («${label}»): выберите хотя бы один канал (В приложении или Telegram).`
+          }
+          if (!(s.messageText || '').trim()) {
+            return `Блок «Уведомление» («${label}»): заполните «Текст сообщения».`
+          }
+          const recipientSource = s.recipientSource || 'users'
+          if (recipientSource === 'users') {
+            const ids = s.userIds || []
+            if (!Array.isArray(ids) || ids.length === 0) {
+              return `Блок «Уведомление» («${label}»): выберите хотя бы одного получателя.`
+            }
+          } else if (recipientSource === 'department' && !s.departmentId) {
+            return `Блок «Уведомление» («${label}»): выберите отдел получателей.`
+          } else if (recipientSource === 'role' && !s.roleId) {
+            return `Блок «Уведомление» («${label}»): выберите роль получателей.`
+          } else if (recipientSource === 'task_assignee' && !s.taskSourceNodeId) {
+            return `Блок «Уведомление» («${label}»): выберите блок-источник исполнителя задачи.`
+          }
+        }
+      }
+    }
+
     return null
   }, [scheme, processName])
 
@@ -76,7 +149,7 @@ const ProcessDesigner = () => {
   }, [validateScheme, selectedProcess, processName, processDescription, scheme, resetDesigner])
 
   const handlePublish = useCallback(async () => {
-    const err = validateScheme()
+    const err = validateScheme(true)
     if (err) {
       Toastify({ text: err, close: true, backgroundColor: '#b91c1c' }).showToast()
       return

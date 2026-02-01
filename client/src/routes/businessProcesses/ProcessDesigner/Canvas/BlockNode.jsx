@@ -7,7 +7,9 @@ import {
   IoPeople,
   IoNotifications,
   IoGitBranch,
+  IoGitMergeOutline,
   IoTime,
+  IoCheckmarkDoneCircle,
 } from 'react-icons/io5'
 import { BLOCK_TYPES, BLOCK_LABELS } from '../../constants/blockTypes'
 import './BlockNode.scss'
@@ -18,7 +20,9 @@ const ICONS = {
   [BLOCK_TYPES.CREATE_TASK]: IoDocumentText,
   [BLOCK_TYPES.ASSIGN_TASK]: IoPeople,
   [BLOCK_TYPES.NOTIFICATION]: IoNotifications,
+  [BLOCK_TYPES.DECISION]: IoCheckmarkDoneCircle,
   [BLOCK_TYPES.GATEWAY]: IoGitBranch,
+  [BLOCK_TYPES.GATEWAY_JOIN]: IoGitMergeOutline,
   [BLOCK_TYPES.TIMER]: IoTime,
 }
 
@@ -28,7 +32,9 @@ const COLORS = {
   [BLOCK_TYPES.CREATE_TASK]: '#3b82f6',
   [BLOCK_TYPES.ASSIGN_TASK]: '#8b5cf6',
   [BLOCK_TYPES.NOTIFICATION]: '#f59e0b',
+  [BLOCK_TYPES.DECISION]: '#8b5cf6',
   [BLOCK_TYPES.GATEWAY]: '#e11d48',
+  [BLOCK_TYPES.GATEWAY_JOIN]: '#c026d3',
   [BLOCK_TYPES.TIMER]: '#0ea5e9',
 }
 
@@ -48,11 +54,12 @@ const BlockNode = ({ data, selected }) => {
   const isStart = nodeType === BLOCK_TYPES.START
   const isEnd = nodeType === BLOCK_TYPES.END
   const isGateway = nodeType === BLOCK_TYPES.GATEWAY
+  const isGatewayJoin = nodeType === BLOCK_TYPES.GATEWAY_JOIN
 
   const gatewayOutgoingCount = useMemo(() => {
-    if (!isGateway) return 0
+    if (!isGateway && !isGatewayJoin) return 0
     return clampInt(settings.outgoingCount ?? 3, 1, 10)
-  }, [isGateway, settings.outgoingCount])
+  }, [isGateway, isGatewayJoin, settings.outgoingCount])
 
   return (
     <div
@@ -68,11 +75,11 @@ const BlockNode = ({ data, selected }) => {
         <span className="block-node__label">{label}</span>
       </div>
 
-      {!isEnd && !isGateway && (
+      {!isEnd && !isGateway && !isGatewayJoin && (
         <Handle type="source" position={Position.Right} className="block-node__handle" />
       )}
 
-      {!isEnd && isGateway && (
+      {!isEnd && (isGateway || isGatewayJoin) && (
         <div className="block-node__gateway-sources">
           {Array.from({ length: gatewayOutgoingCount }).map((_, idx) => {
             const offset = (idx - (gatewayOutgoingCount - 1) / 2) * 16

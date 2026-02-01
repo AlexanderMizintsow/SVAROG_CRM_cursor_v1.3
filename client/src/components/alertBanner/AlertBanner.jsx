@@ -22,7 +22,7 @@ import useExtensionRequestsNotifications from './subcomponents/ExtensionRequests
 import './alertBanner.scss'
 import useNotificationsTask from './subcomponents/TaskNotifications'
 import ReactDOM from 'react-dom'
-import { getBpNotifications, markBpNotificationRead } from '../../api/businessProcessApi'
+import { getBpNotifications, markBpNotificationRead, getDecisionRequests, respondDecision } from '../../api/businessProcessApi'
 
 const AlertBanner = () => {
   // ==================== Инициализация состояний и хуков ====================
@@ -41,7 +41,45 @@ const AlertBanner = () => {
   const [openConfirmationDialog, setOpenConfirmationDialog] = useState(false)
   const [currentTaskId, setCurrentTaskId] = useState(null)
   const [bpNotifications, setBpNotifications] = useState([])
+  const [decisionRequests, setDecisionRequests] = useState([])
   const notifications = []
+
+  // Запросы на принятие решения (блок «Принятие решения»)
+  if (currentUserId && Array.isArray(decisionRequests) && decisionRequests.length > 0) {
+    decisionRequests.forEach((dr) => {
+      const buttons = Array.isArray(dr.buttons) ? dr.buttons : []
+      notifications.push({
+        key: `decision-${dr.id}`,
+        text: (
+          <div className="alert-banner__decision">
+            <div className="alert-banner__decision-header">
+              <b>БП: {dr.process_name || 'Процесс'}</b>
+              {dr.initiator_name && <span className="alert-banner__decision-initiator">Инициатор: {dr.initiator_name}</span>}
+            </div>
+            <div className="alert-banner__decision-message">{dr.message}</div>
+            {buttons.length > 0 && (
+              <div className="alert-banner__decision-buttons">
+                {buttons.map((b) => (
+                  <button
+                    key={b.id}
+                    type="button"
+                    className="alert-banner__decision-btn"
+                    onClick={(e) => {
+                      e.stopPropagation()
+                      handleDecisionButtonClick(dr.instance_id, dr.node_id, b.id, dr.id)
+                    }}
+                  >
+                    {b.label || b.id}
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+        ),
+        icon: <FcFlowChart style={{ fontSize: '16px' }} />,
+      })
+    })
+  }
 
   // Уведомления БП (in-app)
   if (currentUserId && Array.isArray(bpNotifications) && bpNotifications.length > 0) {
@@ -91,16 +129,20 @@ const AlertBanner = () => {
 
   // ==================== Эффекты ====================
 
-  // BPE in-app уведомления (показываем в AlertBanner с пометкой «БП»)
+  // BPE in-app уведомления и запросы на принятие решения
   useEffect(() => {
     if (!currentUserId) return
     let cancelled = false
 
     const load = async () => {
       try {
-        const list = await getBpNotifications(currentUserId)
+        const [notifList, decList] = await Promise.all([
+          getBpNotifications(currentUserId),
+          getDecisionRequests(currentUserId).catch(() => []),
+        ])
         if (cancelled) return
-        setBpNotifications(Array.isArray(list) ? list : [])
+        setBpNotifications(Array.isArray(notifList) ? notifList : [])
+        setDecisionRequests(Array.isArray(decList) ? decList : [])
       } catch (e) {
         // не ломаем AlertBanner из-за проблем BPE
       }
@@ -113,6 +155,20 @@ const AlertBanner = () => {
       clearInterval(t)
     }
   }, [currentUserId])
+
+  const handleDecisionButtonClick = async (instanceId, nodeId, buttonId, requestId) => {
+    if (!currentUserId) return
+    try {
+      await respondDecision(instanceId, {
+        node_id: nodeId,
+        button_id: buttonId,
+        user_id: currentUserId,
+      })
+      setDecisionRequests((prev) => (Array.isArray(prev) ? prev.filter((r) => r.id !== requestId) : []))
+    } catch (e) {
+      console.error('respondDecision:', e)
+    }
+  }
 
   useEffect(() => {
     if (currentUserId) {
@@ -272,7 +328,11 @@ const AlertBanner = () => {
     })
   })
 
-  const allNotifications = [...notifications, ...taskNotifications, ...extensionNotifications]
+  const allNotifications = [
+    ...notifications,
+    ...taskNotifications,
+    ...extensionNotifications,
+  ]
 
   const handleBpNotificationClick = async (key) => {
     const id = Number(String(key).replace('bp-', ''))

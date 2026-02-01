@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, useCallback } from 'react'
 import Toastify from 'toastify-js'
 import useUserStore from '../../../store/userStore'
 import useBusinessProcessStore from '../../../store/useBusinessProcessStore'
@@ -8,6 +8,7 @@ import {
   getInstance,
   completeTaskCreation,
   deleteProcess,
+  updateProcess,
 } from '../../../api/businessProcessApi.js'
 import ProcessCard from './ProcessCard'
 import StartProcessModal from './StartProcessModal'
@@ -17,7 +18,7 @@ import './ProcessList.scss'
 const POLL_INTERVAL_MS = 2000
 const FINAL_STATUSES = ['completed', 'failed', 'cancelled']
 
-const ProcessList = ({ onEditProcess, onCreateNew }) => {
+const ProcessList = ({ showDrafts = false, onEditProcess, onCreateNew }) => {
   const { user } = useUserStore()
   const { processes, setProcesses, setLoading, setError } = useBusinessProcessStore()
   const [loading, setLoadingLocal] = useState(true)
@@ -27,11 +28,11 @@ const ProcessList = ({ onEditProcess, onCreateNew }) => {
   const [pendingTaskCreationData, setPendingTaskCreationData] = useState(null)
   const skipReopenForInstanceIdRef = useRef(null)
 
-  const loadProcesses = async () => {
+  const loadProcesses = useCallback(async () => {
     setLoadingLocal(true)
     setLoading(true)
     try {
-      const list = await getProcesses({ is_draft: false })
+      const list = await getProcesses({ is_draft: showDrafts })
       setProcesses(Array.isArray(list) ? list : [])
     } catch (err) {
       console.error('Ошибка загрузки процессов:', err)
@@ -46,11 +47,11 @@ const ProcessList = ({ onEditProcess, onCreateNew }) => {
       setLoadingLocal(false)
       setLoading(false)
     }
-  }
+  }, [showDrafts, setProcesses, setLoading, setError])
 
   useEffect(() => {
     loadProcesses()
-  }, [])
+  }, [loadProcesses])
 
   const handleStart = (process) => {
     setStartModalProcess(process)
@@ -58,6 +59,29 @@ const ProcessList = ({ onEditProcess, onCreateNew }) => {
 
   const handleEdit = (process) => {
     if (typeof onEditProcess === 'function') onEditProcess(process)
+  }
+
+  const handlePublish = async (process) => {
+    const name = process?.name || 'Без названия'
+    const ok = window.confirm(`Опубликовать процесс «${name}»? После публикации он появится в списке готовых процессов и его можно будет запускать.`)
+    if (!ok) return
+    try {
+      await updateProcess(process.id, {
+        name: process.name,
+        description: process.description || '',
+        scheme: process.scheme,
+        is_draft: false,
+      })
+      Toastify({ text: 'Процесс опубликован', close: true, backgroundColor: '#059669' }).showToast()
+      await loadProcesses()
+    } catch (err) {
+      console.error('Ошибка публикации процесса:', err)
+      Toastify({
+        text: err.response?.data?.error || 'Не удалось опубликовать процесс',
+        close: true,
+        backgroundColor: 'linear-gradient(to right, #b91c1c, #dc2626)',
+      }).showToast()
+    }
   }
 
   const handleDelete = async (process) => {
@@ -181,13 +205,17 @@ const ProcessList = ({ onEditProcess, onCreateNew }) => {
     )
   }
 
+  const emptyMessage = showDrafts
+    ? { title: 'Нет черновиков.', hint: 'Создайте процесс во вкладке «Конструктор» и сохраните его как черновик.' }
+    : { title: 'Нет опубликованных бизнес-процессов.', hint: 'Создайте процесс во вкладке «Конструктор» и опубликуйте его.' }
+
   return (
     <div className="process-list">
       {processes.length === 0 ? (
         <div className="process-list__empty">
-          <p>Нет опубликованных бизнес-процессов.</p>
+          <p>{emptyMessage.title}</p>
           <p className="process-list__empty-hint">
-            Создайте процесс во вкладке «Конструктор» и опубликуйте его.
+            {emptyMessage.hint}
           </p>
           {typeof onCreateNew === 'function' && (
             <button
@@ -205,7 +233,9 @@ const ProcessList = ({ onEditProcess, onCreateNew }) => {
             <ProcessCard
               key={process.id}
               process={process}
+              isDraft={showDrafts}
               onStart={() => handleStart(process)}
+              onPublish={() => handlePublish(process)}
               onEdit={() => handleEdit(process)}
               onDelete={() => handleDelete(process)}
             />

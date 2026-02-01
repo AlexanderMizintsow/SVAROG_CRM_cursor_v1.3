@@ -38,6 +38,13 @@
   color: var(--text-secondary, #64748b);
 }
 
+.properties-panel__list-simple {
+  margin: 0;
+  padding-left: 1.2rem;
+  font-size: 0.9rem;
+  color: var(--text-secondary, #64748b);
+}
+
 .properties-panel__input,
 .properties-panel__select,
 .properties-panel__textarea {
@@ -68,5 +75,40 @@
 
   input {
     cursor: pointer;
+  }
+}
+
+.properties-panel__btn-add {
+  padding: 0.35rem 0.6rem;
+  font-size: 0.85rem;
+  border: 1px dashed var(--border, #cbd5e1);
+  border-radius: 6px;
+  background: transparent;
+  color: var(--text-secondary, #64748b);
+  cursor: pointer;
+  transition: border-color 0.2s, color 0.2s;
+
+  &:hover {
+    border-color: var(--primary, #2563eb);
+    color: var(--primary, #2563eb);
+  }
+}
+
+.properties-panel__btn-remove {
+  flex-shrink: 0;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  border: 1px solid #fecaca;
+  border-radius: 6px;
+  background: #fff;
+  color: #b91c1c;
+  font-size: 1.1rem;
+  line-height: 1;
+  cursor: pointer;
+  transition: background 0.2s;
+
+  &:hover {
+    background: #fef2f2;
   }
 }

@@ -1,4 +1,5 @@
 .process-card {
+  position: relative;
   display: flex;
   flex-direction: column;
   padding: 1rem;
@@ -56,21 +57,44 @@
   gap: 0.5rem;
 }
 
-.process-card__btn-start {
+.process-card__badge {
+  position: absolute;
+  top: 0.5rem;
+  right: 0.5rem;
+  padding: 0.2rem 0.5rem;
+  font-size: 0.75rem;
+  border-radius: 4px;
+  background: var(--bg-secondary, #f1f5f9);
+  color: var(--text-secondary, #64748b);
+}
+
+.process-card__btn-start,
+.process-card__btn-publish {
   display: inline-flex;
   align-items: center;
   gap: 0.5rem;
   padding: 0.5rem 1rem;
   border: none;
   border-radius: 8px;
-  background: var(--primary, #2563eb);
   color: #fff;
   font-size: 0.95rem;
   cursor: pointer;
   transition: background 0.2s;
+}
+
+.process-card__btn-start {
+  background: var(--primary, #2563eb);
 
   &:hover {
     background: var(--primary-dark, #1d4ed8);
+  }
+}
+
+.process-card__btn-publish {
+  background: var(--success, #059669);
+
+  &:hover {
+    background: #047857;
   }
 }
 

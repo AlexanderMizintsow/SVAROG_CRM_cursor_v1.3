@@ -6,6 +6,7 @@ import {
 } from '../../../../api/businessProcessApi.js'
 import { ASSIGNEE_SOURCES } from '../../constants/blockTypes'
 import useBusinessProcessStore from '../../../../store/useBusinessProcessStore'
+import UserCheckboxList from './UserCheckboxList'
 import './PropertiesPanel.scss'
 
 const AssignTaskNodeProps = ({ node, onUpdate }) => {
@@ -75,21 +76,11 @@ const AssignTaskNodeProps = ({ node, onUpdate }) => {
       {settings.assigneeSource === 'users' && (
         <div className="properties-panel__field">
           <label className="properties-panel__label">Пользователи</label>
-          <select
-            className="properties-panel__select"
-            multiple
-            value={settings.assigneeUserIds || []}
-            onChange={(e) => {
-              const selected = Array.from(e.target.selectedOptions, (o) => Number(o.value))
-              handleChange('assigneeUserIds', selected)
-            }}
-          >
-            {users.map((u) => (
-              <option key={u.id} value={u.id}>
-                {[u.first_name, u.last_name].filter(Boolean).join(' ') || u.username}
-              </option>
-            ))}
-          </select>
+          <UserCheckboxList
+            users={users}
+            selectedIds={settings.assigneeUserIds || []}
+            onChange={(ids) => handleChange('assigneeUserIds', ids)}
+          />
         </div>
       )}
       {settings.assigneeSource === 'department' && (

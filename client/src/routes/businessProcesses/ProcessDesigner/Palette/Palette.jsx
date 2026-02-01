@@ -6,7 +6,9 @@ import {
   IoDocumentText,
   IoNotifications,
   IoGitBranch,
+  IoGitMergeOutline,
   IoTime,
+  IoCheckmarkDoneCircle,
 } from 'react-icons/io5'
 import useBusinessProcessStore from '../../../../store/useBusinessProcessStore.js'
 import { BLOCK_TYPES, BLOCK_LABELS } from '../../constants/blockTypes.js'
@@ -17,7 +19,9 @@ const PALETTE_ITEMS = [
   { type: BLOCK_TYPES.END, icon: IoStopCircle, color: '#94a3b8' },
   { type: BLOCK_TYPES.CREATE_TASK, icon: IoDocumentText, color: '#3b82f6' },
   { type: BLOCK_TYPES.NOTIFICATION, icon: IoNotifications, color: '#f59e0b' },
+  { type: BLOCK_TYPES.DECISION, icon: IoCheckmarkDoneCircle, color: '#8b5cf6' },
   { type: BLOCK_TYPES.GATEWAY, icon: IoGitBranch, color: '#e11d48' },
+  { type: BLOCK_TYPES.GATEWAY_JOIN, icon: IoGitMergeOutline, color: '#c026d3' },
   { type: BLOCK_TYPES.TIMER, icon: IoTime, color: '#0ea5e9' },
 ]
 
@@ -99,12 +103,24 @@ function getDefaultSettings(type) {
         messageText: '',
         priority: 'normal',
       }
+    case BLOCK_TYPES.DECISION:
+      return {
+        recipientSource: 'users',
+        userIds: [],
+        messageText: '',
+        buttons: [{ id: 'approve', label: 'Принять' }, { id: 'reject', label: 'Отклонить' }],
+      }
     case BLOCK_TYPES.GATEWAY:
       return {
         sourceType: 'auto',
         waitMode: 'event',
         outgoingCount: 3,
         taskSourceNodeId: null,
+        edges: [],
+      }
+    case BLOCK_TYPES.GATEWAY_JOIN:
+      return {
+        outgoingCount: 3,
         edges: [],
       }
     case BLOCK_TYPES.TIMER:

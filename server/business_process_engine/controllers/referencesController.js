@@ -42,8 +42,21 @@ async function getRoles(req, res) {
   }
 }
 
+async function getPositions(req, res) {
+  try {
+    const response = await registerClient.get('/api/positions')
+    res.json(response.data)
+  } catch (err) {
+    console.error('getPositions proxy:', err.message)
+    res.status(err.response?.status || 500).json(
+      err.response?.data || { error: 'Не удалось получить список должностей' }
+    )
+  }
+}
+
 module.exports = {
   getUsers,
   getDepartments,
   getRoles,
+  getPositions,
 }

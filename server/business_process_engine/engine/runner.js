@@ -157,6 +157,16 @@ async function runProcessFromStart(dbPool, instanceId) {
       return
     }
 
+    if (result.waitDecision) {
+      await logExit(dbPool, instanceId, currentNodeId, 'waiting_decision', { nodeId: result.waitDecision.nodeId })
+      return
+    }
+
+    if (result.waitJoin) {
+      await logExit(dbPool, instanceId, currentNodeId, 'waiting_join', { nodeId: result.waitJoin.nodeId })
+      return
+    }
+
     if (result.end) {
       await logExit(dbPool, instanceId, currentNodeId, 'success', {
         end: true,
@@ -280,8 +290,152 @@ async function runProcessFromGateway(dbPool, taskId) {
   }
 }
 
+function getIncomingSourceNodes(scheme, nodeId) {
+  const edges = (scheme.edges || []).filter((e) => e.target === nodeId)
+  const nodes = scheme.nodes || []
+  const seen = new Set()
+  const list = []
+  for (const e of edges) {
+    const src = nodes.find((n) => n.id === e.source)
+    if (src && (src.type === 'create_task' || src.type === 'assign_task' || src.type === 'decision') && !seen.has(src.id)) {
+      seen.add(src.id)
+      list.push(src)
+    }
+  }
+  return list
+}
+
+function normalizeTaskStatus(raw) {
+  const s = raw != null ? String(raw) : ''
+  if (!s) return ''
+  const v = s.toLowerCase()
+  if (v === 'pending') return 'wait'
+  if (v === 'in_progress') return 'doing'
+  if (v === 'completed') return 'done'
+  if (v === 'on_hold') return 'pause'
+  if (v === 'cancelled') return 'cancelled'
+  if (v === 'backlog' || v === 'todo' || v === 'wait' || v === 'doing' || v === 'done' || v === 'pause') return v
+  return v
+}
+
+async function runProcessFromGatewayJoin(dbPool, taskId) {
+  const links = await dbPool.query('SELECT instance_id, node_id FROM bp_gateway_join_waiting')
+  if (links.rows.length === 0) return
+
+  for (const row of links.rows) {
+    const instanceId = row.instance_id
+    const joinNodeId = row.node_id
+
+    const instResult = await dbPool.query(
+      'SELECT * FROM bp_process_instances WHERE id = $1 AND status = $2',
+      [instanceId, 'waiting_join']
+    )
+    if (instResult.rows.length === 0) continue
+
+    const instance = instResult.rows[0]
+    const defResult = await dbPool.query(
+      'SELECT scheme FROM bp_process_definitions WHERE id = $1',
+      [instance.process_id]
+    )
+    if (defResult.rows.length === 0) continue
+
+    const scheme = typeof defResult.rows[0].scheme === 'object'
+      ? defResult.rows[0].scheme
+      : JSON.parse(defResult.rows[0].scheme)
+    const joinNode = getNodeById(scheme, joinNodeId)
+    if (!joinNode || joinNode.type !== 'gateway_join') continue
+
+    const context = typeof instance.context === 'object' ? instance.context : (instance.context ? JSON.parse(instance.context) : {})
+    const blockOutputs = context.block_outputs || {}
+    const joinSignals = context.join_signals && typeof context.join_signals === 'object' ? context.join_signals : {}
+    const sources = getIncomingSourceNodes(scheme, joinNodeId)
+    let updated = false
+    for (const src of sources) {
+      if (src.type !== 'create_task' && src.type !== 'assign_task') continue
+      const tid = blockOutputs[src.id]?.task_id
+      if (tid == null || Number(tid) !== Number(taskId)) continue
+      try {
+        const task = await integrations.registerClient.getTask(taskId)
+        const status = normalizeTaskStatus(task && task.status)
+        const now = new Date()
+        const deadline = task && task.deadline ? new Date(task.deadline) : null
+        const isOverdue = deadline ? now > deadline : false
+        const isCompleted = task && task.is_completed === true
+        const priority = (task && task.priority) ? String(task.priority).toLowerCase() : ''
+        const hasDeadline = !!(task && task.deadline)
+        const assignees = (task && task.assignees) || []
+        const assigneeIds = assignees.map((a) => (typeof a === 'object' ? Number(a.id) : Number(a))).filter((x) => Number.isFinite(x))
+        const taskSignal = {
+          type: 'task',
+          status,
+          task,
+          deadline,
+          now,
+          isOverdue,
+          isCompleted,
+          priority,
+          hasDeadline,
+          assigneeIds,
+        }
+        const newJoinSignals = { ...joinSignals, [src.id]: taskSignal }
+        const newContext = { ...context, join_signals: newJoinSignals }
+        await dbPool.query(
+          'UPDATE bp_process_instances SET context = $1, status = $2 WHERE id = $3',
+          [JSON.stringify(newContext), 'running', instanceId]
+        )
+        try {
+          await dbPool.query('DELETE FROM bp_gateway_join_waiting WHERE instance_id = $1', [instanceId])
+        } catch (e) {
+          if (e?.code !== '42P01') throw e
+        }
+        await runProcessFromStart(dbPool, instanceId)
+        updated = true
+        break
+      } catch (e) {
+        console.warn('runProcessFromGatewayJoin getTask:', taskId, e?.message)
+      }
+    }
+    if (updated) break
+  }
+}
+
+async function runProcessFromDecision(dbPool, instanceId, nodeId, buttonId) {
+  const instResult = await dbPool.query(
+    'SELECT * FROM bp_process_instances WHERE id = $1 AND status = $2',
+    [instanceId, 'waiting_decision']
+  )
+  if (instResult.rows.length === 0) return
+
+  const instance = instResult.rows[0]
+  const context = typeof instance.context === 'object' ? instance.context : (instance.context ? JSON.parse(instance.context) : {})
+  const decisionOutputs = context.decision_outputs || {}
+  decisionOutputs[nodeId] = { button_id: buttonId }
+  const newContext = { ...context, decision_outputs: decisionOutputs, last_decision: { nodeId, buttonId } }
+
+  const defResult = await dbPool.query(
+    'SELECT scheme FROM bp_process_definitions WHERE id = $1',
+    [instance.process_id]
+  )
+  if (defResult.rows.length === 0) return
+
+  const scheme = typeof defResult.rows[0].scheme === 'object'
+    ? defResult.rows[0].scheme
+    : JSON.parse(defResult.rows[0].scheme)
+  const edges = (scheme.edges || []).filter((e) => e.source === nodeId)
+  const nextEdge = edges[0]
+  if (!nextEdge) return
+
+  await dbPool.query(
+    'UPDATE bp_process_instances SET context = $1, status = $2, current_node_id = $3 WHERE id = $4',
+    [JSON.stringify(newContext), 'running', nextEdge.target, instanceId]
+  )
+  await runProcessFromStart(dbPool, instanceId)
+}
+
 module.exports = {
   runProcessFromStart,
   runProcessFromGateway,
+  runProcessFromGatewayJoin,
   runProcessFromTaskCreation,
+  runProcessFromDecision,
 }

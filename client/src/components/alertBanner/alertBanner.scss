@@ -275,6 +275,57 @@
   margin-left: 4px;
 }
 
+.alert-banner__decision {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-size: 12px;
+}
+
+.alert-banner__decision-header {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+
+  b {
+    font-size: 12px;
+  }
+}
+
+.alert-banner__decision-initiator {
+  font-size: 11px;
+  color: rgba(236, 240, 241, 0.85);
+}
+
+.alert-banner__decision-message {
+  line-height: 1.35;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.alert-banner__decision-buttons {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 4px;
+}
+
+.alert-banner__decision-btn {
+  padding: 4px 10px;
+  font-size: 11px;
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  border-radius: 6px;
+  background: rgba(52, 152, 219, 0.3);
+  color: #ecf0f1;
+  cursor: pointer;
+  transition: background 0.2s, border-color 0.2s;
+
+  &:hover {
+    background: rgba(52, 152, 219, 0.5);
+    border-color: rgba(255, 255, 255, 0.5);
+  }
+}
+
 // Стили для скроллбара
 .alert-banner-scrollable::-webkit-scrollbar {
   width: 4px;

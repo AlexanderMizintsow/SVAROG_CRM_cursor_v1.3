@@ -90,7 +90,19 @@ function FlowCanvasInner() {
 
   useEffect(() => {
     const handleKeyDown = (event) => {
-      if ((event.key !== 'Delete' && event.key !== 'Backspace') || !selectedNodeId) return
+      // Удаление блока только по клавише Delete (Backspace — для редактирования текста)
+      if (event.key !== 'Delete' || !selectedNodeId) return
+
+      // Не удалять, если пользователь редактирует текст в input/textarea/select
+      const activeEl = document.activeElement
+      const isEditing =
+        activeEl &&
+        (activeEl.tagName === 'INPUT' ||
+          activeEl.tagName === 'TEXTAREA' ||
+          activeEl.tagName === 'SELECT' ||
+          activeEl.isContentEditable)
+      if (isEditing) return
+
       event.preventDefault()
 
       const nodesList = Array.isArray(scheme?.nodes) ? scheme.nodes : []
