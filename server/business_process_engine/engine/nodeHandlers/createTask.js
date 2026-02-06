@@ -6,6 +6,8 @@
  * Важно: статусы задач нормализуются под статусы канбана SVAROG:
  * backlog / todo / wait / doing / done / pause (+ алиасы pending/in_progress/completed/on_hold/cancelled).
  */
+const { resolveProjectId } = require('./projectUtils')
+
 function getOutgoingEdges(scheme, nodeId) {
   const edges = scheme.edges || []
   return edges.filter((e) => e.source === nodeId)
@@ -58,6 +60,16 @@ async function handle(instance, node, scheme, integrations, dbPool) {
   let tags = settings.tags
   let deadlineOffsetDays = settings.deadlineOffsetDays != null ? settings.deadlineOffsetDays : null
 
+  // Опционально: создать задачу как подзадачу проекта (global_task_id)
+  const linkToProject = settings.linkToProject === true
+  const projectId = linkToProject
+    ? resolveProjectId(context, {
+        projectSource: settings.projectSource || 'last',
+        projectNodeId: settings.projectNodeId || null,
+        fixedProjectId: settings.fixedProjectId || null,
+      })
+    : null
+
   // Если выбран BPE-шаблон — используем его как базу, но поля блока имеют приоритет
   if (settings.templateId) {
     const templateResult = await dbPool.query('SELECT * FROM bp_task_templates WHERE id = $1', [settings.templateId])
@@ -73,6 +85,9 @@ async function handle(instance, node, scheme, integrations, dbPool) {
 
   const createMode = settings.createMode || 'prepared'
   if (createMode === 'modal_at_runtime') {
+    if (linkToProject) {
+      return { fail: 'Создать задачу: режим «окно при запуске» сейчас не поддерживает подзадачи проекта. Используйте режим «создать сразу».' }
+    }
     const templateData = {
       title,
       description,
@@ -124,6 +139,11 @@ async function handle(instance, node, scheme, integrations, dbPool) {
     tags: tagsValue,
     status: initialStatus,
     business_process_instance_id: instance.id,
+    ...(linkToProject ? { global_task_id: projectId } : {}),
+  }
+
+  if (linkToProject && !projectId) {
+    return { fail: 'Создать задачу: включено «как подзадача проекта», но проект не найден (создайте проект выше или выберите источник)' }
   }
 
   let task

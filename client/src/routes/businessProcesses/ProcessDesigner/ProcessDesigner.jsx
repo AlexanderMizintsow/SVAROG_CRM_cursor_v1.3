@@ -74,6 +74,67 @@ const ProcessDesigner = () => {
         const s = node.settings || {}
         const label = node.label || node.type
 
+        if (node.type === 'create_project') {
+          if (!(s.title || '').trim()) {
+            return `Блок «Создать проект» («${label}»): заполните «Название проекта».`
+          }
+        }
+
+        if (node.type === 'project_update_status') {
+          if (!(s.status || '').trim()) {
+            return `Блок «Проект: статус» («${label}»): укажите новый статус проекта.`
+          }
+        }
+
+        if (node.type === 'project_add_comment') {
+          if (!(s.comment || '').trim()) {
+            return `Блок «Проект: комментарий» («${label}»): заполните комментарий.`
+          }
+        }
+
+        if (node.type === 'project_post_chat') {
+          if (!(s.text || '').trim()) {
+            return `Блок «Проект: чат» («${label}»): заполните текст сообщения.`
+          }
+        }
+
+        if (node.type === 'project_add_responsibles') {
+          const rs = Array.isArray(s.responsibles) ? s.responsibles : []
+          if (rs.length === 0) {
+            return `Блок «Проект: ответственные» («${label}»): добавьте хотя бы одного ответственного.`
+          }
+          const bad = rs.some((r) => !r || !r.id)
+          if (bad) {
+            return `Блок «Проект: ответственные» («${label}»): у всех ответственных должен быть выбран пользователь.`
+          }
+        }
+
+        if (node.type === 'project_update_goals') {
+          const g = Array.isArray(s.goals) ? s.goals : []
+          if (g.length === 0) {
+            return `Блок «Проект: цели» («${label}»): добавьте хотя бы одну цель.`
+          }
+        }
+
+        if (node.type === 'project_update_additional_info') {
+          const rows = Array.isArray(s.additionalInfo) ? s.additionalInfo : []
+          if (rows.length === 0) {
+            return `Блок «Проект: доп. инфо» («${label}»): добавьте хотя бы одно поле key → value.`
+          }
+        }
+
+        if (node.type === 'project_add_attachment') {
+          if (!(s.file_url || '').trim() || !(s.file_type || '').trim() || !(s.name_file || '').trim()) {
+            return `Блок «Проект: вложение» («${label}»): заполните file_url, file_type и name_file.`
+          }
+        }
+
+        if (node.type === 'project_update_task_status') {
+          if (!(s.status || '').trim()) {
+            return `Блок «Подзадача: статус» («${label}»): укажите новый статус задачи.`
+          }
+        }
+
         if (node.type === 'create_task' && (s.createMode || 'prepared') === 'prepared') {
           if (!(s.title || '').trim()) {
             return `Блок «Создать задачу» («${label}»): заполните «Название задачи (шаблон)».`
@@ -92,6 +153,10 @@ const ProcessDesigner = () => {
           } else if (assigneeSource === 'role' && !s.roleId) {
             return `Блок «Создать задачу» («${label}»): выберите роль для исполнителей.`
           }
+        }
+
+        if (node.type === 'create_task' && s.linkToProject === true && (s.createMode || 'prepared') === 'modal_at_runtime') {
+          return `Блок «Создать задачу» («${label}»): подзадачи проекта пока поддерживаются только в режиме «Создать сразу».`
         }
 
         if (node.type === 'notification') {

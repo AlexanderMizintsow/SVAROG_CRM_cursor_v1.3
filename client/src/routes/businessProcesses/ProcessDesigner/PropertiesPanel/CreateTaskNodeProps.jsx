@@ -7,6 +7,7 @@ import {
 } from '../../../../api/businessProcessApi.js'
 import { ASSIGNEE_SOURCES, CREATE_TASK_MODES } from '../../constants/blockTypes'
 import UserCheckboxList from './UserCheckboxList'
+import useBusinessProcessStore from '../../../../store/useBusinessProcessStore'
 import './PropertiesPanel.scss'
 
 const CreateTaskNodeProps = ({ node, onUpdate }) => {
@@ -15,6 +16,7 @@ const CreateTaskNodeProps = ({ node, onUpdate }) => {
   const [departments, setDepartments] = useState([])
   const [roles, setRoles] = useState([])
   const [templates, setTemplates] = useState([])
+  const { scheme } = useBusinessProcessStore()
 
   useEffect(() => {
     const load = async () => {
@@ -57,6 +59,9 @@ const CreateTaskNodeProps = ({ node, onUpdate }) => {
   ]
 
   const createMode = settings.createMode ?? 'prepared'
+  const projectNodes = Array.isArray(scheme?.nodes) ? scheme.nodes.filter((n) => n.type === 'create_project') : []
+  const linkToProject = settings.linkToProject === true
+  const projectSource = settings.projectSource || 'last'
 
   return (
     <div className="properties-panel__fields">
@@ -76,6 +81,63 @@ const CreateTaskNodeProps = ({ node, onUpdate }) => {
             ? 'Задача создаётся сразу при прохождении процесса по данным шаблона ниже.'
             : 'При запуске процесса пользователю откроется окно создания задачи (как в Менеджере задач) с подставленными данными шаблона.'}
         </p>
+      </div>
+
+      <div className="properties-panel__field">
+        <label className="properties-panel__checkbox-row">
+          <input
+            type="checkbox"
+            checked={linkToProject}
+            onChange={(e) => handleChange('linkToProject', e.target.checked)}
+          />
+          <span>Создавать как <b>подзадачу проекта</b> (global_task_id)</span>
+        </label>
+        {linkToProject && (
+          <>
+            <select
+              className="properties-panel__select"
+              value={projectSource}
+              onChange={(e) => handleChange('projectSource', e.target.value)}
+              style={{ marginTop: 6 }}
+            >
+              <option value="last">Последний созданный проект в процессе</option>
+              <option value="by_node" disabled={projectNodes.length === 0}>По блоку «Создать проект»</option>
+              <option value="fixed">Фиксированный ID проекта</option>
+            </select>
+
+            {projectSource === 'by_node' && (
+              <select
+                className="properties-panel__select"
+                value={settings.projectNodeId ?? ''}
+                onChange={(e) => handleChange('projectNodeId', e.target.value || null)}
+                style={{ marginTop: 6 }}
+              >
+                <option value="">— Выберите блок «Создать проект» —</option>
+                {projectNodes.map((n) => (
+                  <option key={n.id} value={n.id}>{n.label || n.id}</option>
+                ))}
+              </select>
+            )}
+
+            {projectSource === 'fixed' && (
+              <input
+                type="number"
+                className="properties-panel__input"
+                value={settings.fixedProjectId ?? ''}
+                onChange={(e) => handleChange('fixedProjectId', e.target.value ? Number(e.target.value) : null)}
+                placeholder="ID проекта (global_task_id)"
+                style={{ marginTop: 6 }}
+              />
+            )}
+
+            {createMode === 'modal_at_runtime' && (
+              <p className="properties-panel__hint" style={{ color: '#b45309' }}>
+                В режиме «окно при запуске» подзадача проекта передаётся как параметр. Убедитесь, что окно создания задачи
+                умеет принимать <b>global_task_id</b>.
+              </p>
+            )}
+          </>
+        )}
       </div>
 
       <div className="properties-panel__field">

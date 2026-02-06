@@ -11,6 +11,13 @@ import {
   IoCheckmarkDoneCircle,
   IoLayersOutline,
   IoInformationCircleOutline,
+  IoFolderOpenOutline,
+  IoAttachOutline,
+  IoChatboxEllipsesOutline,
+  IoChatbubbleEllipsesOutline,
+  IoPeopleCircleOutline,
+  IoListOutline,
+  IoSwapVerticalOutline,
 } from 'react-icons/io5'
 import { LuSplit } from "react-icons/lu";
 import useBusinessProcessStore from '../../../../store/useBusinessProcessStore.js'
@@ -22,6 +29,15 @@ const PALETTE_ITEMS = [
   { type: BLOCK_TYPES.END, icon: IoStopCircle, color: '#94a3b8' },
   { type: BLOCK_TYPES.LANE, icon: IoLayersOutline, color: '#64748b' },
   { type: BLOCK_TYPES.ADDITIONAL_INFO, icon: IoInformationCircleOutline, color: '#0f766e' },
+  { type: BLOCK_TYPES.CREATE_PROJECT, icon: IoFolderOpenOutline, color: '#0ea5e9' },
+  { type: BLOCK_TYPES.PROJECT_UPDATE_STATUS, icon: IoSwapVerticalOutline, color: '#0284c7' },
+  { type: BLOCK_TYPES.PROJECT_ADD_RESPONSIBLES, icon: IoPeopleCircleOutline, color: '#0284c7' },
+  { type: BLOCK_TYPES.PROJECT_ADD_COMMENT, icon: IoChatbubbleEllipsesOutline, color: '#0284c7' },
+  { type: BLOCK_TYPES.PROJECT_POST_CHAT, icon: IoChatboxEllipsesOutline, color: '#0284c7' },
+  { type: BLOCK_TYPES.PROJECT_UPDATE_GOALS, icon: IoListOutline, color: '#0284c7' },
+  { type: BLOCK_TYPES.PROJECT_UPDATE_ADDITIONAL_INFO, icon: IoInformationCircleOutline, color: '#0284c7' },
+  { type: BLOCK_TYPES.PROJECT_ADD_ATTACHMENT, icon: IoAttachOutline, color: '#0284c7' },
+  { type: BLOCK_TYPES.PROJECT_UPDATE_TASK_STATUS, icon: IoSwapVerticalOutline, color: '#8b5cf6' },
   { type: BLOCK_TYPES.CREATE_TASK, icon: IoDocumentText, color: '#3b82f6' },
   { type: BLOCK_TYPES.NOTIFICATION, icon: IoNotifications, color: '#f59e0b' },
   { type: BLOCK_TYPES.DECISION, icon: IoCheckmarkDoneCircle, color: '#8b5cf6' },
@@ -147,6 +163,42 @@ function getDefaultSettings(type) {
         // fields: [{ key, value, requiredAtRuntime, requiredFor: { source, userIds, departmentId, roleId }, promptText }]
         fields: [],
       }
+    case BLOCK_TYPES.CREATE_PROJECT:
+      return {
+        title: '',
+        description: '',
+        goals: [],
+        deadline: null,
+        priority: 'medium',
+        // additionalInfo: [{ key, value }]
+        additionalInfo: [],
+        // responsibles: [{ id, role }]
+        responsibles: [],
+      }
+    case BLOCK_TYPES.PROJECT_UPDATE_STATUS:
+      return { projectSource: 'last', projectNodeId: null, fixedProjectId: null, status: 'Новая' }
+    case BLOCK_TYPES.PROJECT_ADD_COMMENT:
+      return { projectSource: 'last', projectNodeId: null, fixedProjectId: null, comment: '' }
+    case BLOCK_TYPES.PROJECT_POST_CHAT:
+      return { projectSource: 'last', projectNodeId: null, fixedProjectId: null, text: '', title: '' }
+    case BLOCK_TYPES.PROJECT_ADD_RESPONSIBLES:
+      return { projectSource: 'last', projectNodeId: null, fixedProjectId: null, responsibles: [] }
+    case BLOCK_TYPES.PROJECT_UPDATE_GOALS:
+      return { projectSource: 'last', projectNodeId: null, fixedProjectId: null, goals: [] }
+    case BLOCK_TYPES.PROJECT_UPDATE_ADDITIONAL_INFO:
+      return { projectSource: 'last', projectNodeId: null, fixedProjectId: null, additionalInfo: [] }
+    case BLOCK_TYPES.PROJECT_ADD_ATTACHMENT:
+      return {
+        projectSource: 'last',
+        projectNodeId: null,
+        fixedProjectId: null,
+        file_url: '',
+        file_type: '',
+        name_file: '',
+        comment_file: '',
+      }
+    case BLOCK_TYPES.PROJECT_UPDATE_TASK_STATUS:
+      return { taskSource: 'last', taskNodeId: null, fixedTaskId: null, status: 'backlog' }
     case BLOCK_TYPES.CREATE_TASK:
       return {
         createMode: 'prepared',
@@ -161,6 +213,10 @@ function getDefaultSettings(type) {
         approverUserIds: [],
         viewerUserIds: [],
         deadlineOffsetDays: null,
+        linkToProject: false,
+        projectSource: 'last',
+        projectNodeId: null,
+        fixedProjectId: null,
       }
     case BLOCK_TYPES.NOTIFICATION:
       return {

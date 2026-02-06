@@ -13,6 +13,15 @@ import SplitterNodeProps from './SplitterNodeProps'
 import TimerNodeProps from './TimerNodeProps'
 import LaneNodeProps from './LaneNodeProps'
 import AdditionalInfoNodeProps from './AdditionalInfoNodeProps'
+import CreateProjectNodeProps from './CreateProjectNodeProps'
+import ProjectUpdateStatusNodeProps from './ProjectUpdateStatusNodeProps'
+import ProjectAddCommentNodeProps from './ProjectAddCommentNodeProps'
+import ProjectPostChatNodeProps from './ProjectPostChatNodeProps'
+import ProjectAddResponsiblesNodeProps from './ProjectAddResponsiblesNodeProps'
+import ProjectUpdateGoalsNodeProps from './ProjectUpdateGoalsNodeProps'
+import ProjectUpdateAdditionalInfoNodeProps from './ProjectUpdateAdditionalInfoNodeProps'
+import ProjectAddAttachmentNodeProps from './ProjectAddAttachmentNodeProps'
+import ProjectUpdateTaskStatusNodeProps from './ProjectUpdateTaskStatusNodeProps'
 import './PropertiesPanel.scss'
 
 const NODE_PROPS_MAP = {
@@ -20,6 +29,15 @@ const NODE_PROPS_MAP = {
   [BLOCK_TYPES.END]: EndNodeProps,
   [BLOCK_TYPES.LANE]: LaneNodeProps,
   [BLOCK_TYPES.ADDITIONAL_INFO]: AdditionalInfoNodeProps,
+  [BLOCK_TYPES.CREATE_PROJECT]: CreateProjectNodeProps,
+  [BLOCK_TYPES.PROJECT_UPDATE_STATUS]: ProjectUpdateStatusNodeProps,
+  [BLOCK_TYPES.PROJECT_ADD_COMMENT]: ProjectAddCommentNodeProps,
+  [BLOCK_TYPES.PROJECT_POST_CHAT]: ProjectPostChatNodeProps,
+  [BLOCK_TYPES.PROJECT_ADD_RESPONSIBLES]: ProjectAddResponsiblesNodeProps,
+  [BLOCK_TYPES.PROJECT_UPDATE_GOALS]: ProjectUpdateGoalsNodeProps,
+  [BLOCK_TYPES.PROJECT_UPDATE_ADDITIONAL_INFO]: ProjectUpdateAdditionalInfoNodeProps,
+  [BLOCK_TYPES.PROJECT_ADD_ATTACHMENT]: ProjectAddAttachmentNodeProps,
+  [BLOCK_TYPES.PROJECT_UPDATE_TASK_STATUS]: ProjectUpdateTaskStatusNodeProps,
   [BLOCK_TYPES.CREATE_TASK]: CreateTaskNodeProps,
   [BLOCK_TYPES.ASSIGN_TASK]: AssignTaskNodeProps,
   [BLOCK_TYPES.NOTIFICATION]: NotificationNodeProps,
