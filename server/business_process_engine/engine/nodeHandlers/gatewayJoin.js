@@ -47,6 +47,46 @@ function isTomorrow(d, ref) {
   return isSameDay(a, r)
 }
 
+function getAdditionalInfoValue(context, key) {
+  const k = key != null ? String(key).trim() : ''
+  if (!k) return false
+  const map = context && typeof context === 'object' && context.additional_info && typeof context.additional_info === 'object'
+    ? context.additional_info
+    : {}
+  const v = map[k]
+  if (v === undefined || v === null) return false
+  if (typeof v === 'string') {
+    const s = v.trim()
+    return s ? s : false
+  }
+  if (v === false) return false
+  return v
+}
+
+function matchAdditionalInfoCondition(aiCondition, aiConfig, context) {
+  const cond = aiCondition != null ? String(aiCondition) : ''
+  if (!cond) return true
+  const cfg = aiConfig && typeof aiConfig === 'object' ? aiConfig : {}
+
+  if (cond === 'ai_var_true') {
+    const v = getAdditionalInfoValue(context, cfg.key)
+    return v !== false
+  }
+  if (cond === 'ai_var_false') {
+    const v = getAdditionalInfoValue(context, cfg.key)
+    return v === false
+  }
+  if (cond === 'ai_var_equals') {
+    const expectedRaw = cfg.value != null ? String(cfg.value) : ''
+    const expected = expectedRaw.trim()
+    const v = getAdditionalInfoValue(context, cfg.key)
+    if (expected === '') return v === false
+    return v !== false && String(v).trim() === expected
+  }
+  // неизвестное условие — не блокируем ветку
+  return true
+}
+
 /** Входящие источники — только create_task, assign_task, decision */
 function getIncomingSourceNodes(scheme, nodeId) {
   const incoming = getIncomingEdges(scheme, nodeId)
@@ -224,6 +264,9 @@ async function handle(instance, node, scheme, integrations, dbPool) {
     const meta = edgesMeta.find((m) => m.edgeId === edge.id) || {}
     const combination = meta.combination && typeof meta.combination === 'object' ? meta.combination : {}
     const operator = meta.operator === 'or' ? 'or' : 'and'
+    if (!matchAdditionalInfoCondition(meta.aiCondition, meta.aiConfig, context)) {
+      continue
+    }
     if (matchCombination(combination, currentState, sourceIds, operator)) {
       try {
         await dbPool.query('DELETE FROM bp_gateway_join_waiting WHERE instance_id = $1', [instance.id])

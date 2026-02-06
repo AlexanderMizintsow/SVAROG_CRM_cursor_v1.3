@@ -41,6 +41,22 @@ function substituteMessage(text, context, registerClient) {
   if (context.last_task_id) {
     out = out.replace(/\{задача_id\}/gi, String(context.last_task_id))
   }
+
+  // Доп. информация: подстановка вида {доп:key}
+  // Пустые/не заданные значения трактуем как false.
+  const addInfo = context && typeof context === 'object' && context.additional_info && typeof context.additional_info === 'object'
+    ? context.additional_info
+    : {}
+  out = out.replace(/\{доп:([^}]+)\}/gi, (_, kRaw) => {
+    const k = String(kRaw || '').trim()
+    if (!k) return ''
+    const v = addInfo[k]
+    if (v === undefined || v === null) return 'false'
+    if (typeof v === 'string') return v.trim() ? v : 'false'
+    if (v === false) return 'false'
+    return String(v)
+  })
+
   return out
 }
 

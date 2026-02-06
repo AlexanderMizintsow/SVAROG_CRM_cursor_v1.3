@@ -21,6 +21,13 @@ const SOURCE_TYPE_LABEL = {
 /** Значение assignee_contains_user хранится как "assignee_contains_user|userId" */
 const ASSIGNEE_CONDITION_PREFIX = 'assignee_contains_user|'
 
+const ADD_INFO_CONDITIONS = [
+  { value: '', label: '— не использовать —' },
+  { value: 'ai_var_true', label: 'Доп.инфо: ключ заполнен (true)' },
+  { value: 'ai_var_false', label: 'Доп.инфо: ключ пустой/не задан (false)' },
+  { value: 'ai_var_equals', label: 'Доп.инфо: ключ равен значению' },
+]
+
 const GatewayJoinNodeProps = ({ node, onUpdate }) => {
   const settings = node.settings || {}
   const { scheme } = useBusinessProcessStore()
@@ -46,6 +53,19 @@ const GatewayJoinNodeProps = ({ node, onUpdate }) => {
   }, [incomingEdges, nodesList])
 
   const outgoingEdges = edgesList.filter((e) => e.source === node.id)
+
+  const additionalInfoKeys = useMemo(() => {
+    const keys = []
+    for (const n of nodesList) {
+      if (n.type !== 'additional_info') continue
+      const fields = Array.isArray(n.settings?.fields) ? n.settings.fields : []
+      for (const f of fields) {
+        const k = String(f?.key || '').trim()
+        if (k) keys.push(k)
+      }
+    }
+    return Array.from(new Set(keys)).sort((a, b) => a.localeCompare(b, 'ru'))
+  }, [nodesList])
 
   const usedOutgoingIndexMax = useMemo(() => {
     let max = 0
@@ -99,6 +119,19 @@ const GatewayJoinNodeProps = ({ node, onUpdate }) => {
   const setEdgeOperator = (edgeId, operator) => {
     const meta = getEdgeMeta(edgeId) || { edgeId, operator: 'and', combination: {} }
     setEdgeMeta(edgeId, { ...meta, operator })
+  }
+
+  const setEdgeAiCondition = (edgeId, aiCondition) => {
+    const meta = getEdgeMeta(edgeId) || { edgeId, operator: 'and', combination: {} }
+    const nextCond = aiCondition || ''
+    const nextConfig = nextCond ? { ...(meta.aiConfig || {}), key: (meta.aiConfig || {}).key || '', value: (meta.aiConfig || {}).value || '' } : {}
+    setEdgeMeta(edgeId, { ...meta, aiCondition: nextCond, aiConfig: nextConfig })
+  }
+
+  const setEdgeAiConfig = (edgeId, patch) => {
+    const meta = getEdgeMeta(edgeId) || { edgeId, operator: 'and', combination: {} }
+    const next = { ...(meta.aiConfig || {}), ...(patch || {}) }
+    setEdgeMeta(edgeId, { ...meta, aiConfig: next })
   }
 
   const getOptionsForSource = (sourceNode) => {
@@ -178,6 +211,8 @@ const GatewayJoinNodeProps = ({ node, onUpdate }) => {
             const targetLabel = targetNode?.label || edge.target
             const meta = getEdgeMeta(edge.id) || { edgeId: edge.id, operator: 'and', combination: {} }
             const combination = meta.combination || {}
+            const aiCondition = meta.aiCondition || ''
+            const aiConfig = meta.aiConfig || {}
             return (
               <div
                 key={edge.id}
@@ -197,6 +232,51 @@ const GatewayJoinNodeProps = ({ node, onUpdate }) => {
                     ))}
                   </select>
                 </div>
+
+                {additionalInfoKeys.length > 0 && (
+                  <div className="properties-panel__field" style={{ marginTop: '0.35rem' }}>
+                    <label className="properties-panel__label" style={{ fontSize: '0.8rem' }}>Доп. информация (доп. условие)</label>
+                    <select
+                      className="properties-panel__select"
+                      value={aiCondition}
+                      onChange={(e) => setEdgeAiCondition(edge.id, e.target.value)}
+                    >
+                      {ADD_INFO_CONDITIONS.map((opt) => (
+                        <option key={opt.value || 'none'} value={opt.value}>{opt.label}</option>
+                      ))}
+                    </select>
+
+                    {!!aiCondition && (
+                      <div style={{ marginTop: '0.25rem', display: 'flex', gap: '0.35rem', flexWrap: 'wrap' }}>
+                        <select
+                          className="properties-panel__select"
+                          value={aiConfig.key || ''}
+                          onChange={(e) => setEdgeAiConfig(edge.id, { key: e.target.value || '' })}
+                          style={{ flex: '1 1 220px', minWidth: 220 }}
+                        >
+                          <option value="">— Выберите ключ —</option>
+                          {additionalInfoKeys.map((k) => (
+                            <option key={k} value={k}>{k}</option>
+                          ))}
+                        </select>
+                        {aiCondition === 'ai_var_equals' && (
+                          <input
+                            type="text"
+                            className="properties-panel__input"
+                            value={aiConfig.value ?? ''}
+                            onChange={(e) => setEdgeAiConfig(edge.id, { value: e.target.value })}
+                            placeholder="значение"
+                            style={{ flex: '1 1 160px', minWidth: 160 }}
+                          />
+                        )}
+                      </div>
+                    )}
+                    <p className="properties-panel__hint">
+                      Это условие проверяется по <b>общим переменным процесса</b> (из блоков «Доп. информация»).
+                    </p>
+                  </div>
+                )}
+
                 {incomingSources.map((src) => {
                   const options = getOptionsForSource(src)
                   const value = combination[src.id] ?? JOIN_CONDITION_ANY

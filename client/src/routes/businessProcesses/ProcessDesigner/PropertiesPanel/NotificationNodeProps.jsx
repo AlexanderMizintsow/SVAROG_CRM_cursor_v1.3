@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import {
   getReferencesUsers,
   getReferencesDepartments,
@@ -20,6 +20,21 @@ const NotificationNodeProps = ({ node, onUpdate }) => {
   const taskSourceNodes = nodesList.filter(
     (n) => n.type === 'create_task' || n.type === 'assign_task'
   )
+
+  const additionalInfoKeys = useMemo(() => {
+    const keys = []
+    for (const n of nodesList) {
+      if (n.type !== 'additional_info') continue
+      const fields = Array.isArray(n.settings?.fields) ? n.settings.fields : []
+      for (const f of fields) {
+        const k = String(f?.key || '').trim()
+        if (k) keys.push(k)
+      }
+    }
+    return Array.from(new Set(keys)).sort((a, b) => a.localeCompare(b, 'ru'))
+  }, [nodesList])
+
+  const [selectedVarKey, setSelectedVarKey] = useState('')
 
   useEffect(() => {
     const load = async () => {
@@ -50,6 +65,40 @@ const NotificationNodeProps = ({ node, onUpdate }) => {
 
   return (
     <div className="properties-panel__fields">
+      {additionalInfoKeys.length > 0 && (
+        <div className="properties-panel__field">
+          <label className="properties-panel__label">Переменные (Доп. информация)</label>
+          <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
+            <select
+              className="properties-panel__select"
+              value={selectedVarKey}
+              onChange={(e) => setSelectedVarKey(e.target.value)}
+              style={{ flex: '1 1 220px', minWidth: 220 }}
+            >
+              <option value="">— Выберите ключ —</option>
+              {additionalInfoKeys.map((k) => (
+                <option key={k} value={k}>{k}</option>
+              ))}
+            </select>
+            <button
+              type="button"
+              className="properties-panel__btn-add"
+              onClick={() => {
+                if (!selectedVarKey) return
+                const token = `{доп:${selectedVarKey}}`
+                const prev = settings.messageText ?? ''
+                handleChange('messageText', prev ? `${prev}\n${token}` : token)
+              }}
+              disabled={!selectedVarKey}
+              title="Добавить подстановку в конец текста"
+            >
+              Вставить
+            </button>
+          </div>
+          <p className="properties-panel__hint">Подстановка будет заменена на значение ключа при выполнении процесса.</p>
+        </div>
+      )}
+
       <div className="properties-panel__field">
         <label className="properties-panel__label">Получатели</label>
         <select

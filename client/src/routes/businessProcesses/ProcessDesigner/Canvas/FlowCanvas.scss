@@ -9,6 +9,13 @@
   height: 100%;
 }
 
+/* ВАЖНО: контейнеры нод должны быть прозрачными (не трогаем стили линий) */
+.flow-canvas__react-flow {
+  .react-flow__node {
+    background: transparent !important;
+  }
+}
+
 .flow-canvas__controls {
   button {
     background: var(--bg-card, #fff) !important;

@@ -44,6 +44,8 @@ const ProcessDesigner = () => {
       const targetIds = new Set(edges.map((e) => e.target))
 
       for (const node of nodes) {
+        // Дорожки — чисто визуальные контейнеры, не участвуют в связности процесса
+        if (node.type === 'lane') continue
         if (node.type === 'start') continue
         if (!targetIds.has(node.id)) {
           const label = node.label || node.type || node.id
@@ -58,9 +60,17 @@ const ProcessDesigner = () => {
             return `Блок «Развилка-Слияние» («${label}»): подключите хотя бы один входящий блок «Создать задачу», «Назначить задачу» или «Принятие решения».`
           }
         }
+        if (node.type === 'splitter') {
+          const outgoingCount = edges.filter((e) => e.source === node.id).length
+          if (outgoingCount < 2) {
+            const label = node.label || node.type || node.id
+            return `Блок «Разделитель» («${label}»): подключите минимум две исходящие ветки.`
+          }
+        }
       }
 
       for (const node of nodes) {
+        if (node.type === 'lane') continue
         const s = node.settings || {}
         const label = node.label || node.type
 

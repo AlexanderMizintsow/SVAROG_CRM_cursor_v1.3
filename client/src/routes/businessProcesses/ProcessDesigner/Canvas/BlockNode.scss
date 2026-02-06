@@ -52,11 +52,11 @@
 }
 
 /* Разные цвета вход/выход */
-.block-node__handle[data-handlepos='left'] {
+.block-node__handle[data-handlepos='top'] {
   background: #3b82f6;
 }
 
-.block-node__handle[data-handlepos='right'],
+.block-node__handle[data-handlepos='bottom'],
 .block-node__handle--gateway {
   background: #10b981;
 }
@@ -69,14 +69,14 @@
 /* Развилка (gateway) как прямоугольник, но с множественными выходами */
 .block-node__gateway-sources {
   position: absolute;
-  right: -6px;
-  top: 50%;
-  transform: translateY(-50%);
+  left: 50%;
+  bottom: -6px;
+  transform: translateX(-50%);
   display: block;
   z-index: 2;
 }
 
 .block-node__handle--gateway {
   position: absolute;
-  right: 0;
+  top: 0;
 }

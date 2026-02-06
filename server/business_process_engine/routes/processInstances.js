@@ -7,6 +7,7 @@ const {
   deleteInstance,
   completeTaskCreation,
   respondDecision,
+  respondAdditionalInfo,
 } = require('../controllers/processInstancesController')
 const { startProcess } = require('../controllers/processInstancesController')
 
@@ -19,6 +20,7 @@ function processInstancesRoutes(dbPool) {
   router.delete('/:id', (req, res) => deleteInstance(dbPool, req, res))
   router.post('/:id/complete-task-creation', (req, res) => completeTaskCreation(dbPool, req, res))
   router.post('/:id/respond-decision', (req, res) => respondDecision(dbPool, req, res))
+  router.post('/:id/respond-additional-info', (req, res) => respondAdditionalInfo(dbPool, req, res))
   return router
 }
 

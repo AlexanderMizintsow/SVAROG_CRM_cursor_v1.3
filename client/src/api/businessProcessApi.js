@@ -90,3 +90,10 @@ export const getDecisionRequests = (userId) =>
 
 export const respondDecision = (instanceId, body) =>
   bpeClient.post(`/instances/${instanceId}/respond-decision`, body).then((res) => res.data)
+
+// Запросы на заполнение «Доп. информация»
+export const getAdditionalInfoRequests = (userId) =>
+  bpeClient.get('/notifications/additional-info', { params: { user_id: userId } }).then((res) => res.data)
+
+export const respondAdditionalInfo = (instanceId, body) =>
+  bpeClient.post(`/instances/${instanceId}/respond-additional-info`, body).then((res) => res.data)

@@ -1,4 +1,4 @@
-import { useCallback } from 'react'
+import { useCallback, useMemo, useState } from 'react'
 import { v4 as uuidv4 } from 'uuid'
 import {
   IoPlayCircle,
@@ -6,10 +6,13 @@ import {
   IoDocumentText,
   IoNotifications,
   IoGitBranch,
-  IoGitMergeOutline,
+  IoGitMergeOutline, 
   IoTime,
   IoCheckmarkDoneCircle,
+  IoLayersOutline,
+  IoInformationCircleOutline,
 } from 'react-icons/io5'
+import { LuSplit } from "react-icons/lu";
 import useBusinessProcessStore from '../../../../store/useBusinessProcessStore.js'
 import { BLOCK_TYPES, BLOCK_LABELS } from '../../constants/blockTypes.js'
 import './Palette.scss'
@@ -17,16 +20,34 @@ import './Palette.scss'
 const PALETTE_ITEMS = [
   { type: BLOCK_TYPES.START, icon: IoPlayCircle, color: '#22c55e' },
   { type: BLOCK_TYPES.END, icon: IoStopCircle, color: '#94a3b8' },
+  { type: BLOCK_TYPES.LANE, icon: IoLayersOutline, color: '#64748b' },
+  { type: BLOCK_TYPES.ADDITIONAL_INFO, icon: IoInformationCircleOutline, color: '#0f766e' },
   { type: BLOCK_TYPES.CREATE_TASK, icon: IoDocumentText, color: '#3b82f6' },
   { type: BLOCK_TYPES.NOTIFICATION, icon: IoNotifications, color: '#f59e0b' },
   { type: BLOCK_TYPES.DECISION, icon: IoCheckmarkDoneCircle, color: '#8b5cf6' },
   { type: BLOCK_TYPES.GATEWAY, icon: IoGitBranch, color: '#e11d48' },
   { type: BLOCK_TYPES.GATEWAY_JOIN, icon: IoGitMergeOutline, color: '#c026d3' },
+  { type: BLOCK_TYPES.SPLITTER, icon: LuSplit, color: '#dc2626' },
   { type: BLOCK_TYPES.TIMER, icon: IoTime, color: '#0ea5e9' },
 ]
 
 const Palette = () => {
   const { scheme, addNodeToScheme } = useBusinessProcessStore()
+  const [copiedKey, setCopiedKey] = useState('')
+
+  const additionalInfoKeys = useMemo(() => {
+    const nodes = Array.isArray(scheme?.nodes) ? scheme.nodes : []
+    const keys = []
+    for (const n of nodes) {
+      if (n.type !== BLOCK_TYPES.ADDITIONAL_INFO) continue
+      const fields = Array.isArray(n.settings?.fields) ? n.settings.fields : []
+      for (const f of fields) {
+        const k = String(f?.key || '').trim()
+        if (k) keys.push(k)
+      }
+    }
+    return Array.from(new Set(keys)).sort((a, b) => a.localeCompare(b, 'ru'))
+  }, [scheme?.nodes])
 
   const getNextPosition = useCallback(() => {
     const nodes = Array.isArray(scheme?.nodes) ? scheme.nodes : []
@@ -43,7 +64,9 @@ const Palette = () => {
         id: uuidv4(),
         type,
         position: pos,
-        label: BLOCK_LABELS[type] || type,
+        // Для дорожки по умолчанию держим пустую строку (покажем плейсхолдер визуально),
+        // чтобы при редактировании не было «скачка» на дефолтное имя.
+        label: type === BLOCK_TYPES.LANE ? '' : (BLOCK_LABELS[type] || type),
         settings: getDefaultSettings(type),
       }
       addNodeToScheme(node)
@@ -70,6 +93,43 @@ const Palette = () => {
           </li>
         ))}
       </ul>
+
+      <div className="palette__vars">
+        <h3 className="palette__title" style={{ marginTop: 16 }}>Переменные</h3>
+        <p className="palette__hint">
+          Ключи из блоков «Доп. информация». Клик — скопировать подстановку в буфер.
+        </p>
+        {additionalInfoKeys.length === 0 ? (
+          <p className="palette__hint">Добавьте блок «Доп. информация» и задайте ключи.</p>
+        ) : (
+          <ul className="palette__list">
+            {additionalInfoKeys.map((k) => {
+              const token = `{доп:${k}}`
+              return (
+                <li key={k} className="palette__item">
+                  <button
+                    type="button"
+                    className="palette__btn"
+                    onClick={async () => {
+                      try {
+                        await navigator.clipboard.writeText(token)
+                        setCopiedKey(k)
+                        setTimeout(() => setCopiedKey(''), 1200)
+                      } catch (e) {
+                        // fallback: ничего, пользователь может скопировать вручную
+                      }
+                    }}
+                    title="Скопировать"
+                  >
+                    <span className="palette__label" style={{ fontFamily: 'monospace' }}>{token}</span>
+                    {copiedKey === k && <span className="palette__hint" style={{ marginLeft: 8 }}>Скопировано</span>}
+                  </button>
+                </li>
+              )
+            })}
+          </ul>
+        )}
+      </div>
     </div>
   )
 }
@@ -80,6 +140,13 @@ function getDefaultSettings(type) {
       return { initiatorType: 'current_user', allowAllLaunchers: true, allowedLauncherUserIds: [] }
     case BLOCK_TYPES.END:
       return { outcome: 'SUCCESS', comment: '' }
+    case BLOCK_TYPES.LANE:
+      return { width: 420, height: 220 }
+    case BLOCK_TYPES.ADDITIONAL_INFO:
+      return {
+        // fields: [{ key, value, requiredAtRuntime, requiredFor: { source, userIds, departmentId, roleId }, promptText }]
+        fields: [],
+      }
     case BLOCK_TYPES.CREATE_TASK:
       return {
         createMode: 'prepared',
@@ -123,6 +190,8 @@ function getDefaultSettings(type) {
         outgoingCount: 3,
         edges: [],
       }
+    case BLOCK_TYPES.SPLITTER:
+      return { outgoingCount: 2 }
     case BLOCK_TYPES.TIMER:
       return {
         type: 'interval',

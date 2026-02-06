@@ -4,8 +4,10 @@ const createTaskHandler = require('./createTask')
 const assignTaskHandler = require('./assignTask')
 const notificationHandler = require('./notification')
 const decisionHandler = require('./decision')
+const additionalInfoHandler = require('./additionalInfo')
 const gatewayHandler = require('./gateway')
 const gatewayJoinHandler = require('./gatewayJoin')
+const splitterHandler = require('./splitter')
 const timerHandler = require('./timer')
 
 const handlers = {
@@ -15,8 +17,10 @@ const handlers = {
   assign_task: assignTaskHandler,
   notification: notificationHandler,
   decision: decisionHandler,
+  additional_info: additionalInfoHandler,
   gateway: gatewayHandler,
   gateway_join: gatewayJoinHandler,
+  splitter: splitterHandler,
   timer: timerHandler,
 }
 

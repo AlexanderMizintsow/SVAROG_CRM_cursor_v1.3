@@ -5,7 +5,7 @@
 import { GATEWAY_CONDITIONS, CONDITION_MODE, CONDITION_OPERATOR, TIME_CONSTRAINT_TYPES } from '../../constants/blockTypes'
 import './PropertiesPanel.scss'
 
-const renderConfigSelect = (condition, config, onConfigChange, users, roles, departments, positions, decisionButtons = []) => {
+const renderConfigSelect = (condition, config, onConfigChange, users, roles, departments, positions, decisionButtons = [], additionalInfoKeys = []) => {
   const commonProps = { style: { marginTop: '0.25rem' }, className: 'properties-panel__select' }
   if (condition === 'initiator_is_user') {
     return (
@@ -68,6 +68,47 @@ const renderConfigSelect = (condition, config, onConfigChange, users, roles, dep
       </select>
     )
   }
+  if (condition === 'ai_var_true' || condition === 'ai_var_false') {
+    const keys = Array.isArray(additionalInfoKeys) ? additionalInfoKeys : []
+    return (
+      <select
+        {...commonProps}
+        value={config.key || ''}
+        onChange={(e) => onConfigChange({ key: e.target.value || '' })}
+      >
+        <option value="">— Выберите ключ —</option>
+        {keys.map((k) => (
+          <option key={k} value={k}>{k}</option>
+        ))}
+      </select>
+    )
+  }
+  if (condition === 'ai_var_equals') {
+    const keys = Array.isArray(additionalInfoKeys) ? additionalInfoKeys : []
+    return (
+      <div style={{ marginTop: '0.25rem', display: 'flex', gap: '0.35rem', flexWrap: 'wrap' }}>
+        <select
+          className="properties-panel__select"
+          value={config.key || ''}
+          onChange={(e) => onConfigChange({ key: e.target.value || '' })}
+          style={{ flex: '1 1 180px', minWidth: 180 }}
+        >
+          <option value="">— Выберите ключ —</option>
+          {keys.map((k) => (
+            <option key={k} value={k}>{k}</option>
+          ))}
+        </select>
+        <input
+          type="text"
+          className="properties-panel__input"
+          value={config.value ?? ''}
+          onChange={(e) => onConfigChange({ value: e.target.value })}
+          placeholder="Значение (строка)"
+          style={{ flex: '1 1 160px', minWidth: 160 }}
+        />
+      </div>
+    )
+  }
   return null
 }
 
@@ -84,6 +125,7 @@ const GatewayEdgeConditionEditor = ({
   departments,
   positions,
   decisionButtons = [],
+  additionalInfoKeys = [],
 }) => {
   const edgeId = edge.id
   const conditionMode = meta?.conditionMode || 'single'
@@ -167,7 +209,17 @@ const GatewayEdgeConditionEditor = ({
               <option key={opt.value} value={opt.value}>{opt.label}</option>
             ))}
           </select>
-          {renderConfigSelect(condition, config, (patch) => updateEdgeConfig(edgeId, patch), users, roles, departments, positions, decisionButtons)}
+          {renderConfigSelect(
+            condition,
+            config,
+            (patch) => updateEdgeConfig(edgeId, patch),
+            users,
+            roles,
+            departments,
+            positions,
+            decisionButtons,
+            additionalInfoKeys
+          )}
         </>
       ) : (
         <div style={{ marginTop: '0.5rem' }}>
@@ -199,7 +251,17 @@ const GatewayEdgeConditionEditor = ({
                 </select>
                 <button type="button" className="properties-panel__btn-remove" onClick={() => removeConditionItem(idx)} title="Удалить условие">−</button>
               </div>
-              {renderConfigSelect(item.condition, item.config || {}, (patch) => handleConditionItemChange(idx, item.condition, { ...(item.config || {}), ...patch }), users, roles, departments, positions, decisionButtons)}
+              {renderConfigSelect(
+                item.condition,
+                item.config || {},
+                (patch) => handleConditionItemChange(idx, item.condition, { ...(item.config || {}), ...patch }),
+                users,
+                roles,
+                departments,
+                positions,
+                decisionButtons,
+                additionalInfoKeys
+              )}
             </div>
           ))}
           <button type="button" className="properties-panel__btn-add" onClick={addConditionItem} style={{ marginTop: '0.35rem' }}>+ Добавить условие</button>

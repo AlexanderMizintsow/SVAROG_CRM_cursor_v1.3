@@ -22,7 +22,14 @@ import useExtensionRequestsNotifications from './subcomponents/ExtensionRequests
 import './alertBanner.scss'
 import useNotificationsTask from './subcomponents/TaskNotifications'
 import ReactDOM from 'react-dom'
-import { getBpNotifications, markBpNotificationRead, getDecisionRequests, respondDecision } from '../../api/businessProcessApi'
+import {
+  getBpNotifications,
+  markBpNotificationRead,
+  getDecisionRequests,
+  respondDecision,
+  getAdditionalInfoRequests,
+  respondAdditionalInfo,
+} from '../../api/businessProcessApi'
 
 const AlertBanner = () => {
   // ==================== Инициализация состояний и хуков ====================
@@ -42,6 +49,7 @@ const AlertBanner = () => {
   const [currentTaskId, setCurrentTaskId] = useState(null)
   const [bpNotifications, setBpNotifications] = useState([])
   const [decisionRequests, setDecisionRequests] = useState([])
+  const [additionalInfoRequests, setAdditionalInfoRequests] = useState([])
   const notifications = []
 
   // Запросы на принятие решения (блок «Принятие решения»)
@@ -75,6 +83,32 @@ const AlertBanner = () => {
               </div>
             )}
           </div>
+        ),
+        icon: <FcFlowChart style={{ fontSize: '16px' }} />,
+      })
+    })
+  }
+
+  // Запросы на заполнение «Доп. информация»
+  if (currentUserId && Array.isArray(additionalInfoRequests) && additionalInfoRequests.length > 0) {
+    additionalInfoRequests.forEach((r) => {
+      const required = Array.isArray(r.required_keys) ? r.required_keys : []
+      notifications.push({
+        key: `addinfo-${r.id}`,
+        text: (
+          <AdditionalInfoRequestCard
+            request={r}
+            requiredKeys={required}
+            currentUserId={currentUserId}
+            onSubmit={async (values) => {
+              await respondAdditionalInfo(r.instance_id, {
+                node_id: r.node_id,
+                user_id: currentUserId,
+                values,
+              })
+              setAdditionalInfoRequests((prev) => (Array.isArray(prev) ? prev.filter((x) => x.id !== r.id) : []))
+            }}
+          />
         ),
         icon: <FcFlowChart style={{ fontSize: '16px' }} />,
       })
@@ -136,13 +170,15 @@ const AlertBanner = () => {
 
     const load = async () => {
       try {
-        const [notifList, decList] = await Promise.all([
+        const [notifList, decList, addInfoList] = await Promise.all([
           getBpNotifications(currentUserId),
           getDecisionRequests(currentUserId).catch(() => []),
+          getAdditionalInfoRequests(currentUserId).catch(() => []),
         ])
         if (cancelled) return
         setBpNotifications(Array.isArray(notifList) ? notifList : [])
         setDecisionRequests(Array.isArray(decList) ? decList : [])
+        setAdditionalInfoRequests(Array.isArray(addInfoList) ? addInfoList : [])
       } catch (e) {
         // не ломаем AlertBanner из-за проблем BPE
       }
@@ -155,6 +191,64 @@ const AlertBanner = () => {
       clearInterval(t)
     }
   }, [currentUserId])
+
+  // Карточка запроса «Доп. информация» (локальный компонент для AlertBanner)
+  function AdditionalInfoRequestCard({ request, requiredKeys, currentUserId, onSubmit }) {
+    const [values, setValues] = useState(() => {
+      const obj = {}
+      ;(requiredKeys || []).forEach((k) => { obj[k] = '' })
+      return obj
+    })
+    const [isSending, setIsSending] = useState(false)
+    const prompt = request?.prompt_text || 'Заполните доп. информацию'
+    const processName = request?.process_name || 'Процесс'
+    const initiatorName = request?.initiator_name || ''
+
+    return (
+      <div className="alert-banner__decision">
+        <div className="alert-banner__decision-header">
+          <b>БП: {processName}</b>
+          {initiatorName && <span className="alert-banner__decision-initiator">Инициатор: {initiatorName}</span>}
+        </div>
+        <div className="alert-banner__decision-message" style={{ whiteSpace: 'pre-wrap' }}>{prompt}</div>
+
+        <div className="alert-banner__decision-buttons" style={{ flexDirection: 'column', alignItems: 'stretch' }}>
+          {(requiredKeys || []).map((k) => (
+            <div key={k} style={{ display: 'flex', gap: 8, alignItems: 'center', marginTop: 6 }}>
+              <span style={{ fontFamily: 'monospace', minWidth: 120 }}>{k}</span>
+              <input
+                type="text"
+                value={values[k] ?? ''}
+                onChange={(e) => setValues((prev) => ({ ...(prev || {}), [k]: e.target.value }))}
+                style={{ flex: '1 1 auto' }}
+                placeholder="значение"
+              />
+            </div>
+          ))}
+
+          <button
+            type="button"
+            className="alert-banner__decision-btn"
+            disabled={isSending}
+            onClick={async (e) => {
+              e.stopPropagation()
+              setIsSending(true)
+              try {
+                await onSubmit(values || {})
+              } catch (err) {
+                console.error('respondAdditionalInfo:', err)
+              } finally {
+                setIsSending(false)
+              }
+            }}
+            style={{ marginTop: 10, alignSelf: 'flex-start' }}
+          >
+            Заполнить
+          </button>
+        </div>
+      </div>
+    )
+  }
 
   const handleDecisionButtonClick = async (instanceId, nodeId, buttonId, requestId) => {
     if (!currentUserId) return

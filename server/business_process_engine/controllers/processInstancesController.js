@@ -1,4 +1,4 @@
-const { runProcessFromStart, runProcessFromTaskCreation, runProcessFromDecision } = require('../engine/runner')
+const { runProcessFromStart, runProcessFromTaskCreation, runProcessFromDecision, runProcessFromAdditionalInfo } = require('../engine/runner')
 
 async function startProcess(dbPool, req, res) {
   try {
@@ -170,11 +170,60 @@ async function respondDecision(dbPool, req, res) {
   }
 }
 
+async function respondAdditionalInfo(dbPool, req, res) {
+  try {
+    const { id } = req.params
+    const instanceId = Number(id)
+    const { node_id: nodeId, values, user_id: userIdRaw } = req.body || {}
+    const userId = userIdRaw ?? req.headers['x-user-id']
+    if (!instanceId) return res.status(400).json({ error: 'Некорректный id' })
+    if (!nodeId) return res.status(400).json({ error: 'Не указан node_id' })
+    if (!userId) return res.status(400).json({ error: 'Не указан user_id (текущий пользователь)' })
+
+    const instResult = await dbPool.query(
+      'SELECT id FROM bp_process_instances WHERE id = $1 AND status = $2',
+      [instanceId, 'waiting_additional_info']
+    )
+    if (instResult.rows.length === 0) {
+      return res.status(404).json({ error: 'Экземпляр не найден или не ожидает доп. информации' })
+    }
+
+    // проверяем, что запрос существует для пользователя и ещё не закрыт
+    const r = await dbPool.query(
+      'SELECT id FROM bp_additional_info_requests WHERE instance_id = $1 AND node_id = $2 AND user_id = $3 AND responded_at IS NULL',
+      [instanceId, nodeId, userId]
+    )
+    if (r.rows.length === 0) {
+      return res.status(403).json({ error: 'Запрос на доп. информацию не найден или уже обработан' })
+    }
+
+    // закрываем все запросы по этому узлу/экземпляру (чтобы не висели у других пользователей)
+    try {
+      await dbPool.query(
+        'UPDATE bp_additional_info_requests SET responded_at = NOW(), responded_values = $1 WHERE instance_id = $2 AND node_id = $3 AND responded_at IS NULL',
+        [JSON.stringify(values || {}), instanceId, nodeId]
+      )
+    } catch (e) {
+      if (e?.code === '42P01') {
+        return res.status(500).json({ error: 'Таблица bp_additional_info_requests не создана' })
+      }
+      throw e
+    }
+
+    await runProcessFromAdditionalInfo(dbPool, instanceId, nodeId, values || {})
+    const updated = await dbPool.query('SELECT id, status, current_node_id FROM bp_process_instances WHERE id = $1', [instanceId])
+    res.json(updated.rows[0] || { success: true })
+  } catch (err) {
+    console.error('respondAdditionalInfo:', err)
+    res.status(500).json({ error: 'Ошибка при заполнении доп. информации' })
+  }
+}
+
 async function cancelInstance(dbPool, req, res) {
   try {
     const { id } = req.params
     const result = await dbPool.query(
-      `UPDATE bp_process_instances SET status = 'cancelled', finished_at = NOW() WHERE id = $1 AND status IN ('running', 'waiting_gateway', 'waiting_timer', 'waiting_user_input', 'waiting_decision', 'waiting_join') RETURNING id`,
+      `UPDATE bp_process_instances SET status = 'cancelled', finished_at = NOW() WHERE id = $1 AND status IN ('running', 'waiting_gateway', 'waiting_timer', 'waiting_user_input', 'waiting_decision', 'waiting_additional_info', 'waiting_join') RETURNING id`,
       [id]
     )
     if (result.rows.length === 0) {
@@ -183,6 +232,11 @@ async function cancelInstance(dbPool, req, res) {
     await dbPool.query('DELETE FROM bp_gateway_waiting WHERE instance_id = $1', [id])
     try {
       await dbPool.query('UPDATE bp_decision_requests SET responded_at = NOW() WHERE instance_id = $1 AND responded_at IS NULL', [id])
+    } catch (e) {
+      if (e?.code !== '42P01') throw e
+    }
+    try {
+      await dbPool.query('UPDATE bp_additional_info_requests SET responded_at = NOW() WHERE instance_id = $1 AND responded_at IS NULL', [id])
     } catch (e) {
       if (e?.code !== '42P01') throw e
     }
@@ -342,4 +396,5 @@ module.exports = {
   deleteInstance,
   completeTaskCreation,
   respondDecision,
+  respondAdditionalInfo,
 }

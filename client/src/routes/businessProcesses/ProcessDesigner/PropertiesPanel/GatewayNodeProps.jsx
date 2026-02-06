@@ -30,6 +30,19 @@ const GatewayNodeProps = ({ node, onUpdate }) => {
   const decisionButtons = predecessorNode?.type === 'decision' ? (predecessorNode.settings?.buttons || []) : []
   const predecessorType = predecessorNode?.type || null
 
+  const additionalInfoKeys = useMemo(() => {
+    const keys = []
+    for (const n of nodesList) {
+      if (n.type !== 'additional_info') continue
+      const fields = Array.isArray(n.settings?.fields) ? n.settings.fields : []
+      for (const f of fields) {
+        const k = String(f?.key || '').trim()
+        if (k) keys.push(k)
+      }
+    }
+    return Array.from(new Set(keys)).sort((a, b) => a.localeCompare(b, 'ru'))
+  }, [nodesList])
+
   useEffect(() => {
     const load = async () => {
       try {
@@ -225,6 +238,7 @@ const GatewayNodeProps = ({ node, onUpdate }) => {
                 departments={departments}
                 positions={positions}
                 decisionButtons={decisionButtons}
+                additionalInfoKeys={additionalInfoKeys}
               />
             )
           })}

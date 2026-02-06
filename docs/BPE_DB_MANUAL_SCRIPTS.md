@@ -159,12 +159,32 @@ CREATE INDEX idx_bp_decision_requests_responded_at ON bp_decision_requests(user_
 -- Добавить outcome 'waiting_decision', 'waiting_join' в bp_node_execution_log (если таблица уже создана)
 ALTER TABLE bp_node_execution_log DROP CONSTRAINT IF EXISTS bp_node_execution_log_outcome_check;
 ALTER TABLE bp_node_execution_log ADD CONSTRAINT bp_node_execution_log_outcome_check
-  CHECK (outcome IN ('success', 'condition_met', 'error', 'timer_scheduled', 'waiting_user_input', 'waiting_decision', 'waiting_join'));
+  CHECK (outcome IN ('success', 'condition_met', 'error', 'timer_scheduled', 'waiting_user_input', 'waiting_decision', 'waiting_additional_info', 'waiting_join'));
 
 -- Добавить статус waiting_decision, waiting_join в bp_process_instances (если таблица уже создана)
 ALTER TABLE bp_process_instances DROP CONSTRAINT IF EXISTS bp_process_instances_status_check;
 ALTER TABLE bp_process_instances ADD CONSTRAINT bp_process_instances_status_check
-  CHECK (status IN ('running', 'waiting_gateway', 'waiting_timer', 'waiting_user_input', 'waiting_decision', 'waiting_join', 'completed', 'failed', 'cancelled'));
+  CHECK (status IN ('running', 'waiting_gateway', 'waiting_timer', 'waiting_user_input', 'waiting_decision', 'waiting_additional_info', 'waiting_join', 'completed', 'failed', 'cancelled'));
+
+-- 11) Запросы на заполнение «Доп. информация»
+CREATE TABLE bp_additional_info_requests (
+  id SERIAL PRIMARY KEY,
+  instance_id INT NOT NULL REFERENCES bp_process_instances(id) ON DELETE CASCADE,
+  node_id VARCHAR(100) NOT NULL,
+  user_id INT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  process_name VARCHAR(255),
+  prompt_text TEXT NOT NULL,
+  required_keys JSONB NOT NULL DEFAULT '[]',
+  initiator_id INT REFERENCES users(id) ON DELETE SET NULL,
+  initiator_name VARCHAR(255),
+  responded_values JSONB,
+  responded_at TIMESTAMP,
+  created_at TIMESTAMP DEFAULT NOW()
+);
+
+CREATE INDEX idx_bp_additional_info_requests_user_id ON bp_additional_info_requests(user_id);
+CREATE INDEX idx_bp_additional_info_requests_instance_id ON bp_additional_info_requests(instance_id);
+CREATE INDEX idx_bp_additional_info_requests_responded_at ON bp_additional_info_requests(user_id, responded_at);
 
 -- Миграция: создать таблицу bp_gateway_join_waiting (если её ещё нет)
 -- Выполните при ошибке "отношение bp_gateway_join_waiting не существует"
@@ -176,3 +196,62 @@ CREATE TABLE IF NOT EXISTS bp_gateway_join_waiting (
 );
 CREATE INDEX IF NOT EXISTS idx_bp_gateway_join_waiting_instance_id ON bp_gateway_join_waiting(instance_id);
 ```
+
+ 
+ALTER TABLE bp_node_execution_log
+  DROP CONSTRAINT IF EXISTS bp_node_execution_log_outcome_check;
+
+ALTER TABLE bp_node_execution_log
+  ADD CONSTRAINT bp_node_execution_log_outcome_check
+  CHECK (outcome IN (
+    'success',
+    'condition_met',
+    'error',
+    'timer_scheduled',
+    'waiting_user_input',
+    'waiting_decision',
+    'waiting_additional_info',
+    'waiting_join'
+  ));
+ 
+ALTER TABLE bp_process_instances
+  DROP CONSTRAINT IF EXISTS bp_process_instances_status_check;
+
+ALTER TABLE bp_process_instances
+  ADD CONSTRAINT bp_process_instances_status_check
+  CHECK (status IN (
+    'running',
+    'waiting_gateway',
+    'waiting_timer',
+    'waiting_user_input',
+    'waiting_decision',
+    'waiting_additional_info',
+    'waiting_join',
+    'completed',
+    'failed',
+    'cancelled'
+  ));
+ 
+CREATE TABLE IF NOT EXISTS bp_additional_info_requests (
+  id SERIAL PRIMARY KEY,
+  instance_id INT NOT NULL REFERENCES bp_process_instances(id) ON DELETE CASCADE,
+  node_id VARCHAR(100) NOT NULL,
+  user_id INT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  process_name VARCHAR(255),
+  prompt_text TEXT NOT NULL,
+  required_keys JSONB NOT NULL DEFAULT '[]',
+  initiator_id INT REFERENCES users(id) ON DELETE SET NULL,
+  initiator_name VARCHAR(255),
+  responded_values JSONB,
+  responded_at TIMESTAMP,
+  created_at TIMESTAMP DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_bp_additional_info_requests_user_id
+  ON bp_additional_info_requests(user_id);
+
+CREATE INDEX IF NOT EXISTS idx_bp_additional_info_requests_instance_id
+  ON bp_additional_info_requests(instance_id);
+
+CREATE INDEX IF NOT EXISTS idx_bp_additional_info_requests_responded_at
+  ON bp_additional_info_requests(user_id, responded_at);

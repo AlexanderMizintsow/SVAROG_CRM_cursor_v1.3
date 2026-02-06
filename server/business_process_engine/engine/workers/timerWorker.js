@@ -50,9 +50,11 @@ function startTimerWorker(dbPool) {
 
         const nextNodeId = nextEdge.target
         await dbPool.query('DELETE FROM bp_timer_waiting WHERE instance_id = $1', [instanceId])
+        const context = typeof instance.context === 'object' ? instance.context : (instance.context ? JSON.parse(instance.context) : {})
+        const newContext = { ...context, active_tokens: [nextNodeId] }
         await dbPool.query(
-          'UPDATE bp_process_instances SET status = $1, current_node_id = $2 WHERE id = $3',
-          ['running', nextNodeId, instanceId]
+          'UPDATE bp_process_instances SET context = $1, status = $2, current_node_id = $3 WHERE id = $4',
+          [JSON.stringify(newContext), 'running', nextNodeId, instanceId]
         )
 
         runProcessFromStart(dbPool, instanceId).catch((err) => {

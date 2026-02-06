@@ -107,6 +107,22 @@ async function tryPersistGatewayDebug(dbPool, instanceId, context, nodeId, patch
   }
 }
 
+function getAdditionalInfoValue(context, key) {
+  const k = key != null ? String(key).trim() : ''
+  if (!k) return false
+  const map = context && typeof context === 'object' && context.additional_info && typeof context.additional_info === 'object'
+    ? context.additional_info
+    : {}
+  const v = map[k]
+  if (v === undefined || v === null) return false
+  if (typeof v === 'string') {
+    const s = v.trim()
+    return s ? s : false
+  }
+  if (v === false) return false
+  return v
+}
+
 async function handle(instance, node, scheme, integrations, dbPool) {
   const { registerClient: reg } = integrations
   const settings = node.settings || {}
@@ -303,6 +319,28 @@ async function handle(instance, node, scheme, integrations, dbPool) {
       const assignees = (task && task.assignees) || []
       const ids = assignees.map((a) => (typeof a === 'object' ? Number(a.id) : Number(a))).filter((x) => Number.isFinite(x))
       return ids.includes(userId)
+    }
+
+    // Доп. информация (контекст additional_info): пустое значение трактуем как false
+    if (cond === 'ai_var_true') {
+      const key = cfg && cfg.key != null ? String(cfg.key) : ''
+      const v = getAdditionalInfoValue(context, key)
+      return v !== false
+    }
+    if (cond === 'ai_var_false') {
+      const key = cfg && cfg.key != null ? String(cfg.key) : ''
+      const v = getAdditionalInfoValue(context, key)
+      return v === false
+    }
+    if (cond === 'ai_var_equals') {
+      const key = cfg && cfg.key != null ? String(cfg.key) : ''
+      const expectedRaw = cfg && cfg.value != null ? String(cfg.value) : ''
+      const expected = expectedRaw.trim()
+      const v = getAdditionalInfoValue(context, key)
+      if (expected === '') {
+        return v === false
+      }
+      return v !== false && String(v).trim() === expected
     }
 
     return false

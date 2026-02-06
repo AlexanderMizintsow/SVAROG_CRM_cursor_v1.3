@@ -4,11 +4,16 @@
 export const BLOCK_TYPES = {
   START: 'start',
   END: 'end',
+  // Визуальная группировка / «дорожка» (не участвует в логике процесса)
+  LANE: 'lane',
+  // Заглушка/контейнер доп. данных (ключ:значение), может останавливать процесс до заполнения
+  ADDITIONAL_INFO: 'additional_info',
   CREATE_TASK: 'create_task',
   ASSIGN_TASK: 'assign_task',
   NOTIFICATION: 'notification',
   GATEWAY: 'gateway',
   GATEWAY_JOIN: 'gateway_join',
+  SPLITTER: 'splitter',
   TIMER: 'timer',
   DECISION: 'decision',
 }
@@ -19,11 +24,14 @@ export const JOIN_CONDITION_ANY = 'any'
 export const BLOCK_LABELS = {
   [BLOCK_TYPES.START]: 'Старт',
   [BLOCK_TYPES.END]: 'Конец',
+  [BLOCK_TYPES.LANE]: 'Дорожка',
+  [BLOCK_TYPES.ADDITIONAL_INFO]: 'Доп. информация',
   [BLOCK_TYPES.CREATE_TASK]: 'Создать задачу',
   [BLOCK_TYPES.ASSIGN_TASK]: 'Назначить задачу',
   [BLOCK_TYPES.NOTIFICATION]: 'Уведомление',
   [BLOCK_TYPES.GATEWAY]: 'Развилка',
   [BLOCK_TYPES.GATEWAY_JOIN]: 'Развилка-Слияние',
+  [BLOCK_TYPES.SPLITTER]: 'Разделитель',
   [BLOCK_TYPES.TIMER]: 'Таймер',
   [BLOCK_TYPES.DECISION]: 'Принятие решения',
 }
@@ -118,6 +126,10 @@ export const GATEWAY_CONDITIONS = [
   { value: 'overdue_not_done', label: 'Просрочена и не выполнена' },
   // После блока «Принятие решения»
   { value: 'decision_button_clicked', label: 'Нажата кнопка ответа' },
+  // Доп. информация (ключи из блоков «Доп. информация»)
+  { value: 'ai_var_true', label: 'Доп.инфо: ключ заполнен (true)' },
+  { value: 'ai_var_false', label: 'Доп.инфо: ключ пустой/не задан (false)' },
+  { value: 'ai_var_equals', label: 'Доп.инфо: ключ равен значению' },
 ]
 
 export const INITIATOR_TYPES = [
