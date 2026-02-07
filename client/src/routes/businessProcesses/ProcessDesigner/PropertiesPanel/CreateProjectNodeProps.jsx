@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { getReferencesUsers } from '../../../../api/businessProcessApi'
+import { CREATE_PROJECT_MODES } from '../../constants/blockTypes'
 import './PropertiesPanel.scss'
 
 const emptyInfoRow = () => ({ key: '', value: '' })
@@ -45,12 +46,32 @@ const CreateProjectNodeProps = ({ node, onUpdate }) => {
 
   const priority = settings.priority || 'medium'
 
+  const createMode = settings.createMode ?? 'prepared'
+
   return (
     <div className="properties-panel__fields">
       <p className="properties-panel__hint">
         Этот блок создаёт <b>Проект</b> (global task) и сохраняет его ID в контексте процесса (как «последний проект»).
         Далее вы можете управлять проектом через блоки «Проект: …», а задачи создавать как <b>подзадачи проекта</b>.
       </p>
+
+      <div className="properties-panel__field">
+        <label className="properties-panel__label">Режим создания проекта</label>
+        <select
+          className="properties-panel__select"
+          value={createMode}
+          onChange={(e) => handleChange({ createMode: e.target.value })}
+        >
+          {CREATE_PROJECT_MODES.map((opt) => (
+            <option key={opt.value} value={opt.value}>{opt.label}</option>
+          ))}
+        </select>
+        <p className="properties-panel__hint">
+          {createMode === 'prepared'
+            ? 'Проект создаётся сразу при прохождении процесса по данным шаблона ниже.'
+            : 'При запуске процесса пользователю откроется окно создания проекта с подставленными данными шаблона.'}
+        </p>
+      </div>
 
       <div className="properties-panel__field">
         <label className="properties-panel__label">Название проекта</label>
@@ -184,7 +205,7 @@ const CreateProjectNodeProps = ({ node, onUpdate }) => {
           ))
         )}
         <button type="button" className="properties-panel__btn-add" onClick={addResponsible} style={{ marginTop: 8 }}>
-          + Добавить ответственного
+          + Добавить участника
         </button>
       </div>
     </div>

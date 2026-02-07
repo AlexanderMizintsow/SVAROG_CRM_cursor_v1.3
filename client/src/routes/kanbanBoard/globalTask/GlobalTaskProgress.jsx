@@ -14,12 +14,13 @@ import {
   FaPlay,
 } from 'react-icons/fa'
 import Toastify from 'toastify-js'
+import { getRemainingDays, formatDeadlineDateTime } from './utils/globalTaskUtils'
 import './styles/GlobalTaskProgress.scss'
 
 const GlobalTaskProgress = ({
   taskId,
   status,
-  dueDate,
+  deadline,
   completionPercentage,
   onRefresh,
 }) => {
@@ -71,38 +72,8 @@ const GlobalTaskProgress = ({
     }
   }
 
-  // Calculate remaining days (simplified)
-  const today = new Date()
-  let remainingDays = 'Дата не указана'
-  if (dueDate && typeof dueDate === 'string') {
-    try {
-      const [day, month, year] = dueDate.split('.')
-
-      if (day && month && year) {
-        const isoDateString = `${year}-${month}-${day}` // Формат YYYY-MM-DD
-        const due = new Date(isoDateString)
-
-        if (!isNaN(due.getTime())) {
-          const diffTime = due - today
-          const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24))
-
-          remainingDays =
-            diffDays > 0
-              ? `${diffDays} дней`
-              : diffDays === 0
-              ? 'Сегодня'
-              : 'Просрочено'
-        } else {
-          remainingDays = 'Некорректная дата'
-        }
-      } else {
-        remainingDays = 'Некорректный формат даты' // Если split не дал 3 части
-      }
-    } catch (error) {
-      console.error('Ошибка при парсинге даты dueDate:', error)
-      remainingDays = 'Ошибка даты' // В случае любой другой ошибки парсинга
-    }
-  }
+  // Оставшееся время до срока (с учётом даты и времени)
+  const remainingDays = deadline ? getRemainingDays(deadline) : 'Дата не указана'
   const updateTaskStatus = async (status) => {
     try {
       const response = await axios.put(
@@ -194,7 +165,9 @@ const GlobalTaskProgress = ({
       </div>
       <div className="global-task-progress__dates">
         <span>Начало</span>
-        <span>Завершение </span>
+        <span>
+          Завершение{deadline ? `: ${formatDeadlineDateTime(deadline)} (${remainingDays})` : ''}
+        </span>
       </div>
 
       <div className="global-task-progress__controller">

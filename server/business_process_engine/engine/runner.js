@@ -306,6 +306,45 @@ async function runProcessFromTaskCreation(dbPool, instanceId, taskId) {
   await runProcessFromStart(dbPool, instanceId)
 }
 
+async function runProcessFromProjectCreation(dbPool, instanceId, projectId) {
+  const instResult = await dbPool.query(
+    'SELECT * FROM bp_process_instances WHERE id = $1 AND status = $2',
+    [instanceId, 'waiting_user_input']
+  )
+  if (instResult.rows.length === 0) return
+
+  const instance = instResult.rows[0]
+  const context = typeof instance.context === 'object' ? instance.context : (instance.context ? JSON.parse(instance.context) : {})
+  const pending = context.pending_project_creation
+  if (!pending || !pending.nodeId) return
+
+  const nodeId = pending.nodeId
+  const projectOutputs = context.project_outputs && typeof context.project_outputs === 'object' ? context.project_outputs : {}
+  projectOutputs[nodeId] = { global_task_id: Number(projectId) || projectId }
+  const newContext = { ...context, last_global_task_id: Number(projectId) || projectId, project_outputs: projectOutputs }
+  delete newContext.pending_project_creation
+
+  const defResult = await dbPool.query(
+    'SELECT scheme FROM bp_process_definitions WHERE id = $1',
+    [instance.process_id]
+  )
+  if (defResult.rows.length === 0) return
+
+  const scheme = typeof defResult.rows[0].scheme === 'object'
+    ? defResult.rows[0].scheme
+    : JSON.parse(defResult.rows[0].scheme)
+  const edges = (scheme.edges || []).filter((e) => e.source === nodeId)
+  const nextEdge = edges[0]
+  if (!nextEdge) return
+
+  const ctxForResume = { ...newContext, active_tokens: [nextEdge.target] }
+  await dbPool.query(
+    'UPDATE bp_process_instances SET context = $1, status = $2, current_node_id = $3 WHERE id = $4',
+    [JSON.stringify(ctxForResume), 'running', nextEdge.target, instanceId]
+  )
+  await runProcessFromStart(dbPool, instanceId)
+}
+
 async function runProcessFromGateway(dbPool, taskId) {
   const links = await dbPool.query(
     'SELECT instance_id, node_id FROM bp_gateway_waiting WHERE task_id = $1',
@@ -569,6 +608,7 @@ module.exports = {
   runProcessFromGateway,
   runProcessFromGatewayJoin,
   runProcessFromTaskCreation,
+  runProcessFromProjectCreation,
   runProcessFromDecision,
   runProcessFromAdditionalInfo,
 }

@@ -6,6 +6,7 @@ const {
   cancelInstance,
   deleteInstance,
   completeTaskCreation,
+  completeProjectCreation,
   respondDecision,
   respondAdditionalInfo,
 } = require('../controllers/processInstancesController')
@@ -19,6 +20,7 @@ function processInstancesRoutes(dbPool) {
   router.post('/:id/cancel', (req, res) => cancelInstance(dbPool, req, res))
   router.delete('/:id', (req, res) => deleteInstance(dbPool, req, res))
   router.post('/:id/complete-task-creation', (req, res) => completeTaskCreation(dbPool, req, res))
+  router.post('/:id/complete-project-creation', (req, res) => completeProjectCreation(dbPool, req, res))
   router.post('/:id/respond-decision', (req, res) => respondDecision(dbPool, req, res))
   router.post('/:id/respond-additional-info', (req, res) => respondAdditionalInfo(dbPool, req, res))
   return router

@@ -1,7 +1,7 @@
 /**
  * Узел «Создать проект» (global_task):
- * - создаёт проект в register (global_tasks)
- * - сохраняет project_id в context (last_global_task_id и project_outputs[node.id])
+ * - prepared: создать проект сразу в register
+ * - modal_at_runtime: поставить экземпляр на waiting_user_input и отдать templateData на клиент
  */
 function getOutgoingEdges(scheme, nodeId) {
   const edges = scheme.edges || []
@@ -44,6 +44,29 @@ async function handle(instance, node, scheme, integrations, dbPool) {
   const settings = node.settings || {}
   const context = typeof instance.context === 'object' ? instance.context : (instance.context ? JSON.parse(instance.context) : {})
 
+  const createMode = settings.createMode || 'prepared'
+  const createdBy = context.initiator_id || instance.launched_by_user_id || null
+  if (!createdBy) return { fail: 'Создать проект: не определён created_by (initiator_id)' }
+
+  if (createMode === 'modal_at_runtime') {
+    const templateData = {
+      title: settings.title || 'Проект из бизнес‑процесса',
+      description: settings.description || '',
+      goals: Array.isArray(settings.goals) ? settings.goals : [],
+      deadline: settings.deadline || null,
+      priority: settings.priority || 'medium',
+      additionalInfo: Array.isArray(settings.additionalInfo) ? settings.additionalInfo : [],
+      responsibles: Array.isArray(settings.responsibles) ? settings.responsibles : [],
+    }
+    const pending = { nodeId: node.id, type: 'create_project', templateData }
+    const newContext = { ...context, pending_project_creation: pending }
+    await dbPool.query(
+      'UPDATE bp_process_instances SET context = $1, status = $2 WHERE id = $3',
+      [JSON.stringify(newContext), 'waiting_user_input', instance.id]
+    )
+    return { waitUserInput: true }
+  }
+
   const title = substituteText(settings.title || 'Проект из бизнес‑процесса', context)
   const description = substituteText(settings.description || '', context)
   const goals = Array.isArray(settings.goals) ? settings.goals.map((x) => substituteText(String(x || ''), context)).filter((x) => x.trim()) : []
@@ -51,9 +74,6 @@ async function handle(instance, node, scheme, integrations, dbPool) {
   const priority = settings.priority || 'medium'
   const additionalInfo = normalizeAdditionalInfo(settings.additionalInfo)
   const responsibles = Array.isArray(settings.responsibles) ? settings.responsibles : []
-
-  const createdBy = context.initiator_id || instance.launched_by_user_id || null
-  if (!createdBy) return { fail: 'Создать проект: не определён created_by (initiator_id)' }
 
   let created
   try {

@@ -14,6 +14,9 @@ const projectUpdateGoalsHandler = require('./projectUpdateGoals')
 const projectUpdateAdditionalInfoHandler = require('./projectUpdateAdditionalInfo')
 const projectAddAttachmentHandler = require('./projectAddAttachment')
 const projectUpdateTaskStatusHandler = require('./projectUpdateTaskStatus')
+const taskUpdateStatusHandler = require('./taskUpdateStatus')
+const taskAddCommentHandler = require('./taskAddComment')
+const taskAddAttachmentHandler = require('./taskAddAttachment')
 const gatewayHandler = require('./gateway')
 const gatewayJoinHandler = require('./gatewayJoin')
 const splitterHandler = require('./splitter')
@@ -36,6 +39,9 @@ const handlers = {
   project_update_additional_info: projectUpdateAdditionalInfoHandler,
   project_add_attachment: projectAddAttachmentHandler,
   project_update_task_status: projectUpdateTaskStatusHandler,
+  task_update_status: taskUpdateStatusHandler,
+  task_add_comment: taskAddCommentHandler,
+  task_add_attachment: taskAddAttachmentHandler,
   gateway: gatewayHandler,
   gateway_join: gatewayJoinHandler,
   splitter: splitterHandler,

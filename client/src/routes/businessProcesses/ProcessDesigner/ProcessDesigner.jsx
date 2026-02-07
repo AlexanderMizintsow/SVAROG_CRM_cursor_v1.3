@@ -53,11 +53,11 @@ const ProcessDesigner = () => {
         }
         if (node.type === 'gateway_join') {
           const incomingFrom = edges.filter((e) => e.target === node.id).map((e) => nodes.find((n) => n.id === e.source)?.type).filter(Boolean)
-          const allowed = ['create_task', 'assign_task', 'decision']
+          const allowed = ['create_task', 'assign_task', 'create_project', 'decision']
           const hasAllowed = incomingFrom.some((t) => allowed.includes(t))
           if (!hasAllowed) {
             const label = node.label || node.type || node.id
-            return `Блок «Развилка-Слияние» («${label}»): подключите хотя бы один входящий блок «Создать задачу», «Назначить задачу» или «Принятие решения».`
+            return `Блок «Развилка-Слияние» («${label}»): подключите хотя бы один входящий блок «Создать задачу», «Назначить задачу», «Создать проект» или «Принятие решения».`
           }
         }
         if (node.type === 'splitter') {

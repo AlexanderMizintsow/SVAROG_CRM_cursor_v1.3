@@ -1,9 +1,38 @@
 /**
  * Редактор условия для одной стрелки развилки.
  * Поддержка: одно условие, несколько (И/ИЛИ), ограничение по времени/дате.
+ * Условия группируются по источнику данных (Задача / Проект / Инициатор / Принятие решения / Доп.инфо).
  */
-import { GATEWAY_CONDITIONS, CONDITION_MODE, CONDITION_OPERATOR, TIME_CONSTRAINT_TYPES } from '../../constants/blockTypes'
+import {
+  GATEWAY_CONDITIONS,
+  GATEWAY_CONDITIONS_GROUPED,
+  GATEWAY_CONDITION_GROUPS_BY_SOURCE,
+  CONDITION_MODE,
+  CONDITION_OPERATOR,
+  TIME_CONSTRAINT_TYPES,
+} from '../../constants/blockTypes'
 import './PropertiesPanel.scss'
+
+const conditionByValue = (GATEWAY_CONDITIONS || []).reduce((acc, c) => {
+  acc[c.value] = c
+  return acc
+}, {})
+
+function getConditionOptionsGrouped(resolvedSourceType) {
+  const allowedKeys = GATEWAY_CONDITION_GROUPS_BY_SOURCE[resolvedSourceType] || ['initiator', 'task', 'ai']
+  const groups = (GATEWAY_CONDITIONS_GROUPED || []).filter((g) => allowedKeys.includes(g.groupKey))
+  const result = [{ value: 'else', label: '— Иначе (ветка по умолчанию)' }]
+  for (const g of groups) {
+    result.push({
+      groupLabel: g.groupLabel,
+      options: (g.conditions || [])
+        .map((val) => conditionByValue[val])
+        .filter(Boolean)
+        .map((c) => ({ value: c.value, label: c.label })),
+    })
+  }
+  return result
+}
 
 const renderConfigSelect = (condition, config, onConfigChange, users, roles, departments, positions, decisionButtons = [], additionalInfoKeys = []) => {
   const commonProps = { style: { marginTop: '0.25rem' }, className: 'properties-panel__select' }
@@ -109,6 +138,24 @@ const renderConfigSelect = (condition, config, onConfigChange, users, roles, dep
       </div>
     )
   }
+  if (condition === 'project_completion_above') {
+    const percent = config.percent != null ? Number(config.percent) : 90
+    return (
+      <div style={{ marginTop: '0.25rem', display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
+        <input
+          type="number"
+          className="properties-panel__input"
+          min={0}
+          max={100}
+          value={percent}
+          onChange={(e) => onConfigChange({ percent: e.target.value === '' ? null : Number(e.target.value) })}
+          placeholder="90"
+          style={{ width: 72 }}
+        />
+        <span className="properties-panel__hint">% (выполнено больше или равно)</span>
+      </div>
+    )
+  }
   return null
 }
 
@@ -126,7 +173,9 @@ const GatewayEdgeConditionEditor = ({
   positions,
   decisionButtons = [],
   additionalInfoKeys = [],
+  resolvedSourceType = 'task',
 }) => {
+  const conditionOptionsGrouped = getConditionOptionsGrouped(resolvedSourceType)
   const edgeId = edge.id
   const conditionMode = meta?.conditionMode || 'single'
   const condition = meta?.condition ?? ''
@@ -205,9 +254,17 @@ const GatewayEdgeConditionEditor = ({
             style={{ marginTop: '0.35rem' }}
           >
             <option value="">— Не задано —</option>
-            {GATEWAY_CONDITIONS.map((opt) => (
-              <option key={opt.value} value={opt.value}>{opt.label}</option>
-            ))}
+            {conditionOptionsGrouped.map((item, idx) =>
+              item.value === 'else' ? (
+                <option key="else" value="else">{item.label}</option>
+              ) : item.groupLabel ? (
+                <optgroup key={`g-${idx}`} label={item.groupLabel}>
+                  {item.options.map((opt) => (
+                    <option key={opt.value} value={opt.value}>{opt.label}</option>
+                  ))}
+                </optgroup>
+              ) : null
+            )}
           </select>
           {renderConfigSelect(
             condition,
@@ -245,9 +302,15 @@ const GatewayEdgeConditionEditor = ({
                   style={{ flex: '1 1 180px', minWidth: 0 }}
                 >
                   <option value="">— Не задано —</option>
-                  {GATEWAY_CONDITIONS.filter((o) => o.value !== 'else').map((opt) => (
-                    <option key={opt.value} value={opt.value}>{opt.label}</option>
-                  ))}
+                  {conditionOptionsGrouped.map((row, i) =>
+                    row.value === 'else' ? null : row.groupLabel ? (
+                      <optgroup key={`g-${i}`} label={row.groupLabel}>
+                        {row.options.map((opt) => (
+                          <option key={opt.value} value={opt.value}>{opt.label}</option>
+                        ))}
+                      </optgroup>
+                    ) : null
+                  )}
                 </select>
                 <button type="button" className="properties-panel__btn-remove" onClick={() => removeConditionItem(idx)} title="Удалить условие">−</button>
               </div>

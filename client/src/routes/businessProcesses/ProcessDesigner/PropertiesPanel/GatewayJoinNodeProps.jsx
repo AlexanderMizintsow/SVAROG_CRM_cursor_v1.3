@@ -8,6 +8,7 @@ import { getReferencesUsers } from '../../../../api/businessProcessApi'
 import {
   JOIN_CONDITION_ANY,
   GATEWAY_JOIN_TASK_CONDITIONS,
+  GATEWAY_JOIN_PROJECT_CONDITIONS,
   CONDITION_OPERATOR,
 } from '../../constants/blockTypes'
 import './PropertiesPanel.scss'
@@ -15,6 +16,7 @@ import './PropertiesPanel.scss'
 const SOURCE_TYPE_LABEL = {
   create_task: 'Создать задачу',
   assign_task: 'Назначить задачу',
+  create_project: 'Создать проект',
   decision: 'Принятие решения',
 }
 
@@ -45,9 +47,13 @@ const GatewayJoinNodeProps = ({ node, onUpdate }) => {
     const list = []
     for (const e of incomingEdges) {
       const src = nodesList.find((n) => n.id === e.source)
-      if (src && (src.type === 'create_task' || src.type === 'assign_task' || src.type === 'decision')) {
-        if (!list.some((x) => x.id === src.id)) list.push(src)
-      }
+      const allowed = src && (
+        src.type === 'create_task' ||
+        src.type === 'assign_task' ||
+        src.type === 'create_project' ||
+        src.type === 'decision'
+      )
+      if (allowed && !list.some((x) => x.id === src.id)) list.push(src)
     }
     return list
   }, [incomingEdges, nodesList])
@@ -142,6 +148,9 @@ const GatewayJoinNodeProps = ({ node, onUpdate }) => {
         ...buttons.map((b) => ({ value: b.id, label: b.label || b.id })),
       ]
     }
+    if (sourceNode.type === 'create_project') {
+      return GATEWAY_JOIN_PROJECT_CONDITIONS
+    }
     return GATEWAY_JOIN_TASK_CONDITIONS
   }
 
@@ -170,7 +179,7 @@ const GatewayJoinNodeProps = ({ node, onUpdate }) => {
         <label className="properties-panel__label">Входящие источники</label>
         {incomingSources.length === 0 ? (
           <p className="properties-panel__hint">
-            Подключите к блоку стрелки от блоков «Создать задачу», «Назначить задачу» или «Принятие решения».
+            Подключите к блоку стрелки от блоков «Создать задачу», «Назначить задачу», «Создать проект» или «Принятие решения».
           </p>
         ) : (
           <ul className="properties-panel__list-simple">

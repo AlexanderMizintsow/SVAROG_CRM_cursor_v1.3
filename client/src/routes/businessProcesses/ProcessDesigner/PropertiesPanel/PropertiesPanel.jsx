@@ -22,6 +22,9 @@ import ProjectUpdateGoalsNodeProps from './ProjectUpdateGoalsNodeProps'
 import ProjectUpdateAdditionalInfoNodeProps from './ProjectUpdateAdditionalInfoNodeProps'
 import ProjectAddAttachmentNodeProps from './ProjectAddAttachmentNodeProps'
 import ProjectUpdateTaskStatusNodeProps from './ProjectUpdateTaskStatusNodeProps'
+import TaskUpdateStatusNodeProps from './TaskUpdateStatusNodeProps'
+import TaskAddCommentNodeProps from './TaskAddCommentNodeProps'
+import TaskAddAttachmentNodeProps from './TaskAddAttachmentNodeProps'
 import './PropertiesPanel.scss'
 
 const NODE_PROPS_MAP = {
@@ -40,6 +43,9 @@ const NODE_PROPS_MAP = {
   [BLOCK_TYPES.PROJECT_UPDATE_TASK_STATUS]: ProjectUpdateTaskStatusNodeProps,
   [BLOCK_TYPES.CREATE_TASK]: CreateTaskNodeProps,
   [BLOCK_TYPES.ASSIGN_TASK]: AssignTaskNodeProps,
+  [BLOCK_TYPES.TASK_UPDATE_STATUS]: TaskUpdateStatusNodeProps,
+  [BLOCK_TYPES.TASK_ADD_COMMENT]: TaskAddCommentNodeProps,
+  [BLOCK_TYPES.TASK_ADD_ATTACHMENT]: TaskAddAttachmentNodeProps,
   [BLOCK_TYPES.NOTIFICATION]: NotificationNodeProps,
   [BLOCK_TYPES.DECISION]: DecisionNodeProps,
   [BLOCK_TYPES.GATEWAY]: GatewayNodeProps,

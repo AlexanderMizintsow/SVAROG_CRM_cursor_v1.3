@@ -7,6 +7,7 @@ import UserStore from '../../../store/userStore'
 import GlobalTaskPage from './GlobalTaskPage'
 import CreateGlobalTaskForm from './CreateGlobalTaskForm'
 import HelpModalGlobalTask from './subcomponents/HelpModalGlobalTask'
+import { formatDeadlineDateTime, getRemainingDays } from './utils/globalTaskUtils'
 import './styles/GlobalTasksContainer.scss'
 import axios from 'axios'
 
@@ -325,10 +326,12 @@ const GlobalTasksContainer = ({ onClose }) => {
                       ? task.responsibles[0].name || 'Не назначен'
                       : 'Не назначен'}
                   </span>
-                  {/* Убедитесь, что task.deadline существует и форматируйте его */}
                   <span>
                     Срок:{' '}
-                    {task.deadline ? new Date(task.deadline).toLocaleDateString() : 'Не указан'}
+                    {formatDeadlineDateTime(task.deadline) || 'Не указан'}
+                    {task.deadline && (
+                      <> · Осталось: {getRemainingDays(task.deadline)}</>
+                    )}
                   </span>
                 </div>
                 {/* Прогресс бар в списке */}

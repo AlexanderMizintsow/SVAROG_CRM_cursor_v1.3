@@ -20,6 +20,9 @@ export const BLOCK_TYPES = {
   PROJECT_UPDATE_TASK_STATUS: 'project_update_task_status',
   CREATE_TASK: 'create_task',
   ASSIGN_TASK: 'assign_task',
+  TASK_UPDATE_STATUS: 'task_update_status',
+  TASK_ADD_COMMENT: 'task_add_comment',
+  TASK_ADD_ATTACHMENT: 'task_add_attachment',
   NOTIFICATION: 'notification',
   GATEWAY: 'gateway',
   GATEWAY_JOIN: 'gateway_join',
@@ -47,6 +50,9 @@ export const BLOCK_LABELS = {
   [BLOCK_TYPES.PROJECT_UPDATE_TASK_STATUS]: 'Подзадача: статус',
   [BLOCK_TYPES.CREATE_TASK]: 'Создать задачу',
   [BLOCK_TYPES.ASSIGN_TASK]: 'Назначить задачу',
+  [BLOCK_TYPES.TASK_UPDATE_STATUS]: 'Задача: статус',
+  [BLOCK_TYPES.TASK_ADD_COMMENT]: 'Задача: комментарий',
+  [BLOCK_TYPES.TASK_ADD_ATTACHMENT]: 'Задача: вложение',
   [BLOCK_TYPES.NOTIFICATION]: 'Уведомление',
   [BLOCK_TYPES.GATEWAY]: 'Развилка',
   [BLOCK_TYPES.GATEWAY_JOIN]: 'Развилка-Слияние',
@@ -102,6 +108,35 @@ export const GATEWAY_JOIN_TASK_CONDITIONS = [
   { value: 'assignee_contains_user', label: 'Исполнители: содержит пользователя' },
 ]
 
+/** Условия по проекту для блока «Развилка-Слияние» (входящий источник — Создать проект / подблоки проекта) */
+export const GATEWAY_JOIN_PROJECT_CONDITIONS = [
+  { value: JOIN_CONDITION_ANY, label: 'Неважно' },
+  { value: 'project_status_new', label: 'Проект: статус «Новая»' },
+  { value: 'project_status_in_progress', label: 'Проект: статус «В работе»' },
+  { value: 'project_status_pause', label: 'Проект: статус «Пауза»' },
+  { value: 'project_status_completed', label: 'Проект: статус «Завершено»' },
+  { value: 'project_status_failed', label: 'Проект: статус «Провал»' },
+  { value: 'project_overdue', label: 'Проект: просрочен' },
+  { value: 'project_in_time', label: 'Проект: в срок' },
+  { value: 'project_no_deadline', label: 'Проект: без дедлайна' },
+  { value: 'project_deadline_today', label: 'Проект: дедлайн сегодня' },
+  { value: 'project_deadline_tomorrow', label: 'Проект: дедлайн завтра' },
+  { value: 'project_priority_high', label: 'Проект: приоритет высокий' },
+  { value: 'project_priority_medium', label: 'Проект: приоритет средний' },
+  { value: 'project_priority_low', label: 'Проект: приоритет низкий' },
+  { value: 'project_completion_100', label: 'Проект: прогресс 100%' },
+  { value: 'project_completion_not_100', label: 'Проект: прогресс не 100%' },
+  { value: 'project_completion_above_50', label: 'Проект: прогресс > 50%' },
+  { value: 'project_completion_above_75', label: 'Проект: прогресс > 75%' },
+  { value: 'project_completion_above_90', label: 'Проект: прогресс > 90%' },
+]
+
+/** Режим создания проекта (аналог CREATE_TASK_MODES) */
+export const CREATE_PROJECT_MODES = [
+  { value: 'prepared', label: 'Создать проект сразу по шаблону (все поля подставляются при запуске процесса)' },
+  { value: 'modal_at_runtime', label: 'При запуске открыть окно создания проекта с подстановкой шаблона' },
+]
+
 /**
  * Условия развилки: статус задачи, дедлайн, приоритет, одобрение.
  * Сервер сопоставляет по value (см. gateway.js matchCondition).
@@ -149,7 +184,60 @@ export const GATEWAY_CONDITIONS = [
   { value: 'ai_var_true', label: 'Доп.инфо: ключ заполнен (true)' },
   { value: 'ai_var_false', label: 'Доп.инфо: ключ пустой/не задан (false)' },
   { value: 'ai_var_equals', label: 'Доп.инфо: ключ равен значению' },
+  // Проект (блок «Создать проект» и подблоки)
+  { value: 'project_status_new', label: 'Проект: статус «Новая»' },
+  { value: 'project_status_in_progress', label: 'Проект: статус «В работе»' },
+  { value: 'project_status_pause', label: 'Проект: статус «Пауза»' },
+  { value: 'project_status_completed', label: 'Проект: статус «Завершено»' },
+  { value: 'project_status_failed', label: 'Проект: статус «Провал»' },
+  { value: 'project_overdue', label: 'Проект: просрочен (дедлайн истёк)' },
+  { value: 'project_in_time', label: 'Проект: в срок (дедлайн не истёк)' },
+  { value: 'project_no_deadline', label: 'Проект: без дедлайна' },
+  { value: 'project_deadline_today', label: 'Проект: дедлайн сегодня' },
+  { value: 'project_deadline_tomorrow', label: 'Проект: дедлайн завтра' },
+  { value: 'project_priority_high', label: 'Проект: приоритет высокий' },
+  { value: 'project_priority_medium', label: 'Проект: приоритет средний' },
+  { value: 'project_priority_low', label: 'Проект: приоритет низкий' },
+  { value: 'project_completion_100', label: 'Проект: прогресс 100% (выполнен)' },
+  { value: 'project_completion_not_100', label: 'Проект: прогресс не 100%' },
+  { value: 'project_completion_above', label: 'Проект: процент выполнения больше (%)' },
 ]
+
+/** Группы условий развилки по источнику данных (для отображения: какой источник к какому блоку относится) */
+export const GATEWAY_CONDITIONS_GROUPED = [
+  { groupKey: 'initiator', groupLabel: 'Инициатор процесса', conditions: ['initiator_is_user', 'initiator_has_role', 'initiator_in_department', 'initiator_has_position'] },
+  {
+    groupKey: 'task',
+    groupLabel: 'Задача (блоки «Создать задачу», «Назначить задачу»)',
+    conditions: [
+      'status_backlog', 'status_wait', 'status_doing', 'status_todo', 'status_done', 'status_pause', 'status_cancelled',
+      'task_completed', 'task_not_completed', 'returned_for_rework', 'rejected_by_customer', 'approval_pending',
+      'assignee_contains_user', 'task_overdue', 'task_in_time', 'task_no_deadline', 'deadline_today', 'deadline_tomorrow',
+      'priority_high', 'priority_medium', 'priority_low',
+      'done_and_approved', 'done_not_approved', 'overdue_and_doing', 'overdue_not_done',
+    ],
+  },
+  {
+    groupKey: 'project',
+    groupLabel: 'Проект (блок «Создать проект» и подблоки)',
+    conditions: [
+      'project_status_new', 'project_status_in_progress', 'project_status_pause', 'project_status_completed', 'project_status_failed',
+      'project_overdue', 'project_in_time', 'project_no_deadline', 'project_deadline_today', 'project_deadline_tomorrow',
+      'project_priority_high', 'project_priority_medium', 'project_priority_low',
+      'project_completion_100', 'project_completion_not_100', 'project_completion_above',
+    ],
+  },
+  { groupKey: 'decision', groupLabel: 'Принятие решения', conditions: ['decision_button_clicked'] },
+  { groupKey: 'ai', groupLabel: 'Доп. информация', conditions: ['ai_var_true', 'ai_var_false', 'ai_var_equals'] },
+]
+
+/** Какие группы условий показывать при выбранном источнике данных */
+export const GATEWAY_CONDITION_GROUPS_BY_SOURCE = {
+  initiator: ['initiator'],
+  task: ['initiator', 'task', 'ai'],
+  project: ['initiator', 'project', 'ai'],
+  decision: ['initiator', 'decision'],
+}
 
 export const INITIATOR_TYPES = [
   { value: 'current_user', label: 'Текущий пользователь' },

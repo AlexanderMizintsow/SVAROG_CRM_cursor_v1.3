@@ -21,6 +21,7 @@ import {
   getResponsibleColorClass,
   getResponsibleTextColorClass,
   getRemainingDays,
+  formatDeadlineDateTime,
 } from './utils/globalTaskUtils'
 import ResponsibleSelector from './subcomponents/ResponsibleSelector'
 import GoalsEditor from './subcomponents/GoalsEditor'
@@ -382,9 +383,7 @@ const GlobalTaskCard = ({
             <MdCalendarMonth className="global-task-card__footer-icon" />
             <span>
               Срок:{' '}
-              {deadline
-                ? new Date(deadline).toLocaleDateString('ru-RU')
-                : 'Дата не указана'}
+              {formatDeadlineDateTime(deadline) || 'Дата не указана'}
             </span>
           </div>
           {deadline && (

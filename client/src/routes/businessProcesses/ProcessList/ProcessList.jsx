@@ -7,12 +7,16 @@ import {
   startProcess,
   getInstance,
   completeTaskCreation,
+  completeProjectCreation,
   deleteProcess,
   updateProcess,
 } from '../../../api/businessProcessApi.js'
 import ProcessCard from './ProcessCard'
 import StartProcessModal from './StartProcessModal'
 import AddModal from '../../kanbanBoard/Modals/AddModal.jsx'
+import CreateGlobalTaskForm from '../../kanbanBoard/globalTask/CreateGlobalTaskForm.jsx'
+import axios from 'axios'
+import { API_BASE_URL } from '../../../../config.js'
 import './ProcessList.scss'
 
 const POLL_INTERVAL_MS = 2000
@@ -26,6 +30,8 @@ const ProcessList = ({ showDrafts = false, onEditProcess, onCreateNew }) => {
   const [activeInstanceId, setActiveInstanceId] = useState(null)
   const [addModalOpen, setAddModalOpen] = useState(false)
   const [pendingTaskCreationData, setPendingTaskCreationData] = useState(null)
+  const [projectCreationModalOpen, setProjectCreationModalOpen] = useState(false)
+  const [pendingProjectCreationData, setPendingProjectCreationData] = useState(null)
   const skipReopenForInstanceIdRef = useRef(null)
 
   const loadProcesses = useCallback(async () => {
@@ -134,13 +140,14 @@ const ProcessList = ({ showDrafts = false, onEditProcess, onCreateNew }) => {
   }
 
   useEffect(() => {
-    if (!activeInstanceId || addModalOpen) return
+    if (!activeInstanceId || addModalOpen || projectCreationModalOpen) return
     const t = setInterval(async () => {
       try {
         const instance = await getInstance(activeInstanceId)
         const status = instance.status
         const context = typeof instance.context === 'object' ? instance.context : (instance.context ? JSON.parse(instance.context) : {})
-        const pending = context.pending_task_creation
+        const pendingTask = context.pending_task_creation
+        const pendingProject = context.pending_project_creation
 
         if (FINAL_STATUSES.includes(status)) {
           setActiveInstanceId(null)
@@ -151,16 +158,21 @@ const ProcessList = ({ showDrafts = false, onEditProcess, onCreateNew }) => {
           skipReopenForInstanceIdRef.current = null
           return
         }
-        if (!pending || !pending.templateData) return
+        if (pendingProject && pendingProject.templateData && skipReopenForInstanceIdRef.current !== activeInstanceId) {
+          setPendingProjectCreationData({ instanceId: activeInstanceId, templateData: pendingProject.templateData })
+          setProjectCreationModalOpen(true)
+          return
+        }
+        if (!pendingTask || !pendingTask.templateData) return
         if (skipReopenForInstanceIdRef.current === activeInstanceId) return
-        setPendingTaskCreationData({ instanceId: activeInstanceId, templateData: pending.templateData })
+        setPendingTaskCreationData({ instanceId: activeInstanceId, templateData: pendingTask.templateData })
         setAddModalOpen(true)
       } catch (e) {
         console.warn('ProcessList poll instance:', e)
       }
     }, POLL_INTERVAL_MS)
     return () => clearInterval(t)
-  }, [activeInstanceId, addModalOpen])
+  }, [activeInstanceId, addModalOpen, projectCreationModalOpen])
 
   const handleAddModalClose = (taskId) => {
     if (taskId != null && pendingTaskCreationData) {
@@ -196,6 +208,73 @@ const ProcessList = ({ showDrafts = false, onEditProcess, onCreateNew }) => {
         viewers: pendingTaskCreationData.templateData.viewerUserIds || [],
       }
     : undefined
+
+  const initialProjectDataFromTemplate = pendingProjectCreationData?.templateData
+    ? {
+        title: pendingProjectCreationData.templateData.title || '',
+        description: pendingProjectCreationData.templateData.description || '',
+        goals: Array.isArray(pendingProjectCreationData.templateData.goals) && pendingProjectCreationData.templateData.goals.length
+          ? pendingProjectCreationData.templateData.goals
+          : [''],
+        deadline: pendingProjectCreationData.templateData.deadline
+          ? new Date(pendingProjectCreationData.templateData.deadline)
+          : null,
+        priority: pendingProjectCreationData.templateData.priority || 'medium',
+        additionalInfo: Array.isArray(pendingProjectCreationData.templateData.additionalInfo)
+          ? (pendingProjectCreationData.templateData.additionalInfo.reduce((acc, it) => {
+              const k = String(it?.key || '').trim()
+              if (k) acc[k] = it?.value ?? ''
+              return acc
+            }, {}))
+          : {},
+        responsibles: Array.isArray(pendingProjectCreationData.templateData.responsibles)
+          ? pendingProjectCreationData.templateData.responsibles
+          : [],
+      }
+    : undefined
+
+  const handleProjectCreationModalSave = async (newTaskData) => {
+    if (!pendingProjectCreationData) return
+    try {
+      const dataToSend = {
+        ...newTaskData,
+        created_by: user?.id,
+        deadline: newTaskData.deadline ? newTaskData.deadline.toISOString() : null,
+      }
+      const response = await axios.post(
+        `${API_BASE_URL}5000/api/create/global-tasks`,
+        dataToSend,
+        { headers: { 'Content-Type': 'application/json' } }
+      )
+      const projectId = response.data?.taskId
+      if (projectId != null) {
+        await completeProjectCreation(pendingProjectCreationData.instanceId, { project_id: projectId })
+        Toastify({
+          text: 'Проект создан, процесс продолжен',
+          close: true,
+          backgroundColor: 'linear-gradient(to right, #059669, #10b981)',
+        }).showToast()
+      }
+    } catch (err) {
+      console.error('Ошибка создания проекта:', err)
+      Toastify({
+        text: err.response?.data?.error || 'Ошибка при создании проекта',
+        close: true,
+        backgroundColor: 'linear-gradient(to right, #b91c1c, #dc2626)',
+      }).showToast()
+      return
+    }
+    setProjectCreationModalOpen(false)
+    setPendingProjectCreationData(null)
+  }
+
+  const handleProjectCreationModalClose = () => {
+    if (pendingProjectCreationData) {
+      skipReopenForInstanceIdRef.current = pendingProjectCreationData.instanceId
+    }
+    setProjectCreationModalOpen(false)
+    setPendingProjectCreationData(null)
+  }
 
   if (loading) {
     return (
@@ -260,6 +339,14 @@ const ProcessList = ({ showDrafts = false, onEditProcess, onCreateNew }) => {
           userId={user?.id}
           initialTaskData={initialTaskDataFromTemplate}
           businessProcessInstanceId={pendingTaskCreationData.instanceId}
+        />
+      )}
+
+      {projectCreationModalOpen && pendingProjectCreationData && (
+        <CreateGlobalTaskForm
+          initialData={initialProjectDataFromTemplate}
+          onSave={handleProjectCreationModalSave}
+          onCancel={handleProjectCreationModalClose}
         />
       )}
     </div>

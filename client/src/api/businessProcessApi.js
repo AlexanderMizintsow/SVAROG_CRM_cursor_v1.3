@@ -48,6 +48,9 @@ export const deleteInstance = (id) =>
 export const completeTaskCreation = (instanceId, body) =>
   bpeClient.post(`/instances/${instanceId}/complete-task-creation`, body).then((res) => res.data)
 
+export const completeProjectCreation = (instanceId, body) =>
+  bpeClient.post(`/instances/${instanceId}/complete-project-creation`, body).then((res) => res.data)
+
 // Шаблоны задач
 export const getTaskTemplates = () =>
   bpeClient.get('/task-templates').then((res) => res.data)

@@ -99,7 +99,7 @@ const GlobalTaskPage = ({
           taskId={currentTask.id}
           status={currentTask.status}
           completionPercentage={currentTask.completion_percentage}
-          dueDate={currentTask.dueDate}
+          deadline={currentTask.deadline}
           onRefresh={onRefresh}
         />
         <GlobalTaskCard

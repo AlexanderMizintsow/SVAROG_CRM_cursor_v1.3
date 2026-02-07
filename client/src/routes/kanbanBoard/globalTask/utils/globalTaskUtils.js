@@ -64,42 +64,59 @@ export const getResponsibleTextColorClass = (color) => {
   }
 }
 
+/**
+ * Форматирует срок (дата + время) для отображения в ru-RU.
+ * Если время 00:00:00 — выводит только дату, иначе дату и время.
+ */
+export const formatDeadlineDateTime = (deadline) => {
+  if (!deadline) return null
+  try {
+    const d = new Date(deadline)
+    if (isNaN(d.getTime())) return null
+    const hasTime = d.getHours() !== 0 || d.getMinutes() !== 0 || d.getSeconds() !== 0
+    if (hasTime) {
+      return d.toLocaleString('ru-RU', {
+        day: '2-digit',
+        month: '2-digit',
+        year: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit',
+      })
+    }
+    return d.toLocaleDateString('ru-RU')
+  } catch (e) {
+    return null
+  }
+}
+
 export const getRemainingDays = (deadline) => {
   if (!deadline) return 'Дата не указана'
 
-  const today = new Date()
-  today.setHours(0, 0, 0, 0)
+  const now = new Date()
 
   try {
-    const dateParts = deadline.split('T')
-    const datePart = dateParts[0]
-
-    const dateComponents = datePart.split('-')
-    const [year, month, day] = dateComponents
-
-    if (!day || !month || !year) {
-      console.error('Некорректный формат даты:', deadline)
-      return 'Некорректный формат даты'
-    }
-
-    const isoDateString = `${year}-${month}-${day}`
-    const dueDate = new Date(isoDateString)
-
+    const dueDate = new Date(deadline)
     if (isNaN(dueDate.getTime())) {
-      return 'Некорректная дата (объект Date)'
+      return 'Некорректная дата'
     }
 
-    dueDate.setHours(0, 0, 0, 0)
-    const diffTime = dueDate - today
-    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24))
+    const diffMs = dueDate - now
+    const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24))
+    const hasTime = dueDate.getHours() !== 0 || dueDate.getMinutes() !== 0 || dueDate.getSeconds() !== 0
+    const timeStr = hasTime
+      ? dueDate.toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' })
+      : ''
 
-    if (diffDays > 0) {
-      return `${diffDays} дней`
-    } else if (diffDays === 0) {
-      return 'Сегодня'
-    } else {
+    if (diffMs < 0) {
       return 'Просрочено'
     }
+    if (diffDays === 0) {
+      return hasTime ? `Сегодня в ${timeStr}` : 'Сегодня'
+    }
+    if (diffDays === 1) {
+      return hasTime ? `Завтра в ${timeStr}` : 'Завтра'
+    }
+    return hasTime ? `${diffDays} дн. (${timeStr})` : `${diffDays} дн.`
   } catch (error) {
     console.error('Ошибка при парсинге даты:', error)
     return 'Ошибка парсинга даты'

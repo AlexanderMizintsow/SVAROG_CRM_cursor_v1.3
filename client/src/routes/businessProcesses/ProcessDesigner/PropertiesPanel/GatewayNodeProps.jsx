@@ -22,6 +22,7 @@ const GatewayNodeProps = ({ node, onUpdate }) => {
   const taskSourceNodes = nodesList.filter(
     (n) => n.type === 'create_task' || n.type === 'assign_task'
   )
+  const projectSourceNodes = nodesList.filter((n) => n.type === 'create_project')
 
   const outgoingEdges = edgesList.filter((e) => e.source === node.id)
   const incomingEdges = edgesList.filter((e) => e.target === node.id)
@@ -127,7 +128,13 @@ const GatewayNodeProps = ({ node, onUpdate }) => {
     onUpdate({ settings: { ...settings, edges: nextList } })
   }
 
-  const sourceTypeDefault = predecessorType === 'start' ? 'initiator' : (predecessorType === 'decision' ? 'decision' : 'task')
+  const sourceTypeDefault = predecessorType === 'start'
+    ? 'initiator'
+    : predecessorType === 'decision'
+      ? 'decision'
+      : predecessorType === 'create_project' || (predecessorType && predecessorType.startsWith('project_'))
+        ? 'project'
+        : 'task'
   const sourceType = settings.sourceType || 'auto'
   const resolvedSourceType = sourceType === 'auto' ? sourceTypeDefault : sourceType
   const waitMode = settings.waitMode || 'event'
@@ -164,11 +171,12 @@ const GatewayNodeProps = ({ node, onUpdate }) => {
         >
           <option value="auto">Авто (наследовать от предыдущего блока)</option>
           <option value="initiator">Инициатор процесса</option>
-          <option value="task">Задача (по данным блока «Создать задачу»)</option>
+          <option value="task">Задача (блоки «Создать задачу», «Назначить задачу»)</option>
+          <option value="project">Проект (блок «Создать проект» и подблоки)</option>
           <option value="decision">Ответ из блока «Принятие решения»</option>
         </select>
         <p className="properties-panel__hint">
-          Сейчас предыдущий блок: <b>{predecessorNode?.label || predecessorType || 'не определён'}</b>. Будет использован источник: <b>{resolvedSourceType}</b>.
+          Предыдущий блок: <b>{predecessorNode?.label || predecessorType || 'не определён'}</b>. Источник: <b>{resolvedSourceType === 'project' ? 'Проект' : resolvedSourceType === 'task' ? 'Задача' : resolvedSourceType === 'decision' ? 'Принятие решения' : 'Инициатор'}</b>.
         </p>
       </div>
 
@@ -178,38 +186,54 @@ const GatewayNodeProps = ({ node, onUpdate }) => {
           className="properties-panel__select"
           value={waitMode}
           onChange={(e) => handleChange('waitMode', e.target.value)}
-          disabled={resolvedSourceType !== 'task'}
-          style={{ opacity: resolvedSourceType === 'task' ? 1 : 0.7 }}
+          disabled={resolvedSourceType !== 'task' && resolvedSourceType !== 'project'}
+          style={{ opacity: (resolvedSourceType === 'task' || resolvedSourceType === 'project') ? 1 : 0.7 }}
         >
-          <option value="event">Ожидать события по задаче (рекомендуется)</option>
+          <option value="event">Ожидать события (по задаче/проекту, рекомендуется)</option>
           <option value="default">Использовать «Иначе» / продолжить по схеме</option>
         </select>
-        {resolvedSourceType !== 'task' && (
+        {resolvedSourceType !== 'task' && resolvedSourceType !== 'project' && (
           <p className="properties-panel__hint">
             {resolvedSourceType === 'decision'
               ? 'При источнике «Принятие решения» ветка выбирается сразу по нажатой кнопке.'
-              : 'Режим ожидания доступен только для условий по задаче.'}
+              : 'Режим ожидания доступен для условий по задаче или проекту.'}
           </p>
         )}
       </div>
 
       <div className="properties-panel__field">
-        <label className="properties-panel__label">Задача для проверки условия</label>
-        <select
-          className="properties-panel__select"
-          value={settings.taskSourceNodeId ?? ''}
-          onChange={(e) => handleChange('taskSourceNodeId', e.target.value || null)}
-          disabled={resolvedSourceType !== 'task'}
-          style={{ opacity: resolvedSourceType === 'task' ? 1 : 0.7 }}
-        >
-          <option value="">— Последняя созданная в процессе —</option>
-          {taskSourceNodes.map((n) => (
-            <option key={n.id} value={n.id}>{n.label || n.type}</option>
-          ))}
-        </select>
-        {resolvedSourceType !== 'task' && (
+        <label className="properties-panel__label">Блок-источник для проверки условия</label>
+        {resolvedSourceType === 'task' && (
+          <select
+            className="properties-panel__select"
+            value={settings.taskSourceNodeId ?? ''}
+            onChange={(e) => handleChange('taskSourceNodeId', e.target.value || null)}
+          >
+            <option value="">— Последняя созданная в процессе —</option>
+            <optgroup label="Задача (Создать задачу / Назначить задачу)">
+              {taskSourceNodes.map((n) => (
+                <option key={n.id} value={n.id}>{n.label || n.type}</option>
+              ))}
+            </optgroup>
+          </select>
+        )}
+        {resolvedSourceType === 'project' && (
+          <select
+            className="properties-panel__select"
+            value={settings.projectSourceNodeId ?? ''}
+            onChange={(e) => handleChange('projectSourceNodeId', e.target.value || null)}
+          >
+            <option value="">— Последний созданный в процессе —</option>
+            <optgroup label="Создать проект">
+              {projectSourceNodes.map((n) => (
+                <option key={n.id} value={n.id}>{n.label || n.type}</option>
+              ))}
+            </optgroup>
+          </select>
+        )}
+        {(resolvedSourceType === 'initiator' || resolvedSourceType === 'decision') && (
           <p className="properties-panel__hint">
-            Отключено, т.к. выбран источник «{resolvedSourceType === 'initiator' ? 'Инициатор' : 'Принятие решения'}».
+            Источник «{resolvedSourceType === 'initiator' ? 'Инициатор' : 'Принятие решения'}» — выбор блока не требуется.
           </p>
         )}
       </div>
@@ -239,6 +263,7 @@ const GatewayNodeProps = ({ node, onUpdate }) => {
                 positions={positions}
                 decisionButtons={decisionButtons}
                 additionalInfoKeys={additionalInfoKeys}
+                resolvedSourceType={resolvedSourceType}
               />
             )
           })}

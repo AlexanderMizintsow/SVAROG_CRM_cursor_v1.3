@@ -87,14 +87,20 @@ function matchAdditionalInfoCondition(aiCondition, aiConfig, context) {
   return true
 }
 
-/** Входящие источники — только create_task, assign_task, decision */
+/** Входящие источники — create_task, assign_task, decision, create_project */
 function getIncomingSourceNodes(scheme, nodeId) {
   const incoming = getIncomingEdges(scheme, nodeId)
   const seen = new Set()
   const list = []
   for (const e of incoming) {
     const src = getNodeById(scheme, e.source)
-    if (src && (src.type === 'create_task' || src.type === 'assign_task' || src.type === 'decision') && !seen.has(src.id)) {
+    const allowed = src && (
+      src.type === 'create_task' ||
+      src.type === 'assign_task' ||
+      src.type === 'decision' ||
+      src.type === 'create_project'
+    ) && !seen.has(src.id)
+    if (allowed) {
       seen.add(src.id)
       list.push(src)
     }
@@ -102,10 +108,11 @@ function getIncomingSourceNodes(scheme, nodeId) {
   return list
 }
 
-/** Текущее состояние по входящим: { [sourceNodeId]: { type, status?, buttonId?, task? } } */
+/** Текущее состояние по входящим: { [sourceNodeId]: { type, status?, buttonId?, task?, project? } } */
 async function buildCurrentState(instance, scheme, nodeId, reg, joinSignals) {
   const context = typeof instance.context === 'object' ? instance.context : (instance.context ? JSON.parse(instance.context) : {})
   const blockOutputs = context.block_outputs || {}
+  const projectOutputs = context.project_outputs && typeof context.project_outputs === 'object' ? context.project_outputs : {}
   const decisionOutputs = context.decision_outputs || {}
   const lastDecision = context.last_decision || {}
   const sources = getIncomingSourceNodes(scheme, nodeId)
@@ -142,6 +149,33 @@ async function buildCurrentState(instance, scheme, nodeId, reg, joinSignals) {
           priority,
           hasDeadline,
           assigneeIds,
+        }
+      } catch (e) {
+        // skip
+      }
+    } else if (src.type === 'create_project') {
+      const projectId = projectOutputs[src.id]?.global_task_id ?? projectOutputs[src.id]?.project_id ?? context.last_global_task_id
+      if (!projectId) continue
+      try {
+        const project = await reg.getGlobalTaskById(projectId)
+        const projStatusRaw = (project && project.status) ? String(project.status).trim() : ''
+        const now = new Date()
+        const deadline = project && project.deadline ? new Date(project.deadline) : null
+        const isOverdue = deadline ? now > deadline : false
+        const priority = (project && project.priority) ? String(project.priority).toLowerCase() : ''
+        const hasDeadline = !!(project && project.deadline)
+        const completion = project && project.completion_percentage != null ? Number(project.completion_percentage) : 0
+
+        state[src.id] = {
+          type: 'project',
+          projectStatusRaw: projStatusRaw,
+          project,
+          deadline,
+          now,
+          isOverdue,
+          hasDeadline,
+          priority,
+          completion,
         }
       } catch (e) {
         // skip
@@ -206,6 +240,42 @@ function matchOneCondition(requiredValue, current) {
     return false
   }
 
+  if (current.type === 'project') {
+    const projStatusRaw = current.projectStatusRaw || ''
+    const projStatus = projStatusRaw.toLowerCase()
+    const isOverdue = current.isOverdue || false
+    const hasDeadline = current.hasDeadline || false
+    const priority = current.priority || ''
+    const completion = current.completion != null ? Number(current.completion) : 0
+    const task = current.project
+    const now = current.now || new Date()
+
+    if (r.startsWith('project_status_')) {
+      const want = r.replace('project_status_', '')
+      if (want === 'new' && (projStatus === 'новая' || projStatusRaw === 'Новая')) return true
+      if (want === 'in_progress' && (projStatus === 'в работе' || projStatusRaw === 'В работе')) return true
+      if (want === 'pause' && (projStatus === 'пауза' || projStatusRaw === 'Пауза')) return true
+      if (want === 'completed' && (projStatus === 'завершено' || projStatusRaw === 'Завершено')) return true
+      if (want === 'failed' && (projStatus === 'провал' || projStatusRaw === 'Провал')) return true
+      return false
+    }
+    if (r === 'project_overdue' && isOverdue) return true
+    if (r === 'project_in_time' && hasDeadline && !isOverdue) return true
+    if (r === 'project_no_deadline' && !hasDeadline) return true
+    if (r === 'project_deadline_today' && hasDeadline && task && task.deadline && isSameDay(task.deadline, now)) return true
+    if (r === 'project_deadline_tomorrow' && hasDeadline && task && task.deadline && isTomorrow(task.deadline, now)) return true
+    if (r === 'project_priority_high' && (priority === 'высокий' || priority === 'high')) return true
+    if (r === 'project_priority_medium' && (priority === 'средний' || priority === 'medium' || priority === 'нормальный' || priority === 'normal')) return true
+    if (r === 'project_priority_low' && (priority === 'низкий' || priority === 'low')) return true
+    if (r === 'project_completion_100' && completion >= 100) return true
+    if (r === 'project_completion_not_100' && completion < 100) return true
+    if (r.startsWith('project_completion_above_')) {
+      const pct = Number(r.replace('project_completion_above_', ''))
+      return Number.isFinite(pct) && completion >= pct
+    }
+    return false
+  }
+
   if (current.type === 'decision') {
     return current.buttonId === r
   }
@@ -230,7 +300,7 @@ async function handle(instance, node, scheme, integrations, dbPool) {
 
   const sources = getIncomingSourceNodes(scheme, node.id)
   if (sources.length === 0) {
-    return { fail: 'К блоку «Развилка-Слияние» не подключены входящие блоки (Создать задачу, Назначить задачу, Принятие решения)' }
+    return { fail: 'К блоку «Развилка-Слияние» не подключены входящие блоки (Создать задачу, Назначить задачу, Создать проект, Принятие решения)' }
   }
 
   const currentState = await buildCurrentState(instance, scheme, node.id, reg, joinSignals)

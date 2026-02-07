@@ -1,4 +1,4 @@
-const { runProcessFromStart, runProcessFromTaskCreation, runProcessFromDecision, runProcessFromAdditionalInfo } = require('../engine/runner')
+const { runProcessFromStart, runProcessFromTaskCreation, runProcessFromProjectCreation, runProcessFromDecision, runProcessFromAdditionalInfo } = require('../engine/runner')
 
 async function startProcess(dbPool, req, res) {
   try {
@@ -129,6 +129,29 @@ async function completeTaskCreation(dbPool, req, res) {
   } catch (err) {
     console.error('completeTaskCreation:', err)
     res.status(500).json({ error: 'Ошибка при завершении создания задачи' })
+  }
+}
+
+async function completeProjectCreation(dbPool, req, res) {
+  try {
+    const { id } = req.params
+    const projectId = req.body.project_id != null ? req.body.project_id : req.body.task_id
+    if (projectId == null) {
+      return res.status(400).json({ error: 'Не указан project_id' })
+    }
+    const result = await dbPool.query(
+      'SELECT id FROM bp_process_instances WHERE id = $1 AND status = $2',
+      [id, 'waiting_user_input']
+    )
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: 'Экземпляр не найден или не ожидает создания проекта' })
+    }
+    await runProcessFromProjectCreation(dbPool, Number(id), projectId)
+    const updated = await dbPool.query('SELECT id, status, current_node_id FROM bp_process_instances WHERE id = $1', [id])
+    res.json(updated.rows[0] || { success: true })
+  } catch (err) {
+    console.error('completeProjectCreation:', err)
+    res.status(500).json({ error: 'Ошибка при завершении создания проекта' })
   }
 }
 
@@ -395,6 +418,7 @@ module.exports = {
   cancelInstance,
   deleteInstance,
   completeTaskCreation,
+  completeProjectCreation,
   respondDecision,
   respondAdditionalInfo,
 }

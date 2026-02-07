@@ -17,6 +17,11 @@ async function updateTaskStatus(taskId, status) {
   return response.data
 }
 
+async function addTaskComment(taskId, userId, comment) {
+  const response = await client.post(`/api/tasks/${taskId}/comments`, { user_id: userId, comment })
+  return response.data
+}
+
 async function replaceTaskAssignee(taskId, oldUserId, newUserId) {
   const response = await client.put(`/api/tasks/${taskId}/replace-assignee`, {
     task_id: taskId,
@@ -115,6 +120,7 @@ async function getRoles() {
 module.exports = {
   createTask,
   updateTaskStatus,
+  addTaskComment,
   replaceTaskAssignee,
   addTaskAttachment,
   createGlobalTask,

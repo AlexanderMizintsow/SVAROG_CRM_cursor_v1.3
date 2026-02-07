@@ -221,8 +221,41 @@ async function handle(instance, node, scheme, integrations, dbPool) {
     })
   }
 
+  let projectId = null
+  let project = null
+  let projectStatusRaw = ''
+  let projectDeadline = null
+  let projectOverdue = false
+  let projectPriority = ''
+  let projectCompletion = 0
+  const projectOutputs = context.project_outputs && typeof context.project_outputs === 'object' ? context.project_outputs : {}
+  if (sourceType === 'project') {
+    const sourceNodeId = settings.projectSourceNodeId || null
+    if (sourceNodeId) {
+      const out = projectOutputs[sourceNodeId]
+      if (!out || (out.global_task_id == null && out.project_id == null)) {
+        return { fail: 'Не указан проект для развилки или проект ещё не создан (проверьте "Блок-источник для проверки условия")' }
+      }
+      projectId = out.global_task_id != null ? out.global_task_id : out.project_id
+    } else if (context.last_global_task_id != null) {
+      projectId = context.last_global_task_id
+    } else {
+      return { fail: 'Не указан проект для развилки или проект ещё не создан (нет last_global_task_id)' }
+    }
+    try {
+      project = await reg.getGlobalTaskById(projectId)
+    } catch (e) {
+      console.warn('gateway getGlobalTaskById', projectId, e.message)
+    }
+    projectStatusRaw = (project && project.status) ? String(project.status).trim() : ''
+    projectDeadline = project && project.deadline ? new Date(project.deadline) : null
+    const nowProj = new Date()
+    projectOverdue = projectDeadline ? nowProj > projectDeadline : false
+    projectPriority = (project && project.priority) ? String(project.priority).toLowerCase() : ''
+    projectCompletion = project && project.completion_percentage != null ? Number(project.completion_percentage) : 0
+  }
+
   // Событийный режим: развилка должна "стоять" и реагировать на события (task-updated),
-  // иначе схема будет сразу пробегать и/или зацикливаться на петлях.
   const waitMode = settings.waitMode || 'event' // event | default
   const isWebhookResume = instance && instance.__bpe_resume_reason === 'task_updated'
   if (sourceType === 'task' && waitMode === 'event' && taskId) {
@@ -239,6 +272,7 @@ async function handle(instance, node, scheme, integrations, dbPool) {
   const isCompleted = task && task.is_completed === true
   const priority = (task && task.priority) ? String(task.priority).toLowerCase() : ''
   const hasDeadline = !!(task && task.deadline)
+  const projectHasDeadline = !!(project && project.deadline)
 
   const matchCondition = async (cond, cfg) => {
     if (!cond || cond === 'else') return false
@@ -319,6 +353,28 @@ async function handle(instance, node, scheme, integrations, dbPool) {
       const assignees = (task && task.assignees) || []
       const ids = assignees.map((a) => (typeof a === 'object' ? Number(a.id) : Number(a))).filter((x) => Number.isFinite(x))
       return ids.includes(userId)
+    }
+
+    // Проект (блок «Создать проект» и подблоки): статус, дедлайн, приоритет, прогресс
+    const projStatus = (projectStatusRaw || '').toLowerCase()
+    if (cond === 'project_status_new' && (projStatus === 'новая' || projectStatusRaw === 'Новая')) return true
+    if (cond === 'project_status_in_progress' && (projStatus === 'в работе' || projectStatusRaw === 'В работе')) return true
+    if (cond === 'project_status_pause' && (projStatus === 'пауза' || projectStatusRaw === 'Пауза')) return true
+    if (cond === 'project_status_completed' && (projStatus === 'завершено' || projectStatusRaw === 'Завершено')) return true
+    if (cond === 'project_status_failed' && (projStatus === 'провал' || projectStatusRaw === 'Провал')) return true
+    if (cond === 'project_overdue' && projectOverdue) return true
+    if (cond === 'project_in_time' && projectHasDeadline && !projectOverdue) return true
+    if (cond === 'project_no_deadline' && !projectHasDeadline) return true
+    if (cond === 'project_deadline_today' && projectHasDeadline && project && project.deadline && isSameDay(project.deadline, now)) return true
+    if (cond === 'project_deadline_tomorrow' && projectHasDeadline && project && project.deadline && isTomorrow(project.deadline, now)) return true
+    if (cond === 'project_priority_high' && (projectPriority === 'высокий' || projectPriority === 'high')) return true
+    if (cond === 'project_priority_medium' && (projectPriority === 'средний' || projectPriority === 'medium' || projectPriority === 'нормальный' || projectPriority === 'normal')) return true
+    if (cond === 'project_priority_low' && (projectPriority === 'низкий' || projectPriority === 'low')) return true
+    if (cond === 'project_completion_100' && projectCompletion >= 100) return true
+    if (cond === 'project_completion_not_100' && projectCompletion < 100) return true
+    if (cond === 'project_completion_above') {
+      const threshold = cfg && cfg.percent != null ? Number(cfg.percent) : 90
+      return Number.isFinite(threshold) && projectCompletion >= threshold
     }
 
     // Доп. информация (контекст additional_info): пустое значение трактуем как false

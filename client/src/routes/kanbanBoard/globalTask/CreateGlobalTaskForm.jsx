@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import axios from 'axios'
 import { API_BASE_URL } from '../../../../config'
 import DatePicker from 'react-datepicker'
+import { ru } from 'date-fns/locale'
 import { FaPlus, FaTrashAlt, FaUserPlus } from 'react-icons/fa'
 import {
   responsibleRolesList,
@@ -12,7 +13,7 @@ import {
 import 'react-datepicker/dist/react-datepicker.css'
 import './styles/CreateGlobalTaskForm.scss'
 
-const CreateGlobalTaskForm = ({ onSave, onCancel }) => {
+const CreateGlobalTaskForm = ({ onSave, onCancel, initialData }) => {
   const [users, setUsers] = useState([])
   const [responsibleRoles, setResponsibleRoles] = useState(responsibleRolesList)
   const [formData, setFormData] = useState({
@@ -30,6 +31,7 @@ const CreateGlobalTaskForm = ({ onSave, onCancel }) => {
   ])
 
   const [loadingUsers, setLoadingUsers] = useState(true)
+  const [initialDataApplied, setInitialDataApplied] = useState(false)
 
   useEffect(() => {
     const fetchUsers = async () => {
@@ -44,6 +46,48 @@ const CreateGlobalTaskForm = ({ onSave, onCancel }) => {
     }
     fetchUsers()
   }, [])
+
+  useEffect(() => {
+    if (!initialData || initialDataApplied || !Object.keys(initialData).length) return
+    const d = initialData
+    const goals = Array.isArray(d.goals) && d.goals.length ? d.goals : ['']
+    const additionalInfo = d.additionalInfo && typeof d.additionalInfo === 'object' && !Array.isArray(d.additionalInfo)
+      ? d.additionalInfo
+      : {}
+    const entries = Object.entries(additionalInfo)
+    const fields = entries.length
+      ? entries.map(([k, v]) => ({ key: k, value: String(v ?? '') }))
+      : [{ key: '', value: '' }]
+    setFormData({
+      title: d.title || '',
+      description: d.description || '',
+      goals,
+      deadline: d.deadline ? (d.deadline instanceof Date ? d.deadline : new Date(d.deadline)) : null,
+      priority: d.priority || 'medium',
+      additionalInfo,
+      responsibles: Array.isArray(d.responsibles) ? d.responsibles : [],
+    })
+    setAdditionalInfoFields(fields)
+    setInitialDataApplied(true)
+  }, [initialData, initialDataApplied])
+
+  useEffect(() => {
+    if (loadingUsers || !users.length || !initialDataApplied || !formData.responsibles.length) return
+    const needEnrich = formData.responsibles.some((r) => r.id != null && (r.first_name == null || r.last_name == null))
+    if (!needEnrich) return
+    const enriched = formData.responsibles.map((r) => {
+      const u = users.find((us) => us.id === r.id)
+      if (!u) return r
+      return {
+        ...u,
+        role: r.role || responsibleRolesList[0],
+        initials: generateInitials(u.first_name, u.last_name),
+        avatarColorClass: generateRandomAvatarColorClass(),
+        backgroundColorClass: generateRandomBackgroundColorClass(),
+      }
+    })
+    setFormData((prev) => ({ ...prev, responsibles: enriched }))
+  }, [loadingUsers, users, initialDataApplied, formData.responsibles.length])
 
   const handleChange = (e) => {
     const { name, value } = e.target
@@ -232,16 +276,20 @@ const CreateGlobalTaskForm = ({ onSave, onCancel }) => {
               htmlFor="deadline"
               className="create-global-task-form__label"
             >
-              Срок выполнения
+              Срок выполнения (дата и время)
             </label>
             <DatePicker
               id="deadline"
               selected={formData.deadline}
               onChange={handleDateChange}
-              dateFormat="dd.MM.yyyy"
+              showTimeSelect
+              timeFormat="HH:mm"
+              timeIntervals={15}
+              dateFormat="dd.MM.yyyy HH:mm"
               className="create-global-task-form__input"
-              placeholderText="Выберите дату"
+              placeholderText="Выберите дату и время"
               isClearable
+              locale={ru}
             />
           </div>
 
