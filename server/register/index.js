@@ -67,6 +67,7 @@ const {
   getAttachmentsByTaskId,
   addCommentToGlobalTask,
   addResponsiblesToGlobalTask,
+  setProjectApproval,
   updateGoals,
   updateAdditionalInfo,
   getChatMessages,
@@ -485,9 +486,9 @@ app.get('/api/messages-notification-dealer', getMessagesNotificationDealer(dbPoo
 app.post('/api/messages-notification-dealer', postMessagesNotificationDealer(dbPool))
 // Проекты   **************************************************
 app.get('/api/global-tasks/:globalTaskId/title', getGlobalTaskTitle(dbPool))
-app.post('/api/create/global-tasks', createGlobalTask(dbPool))
+app.post('/api/create/global-tasks', createGlobalTask(dbPool, io))
 app.get('/api/global-tasks-all', getGlobalTasks(dbPool))
-app.put('/api/update/global-tasks/:taskId', updateGlobalTask(dbPool))
+app.put('/api/update/global-tasks/:taskId', updateGlobalTask(dbPool, io))
 app.get('/api/tasks/subtasks/:globalTaskId', getSubtasksForGlobalTask(dbPool))
 app.delete('/api/global-tasks/delete/:taskId', deleteGlobalTask(dbPool))
 app.get('/api/global-tasks/:taskId', getGlobalTaskById(dbPool))
@@ -495,6 +496,7 @@ app.put('/api/update/global-tasks/:taskId/status', updateGlobalTaskProcess(dbPoo
 app.get('/api/tasks/:id/attachments', getAttachmentsByTaskId(dbPool))
 app.post('/api/global-tasks/:taskId/comments', addCommentToGlobalTask(dbPool))
 app.post('/api/global-tasks/:taskId/responsibles-new', addResponsiblesToGlobalTask(dbPool))
+app.post('/api/global-tasks/:taskId/approval', setProjectApproval(dbPool, io))
 app.put('/api/tasks/:id/update-goals', updateGoals(dbPool))
 app.put('/api/tasks/:id/update-additional-info', updateAdditionalInfo(dbPool))
 app.get('/api/global-tasks/chat/:globalTaskId', getChatMessages(dbPool))

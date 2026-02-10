@@ -16,6 +16,37 @@ function notifyBpeTaskUpdated(taskId) {
   })
 }
 
+async function getGlobalTaskParticipantUserIds(db, globalTaskId) {
+  if (!globalTaskId) return []
+  const ids = new Set()
+  try {
+    const gtRes = await db.query('SELECT created_by FROM global_tasks WHERE id = $1', [globalTaskId])
+    if (gtRes.rows?.length && gtRes.rows[0]?.created_by != null) {
+      ids.add(String(gtRes.rows[0].created_by))
+    }
+    const respRes = await db.query(
+      'SELECT user_id FROM global_task_responsibles WHERE global_task_id = $1',
+      [globalTaskId]
+    )
+    respRes.rows?.forEach((r) => {
+      if (r.user_id != null) ids.add(String(r.user_id))
+    })
+  } catch (e) {
+    console.error('getGlobalTaskParticipantUserIds:', e)
+  }
+  return Array.from(ids)
+}
+
+function emitGlobalTaskChanged(io, userIds, globalTaskId, reason) {
+  if (!io || !userIds || userIds.length === 0 || !globalTaskId) return
+  for (const uid of userIds) {
+    io.to(String(uid)).emit('globalTaskChanged', {
+      globalTaskId: Number(globalTaskId),
+      reason: reason || 'changed',
+    })
+  }
+}
+
 // Функция для форматирования даты
 function formatDeadline(dateString) {
   try {
@@ -90,13 +121,19 @@ function createTask(dbPool, io) {
       const finalRootId = root_id || parent_id || null
 
       let businessProcessInstanceId = bpInstanceIdFromBody != null ? bpInstanceIdFromBody : null
-      if (parent_id && businessProcessInstanceId == null) {
+      let effectiveGlobalTaskId = global_task_id
+      if (parent_id) {
         const parentRow = await dbPool.query(
-          'SELECT business_process_instance_id FROM tasks WHERE id = $1',
+          'SELECT business_process_instance_id, global_task_id FROM tasks WHERE id = $1',
           [parent_id]
         )
-        if (parentRow.rows.length && parentRow.rows[0].business_process_instance_id != null) {
-          businessProcessInstanceId = parentRow.rows[0].business_process_instance_id
+        if (parentRow.rows.length) {
+          if (parentRow.rows[0].business_process_instance_id != null && businessProcessInstanceId == null) {
+            businessProcessInstanceId = parentRow.rows[0].business_process_instance_id
+          }
+          if (effectiveGlobalTaskId == null && parentRow.rows[0].global_task_id != null) {
+            effectiveGlobalTaskId = parentRow.rows[0].global_task_id
+          }
         }
       }
 
@@ -113,7 +150,7 @@ function createTask(dbPool, io) {
           priority,
           JSON.stringify(tagsValue),
           status,
-          global_task_id,
+          effectiveGlobalTaskId ?? null,
           parent_id || null, // parent_id может быть null
           finalRootId, // root_id
           businessProcessInstanceId,
@@ -139,6 +176,25 @@ function createTask(dbPool, io) {
           created_by,
           null
         )
+      }
+
+      // Если создана связанная подзадача (parent_id), добавляем запись в историю проекта
+      if (parent_id && !global_task_id) {
+        const parentRow = await dbPool.query(
+          'SELECT global_task_id, title FROM tasks WHERE id = $1',
+          [parent_id]
+        )
+        if (parentRow.rows.length && parentRow.rows[0].global_task_id != null) {
+          const parentTitle = parentRow.rows[0].title || 'Подзадача'
+          await insertTaskHistory(
+            dbPool,
+            parentRow.rows[0].global_task_id,
+            'подзадача',
+            `Для подзадачи «${parentTitle}» создана связанная задача: ${title}`,
+            created_by,
+            { parent_task_id: parent_id, new_task_id: task.id }
+          )
+        }
       }
     } catch (error) {
       console.error('Ошибка при создании задачи:', error)
@@ -621,6 +677,7 @@ function updateTaskAccept(dbPool, io) {
     const { comment } = req.body
 
     try {
+      let globalTaskIdForEmit = null
       if (isDone === 'false') {
         const tagsRedo = '[{"title":"ДОРАБОТКА ЗАДАЧИ","bg":"#ffb3b3","text":"#000000"}]'
 
@@ -671,6 +728,7 @@ function updateTaskAccept(dbPool, io) {
         }
 
         const { global_task_id, title, user_id } = taskResult.rows[0]
+        globalTaskIdForEmit = global_task_id
 
         await insertTaskHistory(
           dbPool,
@@ -683,6 +741,11 @@ function updateTaskAccept(dbPool, io) {
       }
 
       io.emit('taskAccept')
+
+      if (globalTaskIdForEmit) {
+        const participantIds = await getGlobalTaskParticipantUserIds(dbPool, globalTaskIdForEmit)
+        emitGlobalTaskChanged(io, participantIds, globalTaskIdForEmit, 'subtaskAccept')
+      }
 
       notifyBpeTaskUpdated(Number(taskId))
 
@@ -971,7 +1034,7 @@ function markMessagesAsRead(dbPool) {
 //  ******************************************************************************************************
 //  ******************************************************************************************************
 // Создание глобальной задачи - Проекта
-function createGlobalTask(dbPool) {
+function createGlobalTask(dbPool, io) {
   return async function (req, res) {
     const {
       title,
@@ -1052,21 +1115,21 @@ function createGlobalTask(dbPool) {
 
       // Если есть ответственные, вставляем их в связующую таблицу global_task_responsibles
       if (responsibles && responsibles.length > 0) {
-        const responsibleValues = responsibles
-          .map(
-            (resp) => `(${newTaskId}, ${resp.id}, '${resp.role || 'Исполнитель'}')` // Указываем ID задачи, ID пользователя и роль (по умолчанию 'Исполнитель', если не указана)
+        const requiresApproval = (r) => r.requires_approval === true || r.requires_approval === 'true'
+        for (const resp of responsibles) {
+          await dbPool.query(
+            `INSERT INTO global_task_responsibles (global_task_id, user_id, role, requires_approval)
+             VALUES ($1, $2, $3, $4)`,
+            [newTaskId, resp.id, resp.role || 'Исполнитель', requiresApproval(resp) || false]
           )
-          .join(', ') // Объединяем строки для вставки
-
-        await dbPool.query(
-          `
-          INSERT INTO global_task_responsibles (global_task_id, user_id, role)
-          VALUES ${responsibleValues};
-          `
-        )
+        }
       }
 
       await dbPool.query('COMMIT') // Подтверждаем транзакцию
+
+      // realtime: оповещаем всех участников проекта, чтобы мини-карточка появилась/обновилась сразу
+      const participantIds = await getGlobalTaskParticipantUserIds(dbPool, newTaskId)
+      emitGlobalTaskChanged(io, participantIds, newTaskId, 'created')
 
       // 5. Отправка успешного ответа
       res.status(201).json({
@@ -1117,14 +1180,30 @@ function getGlobalTasks(dbPool) {
             WHEN u.id % 4 = 2 THEN 'green'
             WHEN u.id % 4 = 3 THEN 'orange'
             ELSE 'default'
-        END
+        END,
+        'requires_approval', COALESCE(gtr.requires_approval, false),
+        'approval_status', gtr.approval_status,
+        'approval_comment', gtr.approval_comment,
+        'approval_at', gtr.approval_at
     )) FILTER (WHERE u.id IS NOT NULL)::jsonb, '[]'::jsonb) as responsibles,
     COALESCE(
-        (SELECT 
-            ROUND(100.0 * SUM(CASE WHEN t.is_completed THEN 1 ELSE 0 END) / COUNT(*), 2)
-         FROM tasks t
-         WHERE t.global_task_id = gt.id
-        ), 0) as completion_percentage
+        (SELECT ROUND(100.0 * (
+            (SELECT COALESCE(SUM(CASE WHEN t.is_completed THEN 1 ELSE 0 END), 0) FROM tasks t WHERE t.global_task_id = gt.id)
+            + (SELECT COUNT(*) FROM global_task_responsibles gtra WHERE gtra.global_task_id = gt.id AND gtra.requires_approval = true AND gtra.approval_status = 'approved')
+        ) / NULLIF(
+            (SELECT COUNT(*) FROM tasks t WHERE t.global_task_id = gt.id)
+            + (SELECT COUNT(*) FROM global_task_responsibles gtra WHERE gtra.global_task_id = gt.id AND gtra.requires_approval = true),
+            0
+        ), 2)
+        ), 0) as completion_percentage,
+    (SELECT COUNT(DISTINCT t.id) FROM tasks t
+     JOIN task_assignments ta ON t.id = ta.task_id
+     WHERE t.global_task_id = gt.id AND ta.user_id = $1) AS user_tasks_count,
+    (SELECT COALESCE(json_agg(t.title), '[]'::json)
+     FROM (SELECT DISTINCT t.title FROM tasks t
+           JOIN task_assignments ta ON t.id = ta.task_id
+           WHERE t.global_task_id = gt.id AND ta.user_id = $1
+           LIMIT 15) t) AS user_task_titles
 FROM
     global_tasks gt
 LEFT JOIN global_task_responsibles gtr ON gt.id = gtr.global_task_id
@@ -1185,7 +1264,7 @@ ORDER BY
   }
 }
 
-function updateGlobalTask(dbPool) {
+function updateGlobalTask(dbPool, io) {
   return async function (req, res) {
     const taskId = req.params.taskId // Получаем ID задачи из параметров URL
     const updatedData = req.body // Получаем обновленные данные из тела запроса
@@ -1201,6 +1280,7 @@ function updateGlobalTask(dbPool) {
     // Начинаем транзакцию для атомарности операций (особенно важно для ответственных)
     const client = await dbPool.connect()
     try {
+      const oldParticipantIds = await getGlobalTaskParticipantUserIds(client, taskId)
       await client.query('BEGIN') // Начать транзакцию
 
       // --- Обновление основных полей задачи ---
@@ -1262,11 +1342,11 @@ function updateGlobalTask(dbPool) {
         // Вставляем новых ответственных
         if (updatedData.responsibles && Array.isArray(updatedData.responsibles)) {
           for (const responsible of updatedData.responsibles) {
-            // Убедитесь, что у объекта ответственного есть хотя бы user_id
             if (responsible.id) {
+              const requiresApproval = responsible.requires_approval === true || responsible.requires_approval === 'true'
               await client.query(
-                'INSERT INTO global_task_responsibles (global_task_id, user_id, role) VALUES ($1, $2, $3)',
-                [taskId, responsible.id, responsible.role || 'Исполнитель'] // 'Исполнитель' по умолчанию, если роль не указана
+                'INSERT INTO global_task_responsibles (global_task_id, user_id, role, requires_approval) VALUES ($1, $2, $3, $4)',
+                [taskId, responsible.id, responsible.role || 'Исполнитель', requiresApproval]
               )
             }
           }
@@ -1306,7 +1386,11 @@ function updateGlobalTask(dbPool) {
                     WHEN u.id % 4 = 2 THEN 'green'
                     WHEN u.id % 4 = 3 THEN 'orange'
                     ELSE 'default'
-                END
+                END,
+                'requires_approval', COALESCE(gtr.requires_approval, false),
+                'approval_status', gtr.approval_status,
+                'approval_comment', gtr.approval_comment,
+                'approval_at', gtr.approval_at
             )) FILTER (WHERE u.id IS NOT NULL)::jsonb, '[]'::jsonb) as responsibles
         FROM
             global_tasks gt
@@ -1324,6 +1408,9 @@ function updateGlobalTask(dbPool) {
       )
 
       if (result.rows.length > 0) {
+        const newParticipantIds = await getGlobalTaskParticipantUserIds(client, taskId)
+        const allIds = Array.from(new Set([...(oldParticipantIds || []), ...(newParticipantIds || [])]))
+        emitGlobalTaskChanged(io, allIds, taskId, 'updated')
         res.status(200).json(result.rows[0]) // Возвращаем обновленную задачу
       } else {
         // Задача не найдена после обновления (что маловероятно, если обновление прошло успешно)
@@ -1612,13 +1699,21 @@ function getGlobalTaskById(dbPool) {
                 WHEN u.id % 4 = 2 THEN 'green'
                 WHEN u.id % 4 = 3 THEN 'orange'
                 ELSE 'default'
-            END
+            END,
+            'requires_approval', COALESCE(gtr.requires_approval, false),
+            'approval_status', gtr.approval_status,
+            'approval_comment', gtr.approval_comment,
+            'approval_at', gtr.approval_at
         )) FILTER (WHERE u.id IS NOT NULL)::jsonb, '[]'::jsonb) as responsibles,
         COALESCE(
-            (SELECT 
-                ROUND(100.0 * SUM(CASE WHEN t.is_completed THEN 1 ELSE 0 END) / NULLIF(COUNT(*), 0), 2)
-             FROM tasks t
-             WHERE t.global_task_id = gt.id
+            (SELECT ROUND(100.0 * (
+                (SELECT COALESCE(SUM(CASE WHEN t.is_completed THEN 1 ELSE 0 END), 0) FROM tasks t WHERE t.global_task_id = gt.id)
+                + (SELECT COUNT(*) FROM global_task_responsibles gtra WHERE gtra.global_task_id = gt.id AND gtra.requires_approval = true AND gtra.approval_status = 'approved')
+            ) / NULLIF(
+                (SELECT COUNT(*) FROM tasks t WHERE t.global_task_id = gt.id)
+                + (SELECT COUNT(*) FROM global_task_responsibles gtra WHERE gtra.global_task_id = gt.id AND gtra.requires_approval = true),
+                0
+            ), 2)
             ), 0) as completion_percentage
     FROM
         global_tasks gt
@@ -1771,14 +1866,13 @@ function addResponsiblesToGlobalTask(dbPool) {
         .map((resp) => userNamesMap[resp.id] || 'Имя не найдено')
         .join(', ')
 
-      // Формируем массив значений для вставки
-      const insertValues = responsibles.map((resp) => [taskId, resp.id, resp.role])
+      const requiresApproval = (r) => r.requires_approval === true || r.requires_approval === 'true'
+      const insertValues = responsibles.map((resp) => [taskId, resp.id, resp.role || 'Исполнитель', requiresApproval(resp) || false])
 
-      // Выполняем массовое вставление
       const insertQuery = `
-        INSERT INTO global_task_responsibles (global_task_id, user_id, role)
+        INSERT INTO global_task_responsibles (global_task_id, user_id, role, requires_approval)
         VALUES ${insertValues
-          .map((_, idx) => `($${idx * 3 + 1}, $${idx * 3 + 2}, $${idx * 3 + 3})`)
+          .map((_, idx) => `($${idx * 4 + 1}, $${idx * 4 + 2}, $${idx * 4 + 3}, $${idx * 4 + 4})`)
           .join(', ')}
         RETURNING *;
       `
@@ -1804,6 +1898,61 @@ function addResponsiblesToGlobalTask(dbPool) {
       await dbPool.query('ROLLBACK')
       console.error('Ошибка при добавлении ответственных:', error)
       res.status(500).json({ error: 'Ошибка при добавлении ответственных' })
+    }
+  }
+}
+
+// Согласование/отклонение участника проекта (обязателен комментарий)
+function setProjectApproval(dbPool, io) {
+  return async function (req, res) {
+    const { taskId } = req.params
+    const { status, comment, userId } = req.body
+
+    if (!status || !['approved', 'rejected'].includes(status)) {
+      return res.status(400).json({ error: 'Укажите status: approved или rejected' })
+    }
+    if (!comment || typeof comment !== 'string' || !comment.trim()) {
+      return res.status(400).json({ error: 'Укажите причину (комментарий) при согласовании или отклонении' })
+    }
+    if (!userId) {
+      return res.status(400).json({ error: 'Не указан userId' })
+    }
+
+    try {
+      const check = await dbPool.query(
+        `SELECT 1 FROM global_task_responsibles
+         WHERE global_task_id = $1 AND user_id = $2 AND requires_approval = true`,
+        [taskId, userId]
+      )
+      if (check.rows.length === 0) {
+        return res.status(403).json({ error: 'Вы не являетесь участником, для которого требуется согласование' })
+      }
+
+      await dbPool.query(
+        `UPDATE global_task_responsibles
+         SET approval_status = $1, approval_comment = $2, approval_at = CURRENT_TIMESTAMP
+         WHERE global_task_id = $3 AND user_id = $4`,
+        [status, comment.trim(), taskId, userId]
+      )
+
+      const label = status === 'approved' ? 'Согласовано' : 'Отклонено'
+      await insertTaskHistory(
+        dbPool,
+        taskId,
+        'согласование',
+        `${label}: ${comment.trim().substring(0, 200)}${comment.trim().length > 200 ? '…' : ''}`,
+        userId,
+        { status, comment: comment.trim() }
+      )
+
+      // realtime: обновить мини-карточки у всех участников проекта
+      const participantIds = await getGlobalTaskParticipantUserIds(dbPool, taskId)
+      emitGlobalTaskChanged(io, participantIds, taskId, 'approval')
+
+      res.status(200).json({ success: true, status })
+    } catch (err) {
+      console.error('setProjectApproval:', err)
+      res.status(500).json({ error: 'Ошибка при сохранении согласования' })
     }
   }
 }
@@ -3096,6 +3245,7 @@ module.exports = {
   getAttachmentsByTaskId,
   addCommentToGlobalTask,
   addResponsiblesToGlobalTask,
+  setProjectApproval,
   updateGoals,
   updateAdditionalInfo,
   getChatMessages,

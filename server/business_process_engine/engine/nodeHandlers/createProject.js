@@ -3,6 +3,8 @@
  * - prepared: создать проект сразу в register
  * - modal_at_runtime: поставить экземпляр на waiting_user_input и отдать templateData на клиент
  */
+const { computeConditionalDeadline } = require('./deadlineUtils')
+
 function getOutgoingEdges(scheme, nodeId) {
   const edges = scheme.edges || []
   return edges.filter((e) => e.source === nodeId)
@@ -49,14 +51,21 @@ async function handle(instance, node, scheme, integrations, dbPool) {
   if (!createdBy) return { fail: 'Создать проект: не определён created_by (initiator_id)' }
 
   if (createMode === 'modal_at_runtime') {
+    let templateDeadline = settings.deadline || null
+    if (settings.deadlineMode === 'conditional' && settings.conditionalDeadline && settings.conditionalDeadline.boundary) {
+      templateDeadline = computeConditionalDeadline(settings.conditionalDeadline)
+    }
+    const templateResponsibles = (Array.isArray(settings.responsibles) ? settings.responsibles : [])
+      .filter((r) => r && r.id != null)
+      .map((r) => ({ id: r.id, role: r.role || 'Исполнитель', requires_approval: !!r.requires_approval }))
     const templateData = {
       title: settings.title || 'Проект из бизнес‑процесса',
       description: settings.description || '',
       goals: Array.isArray(settings.goals) ? settings.goals : [],
-      deadline: settings.deadline || null,
+      deadline: templateDeadline,
       priority: settings.priority || 'medium',
       additionalInfo: Array.isArray(settings.additionalInfo) ? settings.additionalInfo : [],
-      responsibles: Array.isArray(settings.responsibles) ? settings.responsibles : [],
+      responsibles: templateResponsibles,
     }
     const pending = { nodeId: node.id, type: 'create_project', templateData }
     const newContext = { ...context, pending_project_creation: pending }
@@ -70,10 +79,20 @@ async function handle(instance, node, scheme, integrations, dbPool) {
   const title = substituteText(settings.title || 'Проект из бизнес‑процесса', context)
   const description = substituteText(settings.description || '', context)
   const goals = Array.isArray(settings.goals) ? settings.goals.map((x) => substituteText(String(x || ''), context)).filter((x) => x.trim()) : []
-  const deadline = settings.deadline || null
+  let deadline = settings.deadline || null
+  if (settings.deadlineMode === 'conditional' && settings.conditionalDeadline && settings.conditionalDeadline.boundary) {
+    deadline = computeConditionalDeadline(settings.conditionalDeadline)
+  }
   const priority = settings.priority || 'medium'
   const additionalInfo = normalizeAdditionalInfo(settings.additionalInfo)
-  const responsibles = Array.isArray(settings.responsibles) ? settings.responsibles : []
+  const responsiblesRaw = Array.isArray(settings.responsibles) ? settings.responsibles : []
+  const responsibles = responsiblesRaw
+    .filter((r) => r && r.id != null)
+    .map((r) => ({
+      id: r.id,
+      role: r.role || 'Исполнитель',
+      requires_approval: !!r.requires_approval,
+    }))
 
   let created
   try {

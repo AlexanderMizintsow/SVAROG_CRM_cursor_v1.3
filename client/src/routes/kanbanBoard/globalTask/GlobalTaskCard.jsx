@@ -47,6 +47,9 @@ const GlobalTaskCard = ({
   const [isGoalsEditorOpen, setIsGoalsEditorOpen] = useState(false)
   const [isAdditionalInfoEditorOpen, setIsAdditionalInfoEditorOpen] =
     useState(false)
+  const [approvalModal, setApprovalModal] = useState({ open: false, status: null })
+  const [approvalComment, setApprovalComment] = useState('')
+  const [approvalSubmitting, setApprovalSubmitting] = useState(false)
   // Обработчик открытия редактора целей
   const handleOpenGoalsEditor = () => setIsGoalsEditorOpen(true)
   const handleCloseGoalsEditor = () => setIsGoalsEditorOpen(false)
@@ -68,7 +71,44 @@ const GlobalTaskCard = ({
   const responsiblesRef = useRef(null)
   const goalsRef = useRef(null)
   const additionalInfoRef = useRef(null)
-  const userId = user.id
+  const userId = user?.id
+
+  const myApprovalResponsible = responsibles?.find(
+    (r) => r.id === userId && r.requires_approval === true
+  )
+
+  const handleOpenApprovalModal = (status) => {
+    setApprovalComment('')
+    setApprovalModal({ open: true, status })
+  }
+
+  const handleCloseApprovalModal = () => {
+    setApprovalModal({ open: false, status: null })
+    setApprovalComment('')
+  }
+
+  const handleSubmitApproval = async () => {
+    if (!approvalModal.status || !approvalComment.trim()) return
+    setApprovalSubmitting(true)
+    try {
+      await axios.post(
+        `${API_BASE_URL}5000/api/global-tasks/${id}/approval`,
+        {
+          status: approvalModal.status,
+          comment: approvalComment.trim(),
+          userId,
+        },
+        { headers: { 'Content-Type': 'application/json' } }
+      )
+      handleCloseApprovalModal()
+      if (typeof onRefresh === 'function') onRefresh(id)
+    } catch (err) {
+      console.error('Ошибка согласования:', err)
+      alert(err.response?.data?.error || 'Не удалось сохранить согласование')
+    } finally {
+      setApprovalSubmitting(false)
+    }
+  }
 
   let remainingDays = getRemainingDays(deadline)
 
@@ -340,7 +380,7 @@ const GlobalTaskCard = ({
             <div className="global-task-card__responsible-list">
               {responsibles.map((resp, index) => (
                 <div
-                  key={index}
+                  key={resp.id != null ? resp.id : index}
                   className={`global-task-card__responsible-item ${
                     resp.color === 'blue'
                       ? 'global-task-card__responsible-item--blue'
@@ -358,7 +398,7 @@ const GlobalTaskCard = ({
                   >
                     {resp.initials}
                   </div>
-                  <div>
+                  <div className="global-task-card__responsible-main">
                     <div className="global-task-card__responsible-name">
                       {resp.name}
                     </div>
@@ -368,11 +408,87 @@ const GlobalTaskCard = ({
                       )}`}
                     >
                       {resp.role}
+                      {resp.requires_approval && (
+                        <span className="global-task-card__approval-badge">
+                          {' · '}
+                          {resp.approval_status === 'approved'
+                            ? 'Согласовано'
+                            : resp.approval_status === 'rejected'
+                            ? 'Отклонено'
+                            : 'Ожидает'}
+                        </span>
+                      )}
                     </div>
+                    {resp.requires_approval && resp.approval_comment && (
+                      <div className="global-task-card__approval-comment">
+                        {resp.approval_comment}
+                      </div>
+                    )}
+                    {resp.id === userId && resp.requires_approval && (
+                      <div className="global-task-card__approval-actions">
+                        <button
+                          type="button"
+                          className="global-task-card__approval-btn global-task-card__approval-btn--approve"
+                          onClick={() => handleOpenApprovalModal('approved')}
+                        >
+                          Согласовано
+                        </button>
+                        <button
+                          type="button"
+                          className="global-task-card__approval-btn global-task-card__approval-btn--reject"
+                          onClick={() => handleOpenApprovalModal('rejected')}
+                        >
+                          Отклонено
+                        </button>
+                      </div>
+                    )}
                   </div>
                 </div>
               ))}
             </div>
+            {approvalModal.open && (
+              <div className="global-task-card__approval-overlay">
+                <div className="global-task-card__approval-modal">
+                  <h4>
+                    {approvalModal.status === 'approved'
+                      ? 'Согласование'
+                      : 'Отклонение'}
+                  </h4>
+                  <p className="global-task-card__approval-hint">
+                    Укажите причину (комментарий):
+                  </p>
+                  <textarea
+                    className="global-task-card__approval-textarea"
+                    value={approvalComment}
+                    onChange={(e) => setApprovalComment(e.target.value)}
+                    placeholder="Обязательно укажите комментарий"
+                    rows={4}
+                  />
+                  <div className="global-task-card__approval-modal-actions">
+                    <button
+                      type="button"
+                      className="global-task-card__approval-btn global-task-card__approval-btn--cancel"
+                      onClick={handleCloseApprovalModal}
+                      disabled={approvalSubmitting}
+                    >
+                      Отмена
+                    </button>
+                    <button
+                      type="button"
+                      className={
+                        approvalModal.status === 'approved'
+                          ? 'global-task-card__approval-btn global-task-card__approval-btn--approve'
+                          : 'global-task-card__approval-btn global-task-card__approval-btn--reject'
+                      }
+                      onClick={handleSubmitApproval}
+                      disabled={approvalSubmitting || !approvalComment.trim()}
+                    >
+                      {approvalSubmitting ? 'Сохранение…' : 'Подтвердить'}
+                    </button>
+                  </div>
+                </div>
+              </div>
+            )}
           </div>
         </div>
       </div>

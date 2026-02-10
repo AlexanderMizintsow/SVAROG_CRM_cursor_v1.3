@@ -81,6 +81,7 @@ const CreateGlobalTaskForm = ({ onSave, onCancel, initialData }) => {
       return {
         ...u,
         role: r.role || responsibleRolesList[0],
+        requires_approval: r.requires_approval === true,
         initials: generateInitials(u.first_name, u.last_name),
         avatarColorClass: generateRandomAvatarColorClass(),
         backgroundColorClass: generateRandomBackgroundColorClass(),
@@ -159,9 +160,10 @@ const CreateGlobalTaskForm = ({ onSave, onCancel, initialData }) => {
             selectedUser.first_name,
             selectedUser.last_name
           ),
-          avatarColorClass: generateRandomAvatarColorClass(), // Класс для цвета АВАТАРА
-          backgroundColorClass: generateRandomBackgroundColorClass(), // Класс для цвета ФОНА ЭЛЕМЕНТА
+          avatarColorClass: generateRandomAvatarColorClass(),
+          backgroundColorClass: generateRandomBackgroundColorClass(),
           role: responsibleRoles[0],
+          requires_approval: false,
         }
         setFormData({
           ...formData,
@@ -174,6 +176,13 @@ const CreateGlobalTaskForm = ({ onSave, onCancel, initialData }) => {
   const handleResponsibleRoleChange = (userId, newRole) => {
     const updatedResponsibles = formData.responsibles.map((resp) =>
       resp.id === userId ? { ...resp, role: newRole } : resp
+    )
+    setFormData({ ...formData, responsibles: updatedResponsibles })
+  }
+
+  const handleRequiresApprovalChange = (userId, value) => {
+    const updatedResponsibles = formData.responsibles.map((resp) =>
+      resp.id === userId ? { ...resp, requires_approval: !!value } : resp
     )
     setFormData({ ...formData, responsibles: updatedResponsibles })
   }
@@ -366,32 +375,32 @@ const CreateGlobalTaskForm = ({ onSave, onCancel, initialData }) => {
               Ответственные <span className="required">*</span>
             </label>
             <div className="create-global-task-form__responsibles-list">
-              {formData.responsibles.map((resp) => (
+              {formData.responsibles.map((resp, idx) => {
+                const lastName = resp.last_name || ''
+                const firstInitial = (resp.first_name || '')[0]
+                const middleInitial = (resp.middle_name || '')[0]
+                const nameDisplay = [lastName, firstInitial ? firstInitial + '.' : '', middleInitial ? middleInitial + '.' : '']
+                  .filter(Boolean)
+                  .join(' ') || `Участник ${resp.id != null ? resp.id : idx + 1}`
+                return (
                 <div
-                  key={resp.id}
-                  // Применяем класс цвета ФОНА к самому элементу responsible-item
-                  className={`create-global-task-form__responsible-item ${resp.backgroundColorClass}`}
+                  key={resp.id != null ? resp.id : idx}
+                  className={`create-global-task-form__responsible-item ${resp.backgroundColorClass || ''}`}
                 >
                   <div
-                    // Применяем класс цвета АВАТАРА к аватару
-                    className={`create-global-task-form__responsible-avatar ${resp.avatarColorClass}`}
-                    title={`${resp.last_name} ${resp.first_name} ${
-                      resp.middle_name || ''
-                    }`}
+                    className={`create-global-task-form__responsible-avatar ${resp.avatarColorClass || ''}`}
+                    title={[resp.last_name, resp.first_name, resp.middle_name].filter(Boolean).join(' ') || nameDisplay}
                   >
-                    {resp.initials}
+                    {resp.initials != null ? resp.initials : (firstInitial || '') + (lastName[0] || '') || '?'}
                   </div>
                   <div className="create-global-task-form__responsible-details">
                     <div className="create-global-task-form__responsible-name">
-                      {/* Отображаем Фамилию и Инициалы */}
-                      {`${resp.last_name} ${resp.first_name[0]}. ${
-                        resp.middle_name ? resp.middle_name[0] + '.' : ''
-                      }`}
+                      {nameDisplay}
                     </div>
                     {/* Выбор роли для ответственного */}
                     <select
                       className="create-global-task-form__responsible-role-select"
-                      value={resp.role}
+                      value={resp.role || ''}
                       onChange={(e) =>
                         handleResponsibleRoleChange(resp.id, e.target.value)
                       }
@@ -402,9 +411,19 @@ const CreateGlobalTaskForm = ({ onSave, onCancel, initialData }) => {
                         </option>
                       ))}
                     </select>
+                    <label className="create-global-task-form__requires-approval-label">
+                      <input
+                        type="checkbox"
+                        checked={!!resp.requires_approval}
+                        onChange={(e) =>
+                          handleRequiresApprovalChange(resp.id, e.target.checked)
+                        }
+                      />
+                      <span>Требуется согласование</span>
+                    </label>
                   </div>
 
-                  <button
+                    <button
                     type="button"
                     className="create-global-task-form__remove-responsible-button"
                     onClick={() => removeResponsible(resp.id)}
@@ -412,7 +431,8 @@ const CreateGlobalTaskForm = ({ onSave, onCancel, initialData }) => {
                     <FaTrashAlt />
                   </button>
                 </div>
-              ))}
+                )
+              })}
             </div>
             {/* Выбор ответственного */}
             <div className="create-global-task-form__add-responsible-section">

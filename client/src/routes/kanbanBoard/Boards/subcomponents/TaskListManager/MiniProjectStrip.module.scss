@@ -1,0 +1,226 @@
+.strip { 
+  position: fixed;
+  width: 100%;
+  max-width: 100%;
+  flex-shrink: 0; 
+  bottom: 7%;
+  margin-left: 1rem;
+  padding: 0.75rem 0;
+  border-top: 1px solid #e5e7eb00;
+  background: #f9fafb00;
+  border-radius: 8px;
+  overflow: hidden;
+  min-width: 0;
+}
+
+.stripTitle {
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: #374151;
+  margin-bottom: 0.5rem;
+  padding-left: 4px;
+}
+
+.empty {
+  font-size: 0.8rem;
+  color: #6b7280;
+  padding: 0.5rem 4px;
+}
+
+.loading {
+  font-size: 0.75rem;
+  color: #6b7280;
+  padding: 0.5rem 0;
+}
+
+.scroll {
+  display: flex;
+  gap: 0.75rem;
+  
+  max-width: 100%;
+  min-width: 0;
+  overflow-x: auto;
+  overflow-y: hidden;
+  padding-bottom: 4px;
+  -webkit-overflow-scrolling: touch;
+
+  &::-webkit-scrollbar {
+    height: 6px;
+  }
+  &::-webkit-scrollbar-track {
+    background: #e5e7eb;
+    border-radius: 3px;
+  }
+  &::-webkit-scrollbar-thumb {
+    background: #9ca3af;
+    border-radius: 3px;
+  }
+}
+
+.card {
+  flex: 0 0 auto;
+  width: 130px;
+  min-height: 90px;
+  background: #ffffffb2;
+  border-radius: 8px;
+  padding: 0.6rem 0.65rem;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+  cursor: pointer; 
+  position: relative;
+
+  
+}
+
+.eyeIcon {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  color: #059669;
+  font-size: 1rem;
+  opacity: 0.9;
+}
+
+.cardHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 4px;
+  margin-bottom: 6px;
+}
+
+.cardTitle {
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: #111827;
+  margin: 0;
+  line-height: 1.25;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  flex: 1;
+  min-width: 0;
+}
+
+.priority {
+  font-size: 0.6rem;
+  font-weight: 500;
+  padding: 2px 5px;
+  border-radius: 4px;
+  flex-shrink: 0;
+
+  &.priority--high {
+    background: #fee2e2;
+    color: #991b1b;
+  }
+  &.priority--medium {
+    background: #fef3c7;
+    color: #92400e;
+  }
+  &.priority--low {
+    background: #d1fae5;
+    color: #065f46;
+  }
+}
+
+.progressWrap {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 6px;
+}
+
+.progressTrack {
+  flex: 1;
+  height: 6px;
+  background: #e5e7eb;
+  border-radius: 3px;
+  overflow: hidden;
+}
+
+.progressBar {
+  height: 100%;
+  background: linear-gradient(90deg, #3b82f6, #2563eb);
+  border-radius: 3px;
+  transition: width 0.2s;
+}
+
+.progressPercent {
+  font-size: 0.65rem;
+  color: #6b7280;
+  min-width: 24px;
+}
+
+.deadline {
+  font-size: 0.65rem;
+  color: #6b7280;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  margin-bottom: 4px;
+}
+
+.deadlineIcon {
+  font-size: 0.75rem;
+  flex-shrink: 0;
+}
+
+.overdue {
+  color: #dc2626;
+}
+
+.remaining {
+  color: #059669;
+}
+
+.userTasksWrap {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  margin-bottom: 4px;
+  cursor: default;
+}
+
+.userTasksIcon {
+  font-size: 1rem;
+  flex-shrink: 0;
+}
+
+.userTasksCount {
+  font-size: 0.65rem;
+  color: #374151;
+  font-weight: 500;
+}
+
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-top: 4px;
+}
+
+.actionBadge {
+  font-size: 0.6rem;
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  padding: 2px 5px;
+  background: #fef3c7;
+  color: #92400e;
+  border-radius: 4px;
+
+  svg {
+    font-size: 0.7rem;
+  }
+
+  &.actionBadge--done {
+    background: #d1fae5;
+    color: #065f46;
+  }
+
+  &.actionBadge--rejected {
+    background: #fee2e2;
+    color: #991b1b;
+  }
+}

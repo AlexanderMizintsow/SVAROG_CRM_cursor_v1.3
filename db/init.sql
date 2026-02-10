@@ -707,6 +707,10 @@ CREATE TABLE global_task_responsibles (
     global_task_id INT REFERENCES global_tasks(id) ON DELETE CASCADE,
     user_id INT REFERENCES users(id) ON DELETE CASCADE,
     role VARCHAR(50),  -- Можно указать роль: например, "лидер", "исполнитель" и т.д.
+    requires_approval BOOLEAN DEFAULT false,  -- требуется согласование участника
+    approval_status VARCHAR(20) DEFAULT NULL,  -- 'approved' | 'rejected' | NULL (ожидает)
+    approval_comment TEXT,                    -- комментарий при согласовании/отклонении
+    approval_at TIMESTAMP,
     PRIMARY KEY (global_task_id, user_id)
 );
 CREATE INDEX idx_global_task_responsibles_user_id ON global_task_responsibles(user_id);

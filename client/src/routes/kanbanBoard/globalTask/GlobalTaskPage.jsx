@@ -1,5 +1,5 @@
 // Компонент содержит в себе остаьные стыковочные компоненты
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { FaArrowLeft } from 'react-icons/fa'
 import GlobalTaskHeader from './GlobalTaskHeader'
 import GlobalTaskProgress from './GlobalTaskProgress'
@@ -31,6 +31,16 @@ const GlobalTaskPage = ({
   const [currentTaskIndex, setCurrentTaskIndex] = useState(
     tasks && tasks.length > 0 && initialTaskIndex !== -1 ? initialTaskIndex : 0
   )
+
+  // Синхронизация индекса при обновлении списка (после fetch), чтобы не переключалось на tasks[0]
+  useEffect(() => {
+    if (tasks && tasks.length > 0 && initialTask) {
+      const idx = tasks.findIndex((t) => t.id === initialTask.id)
+      if (idx >= 0 && tasks[0]?.id !== initialTask.id) {
+        setCurrentTaskIndex(idx)
+      }
+    }
+  }, [tasks, initialTask?.id])
 
   // Получаем текущую задачу после определения currentTaskIndex
   const currentTask =

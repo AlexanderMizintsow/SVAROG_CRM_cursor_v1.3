@@ -9,9 +9,10 @@ import VisibleTaskList from './groupTasks/VisibleTaskList'
 import CreatedByTaskList from './groupTasks/CreatedByTaskList/CreatedByTaskList'
 import CompletedTaskList from './groupTasks/CompletedTaskList'
 import SearchBar from '../../../../../components/searchBar/SearchBar'
+import MiniProjectStrip from './MiniProjectStrip'
 import styles from './taskListManager.module.scss'
 
-const TaskListManager = ({ onClose }) => {
+const TaskListManager = ({ onClose, onOpenProject, stripRefreshKey }) => {
   const { user } = useUserStore()
   const [searchTerm, setSearchTerm] = useState('')
   const { fetchTasksManager, tasksManager, fetchCompletedTasks, completedTasks, isLoading } =
@@ -140,11 +141,12 @@ const TaskListManager = ({ onClose }) => {
       <Box className={styles.close} onClick={onClose}>
         &times;
       </Box>
-      <SearchBar
-        searchTerm={searchTerm}
-        setSearchTerm={setSearchTerm}
-        placeholder="Поиск задач..."
-      />
+      <Box className={styles.scrollContent}>
+        <SearchBar
+          searchTerm={searchTerm}
+          setSearchTerm={setSearchTerm}
+          placeholder="Поиск задач..."
+        />
       {groupedTasks.approver.length > 0 && (
         <Box>
           <Box onClick={() => toggleGroup('approver')} style={{ cursor: 'pointer' }}>
@@ -195,21 +197,23 @@ const TaskListManager = ({ onClose }) => {
           )}
         </Box>
       )}
-      {groupedTasks.completed.length > 0 && (
-        <Box>
-          <Box onClick={() => toggleGroup('completed')} style={{ cursor: 'pointer' }}>
-            <Typography variant="h6" className={styles.taskTitle}>
-              Завершенные задачи {expandedGroups.completed ? '▼' : '▲'}
-            </Typography>
-          </Box>
-          {expandedGroups.completed && (
-            <CompletedTaskList
-              tasks={filterTasks(groupedTasks.completed)}
-              approvalStatus={approvalStatus}
-            />
+          {groupedTasks.completed.length > 0 && (
+            <Box>
+              <Box onClick={() => toggleGroup('completed')} style={{ cursor: 'pointer' }}>
+                <Typography variant="h6" className={styles.taskTitle}>
+                  Завершенные задачи {expandedGroups.completed ? '▼' : '▲'}
+                </Typography>
+              </Box>
+              {expandedGroups.completed && (
+                <CompletedTaskList
+                  tasks={filterTasks(groupedTasks.completed)}
+                  approvalStatus={approvalStatus}
+                />
+              )}
+            </Box>
           )}
-        </Box>
-      )}
+      </Box>
+      <MiniProjectStrip onOpenProject={onOpenProject} refreshTrigger={stripRefreshKey} />
     </Box>
   )
 }

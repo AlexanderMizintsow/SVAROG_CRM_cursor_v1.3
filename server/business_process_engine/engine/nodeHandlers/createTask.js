@@ -6,7 +6,8 @@
  * Важно: статусы задач нормализуются под статусы канбана SVAROG:
  * backlog / todo / wait / doing / done / pause (+ алиасы pending/in_progress/completed/on_hold/cancelled).
  */
-const { resolveProjectId } = require('./projectUtils')
+const { resolveProjectId, resolveParentTaskId } = require('./projectUtils')
+const { computeConditionalDeadline } = require('./deadlineUtils')
 
 function getOutgoingEdges(scheme, nodeId) {
   const edges = scheme.edges || []
@@ -70,6 +71,16 @@ async function handle(instance, node, scheme, integrations, dbPool) {
       })
     : null
 
+  // Опционально: создать задачу как подзадачу задачи из схемы (parent_id)
+  const linkToParentTask = settings.linkToParentTask === true
+  const parentTaskId = linkToParentTask
+    ? resolveParentTaskId(context, {
+        parentTaskSource: settings.parentTaskSource || 'last',
+        parentTaskNodeId: settings.parentTaskNodeId || null,
+        fixedParentTaskId: settings.fixedParentTaskId || null,
+      })
+    : null
+
   // Если выбран BPE-шаблон — используем его как базу, но поля блока имеют приоритет
   if (settings.templateId) {
     const templateResult = await dbPool.query('SELECT * FROM bp_task_templates WHERE id = $1', [settings.templateId])
@@ -87,6 +98,9 @@ async function handle(instance, node, scheme, integrations, dbPool) {
   if (createMode === 'modal_at_runtime') {
     if (linkToProject) {
       return { fail: 'Создать задачу: режим «окно при запуске» сейчас не поддерживает подзадачи проекта. Используйте режим «создать сразу».' }
+    }
+    if (linkToParentTask) {
+      return { fail: 'Создать задачу: режим «окно при запуске» сейчас не поддерживает подзадачу задачи из схемы. Используйте режим «создать сразу».' }
     }
     const templateData = {
       title,
@@ -113,9 +127,11 @@ async function handle(instance, node, scheme, integrations, dbPool) {
     createdBy = settings.authorUserId
   }
 
-  // Дедлайн
+  // Дедлайн: по условию (граница времени) или смещение в днях
   let deadline = null
-  if (deadlineOffsetDays != null) {
+  if (settings.deadlineMode === 'conditional' && settings.conditionalDeadline && settings.conditionalDeadline.boundary) {
+    deadline = computeConditionalDeadline(settings.conditionalDeadline)
+  } else if (deadlineOffsetDays != null) {
     const d = new Date()
     d.setDate(d.getDate() + Number(deadlineOffsetDays))
     deadline = d.toISOString()
@@ -140,10 +156,17 @@ async function handle(instance, node, scheme, integrations, dbPool) {
     status: initialStatus,
     business_process_instance_id: instance.id,
     ...(linkToProject ? { global_task_id: projectId } : {}),
+    ...(linkToParentTask ? { parent_id: parentTaskId } : {}),
   }
 
   if (linkToProject && !projectId) {
     return { fail: 'Создать задачу: включено «как подзадача проекта», но проект не найден (создайте проект выше или выберите источник)' }
+  }
+  if (linkToParentTask && !parentTaskId) {
+    return { fail: 'Создать задачу: включено «как подзадача задачи из схемы», но родительская задача не найдена (создайте задачу выше или выберите блок)' }
+  }
+  if (linkToProject && linkToParentTask) {
+    return { fail: 'Создать задачу: нельзя одновременно выбрать подзадачу проекта и подзадачу задачи из схемы' }
   }
 
   let task

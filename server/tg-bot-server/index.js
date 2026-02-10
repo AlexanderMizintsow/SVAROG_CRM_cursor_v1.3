@@ -13,6 +13,7 @@ const {
 } = require('./controllers/notificationSender')
 const { handleRegisteredUserMessage } = require('./controllers/messageHandler')
 const { startScheduler } = require('./controllers/scheduler')
+const { sendBpeMessage } = require('./controllers/bpeNotifications')
 
 const app = express()
 const port = 5777
@@ -98,6 +99,9 @@ app.post('/api/create_group_notification', async (req, res) => {
     res.status(500).json({ success: false })
   }
 })
+
+// BPE -> Telegram: отправка уведомлений по user_id приложения (с проверкой регистрации)
+app.post('/api/bpe/send-message', sendBpeMessage(bot, dbPool))
 
 // Запуск планировщика
 startScheduler(bot, dbPool)

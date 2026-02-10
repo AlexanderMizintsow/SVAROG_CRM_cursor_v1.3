@@ -529,7 +529,7 @@ const Task = forwardRef(({ task, provided, actionIcon, column }, ref) => {
               arrow
               className="task-priority-icon"
             >
-              <div style={{ top: '75px' }}>
+              <div style={{ top: '40px' }}>
                 <FcMindMap />
               </div>
             </Tooltip>
@@ -553,7 +553,7 @@ const Task = forwardRef(({ task, provided, actionIcon, column }, ref) => {
               arrow
               className="task-priority-icon"
             >
-              <div style={{ top: '75px' }}>
+              <div style={{ top: '40px' }}>
                 <MdHistoryEdu />
               </div>
             </Tooltip>

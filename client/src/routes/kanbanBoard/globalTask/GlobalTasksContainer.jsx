@@ -11,7 +11,7 @@ import { formatDeadlineDateTime, getRemainingDays } from './utils/globalTaskUtil
 import './styles/GlobalTasksContainer.scss'
 import axios from 'axios'
 
-const GlobalTasksContainer = ({ onClose }) => {
+const GlobalTasksContainer = ({ onClose, initialTask, initialTaskId, onProjectUpdated }) => {
   const { user } = UserStore()
   const [tasks, setTasks] = useState([])
   const [selectedTask, setSelectedTask] = useState(null)
@@ -27,10 +27,11 @@ const GlobalTasksContainer = ({ onClose }) => {
   // *** Функция для обновление задачи по id ***
   const handleRefreshTask = useCallback(
     async (taskId) => {
-      if (!selectedTask) return
+      const idToFetch = taskId != null ? taskId : selectedTask?.id
+      if (!idToFetch || !selectedTask) return
       try {
         // Загрузка обновленной задачи через axios
-        const response = await axios.get(`${API_BASE_URL}5000/api/global-tasks/${taskId}`)
+        const response = await axios.get(`${API_BASE_URL}5000/api/global-tasks/${idToFetch}`)
         const updatedTask = response.data
 
         setSelectedTask(updatedTask)
@@ -41,16 +42,17 @@ const GlobalTasksContainer = ({ onClose }) => {
         )
 
         const historyResponse = await axios.get(
-          `${API_BASE_URL}5000/api/global-task/${taskId}/history`
+          `${API_BASE_URL}5000/api/global-task/${idToFetch}/history`
         )
         setrefreshHistory(historyResponse.data)
 
         setrefreshSubTask((prev) => !prev)
+        onProjectUpdated?.()
       } catch (error) {
         console.error('Ошибка при обновлении задачи:', error)
       }
     },
-    [selectedTask]
+    [selectedTask, onProjectUpdated]
   )
 
   // *** Функция для загрузки задач с бэкенда ***
@@ -82,8 +84,22 @@ const GlobalTasksContainer = ({ onClose }) => {
 
   // *** useEffect для загрузки задач при монтировании компонента ***
   useEffect(() => {
-    fetchGlobalTasks() // Вызываем функцию загрузки
+    fetchGlobalTasks()
   }, [fetchGlobalTasks])
+
+  // Открыть карточку проекта при открытии из мини-карточки (по id, чтобы всегда открывалась выбранная)
+  useEffect(() => {
+    if (initialTaskId != null && initialTask != null) {
+      setSelectedTask(initialTask)
+      setTasks((prev) => {
+        const has = prev.some((t) => t.id === initialTask.id)
+        if (has) return prev
+        return [initialTask, ...prev]
+      })
+    } else if (initialTaskId == null) {
+      setSelectedTask(null)
+    }
+  }, [initialTaskId, initialTask])
 
   // Функция для выбора задачи из списка
   const handleSelectTask = useCallback((task) => {
@@ -128,6 +144,7 @@ const GlobalTasksContainer = ({ onClose }) => {
         // После успешного ответа
         handleCloseCreateForm() // Закрыть форму
         await fetchGlobalTasks() // Обновить список задач
+        onProjectUpdated?.()
       } catch (error) {
         // Обработка ошибок
         if (error.response) {
@@ -149,7 +166,7 @@ const GlobalTasksContainer = ({ onClose }) => {
         }
       }
     },
-    [userId, fetchGlobalTasks, handleCloseCreateForm]
+    [userId, fetchGlobalTasks, handleCloseCreateForm, onProjectUpdated]
   )
 
   // *** Функция для обновления существующей задачи ***
@@ -191,6 +208,7 @@ const GlobalTasksContainer = ({ onClose }) => {
         if (selectedTask && selectedTask.id === result.id) {
           setSelectedTask(result)
         }
+        onProjectUpdated?.()
       } catch (error) {
         console.error('Ошибка сети или другая ошибка при обновлении:', error)
         // Обработка ошибок
@@ -198,7 +216,7 @@ const GlobalTasksContainer = ({ onClose }) => {
         // Завершаем индикацию сохранения
       }
     },
-    [selectedTask]
+    [selectedTask, onProjectUpdated]
   )
 
   // *** Рендеринг в зависимости от состояния ***

@@ -60,8 +60,11 @@ const CreateTaskNodeProps = ({ node, onUpdate }) => {
 
   const createMode = settings.createMode ?? 'prepared'
   const projectNodes = Array.isArray(scheme?.nodes) ? scheme.nodes.filter((n) => n.type === 'create_project') : []
+  const taskNodes = Array.isArray(scheme?.nodes) ? scheme.nodes.filter((n) => n.type === 'create_task' && n.id !== node?.id) : []
   const linkToProject = settings.linkToProject === true
   const projectSource = settings.projectSource || 'last'
+  const linkToParentTask = settings.linkToParentTask === true
+  const parentTaskSource = settings.parentTaskSource || 'last'
 
   return (
     <div className="properties-panel__fields">
@@ -136,6 +139,60 @@ const CreateTaskNodeProps = ({ node, onUpdate }) => {
                 умеет принимать <b>global_task_id</b>.
               </p>
             )}
+          </>
+        )}
+      </div>
+
+      <div className="properties-panel__field">
+        <label className="properties-panel__checkbox-row">
+          <input
+            type="checkbox"
+            checked={linkToParentTask}
+            onChange={(e) => handleChange('linkToParentTask', e.target.checked)}
+          />
+          <span>Создавать как <b>подзадачу задачи из схемы</b> (parent_id)</span>
+        </label>
+        {linkToParentTask && (
+          <>
+            <select
+              className="properties-panel__select"
+              value={parentTaskSource}
+              onChange={(e) => handleChange('parentTaskSource', e.target.value)}
+              style={{ marginTop: 6 }}
+            >
+              <option value="last">Последняя созданная задача в процессе</option>
+              <option value="by_node" disabled={taskNodes.length === 0}>По блоку «Создать задачу»</option>
+              <option value="fixed">Фиксированный ID задачи</option>
+            </select>
+
+            {parentTaskSource === 'by_node' && (
+              <select
+                className="properties-panel__select"
+                value={settings.parentTaskNodeId ?? ''}
+                onChange={(e) => handleChange('parentTaskNodeId', e.target.value || null)}
+                style={{ marginTop: 6 }}
+              >
+                <option value="">— Выберите блок «Создать задачу» —</option>
+                {taskNodes.map((n) => (
+                  <option key={n.id} value={n.id}>{n.label || n.id}</option>
+                ))}
+              </select>
+            )}
+
+            {parentTaskSource === 'fixed' && (
+              <input
+                type="number"
+                className="properties-panel__input"
+                value={settings.fixedParentTaskId ?? ''}
+                onChange={(e) => handleChange('fixedParentTaskId', e.target.value ? Number(e.target.value) : null)}
+                placeholder="ID родительской задачи (task_id)"
+                style={{ marginTop: 6 }}
+              />
+            )}
+
+            <p className="properties-panel__hint" style={{ marginTop: 6 }}>
+              Новая задача будет создана как связанная подзадача выбранной задачи. Режим «окно при запуске» не поддерживается.
+            </p>
           </>
         )}
       </div>
@@ -291,15 +348,56 @@ const CreateTaskNodeProps = ({ node, onUpdate }) => {
       </div>
 
       <div className="properties-panel__field">
-        <label className="properties-panel__label">Дедлайн (смещение в днях)</label>
-        <input
-          type="number"
-          className="properties-panel__input"
-          value={settings.deadlineOffsetDays ?? ''}
-          onChange={(e) => handleChange('deadlineOffsetDays', e.target.value === '' ? null : Number(e.target.value))}
-          placeholder="Пусто — без дедлайна"
-          min={0}
-        />
+        <label className="properties-panel__label">Режим дедлайна</label>
+        <select
+          className="properties-panel__select"
+          value={settings.deadlineMode ?? (settings.deadlineOffsetDays != null ? 'offset' : 'none')}
+          onChange={(e) => handleChange('deadlineMode', e.target.value)}
+        >
+          <option value="none">Без дедлайна</option>
+          <option value="offset">Смещение в днях</option>
+          <option value="conditional">По условию (граница времени)</option>
+        </select>
+        {(settings.deadlineMode ?? (settings.deadlineOffsetDays != null ? 'offset' : 'none')) === 'offset' && (
+          <input
+            type="number"
+            className="properties-panel__input"
+            value={settings.deadlineOffsetDays ?? ''}
+            onChange={(e) => handleChange('deadlineOffsetDays', e.target.value === '' ? null : Number(e.target.value))}
+            placeholder="Дней от текущей даты"
+            min={0}
+            style={{ marginTop: 6 }}
+          />
+        )}
+        {(settings.deadlineMode ?? '') === 'conditional' && (
+          <div style={{ marginTop: 8 }}>
+            <p className="properties-panel__hint">Если момент обработки ≤ границы — дедлайн сегодня в «Время сегодня»; иначе — завтра в «Время след. дня».</p>
+            <label className="properties-panel__label" style={{ marginTop: 6 }}>Граница времени (ЧЧ:ММ)</label>
+            <input
+              type="text"
+              className="properties-panel__input"
+              value={settings.conditionalDeadline?.boundary ?? '12:00'}
+              onChange={(e) => handleChange('conditionalDeadline', { ...settings.conditionalDeadline, boundary: e.target.value || '12:00' })}
+              placeholder="12:00"
+            />
+            <label className="properties-panel__label" style={{ marginTop: 6 }}>Время сегодня (ЧЧ:ММ)</label>
+            <input
+              type="text"
+              className="properties-panel__input"
+              value={settings.conditionalDeadline?.sameDayTime ?? '18:00'}
+              onChange={(e) => handleChange('conditionalDeadline', { ...settings.conditionalDeadline, sameDayTime: e.target.value || '18:00' })}
+              placeholder="18:00"
+            />
+            <label className="properties-panel__label" style={{ marginTop: 6 }}>Время след. дня (ЧЧ:ММ)</label>
+            <input
+              type="text"
+              className="properties-panel__input"
+              value={settings.conditionalDeadline?.nextDayTime ?? '16:00'}
+              onChange={(e) => handleChange('conditionalDeadline', { ...settings.conditionalDeadline, nextDayTime: e.target.value || '16:00' })}
+              placeholder="16:00"
+            />
+          </div>
+        )}
       </div>
 
       <p className="properties-panel__hint" style={{ marginTop: '0.5rem' }}>

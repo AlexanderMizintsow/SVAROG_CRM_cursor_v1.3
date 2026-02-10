@@ -32,6 +32,7 @@ const ConfirmationDialog = React.lazy(() =>
 const BoardSidebar = React.lazy(() => import('../sidebar/BoardSidebar'))
 const AddModal = React.lazy(() => import('../Modals/AddModal'))
 import TaskListManager from './subcomponents/TaskListManager/TaskListManager'
+import MiniProjectStrip from './subcomponents/TaskListManager/MiniProjectStrip'
 import './Boards.scss'
 import GlobalTasksContainer from '../globalTask/GlobalTasksContainer'
 import { IoMdNotificationsOff } from 'react-icons/io'
@@ -57,6 +58,8 @@ const Boards = () => {
   const [modalOpen, setModalOpen] = useState(false)
   const [isTaskListManagerOpen, setTaskListManagerOpen] = useState(false)
   const [isGlobalProjectOpen, setGlobalProjectOpen] = useState(false)
+  const [selectedProjectToOpen, setSelectedProjectToOpen] = useState(null)
+  const [stripRefreshKey, setStripRefreshKey] = useState(0)
   const [isCompletedHistoryOpen, setCompletedHistoryOpen] = useState(false)
   const [isHelpOpen, setHelpOpen] = useState(false)
 
@@ -218,6 +221,17 @@ const Boards = () => {
     setGlobalProjectOpen((prev) => !prev)
   }
 
+  const closeGlobalProject = () => {
+    setSelectedProjectToOpen(null)
+    setGlobalProjectOpen(false)
+    setStripRefreshKey((k) => k + 1)
+  }
+
+  const handleOpenProjectFromMini = (task) => {
+    setSelectedProjectToOpen(task)
+    setGlobalProjectOpen(true)
+  }
+
   const toggleCompletedHistory = () => {
     setCompletedHistoryOpen((prev) => !prev)
   }
@@ -268,6 +282,7 @@ const Boards = () => {
         }
       >
         <div className="home-container">
+          <div className="home-container__columns">
           {/* Колонка Уведомления */}
           <div className="column-container notifications-column" key="notifications">
             <div className="column notifications-column-body">
@@ -340,6 +355,8 @@ const Boards = () => {
                 </Droppable>
               </div>
             ))}
+          </div>
+        
         </div>
       </DragDropContext>
       <Suspense fallback={null}>
@@ -387,19 +404,26 @@ const Boards = () => {
             top: '0',
             left: '0',
             width: '100%',
-            height: '100%',
+            height: '100vh',
+            minHeight: '100vh',
+            display: 'flex',
+            flexDirection: 'column',
             bgcolor: 'background.paper',
             boxShadow: 24,
             p: 4,
-            overflow: 'auto',
+            overflow: 'hidden',
           }}
         >
-          <TaskListManager onClose={toggleTaskListManager} />
+          <TaskListManager
+            onClose={toggleTaskListManager}
+            onOpenProject={handleOpenProjectFromMini}
+            stripRefreshKey={stripRefreshKey}
+          />
         </Box>
       </Modal>
       <Modal
         open={isGlobalProjectOpen}
-        onClose={toggleGlobalProgect}
+        onClose={closeGlobalProject}
         aria-labelledby="task-list-manager-modal"
         aria-describedby="task-list-manager-modal-description"
       >
@@ -416,7 +440,12 @@ const Boards = () => {
             overflow: 'auto',
           }}
         >
-          <GlobalTasksContainer onClose={toggleGlobalProgect} />
+          <GlobalTasksContainer
+            onClose={closeGlobalProject}
+            initialTask={selectedProjectToOpen}
+            initialTaskId={selectedProjectToOpen?.id}
+            onProjectUpdated={() => setStripRefreshKey((k) => k + 1)}
+          />
         </Box>
       </Modal>
       <CompletedNotificationsHistory
@@ -425,6 +454,14 @@ const Boards = () => {
         userId={userId}
       />
       <HelpModalKanban open={isHelpOpen} onClose={() => setHelpOpen(false)} />
+
+      <div className="home-container__strip">
+            <MiniProjectStrip
+              onOpenProject={handleOpenProjectFromMini}
+              refreshTrigger={stripRefreshKey}
+            />
+      </div>
+      
     </div>
   )
 }

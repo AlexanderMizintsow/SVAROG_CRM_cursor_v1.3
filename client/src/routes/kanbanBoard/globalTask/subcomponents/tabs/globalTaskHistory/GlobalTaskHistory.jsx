@@ -150,6 +150,12 @@ const GlobalTaskHistory = ({ taskId, refreshHistory }) => {
           colorClass: 'bg-emerald-icon',
           colorClassIcon: 'bg-emerald',
         }
+      case 'согласование':
+        return {
+          icon: <MdDone />,
+          colorClass: 'bg-yellow',
+          colorClassIcon: 'bg-yellow-icon',
+        }
       default:
         return {
           icon: <FaQuestion />,

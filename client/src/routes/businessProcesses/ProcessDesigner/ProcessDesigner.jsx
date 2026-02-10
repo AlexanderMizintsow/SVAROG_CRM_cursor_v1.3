@@ -158,6 +158,12 @@ const ProcessDesigner = () => {
         if (node.type === 'create_task' && s.linkToProject === true && (s.createMode || 'prepared') === 'modal_at_runtime') {
           return `Блок «Создать задачу» («${label}»): подзадачи проекта пока поддерживаются только в режиме «Создать сразу».`
         }
+        if (node.type === 'create_task' && s.linkToParentTask === true && (s.createMode || 'prepared') === 'modal_at_runtime') {
+          return `Блок «Создать задачу» («${label}»): подзадача задачи из схемы пока поддерживается только в режиме «Создать сразу».`
+        }
+        if (node.type === 'create_task' && s.linkToParentTask === true && (s.parentTaskSource || 'last') === 'by_node' && !s.parentTaskNodeId) {
+          return `Блок «Создать задачу» («${label}»): выберите блок «Создать задачу» — родительскую задачу.`
+        }
 
         if (node.type === 'notification') {
           const ch = s.channels || {}

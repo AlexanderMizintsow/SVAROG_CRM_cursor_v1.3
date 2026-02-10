@@ -2,7 +2,7 @@
 
 .task {
   // background: #f4f2f2d4;
-  background: rgb(148 233 202 / 85%);
+  background: rgb(204 255 236 / 94%);
   width: 190px;
   display: flex;
   flex-direction: column;
@@ -14,7 +14,7 @@
   position: relative;
 
   &.highlighted {
-    background: rgb(166 0 247 / 23%); // Цвет фона при наличии global_task_id
+    background: rgb(253 238 255 / 77%);// Цвет фона при наличии global_task_id
   }
 
   .task-id {
@@ -199,7 +199,7 @@
 .task-subtask-icon {
   position: absolute;
   right: 4px;
-  top: 120px;
+  top: 60px;
   cursor: pointer;
 }
 

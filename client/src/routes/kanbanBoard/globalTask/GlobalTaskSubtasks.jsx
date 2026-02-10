@@ -3,8 +3,10 @@ import { useState, useEffect, useCallback } from 'react'
 import axios from 'axios'
 import { API_BASE_URL } from '../../../../config'
 import { FaTasks, FaPlus } from 'react-icons/fa'
+import { TbSubtask } from 'react-icons/tb'
 import UserStore from '../../../store/userStore'
 import AddModal from '../Modals/AddModal'
+import SubTaskHierarchy from '../Task/subcomponents/subTaskHierarchy/SubTaskHierarchy'
 import {
   getStatusClass,
   getResponsibleAvatarColorClass,
@@ -20,6 +22,7 @@ const GlobalTaskSubtasks = ({ taskId, refreshSubTask }) => {
   const [subtasks, setSubtasks] = useState([]) // Состояние для хранения подзадач
   const [isLoading, setIsLoading] = useState(true) // Состояние для индикации загрузки
   const [error, setError] = useState(null) // Состояние для ошибок
+  const [hierarchyTaskId, setHierarchyTaskId] = useState(null) // ID подзадачи для показа иерархии
   const userId = user ? user.id : null
 
   const fetchSubtasks = useCallback(async () => {
@@ -72,6 +75,14 @@ const GlobalTaskSubtasks = ({ taskId, refreshSubTask }) => {
     }
   }
 
+  const handleOpenHierarchy = (subtaskId) => {
+    setHierarchyTaskId(subtaskId)
+  }
+
+  const handleCloseHierarchy = () => {
+    setHierarchyTaskId(null)
+  }
+
   // Функция для форматирования даты
   const formatDate = (dateString) => {
     if (!dateString) return 'Не указан'
@@ -108,14 +119,14 @@ const GlobalTaskSubtasks = ({ taskId, refreshSubTask }) => {
               <th>Наименование задачи</th>
               <th>Исполнитель</th>
               <th>Срок</th>
-              {/*<th>Действия</th>*/}
+              <th className="global-task-subtasks__th-actions">Иерархия</th>
             </tr>
           </thead>
           <tbody>
             {isLoading && (
               <tr>
                 <td
-                  colSpan="5"
+                  colSpan="6"
                   style={{ textAlign: 'center', padding: '1rem' }}
                 >
                   Загрузка подзадач...
@@ -125,7 +136,7 @@ const GlobalTaskSubtasks = ({ taskId, refreshSubTask }) => {
             {error && (
               <tr>
                 <td
-                  colSpan="4"
+                  colSpan="6"
                   style={{ textAlign: 'center', padding: '1rem', color: 'red' }}
                 >
                   {error}
@@ -176,13 +187,26 @@ const GlobalTaskSubtasks = ({ taskId, refreshSubTask }) => {
                       <span>Не назначен</span>
                     )}
                   </td>
-                  <td>{formatDate(subtask.deadline)}</td>{' '}
+                  <td>{formatDate(subtask.deadline)}</td>
+                  <td className="global-task-subtasks__td-actions">
+                    <button
+                      type="button"
+                      className="global-task-subtasks__hierarchy-btn"
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        handleOpenHierarchy(subtask.id)
+                      }}
+                      title="Иерархия подзадачи"
+                    >
+                      <TbSubtask className="global-task-subtasks__hierarchy-icon" />
+                    </button>
+                  </td>
                 </tr>
               ))}
             {!isLoading && !error && subtasks.length === 0 && (
               <tr>
                 <td
-                  colSpan="5" // Изменено на 5, так как у нас 5 колонок
+                  colSpan="6"
                   style={{
                     textAlign: 'center',
                     padding: '1rem',
@@ -204,6 +228,12 @@ const GlobalTaskSubtasks = ({ taskId, refreshSubTask }) => {
         userId={userId}
         globalTaskId={taskId}
       />
+
+      {hierarchyTaskId != null && (
+        <div className="global-task-subtasks__hierarchy-overlay">
+          <SubTaskHierarchy taskId={hierarchyTaskId} onClose={handleCloseHierarchy} />
+        </div>
+      )}
     </div>
   )
 }

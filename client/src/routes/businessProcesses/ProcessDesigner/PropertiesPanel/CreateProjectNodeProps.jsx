@@ -36,7 +36,8 @@ const CreateProjectNodeProps = ({ node, onUpdate }) => {
     const next = responsibles.map((r, i) => (i === idx ? { ...(r || {}), ...(patch || {}) } : r))
     handleChange({ responsibles: next })
   }
-  const addResponsible = () => handleChange({ responsibles: [...responsibles, { id: null, role: 'Исполнитель' }] })
+  const addResponsible = () =>
+    handleChange({ responsibles: [...responsibles, { id: null, role: 'Исполнитель', requires_approval: false }] })
   const removeResponsible = (idx) => handleChange({ responsibles: responsibles.filter((_, i) => i !== idx) })
 
   const goalsText = useMemo(() => {
@@ -110,13 +111,54 @@ const CreateProjectNodeProps = ({ node, onUpdate }) => {
       </div>
 
       <div className="properties-panel__field">
-        <label className="properties-panel__label">Дедлайн (опционально)</label>
-        <input
-          type="datetime-local"
-          className="properties-panel__input"
-          value={settings.deadline ?? ''}
-          onChange={(e) => handleChange({ deadline: e.target.value || null })}
-        />
+        <label className="properties-panel__label">Режим дедлайна</label>
+        <select
+          className="properties-panel__select"
+          value={settings.deadlineMode ?? (settings.deadline ? 'fixed' : 'none')}
+          onChange={(e) => handleChange({ deadlineMode: e.target.value })}
+        >
+          <option value="none">Без дедлайна</option>
+          <option value="fixed">Конкретная дата и время</option>
+          <option value="conditional">По условию (граница времени)</option>
+        </select>
+        {(settings.deadlineMode ?? (settings.deadline ? 'fixed' : 'none')) === 'fixed' && (
+          <input
+            type="datetime-local"
+            className="properties-panel__input"
+            value={settings.deadline ?? ''}
+            onChange={(e) => handleChange({ deadline: e.target.value || null })}
+            style={{ marginTop: 6 }}
+          />
+        )}
+        {(settings.deadlineMode ?? '') === 'conditional' && (
+          <div style={{ marginTop: 8 }}>
+            <p className="properties-panel__hint">Если момент обработки ≤ границы — дедлайн сегодня в «Время сегодня»; иначе — завтра в «Время след. дня».</p>
+            <label className="properties-panel__label" style={{ marginTop: 6 }}>Граница времени (ЧЧ:ММ)</label>
+            <input
+              type="text"
+              className="properties-panel__input"
+              value={settings.conditionalDeadline?.boundary ?? '12:00'}
+              onChange={(e) => handleChange({ conditionalDeadline: { ...settings.conditionalDeadline, boundary: e.target.value || '12:00' } })}
+              placeholder="12:00"
+            />
+            <label className="properties-panel__label" style={{ marginTop: 6 }}>Время сегодня (ЧЧ:ММ)</label>
+            <input
+              type="text"
+              className="properties-panel__input"
+              value={settings.conditionalDeadline?.sameDayTime ?? '18:00'}
+              onChange={(e) => handleChange({ conditionalDeadline: { ...settings.conditionalDeadline, sameDayTime: e.target.value || '18:00' } })}
+              placeholder="18:00"
+            />
+            <label className="properties-panel__label" style={{ marginTop: 6 }}>Время след. дня (ЧЧ:ММ)</label>
+            <input
+              type="text"
+              className="properties-panel__input"
+              value={settings.conditionalDeadline?.nextDayTime ?? '16:00'}
+              onChange={(e) => handleChange({ conditionalDeadline: { ...settings.conditionalDeadline, nextDayTime: e.target.value || '16:00' } })}
+              placeholder="16:00"
+            />
+          </div>
+        )}
       </div>
 
       <div className="properties-panel__field">
@@ -176,10 +218,10 @@ const CreateProjectNodeProps = ({ node, onUpdate }) => {
           <p className="properties-panel__hint">Можно оставить пустым — проект создастся без ответственных.</p>
         ) : (
           responsibles.map((r, idx) => (
-            <div key={idx} style={{ display: 'flex', gap: 8, alignItems: 'flex-start', marginTop: 6 }}>
+            <div key={idx} style={{ display: 'flex', flexWrap: 'wrap', gap: 8, alignItems: 'flex-start', marginTop: 6 }}>
               <select
                 className="properties-panel__select"
-                style={{ flex: '1 1 0' }}
+                style={{ flex: '1 1 120px' }}
                 value={r?.id ?? ''}
                 onChange={(e) => patchResponsible(idx, { id: e.target.value ? Number(e.target.value) : null })}
               >
@@ -193,11 +235,19 @@ const CreateProjectNodeProps = ({ node, onUpdate }) => {
               <input
                 type="text"
                 className="properties-panel__input"
-                style={{ flex: '1 1 0' }}
+                style={{ flex: '1 1 100px' }}
                 value={r?.role ?? ''}
                 onChange={(e) => patchResponsible(idx, { role: e.target.value })}
-                placeholder="Роль (например: Исполнитель)"
+                placeholder="Роль"
               />
+              <label className="properties-panel__checkbox-row" style={{ flex: '0 0 auto', margin: 0 }}>
+                <input
+                  type="checkbox"
+                  checked={!!r?.requires_approval}
+                  onChange={(e) => patchResponsible(idx, { requires_approval: e.target.checked })}
+                />
+                <span>Согласование</span>
+              </label>
               <button type="button" className="properties-panel__btn-remove" onClick={() => removeResponsible(idx)} title="Удалить">
                 −
               </button>

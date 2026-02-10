@@ -20,5 +20,23 @@ function resolveProjectId(context, settings) {
   return last != null ? (Number(last) || last) : null
 }
 
-module.exports = { getOutgoingEdges, resolveProjectId }
+/** Возвращает task_id родительской задачи из контекста (блок «Создать задачу»). */
+function resolveParentTaskId(context, settings) {
+  const source = settings?.parentTaskSource || 'last' // last | by_node | fixed
+  if (source === 'fixed') {
+    const id = settings?.fixedParentTaskId
+    return id != null ? (Number(id) || id) : null
+  }
+  if (source === 'by_node') {
+    const nodeId = settings?.parentTaskNodeId
+    if (!nodeId) return null
+    const outs = context?.block_outputs && typeof context.block_outputs === 'object' ? context.block_outputs : {}
+    const v = outs[nodeId]?.task_id
+    return v != null ? (Number(v) || v) : null
+  }
+  const last = context?.last_task_id
+  return last != null ? (Number(last) || last) : null
+}
+
+module.exports = { getOutgoingEdges, resolveProjectId, resolveParentTaskId }
 

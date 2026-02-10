@@ -57,20 +57,21 @@ const TaskActions = ({
         sx={{
           zIndex: 1,
           position: 'absolute',
-          bottom: 25,
-          right: -15,
+          bottom: 0,
+          right: -17,
           '& .MuiFab-root': {
-            width: 40,
-            height: 40,
+            width: 30,
+            height: 30,
             minHeight: 'unset',
             borderRadius: '50%',
           },
           '& .MuiSpeedDialIcon-icon': {
-            fontSize: '24px',
+            fontSize: '23px',
           },
           '& .MuiSpeedDialIcon-openIcon': {
             fontSize: '24px',
           },
+        
         }}
       >
         {actions.map((action) => (
@@ -79,6 +80,10 @@ const TaskActions = ({
             icon={action.icon}
             tooltipTitle={action.name}
             onClick={action.onClick}
+            sx={{
+              marginBottom: '2px', // уменьшите отступы 
+              marginTop: '1px', // уменьшите отступы 
+            }}
           />
         ))}
       </SpeedDial>
@@ -90,7 +95,7 @@ const TaskActions = ({
           userId={currentUser}
           parentTaskId={task.id}
           rootTaskId={task.root_id || task.id}
-          setOpen={setIsSubtaskModalOpen}
+          setOpen={setIsSubtaskModalOpen} 
         />
       )}
     </>
