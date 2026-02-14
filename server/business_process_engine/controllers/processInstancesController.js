@@ -254,6 +254,11 @@ async function cancelInstance(dbPool, req, res) {
     }
     await dbPool.query('DELETE FROM bp_gateway_waiting WHERE instance_id = $1', [id])
     try {
+      await dbPool.query('DELETE FROM bp_gateway_project_waiting WHERE instance_id = $1', [id])
+    } catch (e) {
+      if (e?.code !== '42P01') throw e
+    }
+    try {
       await dbPool.query('UPDATE bp_decision_requests SET responded_at = NOW() WHERE instance_id = $1 AND responded_at IS NULL', [id])
     } catch (e) {
       if (e?.code !== '42P01') throw e

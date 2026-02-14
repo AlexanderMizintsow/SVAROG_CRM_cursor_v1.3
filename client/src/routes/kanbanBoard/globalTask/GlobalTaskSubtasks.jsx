@@ -15,7 +15,7 @@ import {
 } from '../Boards/subcomponents/taskUtils'
 import './styles/GlobalTaskSubtasks.scss'
 
-const GlobalTaskSubtasks = ({ taskId, refreshSubTask }) => {
+const GlobalTaskSubtasks = ({ taskId, refreshSubTask, isReadOnly }) => {
   // subtasks теперь не нужен как пропс, будем получать их внутри
   const { user } = UserStore()
   const [isAddModalOpen, setIsAddModalOpen] = useState(false)
@@ -102,6 +102,7 @@ const GlobalTaskSubtasks = ({ taskId, refreshSubTask }) => {
         <h3 className="global-task-subtasks__title">
           <FaTasks className="global-task-subtasks__title-icon" /> Подзадачи
         </h3>
+        {!isReadOnly && (
         <button
           className="global-task-subtasks__add-button"
           onClick={handleOpenAddModal}
@@ -109,6 +110,7 @@ const GlobalTaskSubtasks = ({ taskId, refreshSubTask }) => {
           <FaPlus className="global-task-subtasks__add-icon" /> Добавить
           подзадачу
         </button>
+        )}
       </div>
 
       <div className="global-task-subtasks__table-container">
@@ -118,6 +120,7 @@ const GlobalTaskSubtasks = ({ taskId, refreshSubTask }) => {
               <th>Статус</th>
               <th>Наименование задачи</th>
               <th>Исполнитель</th>
+              <th>Автор задачи</th>
               <th>Срок</th>
               <th className="global-task-subtasks__th-actions">Иерархия</th>
             </tr>
@@ -126,7 +129,7 @@ const GlobalTaskSubtasks = ({ taskId, refreshSubTask }) => {
             {isLoading && (
               <tr>
                 <td
-                  colSpan="6"
+                  colSpan="7"
                   style={{ textAlign: 'center', padding: '1rem' }}
                 >
                   Загрузка подзадач...
@@ -136,7 +139,7 @@ const GlobalTaskSubtasks = ({ taskId, refreshSubTask }) => {
             {error && (
               <tr>
                 <td
-                  colSpan="6"
+                  colSpan="7"
                   style={{ textAlign: 'center', padding: '1rem', color: 'red' }}
                 >
                   {error}
@@ -165,7 +168,6 @@ const GlobalTaskSubtasks = ({ taskId, refreshSubTask }) => {
                     </div>
                   </td>
                   <td>
-                    {/* Отображаем ответственного. */}
                     {subtask.responsible ? (
                       <div
                         className={`global-task-subtasks__responsible ${getResponsibleAvatarColorClass(
@@ -187,6 +189,28 @@ const GlobalTaskSubtasks = ({ taskId, refreshSubTask }) => {
                       <span>Не назначен</span>
                     )}
                   </td>
+                  <td>
+                    {subtask.author ? (
+                      <div
+                        className={`global-task-subtasks__responsible ${getResponsibleAvatarColorClass(
+                          subtask.author.color
+                        )}`}
+                      >
+                        <div
+                          className={`global-task-subtasks__responsible-avatar ${getResponsibleColorClass(
+                            subtask.author.color
+                          )}`}
+                        >
+                          {subtask.author.initials}
+                        </div>
+                        <div className="global-task-subtasks__responsible-name">
+                          {subtask.author.name}
+                        </div>
+                      </div>
+                    ) : (
+                      <span>—</span>
+                    )}
+                  </td>
                   <td>{formatDate(subtask.deadline)}</td>
                   <td className="global-task-subtasks__td-actions">
                     <button
@@ -206,7 +230,7 @@ const GlobalTaskSubtasks = ({ taskId, refreshSubTask }) => {
             {!isLoading && !error && subtasks.length === 0 && (
               <tr>
                 <td
-                  colSpan="6"
+                  colSpan="7"
                   style={{
                     textAlign: 'center',
                     padding: '1rem',

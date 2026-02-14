@@ -202,6 +202,7 @@ const ProcessList = ({ showDrafts = false, onEditProcess, onCreateNew }) => {
     ? {
         title: pendingTaskCreationData.templateData.title || '',
         description: pendingTaskCreationData.templateData.description || '',
+        deadline: pendingTaskCreationData.templateData.deadline || '',
         priority: pendingTaskCreationData.templateData.priority || 'низкий',
         implementers: pendingTaskCreationData.templateData.assigneeUserIds || [],
         approvers: pendingTaskCreationData.templateData.approverUserIds || [],

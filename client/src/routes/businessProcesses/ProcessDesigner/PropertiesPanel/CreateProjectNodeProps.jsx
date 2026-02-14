@@ -5,6 +5,15 @@ import './PropertiesPanel.scss'
 
 const emptyInfoRow = () => ({ key: '', value: '' })
 
+// Значение для input type="datetime-local": дата/время в локальной зоне в формате YYYY-MM-DDTHH:mm
+function toDateTimeLocalValue(deadline) {
+  if (!deadline) return ''
+  const d = new Date(deadline)
+  if (Number.isNaN(d.getTime())) return ''
+  const pad = (n) => String(n).padStart(2, '0')
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`
+}
+
 const CreateProjectNodeProps = ({ node, onUpdate }) => {
   const settings = node.settings || {}
   const [users, setUsers] = useState([])
@@ -42,7 +51,7 @@ const CreateProjectNodeProps = ({ node, onUpdate }) => {
 
   const goalsText = useMemo(() => {
     const g = Array.isArray(settings.goals) ? settings.goals : []
-    return g.join('\n')
+    return g.map((x) => (x != null ? String(x) : '')).join('\n')
   }, [settings.goals])
 
   const priority = settings.priority || 'medium'
@@ -115,7 +124,25 @@ const CreateProjectNodeProps = ({ node, onUpdate }) => {
         <select
           className="properties-panel__select"
           value={settings.deadlineMode ?? (settings.deadline ? 'fixed' : 'none')}
-          onChange={(e) => handleChange({ deadlineMode: e.target.value })}
+          onChange={(e) => {
+            const mode = e.target.value
+            const patch = { deadlineMode: mode }
+            if (mode === 'none') {
+              patch.deadline = null
+              patch.conditionalDeadline = null
+            } else if (mode === 'fixed') {
+              patch.conditionalDeadline = null
+            } else if (mode === 'conditional') {
+              patch.deadline = null
+              // Инициализируем правило, иначе в схеме не сохранятся значения и движок не поставит дедлайн
+              patch.conditionalDeadline = {
+                boundary: settings.conditionalDeadline?.boundary ?? '12:00',
+                sameDayTime: settings.conditionalDeadline?.sameDayTime ?? '18:00',
+                nextDayTime: settings.conditionalDeadline?.nextDayTime ?? '16:00',
+              }
+            }
+            handleChange(patch)
+          }}
         >
           <option value="none">Без дедлайна</option>
           <option value="fixed">Конкретная дата и время</option>
@@ -125,7 +152,7 @@ const CreateProjectNodeProps = ({ node, onUpdate }) => {
           <input
             type="datetime-local"
             className="properties-panel__input"
-            value={settings.deadline ?? ''}
+            value={toDateTimeLocalValue(settings.deadline)}
             onChange={(e) => handleChange({ deadline: e.target.value || null })}
             style={{ marginTop: 6 }}
           />
@@ -168,10 +195,8 @@ const CreateProjectNodeProps = ({ node, onUpdate }) => {
           rows={4}
           value={goalsText}
           onChange={(e) => {
-            const lines = String(e.target.value || '')
-              .split('\n')
-              .map((x) => x.trim())
-              .filter(Boolean)
+            const raw = String(e.target.value ?? '')
+            const lines = raw.split('\n')
             handleChange({ goals: lines })
           }}
           placeholder={'Например:\n- Уточнить размеры\n- Отправить на склад\n- Закрыть проект'}

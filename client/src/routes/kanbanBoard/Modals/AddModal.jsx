@@ -479,6 +479,7 @@ const AddModal = ({
               id="deadline"
               name="deadline"
               onChange={handleChange}
+              value={taskData.deadline || ""}
               onClick={handleInputClick} // Обработчик клика
               onFocus={handleFocus} // Обработчик фокуса
             />

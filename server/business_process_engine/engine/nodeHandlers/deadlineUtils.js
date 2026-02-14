@@ -24,8 +24,11 @@ function setTimeToDate(date, timeStr) {
 function computeConditionalDeadline(rule, now = new Date()) {
   if (!rule || !rule.boundary) return null
   const boundary = parseTime(rule.boundary)
-  const sameDayTime = rule.sameDayTime != null ? String(rule.sameDayTime) : '18:00'
-  const nextDayTime = rule.nextDayTime != null ? String(rule.nextDayTime) : '16:00'
+  // Поддержка camelCase и snake_case (на случай разного формата из схемы/API)
+  const sameDayRaw = rule.sameDayTime ?? rule.same_day_time
+  const nextDayRaw = rule.nextDayTime ?? rule.next_day_time
+  const sameDayTime = (sameDayRaw != null && String(sameDayRaw).trim() !== '') ? String(sameDayRaw).trim() : '18:00'
+  const nextDayTime = (nextDayRaw != null && String(nextDayRaw).trim() !== '') ? String(nextDayRaw).trim() : '16:00'
 
   const currentMins = now.getHours() * 60 + now.getMinutes()
   const boundMins = boundary.h * 60 + boundary.m
@@ -38,7 +41,14 @@ function computeConditionalDeadline(rule, now = new Date()) {
     d.setDate(d.getDate() + 1)
     d = setTimeToDate(d, nextDayTime)
   }
-  return d.toISOString()
+  // Возвращаем YYYY-MM-DDTHH:mm (без timezone), как для конкретной даты в модалке,
+  // чтобы в карточке задачи отображалось выбранное время (19:09), а не UTC (15:09)
+  const y = d.getFullYear()
+  const m = String(d.getMonth() + 1).padStart(2, '0')
+  const day = String(d.getDate()).padStart(2, '0')
+  const h = String(d.getHours()).padStart(2, '0')
+  const min = String(d.getMinutes()).padStart(2, '0')
+  return `${y}-${m}-${day}T${h}:${min}`
 }
 
 module.exports = { computeConditionalDeadline, parseTime, setTimeToDate }

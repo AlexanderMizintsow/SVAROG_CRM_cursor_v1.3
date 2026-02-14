@@ -85,23 +85,7 @@ const ConfirmationDialog = ({
             variant="outlined"
             value={commentValue}
             onChange={(e) => setCommentValue(e.target.value)}
-            sx={{
-              '& .MuiOutlinedInput-input': {
-                color: '#fff',
-              },
-              '& .MuiInputLabel-root': {
-                color: '#fff',
-              },
-              '& .MuiOutlinedInput-notchedOutline': {
-                borderColor: '#fff',
-              },
-              '&:hover .MuiOutlinedInput-notchedOutline': {
-                borderColor: '#fff',
-              },
-              '&.Mui-focused .MuiOutlinedInput-notchedOutline': {
-                borderColor: '#fff',
-              },
-            }}
+           
           />
         )}
         {dateInput && (
@@ -118,17 +102,7 @@ const ConfirmationDialog = ({
             InputLabelProps={{
               shrink: true,
             }}
-            sx={{
-              '& .MuiOutlinedInput-input': { color: '#fff' },
-              '& .MuiInputLabel-root': { color: '#fff' },
-              '& .MuiOutlinedInput-notchedOutline': { borderColor: '#fff' },
-              '&:hover .MuiOutlinedInput-notchedOutline': {
-                borderColor: '#fff',
-              },
-              '&.Mui-focused .MuiOutlinedInput-notchedOutline': {
-                borderColor: '#fff',
-              },
-            }}
+           
           />
         )}
       </DialogContent>

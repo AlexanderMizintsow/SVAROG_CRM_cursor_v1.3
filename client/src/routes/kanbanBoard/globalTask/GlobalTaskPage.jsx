@@ -69,6 +69,9 @@ const GlobalTaskPage = ({
     )
   }
 
+  const TERMINAL_STATUSES = ['Завершено', 'Провал', 'Удален']
+  const isReadOnly = TERMINAL_STATUSES.includes(currentTask.status)
+
   // 6. Определение обработчиков событий и других функций
   const goToPreviousTask = () => {
     if (currentTaskIndex > 0) {
@@ -111,6 +114,8 @@ const GlobalTaskPage = ({
           completionPercentage={currentTask.completion_percentage}
           deadline={currentTask.deadline}
           onRefresh={onRefresh}
+          authorId={typeof currentTask.created_by === 'object' ? currentTask.created_by?.id : currentTask.created_by}
+          isReadOnly={isReadOnly}
         />
         <GlobalTaskCard
           key={currentTask.id}
@@ -121,6 +126,7 @@ const GlobalTaskPage = ({
           hasNext={tasks && currentTaskIndex < tasks.length - 1}
           setAttachments={setAttachments}
           onRefresh={onRefresh}
+          isReadOnly={isReadOnly}
         />
 
         {/* Используем GlobalTaskTabs и передаем ему состояние и колбэк */}
@@ -133,6 +139,7 @@ const GlobalTaskPage = ({
               subtasks={currentTask.subtasks}
               taskId={currentTask.id}
               refreshSubTask={refreshSubTask}
+              isReadOnly={isReadOnly}
             />
           )}
           {activeTab === 'history' && (

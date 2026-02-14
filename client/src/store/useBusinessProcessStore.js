@@ -8,7 +8,7 @@ const initialState = {
   processes: [],
   selectedProcess: null,
   instances: [],
-  scheme: { nodes: [], edges: [] },
+  scheme: { nodes: [], edges: [], meta: { gatewayDebugNotify: false } },
   selectedNodeId: null,
   processName: '',
   processDescription: '',
@@ -114,7 +114,7 @@ const useBusinessProcessStore = create((set, get) => ({
 
   resetDesigner: () =>
     set({
-      scheme: { nodes: [], edges: [] },
+      scheme: { nodes: [], edges: [], meta: { gatewayDebugNotify: false } },
       selectedNodeId: null,
       processName: '',
       processDescription: '',
@@ -130,8 +130,9 @@ const useBusinessProcessStore = create((set, get) => ({
         ? {
             nodes: Array.isArray(raw.nodes) ? raw.nodes : [],
             edges: Array.isArray(raw.edges) ? raw.edges : [],
+            meta: raw.meta && typeof raw.meta === 'object' ? raw.meta : { gatewayDebugNotify: false },
           }
-        : { nodes: [], edges: [] }
+        : { nodes: [], edges: [], meta: { gatewayDebugNotify: false } }
     set({
       selectedProcess: process,
       scheme,

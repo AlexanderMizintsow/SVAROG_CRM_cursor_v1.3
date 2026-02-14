@@ -358,8 +358,8 @@ const Task = forwardRef(({ task, provided, actionIcon, column }, ref) => {
                 position: 'absolute',
                 transform: 'rotate(45deg)',
                 transformOrigin: 'left bottom',
-                letterSpacing: '4px',
-                fontSize: '18px',
+                letterSpacing: '3px',
+                fontSize: '10px',
                 fontWeight: 'bold',
               }}
             >

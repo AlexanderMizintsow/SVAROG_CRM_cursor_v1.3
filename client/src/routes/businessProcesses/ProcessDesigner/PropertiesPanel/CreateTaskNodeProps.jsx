@@ -10,6 +10,15 @@ import UserCheckboxList from './UserCheckboxList'
 import useBusinessProcessStore from '../../../../store/useBusinessProcessStore'
 import './PropertiesPanel.scss'
 
+// Значение для input type="datetime-local": дата/время в локальной зоне в формате YYYY-MM-DDTHH:mm
+function toDateTimeLocalValue(deadline) {
+  if (!deadline) return ''
+  const d = new Date(deadline)
+  if (Number.isNaN(d.getTime())) return ''
+  const pad = (n) => String(n).padStart(2, '0')
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`
+}
+
 const CreateTaskNodeProps = ({ node, onUpdate }) => {
   const settings = node.settings || {}
   const [users, setUsers] = useState([])
@@ -351,14 +360,60 @@ const CreateTaskNodeProps = ({ node, onUpdate }) => {
         <label className="properties-panel__label">Режим дедлайна</label>
         <select
           className="properties-panel__select"
-          value={settings.deadlineMode ?? (settings.deadlineOffsetDays != null ? 'offset' : 'none')}
-          onChange={(e) => handleChange('deadlineMode', e.target.value)}
+          value={
+            settings.deadlineMode ??
+            (settings.deadline
+              ? 'fixed'
+              : settings.deadlineOffsetDays != null
+                ? 'offset'
+                : 'none')
+          }
+          onChange={(e) => {
+            const mode = e.target.value
+            const patch = { deadlineMode: mode }
+            if (mode === 'none') {
+              patch.deadline = null
+              patch.deadlineOffsetDays = null
+              patch.conditionalDeadline = null
+            } else if (mode === 'fixed') {
+              patch.deadlineOffsetDays = null
+              patch.conditionalDeadline = null
+            } else if (mode === 'offset') {
+              patch.deadline = null
+              patch.conditionalDeadline = null
+            } else if (mode === 'conditional') {
+              patch.deadline = null
+              patch.deadlineOffsetDays = null
+              // Инициализируем правило, иначе в схеме не сохранятся значения и движок не поставит дедлайн
+              patch.conditionalDeadline = {
+                boundary: settings.conditionalDeadline?.boundary ?? '12:00',
+                sameDayTime: settings.conditionalDeadline?.sameDayTime ?? '18:00',
+                nextDayTime: settings.conditionalDeadline?.nextDayTime ?? '16:00',
+              }
+            }
+            onUpdate({ settings: { ...settings, ...patch } })
+          }}
         >
           <option value="none">Без дедлайна</option>
+          <option value="fixed">Конкретная дата и время</option>
           <option value="offset">Смещение в днях</option>
           <option value="conditional">По условию (граница времени)</option>
         </select>
-        {(settings.deadlineMode ?? (settings.deadlineOffsetDays != null ? 'offset' : 'none')) === 'offset' && (
+        {(settings.deadlineMode ?? (settings.deadline ? 'fixed' : settings.deadlineOffsetDays != null ? 'offset' : 'none')) === 'fixed' && (
+          <>
+            <input
+              type="datetime-local"
+              className="properties-panel__input"
+              value={toDateTimeLocalValue(settings.deadline)}
+              onChange={(e) => handleChange('deadline', e.target.value || null)}
+              style={{ marginTop: 6 }}
+            />
+            <p className="properties-panel__hint" style={{ marginTop: 4, fontSize: '0.8rem' }}>
+              Укажите и дату, и время — в карточке задачи отобразится выбранное значение.
+            </p>
+          </>
+        )}
+        {(settings.deadlineMode ?? (settings.deadline ? 'fixed' : settings.deadlineOffsetDays != null ? 'offset' : 'none')) === 'offset' && (
           <input
             type="number"
             className="properties-panel__input"

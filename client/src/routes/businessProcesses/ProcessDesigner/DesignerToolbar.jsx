@@ -7,10 +7,12 @@ const DesignerToolbar = ({
   processName,
   processDescription,
   isDraft,
+  gatewayDebugNotify,
   canDelete,
   onProcessNameChange,
   onProcessDescriptionChange,
   onIsDraftChange,
+  onGatewayDebugNotifyChange,
   onSaveDraft,
   onPublish,
   onNewProcess,
@@ -47,6 +49,14 @@ const DesignerToolbar = ({
             onChange={(e) => onIsDraftChange(e.target.checked)}
           />
           <span>Черновик (не показывать в списке для запуска)</span>
+        </label>
+        <label className="designer-toolbar__checkbox" title="При срабатывании Развилки/Развилки-Слияния инициатору будет приходить «Системное сообщение» с отладочной информацией">
+          <input
+            type="checkbox"
+            checked={gatewayDebugNotify === true}
+            onChange={(e) => onGatewayDebugNotifyChange && onGatewayDebugNotifyChange(e.target.checked)}
+          />
+          <span>Тест-уведомление (Развилки) — «Системное сообщение» инициатору</span>
         </label>
       </div>
       <div className="designer-toolbar__actions">

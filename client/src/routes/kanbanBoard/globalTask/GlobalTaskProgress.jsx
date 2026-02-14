@@ -23,6 +23,8 @@ const GlobalTaskProgress = ({
   deadline,
   completionPercentage,
   onRefresh,
+  authorId,
+  isReadOnly,
 }) => {
   const { user } = useUserStore()
   const [dialogOpen, setDialogOpen] = useState(false)
@@ -31,6 +33,7 @@ const GlobalTaskProgress = ({
   const [confirmProgressDialogOpen, setConfirmProgressDialogOpen] =
     useState(false)
   const userId = user.id
+  const isAuthor = authorId != null && String(authorId) === String(userId)
 
   const handleMarkAsFailed = async (commentValue, actionType) => {
     try {
@@ -45,6 +48,7 @@ const GlobalTaskProgress = ({
 
       if (actionType === 'Провал') {
         await updateTaskStatus('Провал')
+        onRefresh(taskId)
       } else if (actionType === 'Пауза') {
         await updateTaskStatus('Пауза')
 
@@ -118,6 +122,7 @@ const GlobalTaskProgress = ({
   const handleConfirmAsComplete = async () => {
     try {
       await updateTaskStatus('Завершено')
+      onRefresh(taskId)
       Toastify({
         text: 'Проект успешно завершен',
         close: true,
@@ -170,12 +175,14 @@ const GlobalTaskProgress = ({
         </span>
       </div>
 
+      {!isReadOnly && (
       <div className="global-task-progress__controller">
         <div className="global-task-progress__controller-extra-actions">
           <button
-            disabled={completionPercentage < 100}
+            disabled={completionPercentage < 100 || !isAuthor}
             className="global-task-progress__controller-button global-task-progress__controller-button--complete"
             onClick={handleOpenConfirmProgress}
+            title={!isAuthor ? 'Доступно только автору проекта' : undefined}
           >
             <FaCheckCircle className="global-task-progress__controller-icon" />
             Отметить выполненной
@@ -183,16 +190,20 @@ const GlobalTaskProgress = ({
 
           {status === 'Пауза' ? (
             <button
+              disabled={!isAuthor}
               onClick={() => setDialogOpenPause(true)}
               className="global-task-progress__controller-button global-task-progress__controller-button--play"
+              title={!isAuthor ? 'Доступно только автору проекта' : undefined}
             >
               <FaPlay className="global-task-progress__controller-icon" />
               Продолжить проект
             </button>
           ) : (
             <button
+              disabled={!isAuthor}
               onClick={() => setDialogOpenPause(true)}
               className="global-task-progress__controller-button global-task-progress__controller-button--pause"
+              title={!isAuthor ? 'Доступно только автору проекта' : undefined}
             >
               <FaPause className="global-task-progress__controller-icon" />
               Поставить на паузу
@@ -201,6 +212,8 @@ const GlobalTaskProgress = ({
           <button
             className="global-task-progress__controller-button global-task-progress__controller-button--delete"
             onClick={() => setDeleteDialogOpen(true)}
+            disabled={!isAuthor}
+            title={!isAuthor ? 'Доступно только автору проекта' : undefined}
           >
             <FaTrashAlt className="global-task-progress__controller-icon" />
             Удалить проект
@@ -208,6 +221,8 @@ const GlobalTaskProgress = ({
           <button
             className="global-task-progress__controller-button global-task-progress__controller-button--delete"
             onClick={() => setDialogOpen(true)}
+            disabled={!isAuthor}
+            title={!isAuthor ? 'Доступно только автору проекта' : undefined}
           >
             <FaExclamationTriangle className="global-task-progress__controller-icon" />
             Пометить как неудачу
@@ -221,6 +236,7 @@ const GlobalTaskProgress = ({
           </button>
         </div>
       </div>
+      )}
       <ConfirmationDialog
         open={deleteDialogOpen}
         onClose={() => setDeleteDialogOpen(false)}

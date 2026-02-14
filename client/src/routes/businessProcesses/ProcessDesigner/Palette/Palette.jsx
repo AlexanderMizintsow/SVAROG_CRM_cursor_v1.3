@@ -295,6 +295,8 @@ function getDefaultSettings(type) {
         assigneeUserIds: [],
         approverUserIds: [],
         viewerUserIds: [],
+        deadlineMode: null,
+        deadline: null,
         deadlineOffsetDays: null,
         linkToProject: false,
         projectSource: 'last',

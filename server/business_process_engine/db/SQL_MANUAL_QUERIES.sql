@@ -29,7 +29,7 @@ CREATE TABLE bp_process_instances (
   initiator_id INT REFERENCES users(id) ON DELETE SET NULL,
   launched_by_user_id INT REFERENCES users(id) ON DELETE SET NULL,
   current_node_id VARCHAR(100),
-  status VARCHAR(30) NOT NULL CHECK (status IN ('running', 'waiting_gateway', 'waiting_timer', 'waiting_user_input', 'completed', 'failed', 'cancelled')),
+  status VARCHAR(30) NOT NULL CHECK (status IN ('running', 'waiting_gateway', 'waiting_timer', 'waiting_user_input', 'waiting_decision', 'waiting_additional_info', 'waiting_join', 'completed', 'failed', 'cancelled')),
   context JSONB DEFAULT '{}',
   error_message TEXT
 );
@@ -40,9 +40,9 @@ CREATE INDEX idx_bp_process_instances_initiator_id ON bp_process_instances(initi
 CREATE INDEX idx_bp_process_instances_started_at ON bp_process_instances(started_at);
 CREATE INDEX idx_bp_process_instances_waiting_timer ON bp_process_instances(status) WHERE status = 'waiting_timer';
 
--- Если таблица bp_process_instances уже создана без waiting_user_input — выполните:
+-- Если таблица bp_process_instances уже создана без новых статусов — выполните:
 -- ALTER TABLE bp_process_instances DROP CONSTRAINT IF EXISTS bp_process_instances_status_check;
--- ALTER TABLE bp_process_instances ADD CONSTRAINT bp_process_instances_status_check CHECK (status IN ('running', 'waiting_gateway', 'waiting_timer', 'waiting_user_input', 'completed', 'failed', 'cancelled'));
+-- ALTER TABLE bp_process_instances ADD CONSTRAINT bp_process_instances_status_check CHECK (status IN ('running', 'waiting_gateway', 'waiting_timer', 'waiting_user_input', 'waiting_decision', 'waiting_additional_info', 'waiting_join', 'completed', 'failed', 'cancelled'));
 
 
 -- 3. Лог прохода по узлам
@@ -52,13 +52,13 @@ CREATE TABLE bp_node_execution_log (
   node_id VARCHAR(100) NOT NULL,
   entered_at TIMESTAMP DEFAULT NOW(),
   exited_at TIMESTAMP,
-  outcome VARCHAR(30) CHECK (outcome IN ('success', 'condition_met', 'error', 'timer_scheduled', 'waiting_user_input')),
+  outcome VARCHAR(30) CHECK (outcome IN ('success', 'condition_met', 'error', 'timer_scheduled', 'waiting_user_input', 'waiting_decision', 'waiting_additional_info', 'waiting_join')),
   payload JSONB
 );
 
--- Если таблица bp_node_execution_log уже создана без outcome 'waiting_user_input' — выполните:
+-- Если таблица bp_node_execution_log уже создана без новых outcome — выполните:
 -- ALTER TABLE bp_node_execution_log DROP CONSTRAINT IF EXISTS bp_node_execution_log_outcome_check;
--- ALTER TABLE bp_node_execution_log ADD CONSTRAINT bp_node_execution_log_outcome_check CHECK (outcome IN ('success', 'condition_met', 'error', 'timer_scheduled', 'waiting_user_input'));
+-- ALTER TABLE bp_node_execution_log ADD CONSTRAINT bp_node_execution_log_outcome_check CHECK (outcome IN ('success', 'condition_met', 'error', 'timer_scheduled', 'waiting_user_input', 'waiting_decision', 'waiting_additional_info', 'waiting_join'));
 
 CREATE INDEX idx_bp_node_execution_log_instance_id ON bp_node_execution_log(instance_id);
 CREATE INDEX idx_bp_node_execution_log_node_id ON bp_node_execution_log(node_id);
@@ -101,6 +101,30 @@ CREATE TABLE bp_gateway_waiting (
 
 CREATE INDEX idx_bp_gateway_waiting_task_id ON bp_gateway_waiting(task_id);
 CREATE INDEX idx_bp_gateway_waiting_instance_id ON bp_gateway_waiting(instance_id);
+
+
+-- 6.1. Ожидание развилки по проекту (global_task)
+CREATE TABLE bp_gateway_project_waiting (
+  id SERIAL PRIMARY KEY,
+  instance_id INT NOT NULL REFERENCES bp_process_instances(id) ON DELETE CASCADE,
+  node_id VARCHAR(100) NOT NULL,
+  global_task_id INT NOT NULL,
+  created_at TIMESTAMP DEFAULT NOW()
+);
+
+CREATE INDEX idx_bp_gateway_project_waiting_global_task_id ON bp_gateway_project_waiting(global_task_id);
+CREATE INDEX idx_bp_gateway_project_waiting_instance_id ON bp_gateway_project_waiting(instance_id);
+
+
+-- 6.2. Ожидание развилки «Слияние» (несколько входящих)
+CREATE TABLE bp_gateway_join_waiting (
+  id SERIAL PRIMARY KEY,
+  instance_id INT NOT NULL UNIQUE REFERENCES bp_process_instances(id) ON DELETE CASCADE,
+  node_id VARCHAR(100) NOT NULL,
+  created_at TIMESTAMP DEFAULT NOW()
+);
+
+CREATE INDEX idx_bp_gateway_join_waiting_instance_id ON bp_gateway_join_waiting(instance_id);
 
 
 -- 7. Шаблоны задач
@@ -153,3 +177,80 @@ CREATE TABLE bp_in_app_notifications (
 CREATE INDEX idx_bp_in_app_notifications_user_id ON bp_in_app_notifications(user_id);
 CREATE INDEX idx_bp_in_app_notifications_is_read ON bp_in_app_notifications(user_id, is_read);
 CREATE INDEX idx_bp_in_app_notifications_created_at ON bp_in_app_notifications(created_at);
+
+
+-- 10. Запросы на принятие решения (блок «Принятие решения»)
+CREATE TABLE bp_decision_requests (
+  id SERIAL PRIMARY KEY,
+  instance_id INT NOT NULL REFERENCES bp_process_instances(id) ON DELETE CASCADE,
+  node_id VARCHAR(100) NOT NULL,
+  user_id INT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  process_name VARCHAR(255),
+  message TEXT NOT NULL,
+  buttons JSONB NOT NULL DEFAULT '[]',
+  initiator_id INT REFERENCES users(id) ON DELETE SET NULL,
+  initiator_name VARCHAR(255),
+  selected_button_id VARCHAR(100),
+  responded_at TIMESTAMP,
+  created_at TIMESTAMP DEFAULT NOW()
+);
+
+CREATE INDEX idx_bp_decision_requests_user_id ON bp_decision_requests(user_id);
+CREATE INDEX idx_bp_decision_requests_instance_id ON bp_decision_requests(instance_id);
+CREATE INDEX idx_bp_decision_requests_responded_at ON bp_decision_requests(user_id, responded_at);
+
+
+-- 11. Запросы на заполнение «Доп. информация» (блок «Доп. информация»)
+CREATE TABLE bp_additional_info_requests (
+  id SERIAL PRIMARY KEY,
+  instance_id INT NOT NULL REFERENCES bp_process_instances(id) ON DELETE CASCADE,
+  node_id VARCHAR(100) NOT NULL,
+  user_id INT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  process_name VARCHAR(255),
+  prompt_text TEXT NOT NULL,
+  required_keys JSONB NOT NULL DEFAULT '[]',
+  initiator_id INT REFERENCES users(id) ON DELETE SET NULL,
+  initiator_name VARCHAR(255),
+  responded_values JSONB,
+  responded_at TIMESTAMP,
+  created_at TIMESTAMP DEFAULT NOW()
+);
+
+CREATE INDEX idx_bp_additional_info_requests_user_id ON bp_additional_info_requests(user_id);
+CREATE INDEX idx_bp_additional_info_requests_instance_id ON bp_additional_info_requests(instance_id);
+CREATE INDEX idx_bp_additional_info_requests_responded_at ON bp_additional_info_requests(user_id, responded_at);
+
+
+-- Согласование участников проекта: колонки в global_task_responsibles
+-- Выполнить один раз для существующей БД (если таблица создана без этих полей).
+
+ALTER TABLE global_task_responsibles ADD COLUMN IF NOT EXISTS requires_approval BOOLEAN DEFAULT false;
+ALTER TABLE global_task_responsibles ADD COLUMN IF NOT EXISTS approval_status VARCHAR(20) DEFAULT NULL;
+ALTER TABLE global_task_responsibles ADD COLUMN IF NOT EXISTS approval_comment TEXT;
+ALTER TABLE global_task_responsibles ADD COLUMN IF NOT EXISTS approval_at TIMESTAMP;
+
+
+-- =============================================================================
+-- БЕЗОПАСНОЕ УДАЛЕНИЕ: если что-то пошло не так, выполните следующий блок.
+-- ВНИМАНИЕ: это удалит все данные и таблицы БП. Задачи (tasks) останутся,
+-- но связь business_process_instance_id будет сброшена.
+-- Выполняйте по порядку.
+-- =============================================================================
+
+-- 1. Удалить FK и колонку в tasks (связь с экземплярами БП)
+ALTER TABLE tasks DROP CONSTRAINT IF EXISTS fk_tasks_bp_instance;
+ALTER TABLE tasks DROP COLUMN IF EXISTS business_process_instance_id;
+
+-- 2. Удалить таблицы (порядок важен: сначала зависимые, затем основные)
+DROP TABLE IF EXISTS bp_additional_info_requests CASCADE;
+DROP TABLE IF EXISTS bp_decision_requests CASCADE;
+DROP TABLE IF EXISTS bp_in_app_notifications CASCADE;
+DROP TABLE IF EXISTS bp_gateway_join_waiting CASCADE;
+DROP TABLE IF EXISTS bp_gateway_project_waiting CASCADE;
+DROP TABLE IF EXISTS bp_gateway_waiting CASCADE;
+DROP TABLE IF EXISTS bp_timer_waiting CASCADE;
+DROP TABLE IF EXISTS bp_task_process_links CASCADE;
+DROP TABLE IF EXISTS bp_node_execution_log CASCADE;
+DROP TABLE IF EXISTS bp_process_instances CASCADE;
+DROP TABLE IF EXISTS bp_process_definitions CASCADE;
+DROP TABLE IF EXISTS bp_task_templates CASCADE;

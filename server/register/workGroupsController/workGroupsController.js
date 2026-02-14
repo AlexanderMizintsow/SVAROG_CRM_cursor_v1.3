@@ -267,9 +267,17 @@ const getParticipantVotes = (dbPool) => async (req, res) => {
       if (!formattedResult[group_id]) {
         formattedResult[group_id] = {}
       }
-      formattedResult[group_id][participant_id] = selected_dates.map(
-        (date) => date.toISOString().split('T')[0]
-      )
+      // YYYY-MM-DD: не использовать toISOString() — node-pg даёт DATE как полночь локального времени, UTC даёт сдвиг на день
+      formattedResult[group_id][participant_id] = selected_dates.map((date) => {
+        if (date instanceof Date) {
+          const y = date.getFullYear()
+          const m = String(date.getMonth() + 1).padStart(2, '0')
+          const d = String(date.getDate()).padStart(2, '0')
+          return `${y}-${m}-${d}`
+        }
+        const s = String(date)
+        return s.length >= 10 ? s.substring(0, 10) : s
+      })
     })
 
     res.status(200).json(formattedResult)

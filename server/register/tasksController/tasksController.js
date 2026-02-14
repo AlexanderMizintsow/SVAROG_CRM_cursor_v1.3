@@ -16,6 +16,19 @@ function notifyBpeTaskUpdated(taskId) {
   })
 }
 
+function notifyBpeProjectUpdated(globalTaskId) {
+  const bpeUrl = process.env.BPE_API_URL || process.env.BPE_WEBHOOK_URL || 'http://localhost:5010'
+  if (!globalTaskId) return
+  if (!_warnedMissingBpeUrl && !(process.env.BPE_API_URL || process.env.BPE_WEBHOOK_URL)) {
+    _warnedMissingBpeUrl = true
+    console.warn('BPE webhook: не задан BPE_API_URL/BPE_WEBHOOK_URL, использую fallback http://localhost:5010')
+  }
+  const url = `${bpeUrl.replace(/\/$/, '')}/api/bp/webhooks/project-updated`
+  axios.post(url, { global_task_id: globalTaskId }, { timeout: 5000 }).catch((err) => {
+    console.warn('BPE webhook project-updated:', err.message)
+  })
+}
+
 async function getGlobalTaskParticipantUserIds(db, globalTaskId) {
   if (!globalTaskId) return []
   const ids = new Set()
@@ -434,6 +447,32 @@ function addTaskAttachment(dbPool, io) {
       return res.status(500).json({ error: 'Ошибка проверки задачи' })
     }
 
+    // Нормализация file_type: некоторые MIME (xlsx/docx) очень длинные и могут не помещаться в колонку
+    // Для UI нам важно только «картинка/не картинка», поэтому для office форматов приводим к короткому виду.
+    const ext = (() => {
+      try {
+        const parts = String(name_file || '').split('.')
+        return parts.length > 1 ? String(parts[parts.length - 1]).toLowerCase() : ''
+      } catch {
+        return ''
+      }
+    })()
+
+    const normalizeFileType = (ftRaw) => {
+      const ft = String(ftRaw || '').trim()
+      if (!ft) return ext ? `application/${ext}` : 'application/octet-stream'
+      const low = ft.toLowerCase()
+      if (low.includes('spreadsheetml')) return 'application/xlsx'
+      if (low.includes('ms-excel')) return 'application/xls'
+      if (low.includes('wordprocessingml')) return 'application/docx'
+      if (low.includes('msword')) return 'application/doc'
+      // если MIME слишком длинный — ужимаем
+      if (ft.length > 60) return ext ? `application/${ext}` : 'application/octet-stream'
+      return ft
+    }
+
+    const fileTypeToStore = normalizeFileType(file_type)
+
     // Выполняем вставку в выбранную таблицу
     const insertQuery = `
       INSERT INTO ${tableName} (task_id, file_url, file_type, uploaded_by, comment_file, name_file)
@@ -444,15 +483,25 @@ function addTaskAttachment(dbPool, io) {
       await dbPool.query(insertQuery, [
         task_id,
         file_url,
-        file_type,
+        fileTypeToStore,
         uploaded_by,
         comment_file,
         name_file,
       ])
-      io.emit('taskAttachment') // оповещаем клиентов
+      io.emit('taskAttachment')
+      if (tableTypeNormalized === 'global' && task_id) {
+        const participantIds = await getGlobalTaskParticipantUserIds(dbPool, task_id)
+        if (participantIds && participantIds.length > 0) {
+          emitGlobalTaskChanged(io, participantIds, task_id, 'attachment')
+        }
+      }
       res.status(201).json({ message: 'Вложение добавлено к задаче' })
     } catch (error) {
-      console.error('Ошибка при добавлении вложения:', error)
+      console.error('Ошибка при добавлении вложения:', {
+        message: error?.message,
+        code: error?.code,
+        detail: error?.detail,
+      })
       res.status(500).json({ error: 'Ошибка при добавлении вложения' })
     }
   }
@@ -745,6 +794,7 @@ function updateTaskAccept(dbPool, io) {
       if (globalTaskIdForEmit) {
         const participantIds = await getGlobalTaskParticipantUserIds(dbPool, globalTaskIdForEmit)
         emitGlobalTaskChanged(io, participantIds, globalTaskIdForEmit, 'subtaskAccept')
+        notifyBpeProjectUpdated(Number(globalTaskIdForEmit))
       }
 
       notifyBpeTaskUpdated(Number(taskId))
@@ -1042,10 +1092,21 @@ function createGlobalTask(dbPool, io) {
       goals, // Массив строк
       deadline, // Дата или строка даты
       priority = 'medium', // Устанавливаем значение по умолчанию на бэкенде, если не передано
-      additionalInfo = {}, // Объект
       responsibles, // Массив объектов { id: ..., role: ... }
       created_by, // ID пользователя, создающего задачу
     } = req.body
+    // Доп. информация: поддерживаем оба варианта ключа (camelCase от BPE и snake_case); массив [{key, value}] приводим к объекту
+    let rawAdditional = req.body.additionalInfo ?? req.body.additional_info ?? {}
+    const additionalInfo =
+      Array.isArray(rawAdditional) && rawAdditional.length > 0
+        ? rawAdditional.reduce((acc, it) => {
+            const k = String(it?.key ?? '').trim()
+            if (k) acc[k] = it?.value != null ? String(it.value) : ''
+            return acc
+          }, {})
+        : typeof rawAdditional === 'object' && rawAdditional !== null
+          ? rawAdditional
+          : {}
 
     // 2. Валидация данных (базовая)
     if (!title || !created_by) {
@@ -1131,6 +1192,9 @@ function createGlobalTask(dbPool, io) {
       const participantIds = await getGlobalTaskParticipantUserIds(dbPool, newTaskId)
       emitGlobalTaskChanged(io, participantIds, newTaskId, 'created')
 
+      // BPE: уведомляем движок о появлении/изменении проекта (событийные развилки по проекту)
+      notifyBpeProjectUpdated(Number(newTaskId))
+
       // 5. Отправка успешного ответа
       res.status(201).json({
         message: 'Глобальная задача успешно создана',
@@ -1212,6 +1276,7 @@ LEFT JOIN users cu ON gt.created_by = cu.id
 WHERE
   gt.status <> 'Завершено' AND
   gt.status <> 'Провал' AND
+  gt.status <> 'Удален' AND
   (
     gt.created_by = $1 -- создатель
     OR
@@ -1411,6 +1476,7 @@ function updateGlobalTask(dbPool, io) {
         const newParticipantIds = await getGlobalTaskParticipantUserIds(client, taskId)
         const allIds = Array.from(new Set([...(oldParticipantIds || []), ...(newParticipantIds || [])]))
         emitGlobalTaskChanged(io, allIds, taskId, 'updated')
+        notifyBpeProjectUpdated(Number(taskId))
         res.status(200).json(result.rows[0]) // Возвращаем обновленную задачу
       } else {
         // Задача не найдена после обновления (что маловероятно, если обновление прошло успешно)
@@ -1441,61 +1507,77 @@ function getSubtasksForGlobalTask(dbPool) {
             t.deadline,
             t.priority,
             t.status,
-            t.is_completed, 
+            t.is_completed,
+            t.created_by AS author_id,
             u.id AS responsible_id,
             u.first_name AS responsible_first_name,
             u.middle_name AS responsible_middle_name,
-            u.last_name AS responsible_last_name
-            -- Добавляем поля color и initials, как вы их формируете в getGlobalTasks
-            -- Если они не хранятся напрямую в таблице users, формируем их здесь
+            u.last_name AS responsible_last_name,
+            cu.first_name AS author_first_name,
+            cu.last_name AS author_last_name,
+            cu.middle_name AS author_middle_name
         FROM tasks t
         LEFT JOIN task_assignments ta ON t.id = ta.task_id
         LEFT JOIN users u ON ta.user_id = u.id
+        LEFT JOIN users cu ON t.created_by = cu.id
         WHERE t.global_task_id = $1
-        ORDER BY t.created_at DESC; -- Опционально: сортировка
+        ORDER BY t.created_at DESC;
         `,
         [globalTaskId]
       )
 
-      // Обработка результата запроса для формирования нужной структуры
-      const subtasks = result.rows.map((row) => ({
-        id: row.id,
-        title: row.title,
-        description: row.description,
-        created_at: row.created_at,
-        deadline: row.deadline,
-        priority: row.priority,
-        status: row.status,
-        is_completed: row.is_completed,
-        responsible: row.responsible_id
-          ? {
-              id: row.responsible_id,
-              name: `${row.responsible_last_name || ''} ${row.responsible_first_name || ''} ${
-                row.middle_name || ''
-              }`.trim(),
-              // Формируем color и initials так же, как в getGlobalTasks
-              initials: `${(row.responsible_first_name || '')[0]}${
-                (row.responsible_last_name || '')[0]
-              }`.toUpperCase(),
-              color: (() => {
-                if (!row.responsible_id) return 'default'
-                switch (row.responsible_id % 4) {
-                  case 0:
-                    return 'blue'
-                  case 1:
-                    return 'purple'
-                  case 2:
-                    return 'green'
-                  case 3:
-                    return 'orange'
-                  default:
-                    return 'default'
-                }
-              })(),
-            }
-          : null,
-        // tags и notification_status не включаем, так как они не нужны для отображения в этом компоненте
-      }))
+      const subtasks = result.rows
+        .filter((row, idx, arr) => arr.findIndex((r) => r.id === row.id) === idx)
+        .map((row) => ({
+          id: row.id,
+          title: row.title,
+          description: row.description,
+          created_at: row.created_at,
+          deadline: row.deadline,
+          priority: row.priority,
+          status: row.status,
+          is_completed: row.is_completed,
+          responsible: row.responsible_id
+            ? {
+                id: row.responsible_id,
+                name: `${row.responsible_last_name || ''} ${row.responsible_first_name || ''} ${
+                  row.responsible_middle_name || ''
+                }`.trim(),
+                initials: `${(row.responsible_first_name || '')[0]}${
+                  (row.responsible_last_name || '')[0]
+                }`.toUpperCase(),
+                color: (() => {
+                  if (!row.responsible_id) return 'default'
+                  switch (row.responsible_id % 4) {
+                    case 0: return 'blue'
+                    case 1: return 'purple'
+                    case 2: return 'green'
+                    case 3: return 'orange'
+                    default: return 'default'
+                  }
+                })(),
+              }
+            : null,
+          author: row.author_id
+            ? {
+                id: row.author_id,
+                name: `${row.author_last_name || ''} ${row.author_first_name || ''} ${
+                  row.author_middle_name || ''
+                }`.trim(),
+                initials: `${(row.author_first_name || '')[0]}${(row.author_last_name || '')[0]}`.toUpperCase(),
+                color: (() => {
+                  if (!row.author_id) return 'default'
+                  switch (row.author_id % 4) {
+                    case 0: return 'blue'
+                    case 1: return 'purple'
+                    case 2: return 'green'
+                    case 3: return 'orange'
+                    default: return 'default'
+                  }
+                })(),
+              }
+            : null,
+        }))
 
       res.status(200).json(subtasks)
     } catch (err) {
@@ -1529,6 +1611,8 @@ function updateGlobalTaskProcess(dbPool, io) {
       if (result.rowCount === 0) {
         return res.status(404).json({ error: 'Задача не найдена' })
       }
+
+      notifyBpeProjectUpdated(Number(taskId))
 
       // История изменений ч1
       let statusHistory = 'Проект завершен'
@@ -1612,6 +1696,11 @@ function updateGlobalTaskProcess(dbPool, io) {
         return res.status(500).json({ error: 'Ошибка обновления deadline' })
       }
 
+      const participantIds = await getGlobalTaskParticipantUserIds(dbPool, taskId)
+      if (io && participantIds && participantIds.length > 0) {
+        emitGlobalTaskChanged(io, participantIds, taskId, 'status')
+      }
+
       res.json({ message: 'Статус обновлен', task: result.rows[0] })
     } catch (error) {
       console.error('Ошибка при обновлении задачи:', error)
@@ -1620,42 +1709,37 @@ function updateGlobalTaskProcess(dbPool, io) {
   }
 }
 
-// Удаление Проекта и подзадач
-function deleteGlobalTask(dbPool) {
+// Мягкое удаление проекта (status = 'Удален'), подзадачи не удаляем
+function deleteGlobalTask(dbPool, io) {
   return async function (req, res) {
     const { taskId } = req.params
 
     try {
-      // Начинаем транзакцию
-      await dbPool.query('BEGIN')
+      const participantIds = await getGlobalTaskParticipantUserIds(dbPool, taskId)
 
-      // 1. Удаляем подзадачи, связанные с глобальной задачей
-      await dbPool.query('DELETE FROM tasks WHERE global_task_id = $1', [taskId])
-
-      // 2. Удаляем глобальную задачу
-      const deleteResult = await dbPool.query(
-        'DELETE FROM global_tasks WHERE id = $1 RETURNING *',
+      const updateResult = await dbPool.query(
+        `UPDATE global_tasks SET status = 'Удален' WHERE id = $1 RETURNING *`,
         [taskId]
       )
 
-      if (deleteResult.rowCount === 0) {
-        await dbPool.query('ROLLBACK')
+      if (updateResult.rowCount === 0) {
         return res.status(404).json({ error: 'Глобальная задача не найдена' })
       }
 
-      // 3. Подтверждаем транзакцию
-      await dbPool.query('COMMIT')
+      if (io && participantIds && participantIds.length > 0) {
+        emitGlobalTaskChanged(io, participantIds, taskId, 'deleted')
+      }
+      notifyBpeProjectUpdated(Number(taskId))
 
-      res.json({ message: 'Глобальная задача и подзадачи успешно удалены' })
+      res.json({ message: 'Проект помечен как удалённый' })
     } catch (error) {
-      await dbPool.query('ROLLBACK')
       console.error('Ошибка при удалении глобальной задачи:', error)
       res.status(500).json({ error: 'Ошибка сервера' })
     }
   }
 }
 
-// Получение информации о конкретной глобальной задаче по id
+// Получение информации о конкретной глобальной задаче по id (любой статус, в т.ч. Завершено/Провал/Удален)
 function getGlobalTaskById(dbPool) {
   return async function (req, res) {
     const { taskId } = req.params
@@ -1671,7 +1755,7 @@ function getGlobalTaskById(dbPool) {
       )
 
       if (resid.rowCount === 0) {
-        return
+        return res.status(404).json({ error: 'Задача не найдена' })
       }
 
       const result = await dbPool.query(
@@ -1720,9 +1804,7 @@ function getGlobalTaskById(dbPool) {
     LEFT JOIN global_task_responsibles gtr ON gt.id = gtr.global_task_id
     LEFT JOIN users u ON gtr.user_id = u.id
     LEFT JOIN users cu ON gt.created_by = cu.id
-    WHERE
-        gt.status <> 'Завершено' and gt.status <> 'Провал'
-        AND gt.id = $1
+    WHERE gt.id = $1
     GROUP BY
         gt.id, cu.id, cu.first_name, cu.last_name
         `,
@@ -1741,6 +1823,98 @@ function getGlobalTaskById(dbPool) {
       res.status(200).json(task)
     } catch (err) {
       console.error(`Ошибка при получении задачи ${taskId}:`, err)
+      res.status(500).json({ error: 'Внутренняя ошибка сервера' })
+    }
+  }
+}
+
+// Получить завершённые/проваленные/удалённые проекты для пользователя (автор или участник)
+function getGlobalTasksCompleted(dbPool) {
+  return async function (req, res) {
+    const userIdParam = req.query.userId
+    const type = (req.query.type || '').toLowerCase() // completed | failed | deleted | all
+    const userId = userIdParam ? parseInt(userIdParam, 10) : null
+
+    if (!userId) {
+      return res.status(400).json({ error: 'Недостаточно параметров' })
+    }
+
+    const statusFilter =
+      type === 'completed'
+        ? "gt.status = 'Завершено'"
+        : type === 'failed'
+        ? "gt.status = 'Провал'"
+        : type === 'deleted'
+        ? "gt.status = 'Удален'"
+        : "gt.status IN ('Завершено', 'Провал', 'Удален')"
+
+    try {
+      const result = await dbPool.query(
+        `
+       SELECT
+    gt.id,
+    gt.title,
+    gt.description,
+    COALESCE(gt.goals, '[]'::jsonb) as goals,
+    gt.deadline,
+    gt.priority,
+    gt.status,
+    gt.progress,
+    gt.created_at,
+    json_build_object('id', cu.id, 'name', TRIM(CONCAT(cu.first_name, ' ', cu.last_name))) as created_by,
+    COALESCE(gt.additional_info, '{}'::jsonb) as additional_info,
+    COALESCE(json_agg(json_build_object(
+        'id', u.id,
+        'name', TRIM(CONCAT(u.first_name, ' ', u.last_name)),
+        'role', gtr.role,
+        'initials', LEFT(u.first_name, 1) || LEFT(u.last_name, 1),
+        'color', CASE
+            WHEN u.id % 4 = 0 THEN 'blue'
+            WHEN u.id % 4 = 1 THEN 'purple'
+            WHEN u.id % 4 = 2 THEN 'green'
+            WHEN u.id % 4 = 3 THEN 'orange'
+            ELSE 'default'
+        END,
+        'requires_approval', COALESCE(gtr.requires_approval, false),
+        'approval_status', gtr.approval_status,
+        'approval_comment', gtr.approval_comment,
+        'approval_at', gtr.approval_at
+    )) FILTER (WHERE u.id IS NOT NULL)::jsonb, '[]'::jsonb) as responsibles,
+    COALESCE(
+        (SELECT ROUND(100.0 * (
+            (SELECT COALESCE(SUM(CASE WHEN t.is_completed THEN 1 ELSE 0 END), 0) FROM tasks t WHERE t.global_task_id = gt.id)
+            + (SELECT COUNT(*) FROM global_task_responsibles gtra WHERE gtra.global_task_id = gt.id AND gtra.requires_approval = true AND gtra.approval_status = 'approved')
+        ) / NULLIF(
+            (SELECT COUNT(*) FROM tasks t WHERE t.global_task_id = gt.id)
+            + (SELECT COUNT(*) FROM global_task_responsibles gtra WHERE gtra.global_task_id = gt.id AND gtra.requires_approval = true),
+            0
+        ), 2)
+        ), 0) as completion_percentage
+FROM
+    global_tasks gt
+LEFT JOIN global_task_responsibles gtr ON gt.id = gtr.global_task_id
+LEFT JOIN users u ON gtr.user_id = u.id
+LEFT JOIN users cu ON gt.created_by = cu.id
+WHERE ${statusFilter}
+  AND (
+    gt.created_by = $1
+    OR
+    EXISTS (
+      SELECT 1 FROM global_task_responsibles gtr2
+      WHERE gtr2.global_task_id = gt.id AND gtr2.user_id = $1
+    )
+  )
+        GROUP BY
+          gt.id, cu.id, cu.first_name, cu.last_name
+        ORDER BY
+          gt.created_at DESC;
+        `,
+        [userId]
+      )
+
+      res.status(200).json(result.rows)
+    } catch (error) {
+      console.error('Ошибка при получении завершённых проектов:', error)
       res.status(500).json({ error: 'Внутренняя ошибка сервера' })
     }
   }
@@ -1832,7 +2006,7 @@ function addCommentToGlobalTask(dbPool) {
 }
 
 // Добавление ответственных к глобальной задаче по ID
-function addResponsiblesToGlobalTask(dbPool) {
+function addResponsiblesToGlobalTask(dbPool, io) {
   return async function (req, res) {
     const { taskId } = req.params
     const { responsibles, userId } = req.body
@@ -1893,6 +2067,12 @@ function addResponsiblesToGlobalTask(dbPool) {
         null
       )
 
+      const participantIds = await getGlobalTaskParticipantUserIds(dbPool, taskId)
+      if (io && participantIds && participantIds.length > 0) {
+        emitGlobalTaskChanged(io, participantIds, taskId, 'responsiblesAdded')
+      }
+      notifyBpeProjectUpdated(Number(taskId))
+
       res.status(201).json(result.rows)
     } catch (error) {
       await dbPool.query('ROLLBACK')
@@ -1948,6 +2128,7 @@ function setProjectApproval(dbPool, io) {
       // realtime: обновить мини-карточки у всех участников проекта
       const participantIds = await getGlobalTaskParticipantUserIds(dbPool, taskId)
       emitGlobalTaskChanged(io, participantIds, taskId, 'approval')
+      notifyBpeProjectUpdated(Number(taskId))
 
       res.status(200).json({ success: true, status })
     } catch (err) {
@@ -1957,33 +2138,92 @@ function setProjectApproval(dbPool, io) {
   }
 }
 
+// Удаление участника из проекта (только автор). Нельзя удалить, если у участника есть задачи по проекту или ожидание согласования.
+function removeResponsibleFromGlobalTask(dbPool, io) {
+  return async function (req, res) {
+    const { taskId, userId: targetUserId } = req.params
+    const requesterId = req.body?.requesterId || req.query?.requesterId
+
+    if (!requesterId || !targetUserId) {
+      return res.status(400).json({ error: 'Укажите requesterId и userId удаляемого участника.' })
+    }
+
+    try {
+      const gt = await dbPool.query(
+        'SELECT created_by FROM global_tasks WHERE id = $1',
+        [taskId]
+      )
+      if (gt.rows.length === 0) {
+        return res.status(404).json({ error: 'Проект не найден' })
+      }
+      if (Number(gt.rows[0].created_by) !== Number(requesterId)) {
+        return res.status(403).json({ error: 'Только автор проекта может удалять участников' })
+      }
+
+      const hasTasks = await dbPool.query(
+        `SELECT 1 FROM tasks t
+         JOIN task_assignments ta ON t.id = ta.task_id
+         WHERE t.global_task_id = $1 AND ta.user_id = $2
+         LIMIT 1`,
+        [taskId, targetUserId]
+      )
+      if (hasTasks.rows.length > 0) {
+        return res.status(400).json({
+          error: 'Нельзя удалить участника: у него есть задачи в этом проекте.',
+        })
+      }
+
+      const pendingApproval = await dbPool.query(
+        `SELECT 1 FROM global_task_responsibles
+         WHERE global_task_id = $1 AND user_id = $2 AND requires_approval = true
+         AND (approval_status IS NULL OR approval_status NOT IN ('approved', 'rejected'))`,
+        [taskId, targetUserId]
+      )
+      if (pendingApproval.rows.length > 0) {
+        return res.status(400).json({
+          error: 'Нельзя удалить участника: от него ожидается согласование по проекту.',
+        })
+      }
+
+      // Собираем id всех, кому слать обновление (включая удаляемого), до удаления
+      const participantIds = await getGlobalTaskParticipantUserIds(dbPool, taskId)
+
+      const del = await dbPool.query(
+        'DELETE FROM global_task_responsibles WHERE global_task_id = $1 AND user_id = $2 RETURNING *',
+        [taskId, targetUserId]
+      )
+      if (del.rowCount === 0) {
+        return res.status(404).json({ error: 'Участник не найден в проекте' })
+      }
+
+      if (io && participantIds && participantIds.length > 0) {
+        emitGlobalTaskChanged(io, participantIds, taskId, 'responsibleRemoved')
+      }
+      notifyBpeProjectUpdated(Number(taskId))
+
+      res.status(200).json({ message: 'Участник удалён из проекта' })
+    } catch (err) {
+      console.error('removeResponsibleFromGlobalTask:', err)
+      res.status(500).json({ error: 'Ошибка при удалении участника' })
+    }
+  }
+}
+
 // Обновление целей задачи по ID
-function updateGoals(dbPool) {
+function updateGoals(dbPool, io) {
   return async function (req, res) {
     const { id } = req.params
-    const { goals, userId } = req.body // ожидается массив целей
+    const { goals, userId } = req.body
 
     try {
       await dbPool.query(
-        `
-          UPDATE global_tasks SET goals = $1 WHERE id = $2
-          `,
+        `UPDATE global_tasks SET goals = $1 WHERE id = $2`,
         [JSON.stringify(goals), id]
       )
-
-      // Формируем строку целей для истории
-      //  const goalsString = goals.filter((goal) => goal.trim() !== '').join(', ')
-
-      // История изменений ответственных
-      //   await insertTaskHistory(
-      //    dbPool,
-      //     id,
-      //   'обновление',
-      //     `Новые цели: ${goalsString}`,
-      //      userId,
-      //    null
-      //    )
-
+      const participantIds = await getGlobalTaskParticipantUserIds(dbPool, id)
+      if (io && participantIds && participantIds.length > 0) {
+        emitGlobalTaskChanged(io, participantIds, id, 'goals')
+      }
       res.json({ message: 'Цели обновлены' })
     } catch (err) {
       console.error('Ошибка при обновлении целей:', err)
@@ -1993,19 +2233,20 @@ function updateGoals(dbPool) {
 }
 
 // Обновление дополнительной информации по ID
-function updateAdditionalInfo(dbPool) {
+function updateAdditionalInfo(dbPool, io) {
   return async function (req, res) {
     const { id } = req.params
-    const { additional_info } = req.body // ожидается объект
+    const { additional_info } = req.body
 
     try {
       await dbPool.query(
-        `
-        UPDATE global_tasks SET additional_info = $1 WHERE id = $2
-        `,
+        `UPDATE global_tasks SET additional_info = $1 WHERE id = $2`,
         [additional_info, id]
       )
-
+      const participantIds = await getGlobalTaskParticipantUserIds(dbPool, id)
+      if (io && participantIds && participantIds.length > 0) {
+        emitGlobalTaskChanged(io, participantIds, id, 'additionalInfo')
+      }
       res.json({ message: 'Дополнительная информация обновлена' })
     } catch (err) {
       console.error('Ошибка при обновлении доп. инфо:', err)
@@ -3253,6 +3494,8 @@ module.exports = {
   getGlobalTaskHistory,
   updateGlobalTaskHistory,
   getGlobalTaskTitle,
+  getGlobalTasksCompleted,
+  removeResponsibleFromGlobalTask,
   updateTaskDescription,
   getTaskDescriptionHistory,
   getTaskById,

@@ -81,6 +81,7 @@ const ResponsibleSelector = ({
         avatarColorClass: generateRandomAvatarColorClass(),
         backgroundColorClass: generateRandomBackgroundColorClass(),
         role: responsibleRolesList[0],
+        requires_approval: false,
       }
       setResponsibles([...responsibles, newResponsible])
       if (onAddResponsible) {
@@ -98,6 +99,14 @@ const ResponsibleSelector = ({
   const handleResponsibleRoleChange = (userId, newRole) => {
     const updated = responsibles.map((resp) =>
       resp.id === userId ? { ...resp, role: newRole } : resp
+    )
+    setResponsibles(updated)
+  }
+
+  // Обработчик галочки «Требуется согласование»
+  const handleRequiresApprovalChange = (respId, checked) => {
+    const updated = responsibles.map((resp) =>
+      resp.id === respId ? { ...resp, requires_approval: !!checked } : resp
     )
     setResponsibles(updated)
   }
@@ -140,6 +149,18 @@ const ResponsibleSelector = ({
                     </option>
                   ))}
                 </select>
+                {/* Требуется согласование */}
+                <label className="create-global-task-form__requires-approval-label">
+                  <input
+                    type="checkbox"
+                    checked={!!resp.requires_approval}
+                    onChange={(e) =>
+                      handleRequiresApprovalChange(resp.id, e.target.checked)
+                    }
+                    className="create-global-task-form__requires-approval-checkbox"
+                  />
+                  <span>Требуется согласование</span>
+                </label>
               </div>
               {/* Кнопка удаления */}
               <button

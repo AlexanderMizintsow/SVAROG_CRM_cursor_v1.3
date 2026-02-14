@@ -36,6 +36,7 @@ const GlobalTaskCard = ({
   hasNext, // Флаг: есть ли следующая задача
   setAttachments,
   onRefresh,
+  isReadOnly,
 }) => {
   const cardRef = useRef(null)
   const { user } = useUserStore()
@@ -72,6 +73,9 @@ const GlobalTaskCard = ({
   const goalsRef = useRef(null)
   const additionalInfoRef = useRef(null)
   const userId = user?.id
+  const authorId = typeof task.created_by === 'object' ? task.created_by?.id : task.created_by
+  const isAuthor = authorId != null && String(authorId) === String(userId)
+  const [removingResponsibleId, setRemovingResponsibleId] = useState(null)
 
   const myApprovalResponsible = responsibles?.find(
     (r) => r.id === userId && r.requires_approval === true
@@ -107,6 +111,23 @@ const GlobalTaskCard = ({
       alert(err.response?.data?.error || 'Не удалось сохранить согласование')
     } finally {
       setApprovalSubmitting(false)
+    }
+  }
+
+  const handleRemoveResponsible = async (responsibleUserId) => {
+    if (!isAuthor) return
+    setRemovingResponsibleId(responsibleUserId)
+    try {
+      await axios.delete(
+        `${API_BASE_URL}5000/api/global-tasks/${id}/responsibles/${responsibleUserId}`,
+        { data: { requesterId: userId } }
+      )
+      if (typeof onRefresh === 'function') onRefresh(id)
+    } catch (err) {
+      const msg = err.response?.data?.error || 'Не удалось исключить участника'
+      alert(msg)
+    } finally {
+      setRemovingResponsibleId(null)
     }
   }
 
@@ -424,7 +445,7 @@ const GlobalTaskCard = ({
                         {resp.approval_comment}
                       </div>
                     )}
-                    {resp.id === userId && resp.requires_approval && (
+                    {!isReadOnly && resp.id === userId && resp.requires_approval && (
                       <div className="global-task-card__approval-actions">
                         <button
                           type="button"
@@ -441,6 +462,17 @@ const GlobalTaskCard = ({
                           Отклонено
                         </button>
                       </div>
+                    )}
+                    {!isReadOnly && isAuthor && (
+                      <button
+                        type="button"
+                        className="global-task-card__remove-responsible-btn"
+                        onClick={() => handleRemoveResponsible(resp.id)}
+                        disabled={removingResponsibleId === resp.id}
+                        title="Исключить из проекта"
+                      >
+                        {removingResponsibleId === resp.id ? '…' : 'Исключить'}
+                      </button>
                     )}
                   </div>
                 </div>
@@ -510,10 +542,10 @@ const GlobalTaskCard = ({
           )}
         </div>
 
+        {!isReadOnly && (
         <div className="global-task-card__footer-actions">
           <button className="global-task-card__footer-button">
             <FaPaperclip onClick={() => handleAddFile(id)} />{' '}
-            {/*Логика добавления к карточке файлов*/}
           </button>
           <button
             className="global-task-card__footer-button"
@@ -527,7 +559,7 @@ const GlobalTaskCard = ({
               <ul>
                 <li
                   onClick={() => {
-                    setIsModalOpenResponsibles(true) // Открываем модальное окно
+                    setIsModalOpenResponsibles(true)
                   }}
                 >
                   Добавить ответственного
@@ -540,6 +572,7 @@ const GlobalTaskCard = ({
             </div>
           )}
         </div>
+        )}
       </div>
 
       {isModalOpenResponsibles && (

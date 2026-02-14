@@ -1,6 +1,14 @@
 import { TIMER_TYPES, TIMER_UNITS } from '../../constants/blockTypes'
 import './PropertiesPanel.scss'
 
+function toDateTimeLocalValue(value) {
+  if (!value) return ''
+  const d = new Date(value)
+  if (Number.isNaN(d.getTime())) return ''
+  const pad = (n) => String(n).padStart(2, '0')
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`
+}
+
 const TimerNodeProps = ({ node, onUpdate }) => {
   const settings = node.settings || {}
 
@@ -54,7 +62,7 @@ const TimerNodeProps = ({ node, onUpdate }) => {
           <input
             type="datetime-local"
             className="properties-panel__input"
-            value={settings.untilDate ?? ''}
+            value={toDateTimeLocalValue(settings.untilDate)}
             onChange={(e) => handleChange('untilDate', e.target.value || null)}
           />
           <p className="properties-panel__hint" style={{ marginTop: '0.35rem', fontSize: '0.8rem' }}>

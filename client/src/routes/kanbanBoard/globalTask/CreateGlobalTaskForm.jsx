@@ -16,6 +16,7 @@ import './styles/CreateGlobalTaskForm.scss'
 const CreateGlobalTaskForm = ({ onSave, onCancel, initialData }) => {
   const [users, setUsers] = useState([])
   const [responsibleRoles, setResponsibleRoles] = useState(responsibleRolesList)
+  const [attachmentsFiles, setAttachmentsFiles] = useState([])
   const [formData, setFormData] = useState({
     title: '',
     description: '',
@@ -197,7 +198,7 @@ const CreateGlobalTaskForm = ({ onSave, onCancel, initialData }) => {
   const handleSubmit = (e) => {
     e.preventDefault()
     console.log('Отправляемые данные:', formData)
-    onSave(formData)
+    onSave({ ...formData, attachmentsFiles })
   }
 
   return (
@@ -320,6 +321,40 @@ const CreateGlobalTaskForm = ({ onSave, onCancel, initialData }) => {
               <option value="medium">Средний</option>
               <option value="high">Высокий</option>
             </select>
+          </div>
+
+          <div className="create-global-task-form__section">
+            <label className="create-global-task-form__label">Файлы (необязательно)</label>
+            <input
+              type="file"
+              className="create-global-task-form__input"
+              multiple
+              onChange={(e) => {
+                const files = Array.from(e.target.files || [])
+                if (files.length === 0) return
+                setAttachmentsFiles((prev) => [...prev, ...files])
+                e.target.value = ''
+              }}
+            />
+            {attachmentsFiles.length > 0 && (
+              <div className="create-global-task-form__attachments">
+                {attachmentsFiles.map((f, idx) => (
+                  <div key={`${f.name}-${idx}`} className="create-global-task-form__attachments-item">
+                    <span title={f.name}>{f.name}</span>
+                    <button
+                      type="button"
+                      className="create-global-task-form__remove-button"
+                      onClick={() =>
+                        setAttachmentsFiles((prev) => prev.filter((_, i) => i !== idx))
+                      }
+                      title="Удалить файл"
+                    >
+                      <FaTrashAlt />
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
 
           <div className="create-global-task-form__section">

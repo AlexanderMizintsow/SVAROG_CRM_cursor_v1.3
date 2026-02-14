@@ -110,6 +110,8 @@ async function handle(instance, node, scheme, integrations, dbPool) {
       approverUserIds: settings.approverUserIds || [],
       viewerUserIds: settings.viewerUserIds || [],
       deadlineOffsetDays: deadlineOffsetDays != null ? deadlineOffsetDays : null,
+      deadlineMode: settings.deadlineMode || null,
+      deadline: settings.deadline || null,
     }
     const pending = { nodeId: node.id, templateData }
     const newContext = { ...context, pending_task_creation: pending }
@@ -127,11 +129,31 @@ async function handle(instance, node, scheme, integrations, dbPool) {
     createdBy = settings.authorUserId
   }
 
-  // Дедлайн: по условию (граница времени) или смещение в днях
+  // Дедлайн: только если выбран соответствующий режим (при смене режима старые поля не используются)
+  // Для «конкретная дата» передаём строку как в модалке «Создать задачу» (YYYY-MM-DDTHH:mm) без toISOString(),
+  // чтобы register сохранил то же значение и в карточке задачи отображалось выбранное время
   let deadline = null
-  if (settings.deadlineMode === 'conditional' && settings.conditionalDeadline && settings.conditionalDeadline.boundary) {
-    deadline = computeConditionalDeadline(settings.conditionalDeadline)
-  } else if (deadlineOffsetDays != null) {
+  if (settings.deadlineMode === 'fixed' && settings.deadline) {
+    const deadlineStr = String(settings.deadline).trim()
+    if (/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}/.test(deadlineStr)) {
+      deadline = deadlineStr
+    } else {
+      const dt = new Date(settings.deadline)
+      if (!Number.isFinite(dt.getTime())) {
+        return { fail: 'Создать задачу: некорректная дата/время дедлайна в настройках блока' }
+      }
+      deadline = dt.toISOString()
+    }
+  } else if (settings.deadlineMode === 'conditional') {
+    const def = { boundary: '12:00', sameDayTime: '18:00', nextDayTime: '16:00' }
+    const raw = settings.conditionalDeadline || {}
+    const rule = {
+      boundary: raw.boundary ?? def.boundary,
+      sameDayTime: raw.sameDayTime ?? raw.same_day_time ?? def.sameDayTime,
+      nextDayTime: raw.nextDayTime ?? raw.next_day_time ?? def.nextDayTime,
+    }
+    deadline = computeConditionalDeadline(rule)
+  } else if (settings.deadlineMode === 'offset' && deadlineOffsetDays != null) {
     const d = new Date()
     d.setDate(d.getDate() + Number(deadlineOffsetDays))
     deadline = d.toISOString()

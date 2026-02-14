@@ -18,6 +18,7 @@ const ProcessDesigner = () => {
     setProcessName,
     setProcessDescription,
     setIsDraft,
+    setScheme,
     resetDesigner,
   } = useBusinessProcessStore()
 
@@ -289,10 +290,15 @@ const ProcessDesigner = () => {
         processName={processName}
         processDescription={processDescription}
         isDraft={isDraft}
+        gatewayDebugNotify={scheme?.meta?.gatewayDebugNotify === true}
         canDelete={!!selectedProcess?.id}
         onProcessNameChange={setProcessName}
         onProcessDescriptionChange={setProcessDescription}
         onIsDraftChange={setIsDraft}
+        onGatewayDebugNotifyChange={(checked) => {
+          const meta = scheme?.meta && typeof scheme.meta === 'object' ? scheme.meta : {}
+          setScheme({ ...(scheme || { nodes: [], edges: [] }), meta: { ...meta, gatewayDebugNotify: !!checked } })
+        }}
         onSaveDraft={handleSaveDraft}
         onPublish={handlePublish}
         onNewProcess={resetDesigner}

@@ -51,9 +51,19 @@ async function handle(instance, node, scheme, integrations, dbPool) {
   if (!createdBy) return { fail: 'Создать проект: не определён created_by (initiator_id)' }
 
   if (createMode === 'modal_at_runtime') {
-    let templateDeadline = settings.deadline || null
-    if (settings.deadlineMode === 'conditional' && settings.conditionalDeadline && settings.conditionalDeadline.boundary) {
-      templateDeadline = computeConditionalDeadline(settings.conditionalDeadline)
+    let templateDeadline = null
+    if (settings.deadlineMode === 'fixed' && settings.deadline) {
+      const dt = new Date(settings.deadline)
+      if (Number.isFinite(dt.getTime())) templateDeadline = dt.toISOString()
+    } else if (settings.deadlineMode === 'conditional') {
+      const def = { boundary: '12:00', sameDayTime: '18:00', nextDayTime: '16:00' }
+      const raw = settings.conditionalDeadline || {}
+      const rule = {
+        boundary: raw.boundary ?? def.boundary,
+        sameDayTime: raw.sameDayTime ?? raw.same_day_time ?? def.sameDayTime,
+        nextDayTime: raw.nextDayTime ?? raw.next_day_time ?? def.nextDayTime,
+      }
+      templateDeadline = computeConditionalDeadline(rule)
     }
     const templateResponsibles = (Array.isArray(settings.responsibles) ? settings.responsibles : [])
       .filter((r) => r && r.id != null)
@@ -79,9 +89,19 @@ async function handle(instance, node, scheme, integrations, dbPool) {
   const title = substituteText(settings.title || 'Проект из бизнес‑процесса', context)
   const description = substituteText(settings.description || '', context)
   const goals = Array.isArray(settings.goals) ? settings.goals.map((x) => substituteText(String(x || ''), context)).filter((x) => x.trim()) : []
-  let deadline = settings.deadline || null
-  if (settings.deadlineMode === 'conditional' && settings.conditionalDeadline && settings.conditionalDeadline.boundary) {
-    deadline = computeConditionalDeadline(settings.conditionalDeadline)
+  let deadline = null
+  if (settings.deadlineMode === 'fixed' && settings.deadline) {
+    const dt = new Date(settings.deadline)
+    if (Number.isFinite(dt.getTime())) deadline = dt.toISOString()
+  } else if (settings.deadlineMode === 'conditional') {
+    const def = { boundary: '12:00', sameDayTime: '18:00', nextDayTime: '16:00' }
+    const raw = settings.conditionalDeadline || {}
+    const rule = {
+      boundary: raw.boundary ?? def.boundary,
+      sameDayTime: raw.sameDayTime ?? raw.same_day_time ?? def.sameDayTime,
+      nextDayTime: raw.nextDayTime ?? raw.next_day_time ?? def.nextDayTime,
+    }
+    deadline = computeConditionalDeadline(rule)
   }
   const priority = settings.priority || 'medium'
   const additionalInfo = normalizeAdditionalInfo(settings.additionalInfo)

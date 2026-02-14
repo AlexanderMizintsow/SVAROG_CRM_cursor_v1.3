@@ -59,6 +59,7 @@ const {
   markMessagesAsRead,
   createGlobalTask,
   getGlobalTasks,
+  getGlobalTasksCompleted,
   updateGlobalTask,
   getSubtasksForGlobalTask,
   updateGlobalTaskProcess,
@@ -67,6 +68,7 @@ const {
   getAttachmentsByTaskId,
   addCommentToGlobalTask,
   addResponsiblesToGlobalTask,
+  removeResponsibleFromGlobalTask,
   setProjectApproval,
   updateGoals,
   updateAdditionalInfo,
@@ -488,17 +490,19 @@ app.post('/api/messages-notification-dealer', postMessagesNotificationDealer(dbP
 app.get('/api/global-tasks/:globalTaskId/title', getGlobalTaskTitle(dbPool))
 app.post('/api/create/global-tasks', createGlobalTask(dbPool, io))
 app.get('/api/global-tasks-all', getGlobalTasks(dbPool))
+app.get('/api/global-tasks-completed', getGlobalTasksCompleted(dbPool))
 app.put('/api/update/global-tasks/:taskId', updateGlobalTask(dbPool, io))
 app.get('/api/tasks/subtasks/:globalTaskId', getSubtasksForGlobalTask(dbPool))
-app.delete('/api/global-tasks/delete/:taskId', deleteGlobalTask(dbPool))
+app.delete('/api/global-tasks/delete/:taskId', deleteGlobalTask(dbPool, io))
 app.get('/api/global-tasks/:taskId', getGlobalTaskById(dbPool))
 app.put('/api/update/global-tasks/:taskId/status', updateGlobalTaskProcess(dbPool, io))
 app.get('/api/tasks/:id/attachments', getAttachmentsByTaskId(dbPool))
 app.post('/api/global-tasks/:taskId/comments', addCommentToGlobalTask(dbPool))
-app.post('/api/global-tasks/:taskId/responsibles-new', addResponsiblesToGlobalTask(dbPool))
+app.post('/api/global-tasks/:taskId/responsibles-new', addResponsiblesToGlobalTask(dbPool, io))
+app.delete('/api/global-tasks/:taskId/responsibles/:userId', removeResponsibleFromGlobalTask(dbPool, io))
 app.post('/api/global-tasks/:taskId/approval', setProjectApproval(dbPool, io))
-app.put('/api/tasks/:id/update-goals', updateGoals(dbPool))
-app.put('/api/tasks/:id/update-additional-info', updateAdditionalInfo(dbPool))
+app.put('/api/tasks/:id/update-goals', updateGoals(dbPool, io))
+app.put('/api/tasks/:id/update-additional-info', updateAdditionalInfo(dbPool, io))
 app.get('/api/global-tasks/chat/:globalTaskId', getChatMessages(dbPool))
 app.post('/api/global-tasks/chat', sendChatMessage(dbPool, io))
 

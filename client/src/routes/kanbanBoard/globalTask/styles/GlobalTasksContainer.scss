@@ -23,6 +23,81 @@
   gap: 0.75rem;
 }
 
+.global-tasks-container__tabs {
+  display: flex;
+  gap: 0;
+  border-radius: 8px;
+  overflow: hidden;
+  border: 1px solid #e5e7eb;
+}
+
+.global-tasks-container__tab {
+  padding: 0.5rem 1rem;
+  font-size: 0.95rem;
+  border: none;
+  background: #f3f4f6;
+  color: #6b7280;
+  cursor: pointer;
+  transition: background 0.2s, color 0.2s;
+
+  &:hover {
+    background: #e5e7eb;
+    color: #374151;
+  }
+
+  &--active {
+    background: #3b82f6;
+    color: #fff;
+
+    &:hover {
+      background: #2563eb;
+      color: #fff;
+    }
+  }
+}
+
+.global-tasks-container__completed-filters {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-bottom: 1rem;
+  flex-wrap: wrap;
+}
+
+.global-tasks-container__filter-label {
+  font-size: 0.9rem;
+  color: #6b7280;
+  margin-right: 0.25rem;
+}
+
+.global-tasks-container__filter-btn {
+  padding: 0.35rem 0.75rem;
+  font-size: 0.875rem;
+  border: 1px solid #e5e7eb;
+  border-radius: 6px;
+  background: #fff;
+  color: #4b5563;
+  cursor: pointer;
+  transition: background 0.2s, border-color 0.2s;
+
+  &:hover {
+    background: #f9fafb;
+    border-color: #d1d5db;
+  }
+
+  &--active {
+    background: #3b82f6;
+    border-color: #3b82f6;
+    color: #fff;
+
+    &:hover {
+      background: #2563eb;
+      border-color: #2563eb;
+      color: #fff;
+    }
+  }
+}
+
 .global-tasks-container__help-button {
   background-color: #6b7280;
   color: #fff;

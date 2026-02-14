@@ -22,7 +22,7 @@ const ProjectAddResponsiblesNodeProps = ({ node, onUpdate }) => {
     const next = responsibles.map((r, i) => (i === idx ? { ...(r || {}), ...(patch || {}) } : r))
     handleChange({ responsibles: next })
   }
-  const addResponsible = () => handleChange({ responsibles: [...responsibles, { id: null, role: 'Исполнитель' }] })
+  const addResponsible = () => handleChange({ responsibles: [...responsibles, { id: null, role: 'Исполнитель', requires_approval: false }] })
   const removeResponsible = (idx) => handleChange({ responsibles: responsibles.filter((_, i) => i !== idx) })
 
   return (
@@ -35,10 +35,10 @@ const ProjectAddResponsiblesNodeProps = ({ node, onUpdate }) => {
           <p className="properties-panel__hint">Добавьте хотя бы одного ответственного.</p>
         ) : (
           responsibles.map((r, idx) => (
-            <div key={idx} style={{ display: 'flex', gap: 8, alignItems: 'flex-start', marginTop: 6 }}>
+            <div key={idx} style={{ display: 'flex', flexWrap: 'wrap', gap: 8, alignItems: 'flex-start', marginTop: 6 }}>
               <select
                 className="properties-panel__select"
-                style={{ flex: '1 1 0' }}
+                style={{ flex: '1 1 120px' }}
                 value={r?.id ?? ''}
                 onChange={(e) => patchResponsible(idx, { id: e.target.value ? Number(e.target.value) : null })}
               >
@@ -52,11 +52,19 @@ const ProjectAddResponsiblesNodeProps = ({ node, onUpdate }) => {
               <input
                 type="text"
                 className="properties-panel__input"
-                style={{ flex: '1 1 0' }}
+                style={{ flex: '1 1 100px' }}
                 value={r?.role ?? ''}
                 onChange={(e) => patchResponsible(idx, { role: e.target.value })}
                 placeholder="Роль"
               />
+              <label className="properties-panel__checkbox-row" style={{ flex: '0 0 auto', margin: 0 }}>
+                <input
+                  type="checkbox"
+                  checked={!!r?.requires_approval}
+                  onChange={(e) => patchResponsible(idx, { requires_approval: e.target.checked })}
+                />
+                <span>Требуется согласование</span>
+              </label>
               <button type="button" className="properties-panel__btn-remove" onClick={() => removeResponsible(idx)} title="Удалить">
                 −
               </button>

@@ -297,19 +297,41 @@ async function handle(instance, node, scheme, integrations, dbPool) {
   const settings = node.settings || {}
   const context = typeof instance.context === 'object' ? instance.context : (instance.context ? JSON.parse(instance.context) : {})
   const joinSignals = context.join_signals && typeof context.join_signals === 'object' ? context.join_signals : {}
+  const joinLastFiredAll =
+    context.gateway_join_last_fired && typeof context.gateway_join_last_fired === 'object'
+      ? context.gateway_join_last_fired
+      : {}
+  const joinLastFiredNode =
+    joinLastFiredAll[node.id] && typeof joinLastFiredAll[node.id] === 'object'
+      ? joinLastFiredAll[node.id]
+      : null
 
-  const sources = getIncomingSourceNodes(scheme, node.id)
-  if (sources.length === 0) {
-    return { fail: 'К блоку «Развилка-Слияние» не подключены входящие блоки (Создать задачу, Назначить задачу, Создать проект, Принятие решения)' }
+  const schemeMeta = scheme && typeof scheme === 'object' ? (scheme.meta && typeof scheme.meta === 'object' ? scheme.meta : {}) : {}
+  const debugNotifyEnabled = schemeMeta.gatewayDebugNotify === true
+
+  async function maybeSendSystemMessage(payload) {
+    if (!debugNotifyEnabled) return
+    const initiatorId = context && context.initiator_id != null ? Number(context.initiator_id) : null
+    if (!initiatorId) return
+    try {
+      const title = 'Системное сообщение'
+      const message = payload && payload.message ? String(payload.message) : ''
+      if (!message.trim()) return
+      await dbPool.query(
+        `INSERT INTO bp_in_app_notifications (user_id, title, message, process_instance_id, node_id)
+         VALUES ($1, $2, $3, $4, $5)`,
+        [initiatorId, title, message.trim(), instance.id, node.id]
+      )
+    } catch (e) {
+      console.warn('gatewayJoin system-message insert:', e?.message || e)
+    }
   }
 
-  const currentState = await buildCurrentState(instance, scheme, node.id, reg, joinSignals)
-  const sourceIds = sources.map((s) => s.id)
-  const allReady = sourceIds.every((sid) => currentState[sid] != null)
-
-  if (!allReady) {
-    const newJoinSignals = { ...joinSignals, ...currentState }
-    const newContext = { ...context, join_signals: newJoinSignals }
+  async function putToWaiting(nextJoinSignals) {
+    const newContext = {
+      ...context,
+      join_signals: nextJoinSignals,
+    }
     await dbPool.query(
       'UPDATE bp_process_instances SET context = $1, status = $2 WHERE id = $3',
       [JSON.stringify(newContext), 'waiting_join', instance.id]
@@ -327,8 +349,65 @@ async function handle(instance, node, scheme, integrations, dbPool) {
     return { waitJoin: { nodeId: node.id } }
   }
 
+  function buildStateHash(currentState, sourceIds) {
+    // Стабильный "снимок" значений, чтобы не триггерить одну и ту же ветку по кругу при возврате из downstream-блоков.
+    const snap = {}
+    for (const sid of sourceIds) {
+      const cur = currentState[sid]
+      if (!cur) {
+        snap[sid] = null
+        continue
+      }
+      if (cur.type === 'task') {
+        snap[sid] = {
+          type: 'task',
+          status: cur.status || null,
+          isOverdue: !!cur.isOverdue,
+          isCompleted: !!cur.isCompleted,
+          hasDeadline: !!cur.hasDeadline,
+          priority: cur.priority || null,
+          deadline: cur.deadline ? new Date(cur.deadline).toISOString() : null,
+        }
+      } else if (cur.type === 'project') {
+        snap[sid] = {
+          type: 'project',
+          status: cur.projectStatusRaw || null,
+          isOverdue: !!cur.isOverdue,
+          hasDeadline: !!cur.hasDeadline,
+          priority: cur.priority || null,
+          completion: cur.completion != null ? Number(cur.completion) : 0,
+          deadline: cur.deadline ? new Date(cur.deadline).toISOString() : null,
+        }
+      } else if (cur.type === 'decision') {
+        snap[sid] = { type: 'decision', buttonId: cur.buttonId || null }
+      } else {
+        snap[sid] = { type: cur.type || 'unknown' }
+      }
+    }
+    try {
+      return JSON.stringify(snap)
+    } catch (e) {
+      return String(Date.now())
+    }
+  }
+
+  const sources = getIncomingSourceNodes(scheme, node.id)
+  if (sources.length === 0) {
+    return { fail: 'К блоку «Развилка-Слияние» не подключены входящие блоки (Создать задачу, Назначить задачу, Создать проект, Принятие решения)' }
+  }
+
+  const currentState = await buildCurrentState(instance, scheme, node.id, reg, joinSignals)
+  const sourceIds = sources.map((s) => s.id)
+  const allReady = sourceIds.every((sid) => currentState[sid] != null)
+
+  if (!allReady) {
+    const newJoinSignals = { ...joinSignals, ...currentState }
+    return putToWaiting(newJoinSignals)
+  }
+
   const edges = getOutgoingEdges(scheme, node.id)
   const edgesMeta = Array.isArray(settings.edges) ? settings.edges : []
+  const stateHash = buildStateHash(currentState, sourceIds)
 
   for (const edge of edges) {
     const meta = edgesMeta.find((m) => m.edgeId === edge.id) || {}
@@ -338,33 +417,68 @@ async function handle(instance, node, scheme, integrations, dbPool) {
       continue
     }
     if (matchCombination(combination, currentState, sourceIds, operator)) {
+      // Защита от цикла: если уже выбирали эту же ветку на этом же состоянии — уходим в ожидание.
+      const alreadyFired =
+        joinLastFiredNode &&
+        joinLastFiredNode.edgeId === edge.id &&
+        joinLastFiredNode.stateHash === stateHash
+      if (alreadyFired) {
+        const newJoinSignals = { ...joinSignals, ...currentState }
+        return putToWaiting(newJoinSignals)
+      }
+
+      // Запоминаем, что на текущем состоянии уже выбирали эту ветку
+      try {
+        const nextLastFiredAll = {
+          ...joinLastFiredAll,
+          [node.id]: {
+            edgeId: edge.id,
+            stateHash,
+            firedAt: new Date().toISOString(),
+          },
+        }
+        const newContext = { ...context, gateway_join_last_fired: nextLastFiredAll }
+        await dbPool.query('UPDATE bp_process_instances SET context = $1 WHERE id = $2', [
+          JSON.stringify(newContext),
+          instance.id,
+        ])
+      } catch (e) {
+        // не критично
+      }
+
       try {
         await dbPool.query('DELETE FROM bp_gateway_join_waiting WHERE instance_id = $1', [instance.id])
       } catch (e) {
         if (e?.code !== '42P01') throw e
       }
+      await maybeSendSystemMessage({
+        message: [
+          `Развилка-Слияние: «${node?.label || node?.id}»`,
+          `Выбрана ветка → ${edge.target}`,
+          `Оператор: ${operator === 'or' ? 'ИЛИ' : 'И'}`,
+          `Условия: ${Object.entries(combination || {})
+            .filter(([, v]) => v && String(v) !== JOIN_CONDITION_ANY)
+            .map(([sid, v]) => `${sid}: ${v}`)
+            .join('; ') || '—'}`,
+          `Текущие значения: ${sourceIds
+            .map((sid) => {
+              const cur = currentState[sid]
+              if (!cur) return `${sid}=—`
+              if (cur.type === 'task') return `${sid}: task статус=${cur.status || '—'} overdue=${cur.isOverdue ? 'да' : 'нет'} completed=${cur.isCompleted ? 'да' : 'нет'}`
+              if (cur.type === 'project') return `${sid}: проект статус=${cur.projectStatusRaw || '—'} completion=${Number.isFinite(cur.completion) ? cur.completion : 0}% overdue=${cur.isOverdue ? 'да' : 'нет'}`
+              if (cur.type === 'decision') return `${sid}: decision buttonId=${cur.buttonId || '—'}`
+              return `${sid}: ${cur.type}`
+            })
+            .join(' | ')}`,
+        ].join('\n'),
+      })
       return { nextNodeId: edge.target }
     }
   }
 
   // Ни одно условие не подошло — ожидаем изменения (например, выполнение задачи)
   const newJoinSignals = { ...joinSignals, ...currentState }
-  const newContext = { ...context, join_signals: newJoinSignals }
-  await dbPool.query(
-    'UPDATE bp_process_instances SET context = $1, status = $2 WHERE id = $3',
-    [JSON.stringify(newContext), 'waiting_join', instance.id]
-  )
-  try {
-    await dbPool.query(
-      'INSERT INTO bp_gateway_join_waiting (instance_id, node_id) VALUES ($1, $2) ON CONFLICT (instance_id) DO UPDATE SET node_id = $2',
-      [instance.id, node.id]
-    )
-  } catch (e) {
-    if (e && e.code === '42P01') {
-      console.warn('gatewayJoin: таблица bp_gateway_join_waiting не создана')
-    }
-  }
-  return { waitJoin: { nodeId: node.id } }
+  return putToWaiting(newJoinSignals)
 }
 
 module.exports = { handle }

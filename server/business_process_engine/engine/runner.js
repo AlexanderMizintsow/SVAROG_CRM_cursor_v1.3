@@ -163,6 +163,30 @@ async function runProcessFromStart(dbPool, instanceId) {
       return
     }
 
+    if (result.waitGatewayProject && result.waitGatewayProject.globalTaskId) {
+      await logExit(dbPool, instanceId, currentNodeId, 'condition_met', { waitGatewayProject: result.waitGatewayProject.globalTaskId })
+      activeTokens.unshift(currentNodeId)
+      const newContext = { ...ctxCurrent, active_tokens: activeTokens }
+      try {
+        await dbPool.query(
+          'INSERT INTO bp_gateway_project_waiting (instance_id, node_id, global_task_id) VALUES ($1, $2, $3)',
+          [instanceId, currentNodeId, result.waitGatewayProject.globalTaskId]
+        )
+      } catch (e) {
+        if (e?.code === '42P01') {
+          throw new Error(
+            'BPE: не создана таблица bp_gateway_project_waiting (см. server/business_process_engine/db/SQL_MANUAL_QUERIES.sql, раздел 6.1)'
+          )
+        }
+        throw e
+      }
+      await dbPool.query(
+        'UPDATE bp_process_instances SET context = $1, status = $2, current_node_id = $3 WHERE id = $4',
+        [JSON.stringify(newContext), 'waiting_gateway', currentNodeId, instanceId]
+      )
+      return
+    }
+
     if (result.waitTimer && result.waitTimer.resumeAt) {
       const resumeAt = result.waitTimer.resumeAt instanceof Date
         ? result.waitTimer.resumeAt
@@ -399,6 +423,72 @@ async function runProcessFromGateway(dbPool, taskId) {
   }
 }
 
+async function runProcessFromGatewayProject(dbPool, globalTaskId) {
+  let links
+  try {
+    links = await dbPool.query(
+      'SELECT instance_id, node_id FROM bp_gateway_project_waiting WHERE global_task_id = $1',
+      [globalTaskId]
+    )
+  } catch (e) {
+    if (e?.code === '42P01') {
+      // Таблица ожиданий по проектам не создана — игнорируем вебхук
+      return
+    }
+    throw e
+  }
+  if (links.rows.length === 0) return
+
+  for (const row of links.rows) {
+    const instanceId = row.instance_id
+    const gatewayNodeId = row.node_id
+
+    const instResult = await dbPool.query(
+      'SELECT * FROM bp_process_instances WHERE id = $1 AND status = $2',
+      [instanceId, 'waiting_gateway']
+    )
+    if (instResult.rows.length === 0) continue
+
+    const instance = instResult.rows[0]
+    const defResult = await dbPool.query(
+      'SELECT scheme FROM bp_process_definitions WHERE id = $1',
+      [instance.process_id]
+    )
+    if (defResult.rows.length === 0) continue
+
+    const scheme = typeof defResult.rows[0].scheme === 'object'
+      ? defResult.rows[0].scheme
+      : JSON.parse(defResult.rows[0].scheme)
+    const node = getNodeById(scheme, gatewayNodeId)
+    if (!node || node.type !== 'gateway') continue
+
+    const handler = getHandler('gateway')
+    if (!handler || !handler.handle) continue
+
+    instance.__bpe_resume_reason = 'project_updated'
+    const result = await handler.handle(instance, node, scheme, integrations, dbPool)
+
+    if (result.nextNodeId) {
+      try {
+        await dbPool.query(
+          'DELETE FROM bp_gateway_project_waiting WHERE instance_id = $1 AND node_id = $2',
+          [instanceId, gatewayNodeId]
+        )
+      } catch (e) {
+        if (e?.code !== '42P01') throw e
+      }
+      const ctx = typeof instance.context === 'object' ? instance.context : (instance.context ? JSON.parse(instance.context) : {})
+      const newContext = { ...ctx, active_tokens: [result.nextNodeId] }
+      await dbPool.query(
+        'UPDATE bp_process_instances SET context = $1, status = $2, current_node_id = $3 WHERE id = $4',
+        [JSON.stringify(newContext), 'running', result.nextNodeId, instanceId]
+      )
+      await runProcessFromStart(dbPool, instanceId)
+      continue
+    }
+  }
+}
+
 function getIncomingSourceNodes(scheme, nodeId) {
   const edges = (scheme.edges || []).filter((e) => e.target === nodeId)
   const nodes = scheme.nodes || []
@@ -406,7 +496,11 @@ function getIncomingSourceNodes(scheme, nodeId) {
   const list = []
   for (const e of edges) {
     const src = nodes.find((n) => n.id === e.source)
-    if (src && (src.type === 'create_task' || src.type === 'assign_task' || src.type === 'decision') && !seen.has(src.id)) {
+    if (
+      src &&
+      (src.type === 'create_task' || src.type === 'assign_task' || src.type === 'decision' || src.type === 'create_project') &&
+      !seen.has(src.id)
+    ) {
       seen.add(src.id)
       list.push(src)
     }
@@ -503,6 +597,95 @@ async function runProcessFromGatewayJoin(dbPool, taskId) {
         break
       } catch (e) {
         console.warn('runProcessFromGatewayJoin getTask:', taskId, e?.message)
+      }
+    }
+    if (updated) break
+  }
+}
+
+async function runProcessFromGatewayJoinProject(dbPool, globalTaskId) {
+  let links
+  try {
+    links = await dbPool.query('SELECT instance_id, node_id FROM bp_gateway_join_waiting')
+  } catch (e) {
+    if (e?.code === '42P01') return
+    throw e
+  }
+  if (links.rows.length === 0) return
+
+  for (const row of links.rows) {
+    const instanceId = row.instance_id
+    const joinNodeId = row.node_id
+
+    const instResult = await dbPool.query(
+      'SELECT * FROM bp_process_instances WHERE id = $1 AND status = $2',
+      [instanceId, 'waiting_join']
+    )
+    if (instResult.rows.length === 0) continue
+
+    const instance = instResult.rows[0]
+    const defResult = await dbPool.query(
+      'SELECT scheme FROM bp_process_definitions WHERE id = $1',
+      [instance.process_id]
+    )
+    if (defResult.rows.length === 0) continue
+
+    const scheme = typeof defResult.rows[0].scheme === 'object'
+      ? defResult.rows[0].scheme
+      : JSON.parse(defResult.rows[0].scheme)
+    const joinNode = getNodeById(scheme, joinNodeId)
+    if (!joinNode || joinNode.type !== 'gateway_join') continue
+
+    const context = typeof instance.context === 'object' ? instance.context : (instance.context ? JSON.parse(instance.context) : {})
+    const projectOutputs = context.project_outputs && typeof context.project_outputs === 'object' ? context.project_outputs : {}
+    const joinSignals = context.join_signals && typeof context.join_signals === 'object' ? context.join_signals : {}
+    const sources = getIncomingSourceNodes(scheme, joinNodeId)
+
+    let updated = false
+    for (const src of sources) {
+      if (src.type !== 'create_project') continue
+      const pid =
+        projectOutputs[src.id]?.global_task_id ??
+        projectOutputs[src.id]?.project_id ??
+        context.last_global_task_id
+      if (pid == null || Number(pid) !== Number(globalTaskId)) continue
+      try {
+        const project = await integrations.registerClient.getGlobalTaskById(globalTaskId)
+        const projStatusRaw = (project && project.status) ? String(project.status).trim() : ''
+        const now = new Date()
+        const deadline = project && project.deadline ? new Date(project.deadline) : null
+        const isOverdue = deadline ? now > deadline : false
+        const priority = (project && project.priority) ? String(project.priority).toLowerCase() : ''
+        const hasDeadline = !!(project && project.deadline)
+        const completion = project && project.completion_percentage != null ? Number(project.completion_percentage) : 0
+        const projectSignal = {
+          type: 'project',
+          projectStatusRaw: projStatusRaw,
+          project,
+          deadline,
+          now,
+          isOverdue,
+          hasDeadline,
+          priority,
+          completion,
+        }
+        const newJoinSignals = { ...joinSignals, [src.id]: projectSignal }
+        const newContext = { ...context, join_signals: newJoinSignals }
+        const ctxForResume = { ...newContext, active_tokens: [joinNodeId] }
+        await dbPool.query(
+          'UPDATE bp_process_instances SET context = $1, status = $2 WHERE id = $3',
+          [JSON.stringify(ctxForResume), 'running', instanceId]
+        )
+        try {
+          await dbPool.query('DELETE FROM bp_gateway_join_waiting WHERE instance_id = $1', [instanceId])
+        } catch (e) {
+          if (e?.code !== '42P01') throw e
+        }
+        await runProcessFromStart(dbPool, instanceId)
+        updated = true
+        break
+      } catch (e) {
+        console.warn('runProcessFromGatewayJoinProject getGlobalTaskById:', globalTaskId, e?.message)
       }
     }
     if (updated) break
@@ -606,7 +789,9 @@ async function runProcessFromAdditionalInfo(dbPool, instanceId, nodeId, values) 
 module.exports = {
   runProcessFromStart,
   runProcessFromGateway,
+  runProcessFromGatewayProject,
   runProcessFromGatewayJoin,
+  runProcessFromGatewayJoinProject,
   runProcessFromTaskCreation,
   runProcessFromProjectCreation,
   runProcessFromDecision,

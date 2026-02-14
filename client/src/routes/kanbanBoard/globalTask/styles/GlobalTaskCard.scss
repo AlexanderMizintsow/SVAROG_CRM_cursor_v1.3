@@ -365,6 +365,24 @@
     }
   }
 
+  &__remove-responsible-btn {
+    margin-left: auto;
+    padding: 0.25rem 0.5rem;
+    font-size: 0.75rem;
+    color: #b91c1c;
+    background: #fef2f2;
+    border: 1px solid #fecaca;
+    border-radius: 0.25rem;
+    cursor: pointer;
+    &:hover:not(:disabled) {
+      background: #fee2e2;
+    }
+    &:disabled {
+      opacity: 0.7;
+      cursor: not-allowed;
+    }
+  }
+
   &__approval-overlay {
     position: fixed;
     inset: 0;

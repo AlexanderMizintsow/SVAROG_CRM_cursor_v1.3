@@ -130,12 +130,34 @@ async function handle(instance, node, scheme, integrations, dbPool) {
   const blockOutputs = context.block_outputs || {}
   const decisionOutputs = context.decision_outputs || {}
 
+  const schemeMeta = scheme && typeof scheme === 'object' ? (scheme.meta && typeof scheme.meta === 'object' ? scheme.meta : {}) : {}
+  const debugNotifyEnabled = schemeMeta.gatewayDebugNotify === true
+
+  async function maybeSendSystemMessage(payload) {
+    if (!debugNotifyEnabled) return
+    const initiatorId = context && context.initiator_id != null ? Number(context.initiator_id) : null
+    if (!initiatorId) return
+    try {
+      const title = 'Системное сообщение'
+      const message = payload && payload.message ? String(payload.message) : ''
+      if (!message.trim()) return
+      await dbPool.query(
+        `INSERT INTO bp_in_app_notifications (user_id, title, message, process_instance_id, node_id)
+         VALUES ($1, $2, $3, $4, $5)`,
+        [initiatorId, title, message.trim(), instance.id, node.id]
+      )
+    } catch (e) {
+      console.warn('gateway system-message insert:', e?.message || e)
+    }
+  }
+
   // Источник данных для условий: auto (по предыдущему узлу), initiator, task или decision
   const incoming = getIncomingEdge(scheme, node.id)
   const predecessor = incoming ? getNodeById(scheme, incoming.source) : null
   let defaultSourceType = 'task'
   if (predecessor && predecessor.type === 'start') defaultSourceType = 'initiator'
   else if (predecessor && predecessor.type === 'decision') defaultSourceType = 'decision'
+  else if (predecessor && (predecessor.type === 'create_project' || String(predecessor.type || '').startsWith('project_'))) defaultSourceType = 'project'
   const sourceType = settings.sourceType && settings.sourceType !== 'auto' ? settings.sourceType : defaultSourceType
 
   // Источник «Принятие решения» — используем last_decision из context, ожидание не нужно
@@ -257,11 +279,16 @@ async function handle(instance, node, scheme, integrations, dbPool) {
 
   // Событийный режим: развилка должна "стоять" и реагировать на события (task-updated),
   const waitMode = settings.waitMode || 'event' // event | default
-  const isWebhookResume = instance && instance.__bpe_resume_reason === 'task_updated'
+  const isWebhookResume = instance && (instance.__bpe_resume_reason === 'task_updated' || instance.__bpe_resume_reason === 'project_updated')
   if (sourceType === 'task' && waitMode === 'event' && taskId) {
     // Если мы пришли в развилку обычным прогоном (не по вебхуку) — сразу ставим ожидание.
     if (!isWebhookResume) {
       return { waitGateway: { taskId } }
+    }
+  }
+  if (sourceType === 'project' && waitMode === 'event' && projectId) {
+    if (!isWebhookResume) {
+      return { waitGatewayProject: { globalTaskId: projectId } }
     }
   }
 
@@ -435,22 +462,60 @@ async function handle(instance, node, scheme, integrations, dbPool) {
     }
   }
   if (chosenEdge) {
+    await maybeSendSystemMessage({
+      message: [
+        `Развилка: «${node?.label || node?.id}»`,
+        `Источник: ${sourceType === 'project' ? 'Проект' : sourceType === 'task' ? 'Задача' : sourceType === 'decision' ? 'Принятие решения' : 'Инициатор'}`,
+        sourceType === 'task'
+          ? `task_id=${taskId}, status=${status || statusRaw || '—'}, overdue=${isOverdue ? 'да' : 'нет'}, completed=${isCompleted ? 'да' : 'нет'}`
+          : sourceType === 'project'
+            ? `project_id=${projectId}, status=${projectStatusRaw || '—'}, completion=${Number.isFinite(projectCompletion) ? projectCompletion : 0}%, overdue=${projectOverdue ? 'да' : 'нет'}`
+            : '',
+        `Выбрана ветка → ${chosenEdge.target}`,
+        `Условие: ${(() => {
+          const meta = getEdgeMeta(settings, chosenEdge.id)
+          if (!meta) return getConditionForEdge(settings, chosenEdge.id) || 'else'
+          if (meta.conditionMode === 'multiple' && meta.conditions && Array.isArray(meta.conditions.items) && meta.conditions.items.length) {
+            const op = meta.conditions.type === 'and' ? 'И' : 'ИЛИ'
+            const items = meta.conditions.items
+              .filter((x) => x && x.condition && x.condition !== 'else')
+              .map((x) => `${x.condition}`)
+            return `несколько (${op}): ${items.join(', ')}`
+          }
+          return meta.condition || getConditionForEdge(settings, chosenEdge.id) || 'else'
+        })()}`,
+      ]
+        .filter(Boolean)
+        .join('\n'),
+    })
     return { nextNodeId: chosenEdge.target }
   }
   // В событийном режиме "else" не выполняем автоматически — продолжаем ожидать,
   // пока не появится подходящее условие.
-  if (!(sourceType === 'task' && waitMode === 'event' && taskId)) {
+  if (!((sourceType === 'task' || sourceType === 'project') && waitMode === 'event' && (taskId || projectId))) {
     const elseEdge = edges.find((e) => getConditionForEdge(settings, e.id) === 'else')
     if (elseEdge) {
+      await maybeSendSystemMessage({
+        message: [
+          `Развилка: «${node?.label || node?.id}»`,
+          `Выбрана ветка «Иначе» → ${elseEdge.target}`,
+        ].join('\n'),
+      })
       return { nextNodeId: elseEdge.target }
     }
   }
   if (edges.length === 1) {
+    await maybeSendSystemMessage({
+      message: `Развилка: «${node?.label || node?.id}»\nОдна исходящая ветка → ${edges[0].target}`,
+    })
     return { nextNodeId: edges[0].target }
   }
 
   if (sourceType === 'task' && taskId) {
     return { waitGateway: { taskId } }
+  }
+  if (sourceType === 'project' && projectId) {
+    return { waitGatewayProject: { globalTaskId: projectId } }
   }
   return { fail: 'Не удалось выбрать ветку развилки: задайте условие «Иначе» или корректные условия' }
 }

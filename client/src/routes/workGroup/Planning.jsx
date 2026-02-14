@@ -37,16 +37,16 @@ const Planning = () => {
     socket.on(
       'participantVotesUpdated',
       ({ group_id, participant, selected_dates }) => {
-        console.log('Голоса обновлены:', group_id, participant, selected_dates)
-        // Здесь обновите состояние компонента
+        const gId = Number(group_id)
+        const pId = Number(participant)
+        if (Number.isNaN(gId) || Number.isNaN(pId) || !Array.isArray(selected_dates)) return
         setSelectedDates((prev) => ({
           ...prev,
-          [group_id]: {
-            ...prev[group_id],
-            [participant]: selected_dates,
+          [gId]: {
+            ...prev[gId],
+            [pId]: selected_dates,
           },
         }))
-        // Дополнительно можно вызвать fetchParticipantVotes(), если нужно обновление
       }
     )
 
@@ -77,8 +77,23 @@ const Planning = () => {
           `${API_BASE_URL}5000/api/participant_votes`
         )
 
-        const storedSelectedDates = response.data
-
+        const raw = response.data || {}
+        // Нормализация ключей (group_id, participant_id) к числам для совпадения с group.id / participant.id
+        const storedSelectedDates = {}
+        Object.keys(raw).forEach((gId) => {
+          const groupKey = Number(gId)
+          if (Number.isNaN(groupKey)) return
+          storedSelectedDates[groupKey] = {}
+          const participants = raw[gId]
+          if (participants && typeof participants === 'object') {
+            Object.keys(participants).forEach((pId) => {
+              const participantKey = Number(pId)
+              if (!Number.isNaN(participantKey) && Array.isArray(participants[pId])) {
+                storedSelectedDates[groupKey][participantKey] = participants[pId]
+              }
+            })
+          }
+        })
         setSelectedDates(storedSelectedDates)
       } catch (error) {
         console.error('Ошибка при получении голосов участников:', error)
@@ -88,16 +103,23 @@ const Planning = () => {
     fetchParticipantVotes()
   }, [dateConfirmed])
 
+  // Диапазон дат в формате YYYY-MM-DD без сдвига по часовым поясам (единообразие с сервером и выделением)
   const getAvailableDatesInRange = (start, end) => {
-    const availableDates = []
-    let startDate = new Date(start)
-    const endDate = new Date(end)
-
-    while (startDate <= endDate) {
-      availableDates.push(startDate.toISOString().split('T')[0])
-      startDate.setDate(startDate.getDate() + 1)
+    const toYyyyMmDd = (d) => {
+      const y = d.getUTCFullYear()
+      const m = String(d.getUTCMonth() + 1).padStart(2, '0')
+      const day = String(d.getUTCDate()).padStart(2, '0')
+      return `${y}-${m}-${day}`
     }
-
+    const startDate = new Date(start)
+    const endDate = new Date(end)
+    const startUtc = Date.UTC(startDate.getUTCFullYear(), startDate.getUTCMonth(), startDate.getUTCDate())
+    const endUtc = Date.UTC(endDate.getUTCFullYear(), endDate.getUTCMonth(), endDate.getUTCDate())
+    const oneDay = 24 * 60 * 60 * 1000
+    const availableDates = []
+    for (let t = startUtc; t <= endUtc; t += oneDay) {
+      availableDates.push(toYyyyMmDd(new Date(t)))
+    }
     return availableDates
   }
 

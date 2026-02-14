@@ -53,6 +53,11 @@ cd ..
 cd email-service
 pm2 start index.js --name "email-service"
 cd ..
+
+cd business_process_engine
+pm2 start index.js --name "business_process_engine"
+cd ..
+
 cd ..
 cd client
 pm2 serve dist 5173 --spa --name SVAROG
