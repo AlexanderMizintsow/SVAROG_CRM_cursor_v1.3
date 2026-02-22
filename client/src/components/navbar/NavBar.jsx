@@ -155,11 +155,11 @@ const NavBar = () => {
       icon: IoStarSharp,
       link: '/reports-dealer-ratings',
     },
-    {
+   {/* {
       name: 'Поиск материалов',
       icon: MdSearch,
       link: '/material-search',
-    },
+    }*/},
   ]
 
   const personnelDepartment = [

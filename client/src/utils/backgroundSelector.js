@@ -12,7 +12,7 @@ export function getSeasonBackground() {
   if (month === 0) {
     return newYearBg // Январь
   } else if (month === 11 || month === 1) {
-    return winterBg // Зима (декабрь, февраль)
+    return springBg // Зима (декабрь, февраль)
   } else if (month >= 2 && month <= 4) {
     return springBg // Весна
   } else if (month === 5 || month === 6) {

@@ -1,11 +1,11 @@
-import React, { useEffect, useState } from 'react'
+import React, { useEffect, useRef, useState } from 'react'
 import UserStore from '../../store/userStore'
 import useTaskStateTracker from '../../store/useTaskStateTracker'
 import { FaEnvelope } from 'react-icons/fa'
 import { MdDoneOutline } from 'react-icons/md'
 import GlobalTaskChat from '../../routes/kanbanBoard/globalTask/subcomponents/globalChat/GlobalTaskChat'
 import { AiOutlineFileDone } from 'react-icons/ai'
-import { MdHistoryEdu } from 'react-icons/md'
+import { MdHistoryEdu, MdFolder } from 'react-icons/md'
 import { GiConfirmed } from 'react-icons/gi'
 import { FcFlowChart } from 'react-icons/fc'
 import {
@@ -142,7 +142,9 @@ const AlertBanner = () => {
   const approvals = useTaskStateTracker((state) => state.approvals)
   const tasks = useTaskStateTracker((state) => state.tasks)
   const globalNotifications = useTaskStateTracker((state) => state.globalNotifications)
+  const projectNotifications = useTaskStateTracker((state) => state.projectNotifications)
   const descriptionChangeNotifications = useTaskStateTracker((state) => state.notifications)
+  const removeProjectNotification = useTaskStateTracker((state) => state.removeProjectNotification)
 
   // ==================== Вспомогательные хуки ====================
   const { notifications: taskNotifications, handleTaskNotificationClick } = useNotificationsTask({
@@ -412,6 +414,32 @@ const AlertBanner = () => {
     })
   })
 
+  // Уведомления по проектам (создание, участники, статус, итоговые решения, дедлайн, подзадачи)
+  const projectNotificationLabels = {
+    created: 'Создан проект',
+    participant_added: 'Вас добавили в проект',
+    participant_removed: 'Вас исключили из проекта',
+    status: 'Изменён статус проекта',
+    deleted: 'Проект удалён',
+    progress_100: 'Прогресс проекта 100%',
+    final_solution_added: 'Добавлено итоговое решение по проекту',
+    final_solution_updated: 'Изменено итоговое решение по проекту',
+    final_solution_deleted: 'Удалено итоговое решение по проекту',
+    deadline_expired: 'Истёк срок по проекту',
+    subtask_added: 'Вам назначена подзадача в проекте',
+  }
+  Object.entries(projectNotifications).forEach(([key, { globalTaskId, title, type }]) => {
+    const label = projectNotificationLabels[type] || 'Проект'
+    notifications.push({
+      key: `project-msg-${key}`,
+      text: `${label}: ${title || 'Без названия'}`,
+      icon: <MdFolder style={{ fontSize: '16px', color: '#6366f1' }} />,
+      taskId: globalTaskId,
+      title: title || 'Проект',
+      projectNotificationKey: key,
+    })
+  })
+
   // Отобразить уведомления, если есть
   Object.entries(descriptionChangeNotifications).forEach(([key, { title, taskId }]) => {
     notifications.push({
@@ -463,6 +491,19 @@ const AlertBanner = () => {
       })
     }
   }, [globalNotifications])
+
+  // Десктоп/браузер: уведомления по проектам (создание, статус, дедлайн и т.д.)
+  const projectNotifKeysRef = useRef(new Set())
+  useEffect(() => {
+    Object.entries(projectNotifications).forEach(([key, { title, type }]) => {
+      if (projectNotifKeysRef.current.has(key)) return
+      projectNotifKeysRef.current.add(key)
+      const label = projectNotificationLabels[type] || 'Проект'
+      const text = `${label}: ${title || 'Без названия'}`
+      sendNotification('Проект', text)
+      if (typeof sendCustomNotification === 'function') sendCustomNotification(text)
+    })
+  }, [projectNotifications])
 
   useEffect(() => {
     if (hasTasks) {
@@ -602,16 +643,18 @@ const AlertBanner = () => {
           extensionNotifications.length > 0 ||
           taskNotifications.length > 0) ? (
           <div className="notifications-container">
-            {[...allNotifications].map(({ key, text, icon, taskId, title }) => (
+            {[...allNotifications].map(({ key, text, icon, taskId, title, projectNotificationKey }) => (
               <div
                 className="alert-banner-content"
                 key={key}
                 style={{
-                  cursor: key.startsWith('global-') ? 'pointer' : undefined,
+                  cursor: key.startsWith('global-') || key.startsWith('project-msg-') ? 'pointer' : undefined,
                 }}
                 onClick={() => {
                   if (key.startsWith('global-')) {
                     handleGlobalNotificationClick({ taskId, title })
+                  } else if (key.startsWith('project-msg-')) {
+                    if (projectNotificationKey) removeProjectNotification(projectNotificationKey)
                   } else if (key.startsWith('bp-')) {
                     handleBpNotificationClick(key)
                   } else if (key.startsWith('authorMessage-')) {

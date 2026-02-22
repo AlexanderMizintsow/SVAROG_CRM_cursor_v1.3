@@ -2,8 +2,10 @@ import { useState, useEffect, useCallback, useRef } from 'react'
 import { API_BASE_URL } from '../../../../../../config'
 import io from 'socket.io-client'
 import useUserStore from '../../../../../store/userStore'
-import { FaEye } from 'react-icons/fa'
+import useTaskStateTracker from '../../../../../store/useTaskStateTracker'
+import { FaEye, FaComments } from 'react-icons/fa'
 import { MdOutlinePendingActions, MdWarning } from 'react-icons/md'
+import { handleGlobalTaskChangedPayload } from '../../../globalTask/utils/projectNotificationsHandler'
 import { PiCalendarDotsDuotone } from 'react-icons/pi'
 import { FcMindMap } from 'react-icons/fc'
 import { getRemainingDays } from '../../../globalTask/utils/globalTaskUtils'
@@ -15,6 +17,10 @@ const MiniProjectStrip = ({ onOpenProject, refreshTrigger }) => {
   const [loading, setLoading] = useState(true)
   const userId = user?.id
   const socketRef = useRef(null)
+  const projectChatUnread = useTaskStateTracker((s) => s.projectChatUnread)
+  const projectBlinkGreen = useTaskStateTracker((s) => s.projectBlinkGreen)
+  const projectBlinkYellow = useTaskStateTracker((s) => s.projectBlinkYellow)
+  const clearProjectCardViewed = useTaskStateTracker((s) => s.clearProjectCardViewed)
 
   const fetchProjects = useCallback(async () => {
     if (!userId) {
@@ -30,6 +36,18 @@ const MiniProjectStrip = ({ onOpenProject, refreshTrigger }) => {
       if (!response.ok) throw new Error('Ошибка загрузки проектов')
       const data = await response.json()
       setProjects(Array.isArray(data) ? data : [])
+
+      const TERMINAL = ['Завершено', 'Провал', 'Удален']
+      const now = Date.now()
+      const store = useTaskStateTracker.getState()
+      ;(Array.isArray(data) ? data : []).forEach((task) => {
+        if (!task?.id || TERMINAL.includes(task?.status)) return
+        const deadline = task.deadline ? new Date(task.deadline).getTime() : null
+        if (!deadline || deadline >= now) return
+        if (store.projectDeadlineNotified[task.id]) return
+        store.addProjectNotification(task.id, task.title || 'Проект', 'deadline_expired')
+        store.setProjectDeadlineNotified(task.id)
+      })
     } catch (err) {
       console.error('MiniProjectStrip fetch:', err)
       setProjects([])
@@ -52,7 +70,10 @@ const MiniProjectStrip = ({ onOpenProject, refreshTrigger }) => {
     })
     socketRef.current = socket
 
-    const handleGlobalTaskChanged = () => {
+    const handleGlobalTaskChanged = (payload) => {
+      if (typeof payload === 'object' && payload?.globalTaskId != null) {
+        handleGlobalTaskChangedPayload(payload, userId)
+      }
       fetchProjects()
     }
 
@@ -145,22 +166,30 @@ const MiniProjectStrip = ({ onOpenProject, refreshTrigger }) => {
           return (
             <div
               key={task.id}
-              className={styles.card}
-              onClick={() => typeof onOpenProject === 'function' && onOpenProject(task)}
+              className={`${styles.card} ${projectBlinkGreen[task.id] ? styles.cardBlinkGreen : ''} ${projectBlinkYellow[task.id] ? styles.cardBlinkYellow : ''}`}
+              onClick={() => {
+                if (typeof onOpenProject === 'function') {
+                  clearProjectCardViewed(task.id)
+                  onOpenProject(task)
+                }
+              }}
               role="button"
               tabIndex={0}
               onKeyDown={(e) => {
                 if (e.key === 'Enter' || e.key === ' ') {
                   e.preventDefault()
-                  typeof onOpenProject === 'function' && onOpenProject(task)
+                  if (typeof onOpenProject === 'function') {
+                    clearProjectCardViewed(task.id)
+                    onOpenProject(task)
+                  }
                 }
               }}
             >
-              {/*showEye && (
-                <div className={styles.eyeIcon} title="Участник, действий не требуется">
-                  <FaEye />
+              {projectChatUnread[task.id] && (
+                <div className={styles.chatIconUnread} title="Новое сообщение в чате проекта">
+                  <FaComments />
                 </div>
-              )*/}
+              )}
               <div className={styles.cardHeader}>
                 <h4 className={styles.cardTitle} title={task.title}>
                   {task.title || 'Без названия'}

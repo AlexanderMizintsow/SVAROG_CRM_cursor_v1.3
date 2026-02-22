@@ -28,12 +28,19 @@ const loadState = () => {
     tasks: {},
     globalNotifications: {},
     notifications: {},
-  } // Дефолтное значение
+    projectChatUnread: {},
+    projectNotifications: {},
+    projectBlinkGreen: {},
+    projectBlinkYellow: {},
+    projectDeadlineNotified: {},
+  }
 }
 
-// Функция для сохранения состояния в localStorage
+// Функция для сохранения состояния в localStorage (projectDeadlineNotified не сохраняем — при каждом входе снова показываем просрочки)
 const saveState = (state) => {
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(state))
+  const rest = { ...state }
+  delete rest.projectDeadlineNotified
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(rest))
 }
 
 const useTaskStateTracker = create((set, get) => {
@@ -46,6 +53,11 @@ const useTaskStateTracker = create((set, get) => {
     tasks: initialState.tasks,
     globalNotifications: initialState.globalNotifications || {},
     notifications: initialState.notifications || {},
+    projectChatUnread: initialState.projectChatUnread || {},
+    projectNotifications: initialState.projectNotifications || {},
+    projectBlinkGreen: initialState.projectBlinkGreen || {},
+    projectBlinkYellow: initialState.projectBlinkYellow || {},
+    projectDeadlineNotified: initialState.projectDeadlineNotified || {},
     notificationsTask: {},
     extensionRequests: {},
 
@@ -103,6 +115,76 @@ const useTaskStateTracker = create((set, get) => {
           ...state,
           globalNotifications: remaining,
         }
+        saveState(newState)
+        return newState
+      })
+    },
+
+    setProjectChatUnread: (globalTaskId) => {
+      set((state) => {
+        const next = { ...state.projectChatUnread, [globalTaskId]: true }
+        const newState = { ...state, projectChatUnread: next }
+        saveState(newState)
+        return newState
+      })
+    },
+    clearProjectChatUnread: (globalTaskId) => {
+      set((state) => {
+        const { [globalTaskId]: _, ...remaining } = state.projectChatUnread
+        const newState = { ...state, projectChatUnread: remaining }
+        saveState(newState)
+        return newState
+      })
+    },
+
+    addProjectNotification: (globalTaskId, title, type) => {
+      set((state) => {
+        const key = `project-${type}-${globalTaskId}`
+        const next = { ...state.projectNotifications, [key]: { globalTaskId, title, type } }
+        const newState = { ...state, projectNotifications: next }
+        saveState(newState)
+        return newState
+      })
+    },
+    removeProjectNotification: (key) => {
+      set((state) => {
+        const { [key]: _, ...remaining } = state.projectNotifications
+        const newState = { ...state, projectNotifications: remaining }
+        saveState(newState)
+        return newState
+      })
+    },
+
+    setProjectBlinkGreen: (globalTaskId) => {
+      set((state) => ({
+        ...state,
+        projectBlinkGreen: { ...state.projectBlinkGreen, [globalTaskId]: true },
+      }))
+    },
+    setProjectBlinkYellow: (globalTaskId) => {
+      set((state) => ({
+        ...state,
+        projectBlinkYellow: { ...state.projectBlinkYellow, [globalTaskId]: true },
+      }))
+    },
+    clearProjectCardViewed: (globalTaskId) => {
+      set((state) => {
+        const { [globalTaskId]: _g, ...restGreen } = state.projectBlinkGreen
+        const { [globalTaskId]: _y, ...restYellow } = state.projectBlinkYellow
+        const newState = {
+          ...state,
+          projectBlinkGreen: restGreen,
+          projectBlinkYellow: restYellow,
+        }
+        saveState(newState)
+        return newState
+      })
+    },
+
+    setProjectDeadlineNotified: (globalTaskId) => {
+      set((state) => {
+        const next = { ...state.projectDeadlineNotified, [globalTaskId]: true }
+        const newState = { ...state, projectDeadlineNotified: next }
         saveState(newState)
         return newState
       })

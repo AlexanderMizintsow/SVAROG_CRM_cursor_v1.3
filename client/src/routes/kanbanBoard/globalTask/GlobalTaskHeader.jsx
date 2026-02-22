@@ -2,11 +2,14 @@
 import { useState } from 'react'
 import { FaRegComments, FaUserEdit } from 'react-icons/fa'
 import { MdCalendarMonth } from 'react-icons/md'
+import useTaskStateTracker from '../../../store/useTaskStateTracker'
 import GlobalTaskChat from './subcomponents/globalChat/GlobalTaskChat'
 import './styles/GlobalTaskHeader.scss'
 
 const GlobalTaskHeader = ({ taskId, status, title, createdAt, author }) => {
   const [isChatOpen, setIsChatOpen] = useState(false)
+  const projectChatUnread = useTaskStateTracker((s) => s.projectChatUnread)
+  const hasUnreadChat = taskId && projectChatUnread[taskId]
 
   const toggleChat = () => {
     setIsChatOpen((prev) => !prev)
@@ -33,7 +36,10 @@ const GlobalTaskHeader = ({ taskId, status, title, createdAt, author }) => {
       </div>
       <div className="global-task-header__actions">
         {/* Кнопка для открытия чата */}
-        <div className="avatar-box bg-indigo-500 global-task__chat">
+        <div
+          className={`avatar-box bg-indigo-500 global-task__chat ${hasUnreadChat ? 'global-task-header__chat--unread' : ''}`}
+          title={hasUnreadChat ? 'Новое сообщение в чате' : 'Чат проекта'}
+        >
           <FaRegComments
             style={{ fontSize: '24px', cursor: 'pointer' }}
             onClick={toggleChat}

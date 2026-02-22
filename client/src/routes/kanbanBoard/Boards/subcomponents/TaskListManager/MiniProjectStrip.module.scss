@@ -65,10 +65,61 @@
   border-radius: 8px;
   padding: 0.6rem 0.65rem;
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
-  cursor: pointer; 
+  cursor: pointer;
   position: relative;
+}
 
-  
+.chatIconUnread {
+  position: absolute;
+  top: -6px;
+  right: -6px;
+  width: 22px;
+  height: 22px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: #3b82f6;
+  color: #fff;
+  border-radius: 50%;
+  font-size: 0.7rem;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.2);
+  z-index: 2;
+  animation: miniChatBlink 1.2s ease-in-out infinite;
+}
+
+@keyframes miniChatBlink {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50% { opacity: 0.85; transform: scale(1.05); }
+}
+
+.cardBlinkGreen {
+  animation: miniBlinkGreen 2s ease-in-out infinite;
+}
+
+@keyframes miniBlinkGreen {
+  0%, 100% {
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+    background: #ffffffb2;
+  }
+  50% {
+    box-shadow: 0 0 0 3px rgba(34, 197, 94, 0.7), 0 0 12px rgba(34, 197, 94, 0.3);
+    background: rgba(220, 252, 231, 0.85);
+  }
+}
+
+.cardBlinkYellow {
+  animation: miniBlinkYellow 2s ease-in-out infinite;
+}
+
+@keyframes miniBlinkYellow {
+  0%, 100% {
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+    background: #ffffffb2;
+  }
+  50% {
+    box-shadow: 0 0 0 3px rgba(234, 179, 8, 0.75), 0 0 12px rgba(234, 179, 8, 0.35);
+    background: rgba(254, 249, 195, 0.9);
+  }
 }
 
 .eyeIcon {

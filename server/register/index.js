@@ -69,6 +69,9 @@ const {
   addCommentToGlobalTask,
   addResponsiblesToGlobalTask,
   removeResponsibleFromGlobalTask,
+  createFinalSolution,
+  updateFinalSolution,
+  deleteFinalSolution,
   setProjectApproval,
   updateGoals,
   updateAdditionalInfo,
@@ -214,6 +217,7 @@ const io = socketIo(server, {
     methods: ['GET', 'POST'],
   },
 })
+app.set('io', io)
 const port = process.env.PORT || 5000
 
 app.use(cors())
@@ -501,6 +505,9 @@ app.post('/api/global-tasks/:taskId/comments', addCommentToGlobalTask(dbPool))
 app.post('/api/global-tasks/:taskId/responsibles-new', addResponsiblesToGlobalTask(dbPool, io))
 app.delete('/api/global-tasks/:taskId/responsibles/:userId', removeResponsibleFromGlobalTask(dbPool, io))
 app.post('/api/global-tasks/:taskId/approval', setProjectApproval(dbPool, io))
+app.post('/api/global-tasks/:taskId/final-solutions', createFinalSolution(dbPool))
+app.put('/api/global-tasks/:taskId/final-solutions/:solutionId', updateFinalSolution(dbPool))
+app.delete('/api/global-tasks/:taskId/final-solutions/:solutionId', deleteFinalSolution(dbPool))
 app.put('/api/tasks/:id/update-goals', updateGoals(dbPool, io))
 app.put('/api/tasks/:id/update-additional-info', updateAdditionalInfo(dbPool, io))
 app.get('/api/global-tasks/chat/:globalTaskId', getChatMessages(dbPool))

@@ -9,6 +9,8 @@ import GlobalTaskPage from './GlobalTaskPage'
 import CreateGlobalTaskForm from './CreateGlobalTaskForm'
 import HelpModalGlobalTask from './subcomponents/HelpModalGlobalTask'
 import { formatDeadlineDateTime, getRemainingDays } from './utils/globalTaskUtils'
+import { handleGlobalTaskChangedPayload } from './utils/projectNotificationsHandler'
+import useTaskStateTracker from '../../../store/useTaskStateTracker'
 import './styles/GlobalTasksContainer.scss'
 import axios from 'axios'
 
@@ -57,6 +59,10 @@ const GlobalTasksContainer = ({ onClose, initialTask, initialTaskId, onProjectUp
           return next
         })
 
+        setCompletedTasks((prev) =>
+          prev.map((task) => (task.id === updatedTask.id ? updatedTask : task))
+        )
+
         onProjectUpdated?.()
       } catch (err) {
         if (err.response?.status === 404 && isCurrentlyOpen) {
@@ -88,7 +94,19 @@ const GlobalTasksContainer = ({ onClose, initialTask, initialTaskId, onProjectUp
 
       const data = await response.json()
 
-      setTasks(data) // Обновляем состояние задач
+      setTasks(data)
+
+      // Уведомление об истечении срока (один раз на проект)
+      const now = Date.now()
+      const store = useTaskStateTracker.getState()
+      ;(Array.isArray(data) ? data : []).forEach((task) => {
+        if (!task?.id || TERMINAL_STATUSES.includes(task?.status)) return
+        const deadline = task.deadline ? new Date(task.deadline).getTime() : null
+        if (!deadline || deadline >= now) return
+        if (store.projectDeadlineNotified[task.id]) return
+        store.addProjectNotification(task.id, task.title || 'Проект', 'deadline_expired')
+        store.setProjectDeadlineNotified(task.id)
+      })
     } catch (err) {
       console.error('Ошибка при загрузке задач:', err)
     } finally {
@@ -133,11 +151,14 @@ const GlobalTasksContainer = ({ onClose, initialTask, initialTaskId, onProjectUp
     const socket = io(`${API_BASE_URL}5000`, { query: { userId }, transports: ['websocket'] })
     const onChanged = (payload) => {
       const globalTaskId = payload?.globalTaskId ?? payload
+      const id = globalTaskId != null ? Number(globalTaskId) : null
+      if (!id) return
+      handleGlobalTaskChangedPayload(typeof payload === 'object' ? payload : { globalTaskId: id, reason: 'changed' }, userId)
+      if (selectedTaskIdRef.current != null && Number(selectedTaskIdRef.current) === id) {
+        handleRefreshTaskRef.current(id)
+      }
       fetchGlobalTasks()
       fetchCompletedTasks()
-      if (selectedTaskIdRef.current === globalTaskId) {
-        handleRefreshTaskRef.current(globalTaskId)
-      }
     }
     socket.on('globalTaskChanged', onChanged)
     return () => {
@@ -160,9 +181,10 @@ const GlobalTasksContainer = ({ onClose, initialTask, initialTaskId, onProjectUp
     }
   }, [initialTaskId, initialTask])
 
-  // Функция для выбора задачи из списка
+  // Функция для выбора задачи из списка (сброс мигания при открытии карточки)
   const handleSelectTask = useCallback((task) => {
     setSelectedTask(task)
+    if (task?.id) useTaskStateTracker.getState().clearProjectCardViewed(task.id)
   }, [])
 
   // Функция для возврата к списку

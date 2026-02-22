@@ -76,9 +76,9 @@ const useWebSocket = (userId, stableSetMessages, currentTaskId) => {
         if (userIds.includes(userId)) {
           fetchMessages(globalTaskId)
 
-          // сохраняем информацию о глобальной задаче
           if (autor !== userId) {
             useTaskStateTracker.getState().setGlobalTaskNotification(globalTaskId, title)
+            useTaskStateTracker.getState().setProjectChatUnread(globalTaskId)
           }
         }
       })

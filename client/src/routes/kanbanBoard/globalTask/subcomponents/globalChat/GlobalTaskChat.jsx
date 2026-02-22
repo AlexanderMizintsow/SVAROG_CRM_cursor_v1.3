@@ -87,6 +87,13 @@ const GlobalTaskChat = ({
     loadMessages()
   }, [globalTaskId])
 
+  useEffect(() => {
+    if (globalTaskId) {
+      useTaskStateTracker.getState().clearProjectChatUnread(globalTaskId)
+      useTaskStateTracker.getState().removeGlobalTaskNotification(globalTaskId)
+    }
+  }, [globalTaskId])
+
   const scrollToBottom = () => {
     if (messagesEndRef.current) {
       messagesEndRef.current.scrollTop = messagesEndRef.current.scrollHeight

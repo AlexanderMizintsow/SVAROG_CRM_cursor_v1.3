@@ -26,6 +26,8 @@ import {
 import ResponsibleSelector from './subcomponents/ResponsibleSelector'
 import GoalsEditor from './subcomponents/GoalsEditor'
 import AdditionalInfoEditor from './subcomponents/AdditionalInfoEditor'
+import FinalSolutionsBlock from './subcomponents/FinalSolutionsBlock'
+import FinalSolutionModal from './subcomponents/FinalSolutionModal'
 import './styles/GlobalTaskCard.scss'
 
 const GlobalTaskCard = ({
@@ -48,6 +50,7 @@ const GlobalTaskCard = ({
   const [isGoalsEditorOpen, setIsGoalsEditorOpen] = useState(false)
   const [isAdditionalInfoEditorOpen, setIsAdditionalInfoEditorOpen] =
     useState(false)
+  const [isFinalSolutionModalOpen, setIsFinalSolutionModalOpen] = useState(false)
   const [approvalModal, setApprovalModal] = useState({ open: false, status: null })
   const [approvalComment, setApprovalComment] = useState('')
   const [approvalSubmitting, setApprovalSubmitting] = useState(false)
@@ -68,7 +71,9 @@ const GlobalTaskCard = ({
     goals,
     additional_info,
     responsibles,
+    final_solutions,
   } = task
+  const solutionsList = Array.isArray(final_solutions) ? final_solutions : []
   const responsiblesRef = useRef(null)
   const goalsRef = useRef(null)
   const additionalInfoRef = useRef(null)
@@ -326,6 +331,16 @@ const GlobalTaskCard = ({
           <h2 className="global-task-card__title">{title}</h2>
           <p className="global-task-card__description">{description}</p>
 
+          {/* Итоговые решения */}
+          {solutionsList.length > 0 && (
+            <FinalSolutionsBlock
+              solutions={solutionsList}
+              globalTaskId={id}
+              onRefresh={onRefresh}
+              isReadOnly={isReadOnly}
+            />
+          )}
+
           {/* Цели */}
           <div className="global-task-card__goals">
             {goals.filter((goal) => goal.trim() !== '').length > 0 ? ( // Проверяем, есть ли непустые цели
@@ -568,6 +583,9 @@ const GlobalTaskCard = ({
                 <li onClick={handleOpenAdditionalInfoEditor}>
                   Добавить доп. инфо
                 </li>
+                <li onClick={() => setIsFinalSolutionModalOpen(true)}>
+                  Итоговое решение
+                </li>
               </ul>
             </div>
           )}
@@ -608,6 +626,18 @@ const GlobalTaskCard = ({
             onRefresh={onRefresh}
           />
         </div>
+      )}
+
+      {isFinalSolutionModalOpen && (
+        <FinalSolutionModal
+          globalTaskId={id}
+          mode="add"
+          onClose={() => setIsFinalSolutionModalOpen(false)}
+          onSaved={() => {
+            setIsFinalSolutionModalOpen(false)
+            if (typeof onRefresh === 'function') onRefresh(id)
+          }}
+        />
       )}
     </div>
   )

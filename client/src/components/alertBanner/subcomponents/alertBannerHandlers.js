@@ -1,6 +1,6 @@
 import axios from 'axios'
 import { API_BASE_URL } from '../../../../config'
-import useTaskStateTracker from '../../../store/useTaskStateTracker'
+import useTaskStateTracker from '../../../../store/useTaskStateTracker'
 
 // Основные обработчики
 export const useAlertBannerHandlers = (params) => {

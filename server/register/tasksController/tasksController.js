@@ -50,13 +50,53 @@ async function getGlobalTaskParticipantUserIds(db, globalTaskId) {
   return Array.from(ids)
 }
 
-function emitGlobalTaskChanged(io, userIds, globalTaskId, reason) {
+function emitGlobalTaskChanged(io, userIds, globalTaskId, reason, payload = {}) {
   if (!io || !userIds || userIds.length === 0 || !globalTaskId) return
+  const message = {
+    globalTaskId: Number(globalTaskId),
+    reason: reason || 'changed',
+    title: payload.title || null,
+    authorId: payload.authorId != null ? Number(payload.authorId) : null,
+  }
   for (const uid of userIds) {
-    io.to(String(uid)).emit('globalTaskChanged', {
-      globalTaskId: Number(globalTaskId),
-      reason: reason || 'changed',
-    })
+    io.to(String(uid)).emit('globalTaskChanged', message)
+  }
+}
+
+/** Проверяет, достиг ли прогресс проекта 100%, и при необходимости эмитит progress_100 */
+async function checkAndEmitProgress100(dbPool, io, globalTaskId) {
+  if (!globalTaskId || !io) return
+  try {
+    const r = await dbPool.query(
+      `SELECT
+        gt.title,
+        gt.created_by as author_id,
+        COALESCE(
+          (SELECT ROUND(100.0 * (
+            (SELECT COALESCE(SUM(CASE WHEN t.is_completed THEN 1 ELSE 0 END), 0) FROM tasks t WHERE t.global_task_id = gt.id)
+            + (SELECT COUNT(*) FROM global_task_responsibles gtra WHERE gtra.global_task_id = gt.id AND gtra.requires_approval = true AND gtra.approval_status = 'approved')
+            + (SELECT COUNT(*) FROM global_task_final_solutions WHERE global_task_id = gt.id)
+          ) / NULLIF(
+            (SELECT COUNT(*) FROM tasks t WHERE t.global_task_id = gt.id)
+            + (SELECT COUNT(*) FROM global_task_responsibles gtra WHERE gtra.global_task_id = gt.id AND gtra.requires_approval = true)
+            + (SELECT COUNT(*) FROM global_task_final_solutions WHERE global_task_id = gt.id),
+            0
+          ), 2)
+        , 0) as pct
+      FROM global_tasks gt WHERE gt.id = $1`,
+      [globalTaskId]
+    )
+    if (r.rows.length === 0) return
+    const pct = Number(r.rows[0].pct)
+    if (pct < 100) return
+    const title = r.rows[0].title || null
+    const authorId = r.rows[0].author_id != null ? Number(r.rows[0].author_id) : null
+    const participantIds = await getGlobalTaskParticipantUserIds(dbPool, globalTaskId)
+    if (participantIds && participantIds.length > 0) {
+      emitGlobalTaskChanged(io, participantIds, globalTaskId, 'progress_100', { title, authorId })
+    }
+  } catch (err) {
+    console.error('checkAndEmitProgress100:', err)
   }
 }
 
@@ -492,7 +532,9 @@ function addTaskAttachment(dbPool, io) {
       if (tableTypeNormalized === 'global' && task_id) {
         const participantIds = await getGlobalTaskParticipantUserIds(dbPool, task_id)
         if (participantIds && participantIds.length > 0) {
-          emitGlobalTaskChanged(io, participantIds, task_id, 'attachment')
+          const titleRes = await dbPool.query('SELECT title FROM global_tasks WHERE id = $1', [task_id])
+          const projectTitle = titleRes.rows[0]?.title || null
+          emitGlobalTaskChanged(io, participantIds, task_id, 'attachment', { title: projectTitle })
         }
       }
       res.status(201).json({ message: 'Вложение добавлено к задаче' })
@@ -626,20 +668,16 @@ unique_comments AS (
 // Для оповещения клиента о создании задачи
 function notifyTaskCreated(dbPool, io) {
   return async function (req, res) {
-    const { id, createdBy, assignedUsers, approvers, viewers } = req.body
+    const { id, createdBy, assignedUsers = [], approvers = [], viewers = [] } = req.body
     try {
-      // Создаем массив всех пользователей, которых нужно уведомить
       const usersToNotify = [
-        createdBy, // Создатель задачи
-        ...assignedUsers, // Исполнители
-        ...approvers, // Утверждающие
-        ...viewers, // Наблюдатели
+        createdBy,
+        ...(Array.isArray(assignedUsers) ? assignedUsers : []),
+        ...(Array.isArray(approvers) ? approvers : []),
+        ...(Array.isArray(viewers) ? viewers : []),
       ]
+      const uniqueUsers = [...new Set(usersToNotify.filter(Boolean))]
 
-      // Убираем дубликаты (если пользователь в нескольких ролях)
-      const uniqueUsers = [...new Set(usersToNotify)]
-
-      // Отправляем событие в комнаты каждого пользователя
       uniqueUsers.forEach((userId) => {
         io.to(userId).emit('taskCreated', {
           taskId: id,
@@ -648,8 +686,25 @@ function notifyTaskCreated(dbPool, io) {
           approvers: approvers,
           viewers: viewers,
         })
-        console.log(`Событие отправлено в комнату ${userId}`)
       })
+
+      // Уведомление «Подзадача добавлена» только исполнителям (для проектов)
+      const taskIdsToNotify = Array.isArray(id) ? id : (id != null ? [id] : [])
+      const assigneeIds = Array.isArray(assignedUsers)
+        ? assignedUsers.map((u) => (typeof u === 'object' && u != null && u.id != null ? u.id : u))
+        : []
+      for (const singleId of taskIdsToNotify) {
+        const taskIdNum = typeof singleId === 'number' ? singleId : parseInt(singleId, 10)
+        if (!Number.isFinite(taskIdNum) || !assigneeIds.length) continue
+        const taskRow = await dbPool.query('SELECT global_task_id FROM tasks WHERE id = $1', [taskIdNum])
+        const globalTaskId = taskRow.rows[0]?.global_task_id
+        if (globalTaskId) {
+          const gtRow = await dbPool.query('SELECT title FROM global_tasks WHERE id = $1', [globalTaskId])
+          const projectTitle = gtRow.rows[0]?.title || null
+          const assigneeIdStrings = assigneeIds.map((u) => String(u))
+          emitGlobalTaskChanged(io, assigneeIdStrings, globalTaskId, 'subtask_added', { title: projectTitle })
+        }
+      }
 
       res.status(200).json({ message: 'Уведомление отправлено' })
     } catch (error) {
@@ -794,6 +849,7 @@ function updateTaskAccept(dbPool, io) {
       if (globalTaskIdForEmit) {
         const participantIds = await getGlobalTaskParticipantUserIds(dbPool, globalTaskIdForEmit)
         emitGlobalTaskChanged(io, participantIds, globalTaskIdForEmit, 'subtaskAccept')
+        await checkAndEmitProgress100(dbPool, io, globalTaskIdForEmit)
         notifyBpeProjectUpdated(Number(globalTaskIdForEmit))
       }
 
@@ -1188,9 +1244,9 @@ function createGlobalTask(dbPool, io) {
 
       await dbPool.query('COMMIT') // Подтверждаем транзакцию
 
-      // realtime: оповещаем всех участников проекта, чтобы мини-карточка появилась/обновилась сразу
+      // realtime: оповещаем всех участников проекта (уведомление о создании для всех)
       const participantIds = await getGlobalTaskParticipantUserIds(dbPool, newTaskId)
-      emitGlobalTaskChanged(io, participantIds, newTaskId, 'created')
+      emitGlobalTaskChanged(io, participantIds, newTaskId, 'created', { title, authorId: created_by })
 
       // BPE: уведомляем движок о появлении/изменении проекта (событийные развилки по проекту)
       notifyBpeProjectUpdated(Number(newTaskId))
@@ -1254,9 +1310,11 @@ function getGlobalTasks(dbPool) {
         (SELECT ROUND(100.0 * (
             (SELECT COALESCE(SUM(CASE WHEN t.is_completed THEN 1 ELSE 0 END), 0) FROM tasks t WHERE t.global_task_id = gt.id)
             + (SELECT COUNT(*) FROM global_task_responsibles gtra WHERE gtra.global_task_id = gt.id AND gtra.requires_approval = true AND gtra.approval_status = 'approved')
+            + (SELECT COUNT(*) FROM global_task_final_solutions WHERE global_task_id = gt.id)
         ) / NULLIF(
             (SELECT COUNT(*) FROM tasks t WHERE t.global_task_id = gt.id)
-            + (SELECT COUNT(*) FROM global_task_responsibles gtra WHERE gtra.global_task_id = gt.id AND gtra.requires_approval = true),
+            + (SELECT COUNT(*) FROM global_task_responsibles gtra WHERE gtra.global_task_id = gt.id AND gtra.requires_approval = true)
+            + (SELECT COUNT(*) FROM global_task_final_solutions WHERE global_task_id = gt.id),
             0
         ), 2)
         ), 0) as completion_percentage,
@@ -1267,7 +1325,11 @@ function getGlobalTasks(dbPool) {
      FROM (SELECT DISTINCT t.title FROM tasks t
            JOIN task_assignments ta ON t.id = ta.task_id
            WHERE t.global_task_id = gt.id AND ta.user_id = $1
-           LIMIT 15) t) AS user_task_titles
+           LIMIT 15) t) AS user_task_titles,
+    (SELECT COALESCE(json_agg(json_build_object('id', fs.id, 'content', fs.content, 'user_id', fs.user_id, 'author_name', TRIM(CONCAT(fsu.first_name, ' ', fsu.last_name)), 'created_at', fs.created_at, 'updated_at', fs.updated_at) ORDER BY fs.created_at), '[]'::json)
+     FROM global_task_final_solutions fs
+     LEFT JOIN users fsu ON fsu.id = fs.user_id
+     WHERE fs.global_task_id = gt.id) as final_solutions
 FROM
     global_tasks gt
 LEFT JOIN global_task_responsibles gtr ON gt.id = gtr.global_task_id
@@ -1697,11 +1759,17 @@ function updateGlobalTaskProcess(dbPool, io) {
       }
 
       const participantIds = await getGlobalTaskParticipantUserIds(dbPool, taskId)
+      const taskRow = result.rows[0]
+      const projectTitle = taskRow?.title || null
+      const authorId = taskRow?.created_by || null
       if (io && participantIds && participantIds.length > 0) {
-        emitGlobalTaskChanged(io, participantIds, taskId, 'status')
+        emitGlobalTaskChanged(io, participantIds, taskId, 'status', { title: projectTitle, authorId })
+        if (status === 'Завершено') {
+          emitGlobalTaskChanged(io, participantIds, taskId, 'progress_100', { title: projectTitle, authorId })
+        }
       }
 
-      res.json({ message: 'Статус обновлен', task: result.rows[0] })
+      res.json({ message: 'Статус обновлен', task: taskRow })
     } catch (error) {
       console.error('Ошибка при обновлении задачи:', error)
       res.status(500).json({ error: 'Внутренняя ошибка сервера' })
@@ -1726,8 +1794,9 @@ function deleteGlobalTask(dbPool, io) {
         return res.status(404).json({ error: 'Глобальная задача не найдена' })
       }
 
+      const projectTitle = updateResult.rows[0]?.title || null
       if (io && participantIds && participantIds.length > 0) {
-        emitGlobalTaskChanged(io, participantIds, taskId, 'deleted')
+        emitGlobalTaskChanged(io, participantIds, taskId, 'deleted', { title: projectTitle })
       }
       notifyBpeProjectUpdated(Number(taskId))
 
@@ -1793,12 +1862,25 @@ function getGlobalTaskById(dbPool) {
             (SELECT ROUND(100.0 * (
                 (SELECT COALESCE(SUM(CASE WHEN t.is_completed THEN 1 ELSE 0 END), 0) FROM tasks t WHERE t.global_task_id = gt.id)
                 + (SELECT COUNT(*) FROM global_task_responsibles gtra WHERE gtra.global_task_id = gt.id AND gtra.requires_approval = true AND gtra.approval_status = 'approved')
+                + (SELECT COUNT(*) FROM global_task_final_solutions WHERE global_task_id = gt.id)
             ) / NULLIF(
                 (SELECT COUNT(*) FROM tasks t WHERE t.global_task_id = gt.id)
-                + (SELECT COUNT(*) FROM global_task_responsibles gtra WHERE gtra.global_task_id = gt.id AND gtra.requires_approval = true),
+                + (SELECT COUNT(*) FROM global_task_responsibles gtra WHERE gtra.global_task_id = gt.id AND gtra.requires_approval = true)
+                + (SELECT COUNT(*) FROM global_task_final_solutions WHERE global_task_id = gt.id),
                 0
             ), 2)
-            ), 0) as completion_percentage
+            ), 0) as completion_percentage,
+        (SELECT COALESCE(json_agg(json_build_object(
+            'id', fs.id,
+            'content', fs.content,
+            'user_id', fs.user_id,
+            'author_name', TRIM(CONCAT(fsu.first_name, ' ', fsu.last_name)),
+            'created_at', fs.created_at,
+            'updated_at', fs.updated_at
+        ) ORDER BY fs.created_at), '[]'::json)
+        FROM global_task_final_solutions fs
+        LEFT JOIN users fsu ON fsu.id = fs.user_id
+        WHERE fs.global_task_id = gt.id) as final_solutions
     FROM
         global_tasks gt
     LEFT JOIN global_task_responsibles gtr ON gt.id = gtr.global_task_id
@@ -1824,6 +1906,148 @@ function getGlobalTaskById(dbPool) {
     } catch (err) {
       console.error(`Ошибка при получении задачи ${taskId}:`, err)
       res.status(500).json({ error: 'Внутренняя ошибка сервера' })
+    }
+  }
+}
+
+// Итоговые решения по проекту: создать
+function createFinalSolution(dbPool) {
+  return async function (req, res) {
+    const { taskId } = req.params
+    const { content, userId } = req.body
+    if (!content || typeof content !== 'string' || !content.trim()) {
+      return res.status(400).json({ error: 'Текст итогового решения обязателен' })
+    }
+    const uid = userId ? parseInt(userId, 10) : null
+    if (!uid) {
+      return res.status(400).json({ error: 'Не указан пользователь' })
+    }
+    try {
+      const insert = await dbPool.query(
+        `INSERT INTO global_task_final_solutions (global_task_id, user_id, content)
+         SELECT $1, $2, $3
+         FROM global_tasks gt
+         WHERE gt.id = $1
+         AND (gt.created_by = $2 OR EXISTS (SELECT 1 FROM global_task_responsibles gtr WHERE gtr.global_task_id = gt.id AND gtr.user_id = $2))
+         RETURNING id, global_task_id, user_id, content, created_at, updated_at`,
+        [taskId, uid, content.trim()]
+      )
+      if (insert.rowCount === 0) {
+        return res.status(403).json({ error: 'Нет доступа к проекту или проект не найден' })
+      }
+      const row = insert.rows[0]
+      const authorRes = await dbPool.query(
+        `SELECT TRIM(CONCAT(first_name, ' ', last_name)) as author_name FROM users WHERE id = $1`,
+        [uid]
+      )
+      const authorName = authorRes.rows[0]?.author_name || ''
+      notifyBpeProjectUpdated(taskId)
+      const io = req.app.get('io')
+      if (io) {
+        const userIds = await getGlobalTaskParticipantUserIds(dbPool, taskId)
+        const gt = await dbPool.query('SELECT title, created_by FROM global_tasks WHERE id = $1', [taskId])
+        const projectTitle = gt.rows[0]?.title || null
+        const authorId = gt.rows[0]?.created_by || null
+        emitGlobalTaskChanged(io, userIds, taskId, 'final_solution_added', { title: projectTitle, authorId })
+      }
+      res.status(201).json({
+        id: row.id,
+        content: row.content,
+        user_id: row.user_id,
+        author_name: authorName,
+        created_at: row.created_at,
+        updated_at: row.updated_at,
+      })
+    } catch (err) {
+      console.error('createFinalSolution:', err)
+      res.status(500).json({ error: 'Ошибка сервера' })
+    }
+  }
+}
+
+// Итоговые решения: обновить (только автор)
+function updateFinalSolution(dbPool) {
+  return async function (req, res) {
+    const { taskId, solutionId } = req.params
+    const { content, userId } = req.body
+    if (!content || typeof content !== 'string' || !content.trim()) {
+      return res.status(400).json({ error: 'Текст обязателен' })
+    }
+    const uid = userId ? parseInt(userId, 10) : null
+    if (!uid) {
+      return res.status(400).json({ error: 'Не указан пользователь' })
+    }
+    try {
+      const update = await dbPool.query(
+        `UPDATE global_task_final_solutions
+         SET content = $1, updated_at = CURRENT_TIMESTAMP
+         WHERE id = $2 AND global_task_id = $3 AND user_id = $4
+         RETURNING id, content, user_id, created_at, updated_at`,
+        [content.trim(), solutionId, taskId, uid]
+      )
+      if (update.rowCount === 0) {
+        return res.status(404).json({ error: 'Решение не найдено или нет прав на редактирование' })
+      }
+      const row = update.rows[0]
+      const authorRes = await dbPool.query(
+        `SELECT TRIM(CONCAT(first_name, ' ', last_name)) as author_name FROM users WHERE id = $1`,
+        [uid]
+      )
+      notifyBpeProjectUpdated(taskId)
+      const io = req.app.get('io')
+      if (io) {
+        const userIds = await getGlobalTaskParticipantUserIds(dbPool, taskId)
+        const gt = await dbPool.query('SELECT title, created_by FROM global_tasks WHERE id = $1', [taskId])
+        const projectTitle = gt.rows[0]?.title || null
+        const authorId = gt.rows[0]?.created_by || null
+        emitGlobalTaskChanged(io, userIds, taskId, 'final_solution_updated', { title: projectTitle, authorId })
+      }
+      res.status(200).json({
+        id: row.id,
+        content: row.content,
+        user_id: row.user_id,
+        author_name: authorRes.rows[0]?.author_name || '',
+        created_at: row.created_at,
+        updated_at: row.updated_at,
+      })
+    } catch (err) {
+      console.error('updateFinalSolution:', err)
+      res.status(500).json({ error: 'Ошибка сервера' })
+    }
+  }
+}
+
+// Итоговые решения: удалить (только автор)
+function deleteFinalSolution(dbPool) {
+  return async function (req, res) {
+    const { taskId, solutionId } = req.params
+    const userId = req.body?.userId ? parseInt(req.body.userId, 10) : (req.query?.userId ? parseInt(req.query.userId, 10) : null)
+    if (!userId) {
+      return res.status(400).json({ error: 'Не указан пользователь' })
+    }
+    try {
+      const del = await dbPool.query(
+        `DELETE FROM global_task_final_solutions
+         WHERE id = $1 AND global_task_id = $2 AND user_id = $3
+         RETURNING id`,
+        [solutionId, taskId, userId]
+      )
+      if (del.rowCount === 0) {
+        return res.status(404).json({ error: 'Решение не найдено или нет прав на удаление' })
+      }
+      notifyBpeProjectUpdated(taskId)
+      const io = req.app.get('io')
+      if (io) {
+        const userIds = await getGlobalTaskParticipantUserIds(dbPool, taskId)
+        const gt = await dbPool.query('SELECT title, created_by FROM global_tasks WHERE id = $1', [taskId])
+        const projectTitle = gt.rows[0]?.title || null
+        const authorId = gt.rows[0]?.created_by || null
+        emitGlobalTaskChanged(io, userIds, taskId, 'final_solution_deleted', { title: projectTitle, authorId })
+      }
+      res.status(200).json({ success: true })
+    } catch (err) {
+      console.error('deleteFinalSolution:', err)
+      res.status(500).json({ error: 'Ошибка сервера' })
     }
   }
 }
@@ -1884,12 +2108,18 @@ function getGlobalTasksCompleted(dbPool) {
         (SELECT ROUND(100.0 * (
             (SELECT COALESCE(SUM(CASE WHEN t.is_completed THEN 1 ELSE 0 END), 0) FROM tasks t WHERE t.global_task_id = gt.id)
             + (SELECT COUNT(*) FROM global_task_responsibles gtra WHERE gtra.global_task_id = gt.id AND gtra.requires_approval = true AND gtra.approval_status = 'approved')
+            + (SELECT COUNT(*) FROM global_task_final_solutions WHERE global_task_id = gt.id)
         ) / NULLIF(
             (SELECT COUNT(*) FROM tasks t WHERE t.global_task_id = gt.id)
-            + (SELECT COUNT(*) FROM global_task_responsibles gtra WHERE gtra.global_task_id = gt.id AND gtra.requires_approval = true),
+            + (SELECT COUNT(*) FROM global_task_responsibles gtra WHERE gtra.global_task_id = gt.id AND gtra.requires_approval = true)
+            + (SELECT COUNT(*) FROM global_task_final_solutions WHERE global_task_id = gt.id),
             0
         ), 2)
-        ), 0) as completion_percentage
+        ), 0) as completion_percentage,
+    (SELECT COALESCE(json_agg(json_build_object('id', fs.id, 'content', fs.content, 'user_id', fs.user_id, 'author_name', TRIM(CONCAT(fsu.first_name, ' ', fsu.last_name)), 'created_at', fs.created_at, 'updated_at', fs.updated_at) ORDER BY fs.created_at), '[]'::json)
+     FROM global_task_final_solutions fs
+     LEFT JOIN users fsu ON fsu.id = fs.user_id
+     WHERE fs.global_task_id = gt.id) as final_solutions
 FROM
     global_tasks gt
 LEFT JOIN global_task_responsibles gtr ON gt.id = gtr.global_task_id
@@ -2068,8 +2298,11 @@ function addResponsiblesToGlobalTask(dbPool, io) {
       )
 
       const participantIds = await getGlobalTaskParticipantUserIds(dbPool, taskId)
+      const titleRes = await dbPool.query('SELECT title FROM global_tasks WHERE id = $1', [taskId])
+      const projectTitle = titleRes.rows[0]?.title || null
       if (io && participantIds && participantIds.length > 0) {
-        emitGlobalTaskChanged(io, participantIds, taskId, 'responsiblesAdded')
+        emitGlobalTaskChanged(io, participantIds, taskId, 'responsiblesAdded', { title: projectTitle })
+        emitGlobalTaskChanged(io, userIds.map(String), taskId, 'participant_added', { title: projectTitle })
       }
       notifyBpeProjectUpdated(Number(taskId))
 
@@ -2127,7 +2360,12 @@ function setProjectApproval(dbPool, io) {
 
       // realtime: обновить мини-карточки у всех участников проекта
       const participantIds = await getGlobalTaskParticipantUserIds(dbPool, taskId)
-      emitGlobalTaskChanged(io, participantIds, taskId, 'approval')
+      const titleRes = await dbPool.query('SELECT title FROM global_tasks WHERE id = $1', [taskId])
+      const projectTitle = titleRes.rows[0]?.title || null
+      emitGlobalTaskChanged(io, participantIds, taskId, 'approval', { title: projectTitle })
+      if (status === 'approved') {
+        await checkAndEmitProgress100(dbPool, io, taskId)
+      }
       notifyBpeProjectUpdated(Number(taskId))
 
       res.status(200).json({ success: true, status })
@@ -2187,6 +2425,8 @@ function removeResponsibleFromGlobalTask(dbPool, io) {
 
       // Собираем id всех, кому слать обновление (включая удаляемого), до удаления
       const participantIds = await getGlobalTaskParticipantUserIds(dbPool, taskId)
+      const titleRes = await dbPool.query('SELECT title FROM global_tasks WHERE id = $1', [taskId])
+      const projectTitle = titleRes.rows[0]?.title || null
 
       const del = await dbPool.query(
         'DELETE FROM global_task_responsibles WHERE global_task_id = $1 AND user_id = $2 RETURNING *',
@@ -2196,8 +2436,12 @@ function removeResponsibleFromGlobalTask(dbPool, io) {
         return res.status(404).json({ error: 'Участник не найден в проекте' })
       }
 
-      if (io && participantIds && participantIds.length > 0) {
-        emitGlobalTaskChanged(io, participantIds, taskId, 'responsibleRemoved')
+      if (io) {
+        const remainingIds = participantIds.filter((uid) => String(uid) !== String(targetUserId))
+        if (remainingIds.length > 0) {
+          emitGlobalTaskChanged(io, remainingIds, taskId, 'responsibleRemoved', { title: projectTitle })
+        }
+        emitGlobalTaskChanged(io, [String(targetUserId)], taskId, 'participant_removed', { title: projectTitle })
       }
       notifyBpeProjectUpdated(Number(taskId))
 
@@ -2221,8 +2465,10 @@ function updateGoals(dbPool, io) {
         [JSON.stringify(goals), id]
       )
       const participantIds = await getGlobalTaskParticipantUserIds(dbPool, id)
+      const titleRes = await dbPool.query('SELECT title FROM global_tasks WHERE id = $1', [id])
+      const projectTitle = titleRes.rows[0]?.title || null
       if (io && participantIds && participantIds.length > 0) {
-        emitGlobalTaskChanged(io, participantIds, id, 'goals')
+        emitGlobalTaskChanged(io, participantIds, id, 'goals', { title: projectTitle })
       }
       res.json({ message: 'Цели обновлены' })
     } catch (err) {
@@ -2244,8 +2490,10 @@ function updateAdditionalInfo(dbPool, io) {
         [additional_info, id]
       )
       const participantIds = await getGlobalTaskParticipantUserIds(dbPool, id)
+      const titleRes = await dbPool.query('SELECT title FROM global_tasks WHERE id = $1', [id])
+      const projectTitle = titleRes.rows[0]?.title || null
       if (io && participantIds && participantIds.length > 0) {
-        emitGlobalTaskChanged(io, participantIds, id, 'additionalInfo')
+        emitGlobalTaskChanged(io, participantIds, id, 'additionalInfo', { title: projectTitle })
       }
       res.json({ message: 'Дополнительная информация обновлена' })
     } catch (err) {
@@ -3496,6 +3744,9 @@ module.exports = {
   getGlobalTaskTitle,
   getGlobalTasksCompleted,
   removeResponsibleFromGlobalTask,
+  createFinalSolution,
+  updateFinalSolution,
+  deleteFinalSolution,
   updateTaskDescription,
   getTaskDescriptionHistory,
   getTaskById,
