@@ -11,6 +11,7 @@ const webhooksRoutes = require('./routes/webhooks')
 const analyticsRoutes = require('./routes/analytics')
 const notificationsRoutes = require('./routes/notifications')
 const { startTimerWorker } = require('./engine/workers/timerWorker')
+const { startScheduleWorker } = require('./engine/workers/scheduleWorker')
 
 const app = express()
 app.use(cors())
@@ -29,6 +30,7 @@ app.get('/api/bp/health', (req, res) => {
 })
 
 startTimerWorker(pool)
+startScheduleWorker(pool)
 
 const port = config.port
 app.listen(port, '0.0.0.0', () => {

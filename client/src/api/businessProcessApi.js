@@ -30,6 +30,13 @@ export const deleteProcess = (id) =>
 export const startProcess = (processId, body = {}) =>
   bpeClient.post(`/processes/${processId}/start`, body).then((res) => res.data)
 
+// Расписание автоматического запуска
+export const getProcessSchedule = (processId) =>
+  bpeClient.get(`/processes/${processId}/schedule`).then((res) => res.data)
+
+export const setProcessSchedule = (processId, body) =>
+  bpeClient.put(`/processes/${processId}/schedule`, body).then((res) => res.data)
+
 export const getInstances = (params = {}) =>
   bpeClient.get('/instances', { params }).then((res) => res.data)
 

@@ -1,8 +1,9 @@
 import { FcFlowChart } from 'react-icons/fc'
 import { IoPlay, IoCreateOutline, IoTrashOutline, IoPersonOutline  } from 'react-icons/io5'
+import ProcessCardSchedule from './ProcessCardSchedule'
 import './ProcessCard.scss'
 
-const ProcessCard = ({ process, isDraft = false, onStart, onPublish, onEdit, onDelete }) => {
+const ProcessCard = ({ process, isDraft = false, currentUserId, onStart, onPublish, onEdit, onDelete }) => {
   return (
     <div className="process-card">
       {isDraft && <span className="process-card__badge">Черновик</span>}
@@ -12,6 +13,12 @@ const ProcessCard = ({ process, isDraft = false, onStart, onPublish, onEdit, onD
       </div>
       {process.description && (
         <p className="process-card__description">{process.description}</p>
+      )}
+      {!isDraft && process.id != null && (
+        <ProcessCardSchedule
+          processId={process.id}
+          currentUserId={currentUserId}
+        />
       )}
       <div className="process-card__actions">
         {isDraft ? (

@@ -230,6 +230,27 @@ ALTER TABLE global_task_responsibles ADD COLUMN IF NOT EXISTS approval_comment T
 ALTER TABLE global_task_responsibles ADD COLUMN IF NOT EXISTS approval_at TIMESTAMP;
 
 
+-- 12. Расписания автоматического запуска процессов
+-- schedule_type: 'dates' | 'weekdays' | 'interval'
+-- config: JSONB — для dates: { "dates": ["YYYY-MM-DD", ...] }; для weekdays: { "weekdays": [1,2,3] } (1=Пн..7=Вс); для interval: { "interval_days": 2, "anchor_date": "YYYY-MM-DD" }; общее: "exclude_weekdays": [6,7], "exclude_dates": ["YYYY-MM-DD", ...]
+CREATE TABLE bp_process_schedules (
+  id SERIAL PRIMARY KEY,
+  process_id INT NOT NULL UNIQUE REFERENCES bp_process_definitions(id) ON DELETE CASCADE,
+  enabled BOOLEAN NOT NULL DEFAULT true,
+  schedule_type VARCHAR(20) NOT NULL CHECK (schedule_type IN ('dates', 'weekdays', 'interval')),
+  time_hour INT NOT NULL CHECK (time_hour >= 0 AND time_hour <= 23),
+  time_minute INT NOT NULL CHECK (time_minute >= 0 AND time_minute <= 59),
+  config JSONB NOT NULL DEFAULT '{}',
+  launched_by_user_id INT REFERENCES users(id) ON DELETE SET NULL,
+  last_triggered_at TIMESTAMP,
+  created_at TIMESTAMP DEFAULT NOW(),
+  updated_at TIMESTAMP DEFAULT NOW()
+);
+
+CREATE INDEX idx_bp_process_schedules_process_id ON bp_process_schedules(process_id);
+CREATE INDEX idx_bp_process_schedules_enabled ON bp_process_schedules(enabled) WHERE enabled = true;
+
+
 -- =============================================================================
 -- БЕЗОПАСНОЕ УДАЛЕНИЕ: если что-то пошло не так, выполните следующий блок.
 -- ВНИМАНИЕ: это удалит все данные и таблицы БП. Задачи (tasks) останутся,
@@ -251,6 +272,7 @@ DROP TABLE IF EXISTS bp_gateway_waiting CASCADE;
 DROP TABLE IF EXISTS bp_timer_waiting CASCADE;
 DROP TABLE IF EXISTS bp_task_process_links CASCADE;
 DROP TABLE IF EXISTS bp_node_execution_log CASCADE;
+DROP TABLE IF EXISTS bp_process_schedules CASCADE;
 DROP TABLE IF EXISTS bp_process_instances CASCADE;
 DROP TABLE IF EXISTS bp_process_definitions CASCADE;
 DROP TABLE IF EXISTS bp_task_templates CASCADE;

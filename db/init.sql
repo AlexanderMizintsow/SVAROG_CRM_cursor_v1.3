@@ -942,6 +942,17 @@ CREATE TABLE notifications (
     is_sent BOOLEAN DEFAULT FALSE, -- было ли уведомление уже отправлено пользователям
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP -- Дата и время создания уведомления
 ); 
+
+CREATE TABLE IF NOT EXISTS global_task_final_solutions (
+    id SERIAL PRIMARY KEY,
+    global_task_id INT NOT NULL REFERENCES global_tasks(id) ON DELETE CASCADE,
+    user_id INT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    content TEXT NOT NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+CREATE INDEX IF NOT EXISTS idx_global_task_final_solutions_task ON global_task_final_solutions(global_task_id);
+
 CREATE INDEX idx_notifications_user_id ON notifications(user_id);
 CREATE INDEX idx_notifications_task_id ON notifications(task_id);
 CREATE INDEX idx_notifications_user_read ON notifications(user_id, is_read);
@@ -952,6 +963,11 @@ CREATE INDEX idx_tasks_created_by ON tasks(created_by);
 CREATE INDEX idx_tasks_deadline ON tasks(deadline); 
 -- Для таблицы global_tasks: создание индекса по полю created_by
 CREATE INDEX idx_global_tasks_created_by ON global_tasks(created_by);
+
+ALTER TABLE global_task_responsibles ADD COLUMN IF NOT EXISTS requires_approval BOOLEAN DEFAULT false;
+ALTER TABLE global_task_responsibles ADD COLUMN IF NOT EXISTS approval_status VARCHAR(20) DEFAULT NULL;
+ALTER TABLE global_task_responsibles ADD COLUMN IF NOT EXISTS approval_comment TEXT;
+ALTER TABLE global_task_responsibles ADD COLUMN IF NOT EXISTS approval_at TIMESTAMP;
 
 
 -- Тэги
@@ -2067,6 +2083,8 @@ ADD COLUMN IF NOT EXISTS original_name VARCHAR(255);
 -- Обновляем комментарии
 COMMENT ON COLUMN marketing_campaign_images.original_name IS 'Оригинальное имя файла (без префикса timestamp)';
 COMMENT ON COLUMN marketing_campaign_attachments.original_name IS 'Оригинальное имя файла (без префикса timestamp)';
+
+
 
 
 

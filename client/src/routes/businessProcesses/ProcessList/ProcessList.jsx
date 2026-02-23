@@ -314,6 +314,7 @@ const ProcessList = ({ showDrafts = false, onEditProcess, onCreateNew }) => {
               key={process.id}
               process={process}
               isDraft={showDrafts}
+              currentUserId={user?.id}
               onStart={() => handleStart(process)}
               onPublish={() => handlePublish(process)}
               onEdit={() => handleEdit(process)}

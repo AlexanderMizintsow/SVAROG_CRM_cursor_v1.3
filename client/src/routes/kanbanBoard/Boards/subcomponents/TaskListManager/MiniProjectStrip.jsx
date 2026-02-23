@@ -201,7 +201,7 @@ const MiniProjectStrip = ({ onOpenProject, refreshTrigger }) => {
               <div className={styles.progressWrap}>
                 <div className={styles.progressTrack}>
                   <div
-                    className={styles.progressBar}
+                    className={`${styles.progressBar} ${completion >= 100 ? styles.progressBarComplete : ''}`}
                     style={{ width: `${completion}%` }}
                   />
                 </div>

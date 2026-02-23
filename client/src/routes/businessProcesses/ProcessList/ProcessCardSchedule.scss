@@ -1,0 +1,204 @@
+.process-card-schedule {
+  margin-top: 0.75rem;
+  padding-top: 0.75rem;
+  border-top: 1px solid var(--border, #e2e8f0);
+}
+
+.process-card-schedule__loading {
+  margin: 0;
+  font-size: 0.9rem;
+  color: var(--text-secondary, #64748b);
+}
+
+.process-card-schedule__checkbox-wrap {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  cursor: pointer;
+  font-size: 0.9rem;
+  color: var(--text-primary, #1e293b);
+}
+
+.process-card-schedule__checkbox {
+  width: 1rem;
+  height: 1rem;
+  cursor: pointer;
+}
+
+.process-card-schedule__checkbox-label {
+  user-select: none;
+}
+
+.process-card-schedule__form {
+  margin-top: 0.75rem;
+  padding: 0.75rem;
+  background: var(--bg-secondary, #f8fafc);
+  border-radius: 8px;
+}
+
+.process-card-schedule__row {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-bottom: 0.5rem;
+}
+
+.process-card-schedule__label {
+  flex-shrink: 0;
+  font-size: 0.85rem;
+  color: var(--text-secondary, #64748b);
+  min-width: 8rem;
+}
+
+.process-card-schedule__sublabel {
+  display: block;
+  font-size: 0.8rem;
+  color: var(--text-secondary, #64748b);
+  margin-top: 0.5rem;
+  margin-bottom: 0.25rem;
+}
+
+.process-card-schedule__time,
+.process-card-schedule__number,
+.process-card-schedule__date-input {
+  padding: 0.35rem 0.5rem;
+  border: 1px solid var(--border, #e2e8f0);
+  border-radius: 6px;
+  font-size: 0.9rem;
+  background: var(--bg-card, #fff);
+}
+
+.process-card-schedule__radios {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem 1rem;
+
+  label {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+    font-size: 0.9rem;
+    cursor: pointer;
+  }
+
+  input {
+    cursor: pointer;
+  }
+}
+
+.process-card-schedule__block {
+  margin-top: 0.75rem;
+}
+
+.process-card-schedule__weekdays {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+
+  &--exclude {
+    margin-top: 0.25rem;
+  }
+}
+
+.process-card-schedule__weekday {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  font-size: 0.85rem;
+  cursor: pointer;
+  padding: 0.2rem 0.4rem;
+  border-radius: 4px;
+  background: var(--bg-card, #fff);
+  border: 1px solid var(--border, #e2e8f0);
+
+  input {
+    cursor: pointer;
+  }
+}
+
+.process-card-schedule__dates-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+
+.process-card-schedule__date-row {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.process-card-schedule__date-input {
+  max-width: 11rem;
+}
+
+.process-card-schedule__btn-remove {
+  padding: 0.2rem 0.5rem;
+  border: 1px solid #fecaca;
+  border-radius: 4px;
+  background: #fff;
+  color: #b91c1c;
+  font-size: 1.1rem;
+  line-height: 1;
+  cursor: pointer;
+
+  &:hover {
+    background: #fef2f2;
+  }
+}
+
+.process-card-schedule__btn-add {
+  padding: 0.35rem 0.5rem;
+  border: 1px dashed var(--border, #e2e8f0);
+  border-radius: 6px;
+  background: transparent;
+  color: var(--text-secondary, #64748b);
+  font-size: 0.85rem;
+  cursor: pointer;
+  align-self: flex-start;
+
+  &:hover {
+    background: var(--bg-hover, #f1f5f9);
+    color: var(--text-primary, #1e293b);
+  }
+}
+
+.process-card-schedule__btn-save {
+  margin-top: 0.75rem;
+  padding: 0.5rem 1rem;
+  border: none;
+  border-radius: 8px;
+  background: var(--primary, #2563eb);
+  color: #fff;
+  font-size: 0.9rem;
+  cursor: pointer;
+
+  &:hover:not(:disabled) {
+    background: var(--primary-dark, #1d4ed8);
+  }
+
+  &:disabled {
+    opacity: 0.7;
+    cursor: not-allowed;
+  }
+}
+
+.process-card-schedule__next-runs {
+  margin-top: 0.75rem;
+  padding-top: 0.5rem;
+  border-top: 1px solid var(--border, #e2e8f0);
+}
+
+.process-card-schedule__next-runs-title {
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--text-primary, #1e293b);
+}
+
+.process-card-schedule__next-runs-list {
+  margin: 0.35rem 0 0;
+  padding-left: 1.25rem;
+  font-size: 0.85rem;
+  color: var(--text-secondary, #64748b);
+  line-height: 1.5;
+}

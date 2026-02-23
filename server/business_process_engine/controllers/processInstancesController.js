@@ -1,65 +1,89 @@
 const { runProcessFromStart, runProcessFromTaskCreation, runProcessFromProjectCreation, runProcessFromDecision, runProcessFromAdditionalInfo } = require('../engine/runner')
 
+/**
+ * Внутренний запуск процесса (для HTTP и для планировщика).
+ * @param {object} dbPool
+ * @param {string|number} processId
+ * @param {{ initiator_id?: number, launched_by_user_id: number }} options
+ * @returns {Promise<object>} созданный экземпляр
+ */
+async function startProcessInternal(dbPool, processId, options = {}) {
+  const { initiator_id, launched_by_user_id } = options
+  if (!launched_by_user_id) {
+    const err = new Error('Не указан launched_by_user_id')
+    err.code = 'MISSING_LAUNCHED_BY'
+    throw err
+  }
+  const defResult = await dbPool.query(
+    'SELECT id, name, scheme FROM bp_process_definitions WHERE id = $1 AND is_draft = false',
+    [String(processId)]
+  )
+  if (defResult.rows.length === 0) {
+    const err = new Error('Процесс не найден или не опубликован')
+    err.code = 'NOT_FOUND'
+    throw err
+  }
+  const definition = defResult.rows[0]
+  const scheme = typeof definition.scheme === 'object' ? definition.scheme : JSON.parse(definition.scheme)
+  const startNode = (scheme.nodes || []).find((n) => n.type === 'start')
+  if (!startNode) {
+    const err = new Error('В схеме нет узла Старт')
+    err.code = 'NO_START_NODE'
+    throw err
+  }
+
+  const startSettings = startNode.settings || {}
+  const allowAllLaunchers = startSettings.allowAllLaunchers !== false
+  const allowedLauncherUserIds = Array.isArray(startSettings.allowedLauncherUserIds)
+    ? startSettings.allowedLauncherUserIds.map((x) => Number(x)).filter((x) => Number.isFinite(x))
+    : []
+  if (!allowAllLaunchers) {
+    const allowed = allowedLauncherUserIds.includes(Number(launched_by_user_id))
+    if (!allowed) {
+      const err = new Error('У вас нет прав на запуск этого процесса')
+      err.code = 'FORBIDDEN'
+      throw err
+    }
+  }
+
+  let initiatorId = initiator_id || launched_by_user_id
+  if (!initiatorId && startNode.settings) {
+    if (startNode.settings.initiatorType === 'fixed_user' && startNode.settings.fixedUserId) {
+      initiatorId = startNode.settings.fixedUserId
+    } else {
+      initiatorId = launched_by_user_id
+    }
+  }
+  const instResult = await dbPool.query(
+    `INSERT INTO bp_process_instances (process_id, initiator_id, launched_by_user_id, current_node_id, status, context)
+     VALUES ($1, $2, $3, $4, 'running', $5)
+     RETURNING id, process_id, started_at, initiator_id, status, current_node_id`,
+    [
+      processId,
+      initiatorId || null,
+      launched_by_user_id || null,
+      startNode.id,
+      JSON.stringify({ initiator_id: initiatorId || null }),
+    ]
+  )
+  const instance = instResult.rows[0]
+  runProcessFromStart(dbPool, instance.id).catch((err) => {
+    console.error('runProcessFromStart error:', err)
+  })
+  return instance
+}
+
 async function startProcess(dbPool, req, res) {
   try {
     const processId = req.params.id
     const { initiator_id, launched_by_user_id } = req.body
-    if (!launched_by_user_id) {
-      return res.status(400).json({ error: 'Не указан launched_by_user_id' })
-    }
-    const defResult = await dbPool.query(
-      'SELECT id, name, scheme FROM bp_process_definitions WHERE id = $1 AND is_draft = false',
-      [processId]
-    )
-    if (defResult.rows.length === 0) {
-      return res.status(404).json({ error: 'Процесс не найден или не опубликован' })
-    }
-    const definition = defResult.rows[0]
-    const scheme = typeof definition.scheme === 'object' ? definition.scheme : JSON.parse(definition.scheme)
-    const startNode = (scheme.nodes || []).find((n) => n.type === 'start')
-    if (!startNode) {
-      return res.status(400).json({ error: 'В схеме нет узла Старт' })
-    }
-
-    // Права на запуск процесса (настраиваются в блоке Старт)
-    const startSettings = startNode.settings || {}
-    const allowAllLaunchers = startSettings.allowAllLaunchers !== false
-    const allowedLauncherUserIds = Array.isArray(startSettings.allowedLauncherUserIds)
-      ? startSettings.allowedLauncherUserIds.map((x) => Number(x)).filter((x) => Number.isFinite(x))
-      : []
-    if (!allowAllLaunchers) {
-      const allowed = allowedLauncherUserIds.includes(Number(launched_by_user_id))
-      if (!allowed) {
-        return res.status(403).json({ error: 'У вас нет прав на запуск этого процесса' })
-      }
-    }
-
-    let initiatorId = initiator_id || launched_by_user_id
-    if (!initiatorId && startNode.settings) {
-      if (startNode.settings.initiatorType === 'fixed_user' && startNode.settings.fixedUserId) {
-        initiatorId = startNode.settings.fixedUserId
-      } else {
-        initiatorId = launched_by_user_id
-      }
-    }
-    const instResult = await dbPool.query(
-      `INSERT INTO bp_process_instances (process_id, initiator_id, launched_by_user_id, current_node_id, status, context)
-       VALUES ($1, $2, $3, $4, 'running', $5)
-       RETURNING id, process_id, started_at, initiator_id, status, current_node_id`,
-      [
-        processId,
-        initiatorId || null,
-        launched_by_user_id || null,
-        startNode.id,
-        JSON.stringify({ initiator_id: initiatorId || null }),
-      ]
-    )
-    const instance = instResult.rows[0]
+    const instance = await startProcessInternal(dbPool, processId, { initiator_id, launched_by_user_id })
     res.status(201).json(instance)
-    runProcessFromStart(dbPool, instance.id).catch((err) => {
-      console.error('runProcessFromStart error:', err)
-    })
   } catch (err) {
+    if (err.code === 'MISSING_LAUNCHED_BY') return res.status(400).json({ error: err.message })
+    if (err.code === 'NOT_FOUND') return res.status(404).json({ error: err.message })
+    if (err.code === 'NO_START_NODE') return res.status(400).json({ error: err.message })
+    if (err.code === 'FORBIDDEN') return res.status(403).json({ error: err.message })
     console.error('startProcess:', err)
     res.status(500).json({ error: 'Ошибка при запуске процесса' })
   }
@@ -417,6 +441,7 @@ async function deleteInstance(dbPool, req, res) {
 
 module.exports = {
   startProcess,
+  startProcessInternal,
   getInstances,
   getInstancesOverview,
   getInstanceById,

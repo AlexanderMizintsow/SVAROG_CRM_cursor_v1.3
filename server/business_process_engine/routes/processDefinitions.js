@@ -7,10 +7,13 @@ const {
   deleteProcess,
 } = require('../controllers/processDefinitionsController')
 const { startProcess } = require('../controllers/processInstancesController')
+const { getSchedule, putSchedule } = require('../controllers/scheduleController')
 
 function processDefinitionsRoutes(dbPool) {
   const router = express.Router()
   router.get('/', (req, res) => getProcesses(dbPool, req, res))
+  router.get('/:id/schedule', (req, res) => getSchedule(dbPool, req, res))
+  router.put('/:id/schedule', (req, res) => putSchedule(dbPool, req, res))
   router.get('/:id', (req, res) => getProcessById(dbPool, req, res))
   router.post('/', (req, res) => createProcess(dbPool, req, res))
   router.post('/:id/start', (req, res) => startProcess(dbPool, req, res))

@@ -195,6 +195,10 @@
   background: linear-gradient(90deg, #3b82f6, #2563eb);
   border-radius: 3px;
   transition: width 0.2s;
+
+  &.progressBarComplete {
+    background: linear-gradient(90deg, #22c55e, #16a34a);
+  }
 }
 
 .progressPercent {
