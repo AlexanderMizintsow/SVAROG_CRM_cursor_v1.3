@@ -120,6 +120,7 @@ const GlobalTaskPage = ({
         <GlobalTaskCard
           key={currentTask.id}
           task={currentTask}
+          attachments={attachments}
           onPrevious={goToPreviousTask}
           onNext={goToNextTask}
           hasPrevious={currentTaskIndex > 0}

@@ -110,6 +110,11 @@ const NavBar = () => {
       link: '/add-dealers',
     },
     {
+      name: 'Поставщики',
+      icon: FaUserFriends,
+      link: '/suppliers',
+    },
+    {
       name: 'Управление доступом дилеров',
       icon: PiTelegramLogoLight,
       link: '/password-company',
@@ -193,7 +198,7 @@ const NavBar = () => {
       <Menu title="МЕНЮ" menuItems={mainManager} />
 
       {roleAdministrator && <Menu title="Администратор" menuItems={adminMenuItems} />}
-      {/*<Menu title="Связь" menuItems={applicationMenuItems} />*/}
+      <Menu title="Связь" menuItems={applicationMenuItems} />
       <Menu title="CRM" menuItems={Notifications} />
       
       

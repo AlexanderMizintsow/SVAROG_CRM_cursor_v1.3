@@ -14,6 +14,34 @@ const { Pool } = require('pg')
 const { body, validationResult } = require('express-validator')
 const { processMessage } = require('./processMessage')
 const app = express()
+
+const REGISTER_URL = process.env.REGISTER_URL || 'http://localhost:5000'
+
+function postToRegister(path, bodyObj) {
+  const url = new URL(path, REGISTER_URL)
+  const data = JSON.stringify(bodyObj)
+  const isHttps = url.protocol === 'https:'
+  const lib = isHttps ? require('https') : require('http')
+  return new Promise((resolve, reject) => {
+    const req = lib.request(
+      {
+        hostname: url.hostname,
+        port: url.port || (isHttps ? 443 : 80),
+        path: url.pathname,
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Content-Length': Buffer.byteLength(data) },
+      },
+      (res) => {
+        let chunks = ''
+        res.on('data', (c) => (chunks += c))
+        res.on('end', () => resolve({ status: res.statusCode, body: chunks }))
+      }
+    )
+    req.on('error', reject)
+    req.write(data)
+    req.end()
+  })
+}
 app.use(express.json())
 
 app.use(
@@ -58,9 +86,7 @@ const userSessions = {}
 
 app.post('/emailAuth', [body('userId').isNumeric()], async (req, res) => {
   try {
-    const userId = req.body.userId
-    console.log('Получен userId:', userId)
-
+    const userId = String(req.body.userId)
     const userQuery = `SELECT email, email_token FROM users WHERE id = $1`
     const userResult = await dbPool.query(userQuery, [userId])
 
@@ -70,10 +96,15 @@ app.post('/emailAuth', [body('userId').isNumeric()], async (req, res) => {
 
     const userEmail = userResult.rows[0].email
     const userEmailToken = userResult.rows[0].email_token
-    console.log('Получен userEmail:', userEmail)
-    console.log('Получен emailToken:', userEmailToken)
+    const hasToken = userEmailToken != null && String(userEmailToken).trim() !== ''
 
-    // Инициализируем конфигурации для конкретного пользователя и сохраняем их в userSessions
+    if (!hasToken) {
+      delete userSessions[userId]
+      return res.status(200).json({
+        message: 'Токен почты не задан. Задайте токен в настройках — тогда будут доступны входящие и уведомления.',
+      })
+    }
+
     userSessions[userId] = {
       email: userEmail,
       emailToken: userEmailToken,
@@ -83,7 +114,7 @@ app.post('/emailAuth', [body('userId').isNumeric()], async (req, res) => {
 
     res.status(200).json({ message: 'Код подтверждения отправлен' })
   } catch (error) {
-    console.error('Ошибка при получении email:', error)
+    console.error('Ошибка при инициализации почты:', error.message)
     res.status(500).json({ error: 'Internal server error' })
   }
 })
@@ -159,110 +190,187 @@ async function initializeSmtpTransport(userEmail, userEmailToken) {
   })
 }
 
-// Функция для подключения к IMAP с рекурсивной попыткой
-async function connectWithRetry(userSession, retries = 5, delay = 3000) {
+// Восстановление имени вложения из mojibake (UTF-8, ошибочно прочитанный как Latin-1)
+function decodeAttachmentFilename(name) {
+  if (!name || typeof name !== 'string') return name
+  if (/[\u0400-\u04FF]/.test(name)) return name
+  try {
+    const decoded = Buffer.from(name, 'latin1').toString('utf8')
+    if (/[\u0400-\u04FF]/.test(decoded) || /[^\x00-\x7F]/.test(decoded)) return decoded
+  } catch (_) {}
+  return name
+}
+
+// Подгрузить сессию из БД, если её ещё нет (после сохранения токена без перезахода)
+async function ensureUserSession(userId) {
+  if (userSessions[userId] && userSessions[userId].smtpTransport) {
+    return userSessions[userId]
+  }
+  const userQuery = `SELECT email, email_token FROM users WHERE id = $1`
+  const userResult = await dbPool.query(userQuery, [userId])
+  if (userResult.rows.length === 0) return null
+  const userEmail = userResult.rows[0].email
+  const userEmailToken = userResult.rows[0].email_token
+  const hasToken = userEmailToken != null && String(userEmailToken).trim() !== ''
+  if (!hasToken) return null
+  userSessions[userId] = {
+    email: userEmail,
+    emailToken: userEmailToken,
+    imapConfig: await initializeImapConfig(userEmail, userEmailToken),
+    smtpTransport: await initializeSmtpTransport(userEmail, userEmailToken),
+  }
+  return userSessions[userId]
+}
+
+function isAuthError(err) {
+  return (
+    (err && err.textCode === 'AUTHENTICATIONFAILED') ||
+    (err && err.source === 'authentication') ||
+    (err && err.message && /parol prilozheniya|application password|AUTHENTICATIONFAILED/i.test(err.message))
+  )
+}
+
+async function connectWithRetry(userSession, retries = 2, delay = 2000) {
   let attempt = 0
+  let lastError
   while (attempt < retries) {
     try {
       const connection = await imaps.connect(userSession.imapConfig)
       return connection
     } catch (error) {
+      lastError = error
       attempt++
-      console.error(
-        `Попытка подключения ${attempt} из ${retries} не удалась:`,
-        error
-      )
+      if (isAuthError(error)) {
+        break
+      }
       if (attempt < retries) {
-        // Задержка перед следующей попыткой
         await new Promise((resolve) => setTimeout(resolve, delay))
-      } else {
-        throw new Error(
-          'Не удалось подключиться к IMAP-серверу после нескольких попыток.'
-        )
       }
     }
   }
+  throw lastError
 }
 
-// Функция для получения всех писем для конкретного пользователя
 async function getAllMails(userId) {
   const userSession = userSessions[userId]
-  if (!userSession || !userSession.imapConfig) {
-    console.error('Ошибка: imapConfig не инициализирован')
-    return
+  if (!userSession || !userSession.emailToken) {
+    return []
   }
 
   let connection
-
   try {
-    connection = await connectWithRetry(userSession) // Подключаемся с попытками
+    connection = await connectWithRetry(userSession)
     await connection.openBox('INBOX')
-
     const searchCriteria = ['ALL']
-    const fetchOptions = {
-      bodies: ['HEADER', 'TEXT'],
-      markSeen: false,
-    }
-
+    const fetchOptions = { bodies: [''], markSeen: false }
     const results = await connection.search(searchCriteria, fetchOptions)
     const messages = await Promise.all(results.map(processMessage))
-
-    const filteredMessages = messages.filter((message) => message !== null)
-    return filteredMessages
+    const list = messages.filter((message) => message !== null)
+    notifyRegisterAboutReplies(list)
+    return list
   } catch (error) {
-    console.error('Ошибка при получении писем:', error)
-    return [] // Возвращаем пустой массив в случае ошибки
+    if (isAuthError(error)) {
+      delete userSessions[userId]
+    }
+    return []
   } finally {
     if (connection) {
-      await connection.end() // Закрываем соединение, если оно было установлено
+      try {
+        await connection.end()
+      } catch (_) {}
     }
   }
 }
 
-// Функция для получения непрочитанных писем для конкретного пользователя
+function formatFrom(from) {
+  if (typeof from === 'string') return from.trim()
+  if (from && typeof from === 'object' && (from.text || from.address)) return (from.text || from.address).trim()
+  return ''
+}
+
+function extractEmail(from) {
+  const s = formatFrom(from)
+  const match = s.match(/<([^>]+)>/)
+  if (match) return match[1].trim()
+  if (/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(s)) return s
+  return ''
+}
+
+function notifyRegisterAboutReplies(messages) {
+  if (!Array.isArray(messages)) return
+  for (const msg of messages) {
+    if (!msg || !msg.inReplyTo || !msg.body) continue
+    const author = formatFrom(msg.from)
+    const attachments = (msg.attachments || []).slice(0, 10).map((a) => {
+      const buf = a.content && Buffer.isBuffer(a.content) ? a.content : Buffer.from(a.content || '')
+      if (buf.length > 5 * 1024 * 1024) return null
+      return {
+        filename: a.filename || 'file',
+        content_type: a.contentType || 'application/octet-stream',
+        content_base64: buf.toString('base64'),
+      }
+    }).filter(Boolean)
+    postToRegister('/api/project-reply-to-final-solution', {
+      in_reply_to_message_id: msg.inReplyTo,
+      reply_message_id: msg.messageId || '',
+      content: String(msg.body).slice(0, 50000),
+      author_display_name: author.slice(0, 500),
+      from_email: extractEmail(msg.from),
+      attachments,
+    }).catch((err) => console.error('Ошибка уведомления register об ответе:', err))
+  }
+}
+
 async function getUnreadMails(userId) {
   const userSession = userSessions[userId]
   if (!userSession || !userSession.emailToken) {
-    //  console.error('Ошибка: emailToken не инициализирован')
-    return [] // Вернуть пустой массив вместо выброса ошибки
+    return []
   }
 
-  const connection = await imaps.connect(userSession.imapConfig)
-  await connection.openBox('INBOX')
-
-  const searchCriteria = ['UNSEEN']
-  const fetchOptions = {
-    bodies: ['HEADER', 'TEXT'],
-    markSeen: false,
+  let connection
+  try {
+    connection = await connectWithRetry(userSession)
+    await connection.openBox('INBOX')
+    const searchCriteria = ['UNSEEN']
+    const fetchOptions = { bodies: [''], markSeen: false }
+    const results = await connection.search(searchCriteria, fetchOptions)
+    const messages = await Promise.all(results.map(processMessage))
+    const list = messages.filter((message) => message !== null)
+    notifyRegisterAboutReplies(list)
+    return list
+  } catch (error) {
+    if (isAuthError(error)) {
+      delete userSessions[userId]
+    }
+    return []
+  } finally {
+    if (connection) {
+      try {
+        await connection.end()
+      } catch (_) {}
+    }
   }
-
-  const results = await connection.search(searchCriteria, fetchOptions)
-  const messages = await Promise.all(results.map(processMessage))
-
-  const filteredMessages = messages.filter((message) => message !== null)
-  await connection.end()
-  return filteredMessages
 }
 
 app.get('/get-emails', async (req, res) => {
-  const userId = req.query.userId // Предполагается, что userId передается как query parameter
+  const userId = req.query.userId
   try {
-    const messages = await getAllMails(userId)
+    await ensureUserSession(userId)
+    const messages = (await getAllMails(userId)) || []
     res.json(messages)
   } catch (error) {
-    console.error('Ошибка при получении писем:', error)
-    res.status(500).send('Ошибка сервера при получении писем')
+    res.json([])
   }
 })
 
 app.get('/get-unread-emails', async (req, res) => {
-  const userId = req.query.userId // Предполагается, что userId передается как query parameter
+  const userId = req.query.userId
   try {
-    const messages = await getUnreadMails(userId)
+    await ensureUserSession(userId)
+    const messages = (await getUnreadMails(userId)) || []
     res.json(messages)
   } catch (error) {
-    console.error('Ошибка при получении непрочитанных писем:', error)
-    res.status(500).send('Ошибка сервера при получении писем')
+    res.json([])
   }
 })
 
@@ -294,51 +402,76 @@ async function notifyUserOfNewEmails(userId) {
   }
 }
 
-// Прослушивание событий новых писем (можно выполнить после проверки почты или при срабатывании триггера)
 setInterval(async () => {
-  // Проходим по всем сессиям пользователей и уведомляем их о новых письмах
   for (const userId in userSessions) {
-    await notifyUserOfNewEmails(userId)
+    if (userSessions[userId] && userSessions[userId].emailToken) {
+      await notifyUserOfNewEmails(userId)
+    }
   }
 }, 10000)
 
 app.post('/send-email', upload.array('attachments', 10), async (req, res) => {
-  const { userId } = req.body
+  const { userId, globalTaskId, finalSolutionId, inReplyTo } = req.body
+  const finalSolId = req.body.finalSolutionId != null ? req.body.finalSolutionId : finalSolutionId
   const { to, subject, body } = req.body
   const attachments = req.files
 
+  if (!userId) {
+    return res.status(400).send('Не указан пользователь (userId).')
+  }
   if (!to || !subject || !body) {
     return res
       .status(400)
       .send('Необходимо указать все поля: to, subject и body.')
   }
 
-  // Получаем конфигурацию пользователя
-  const userSession = userSessions[userId]
+  const userSession = await ensureUserSession(userId)
   if (!userSession || !userSession.smtpTransport) {
-    return res.status(500).send('SMTP транспорт не инициализирован.')
+    return res
+      .status(400)
+      .send('Задайте токен почты в настройках (иконка почты в меню пользователя или в разделе «Почта»). После сохранения токена отправка заработает без перезахода.')
   }
 
+  const messageId = `<${Date.now()}.${userId}.${Math.random().toString(36).slice(2)}@mail.ru>`
+  const headers = {
+    'X-Mailer': 'SVAROG CRM',
+    'Reply-To': userSession.email,
+  }
+  if (inReplyTo && String(inReplyTo).trim()) {
+    headers['In-Reply-To'] = String(inReplyTo).trim()
+    headers['References'] = String(inReplyTo).trim()
+  }
   const mailOptions = {
     from: userSession.email,
     to: to,
     subject: subject,
     text: body,
+    messageId,
+    headers,
   }
 
   if (attachments && attachments.length > 0) {
     mailOptions.attachments = attachments.map((attachment) => ({
-      filename: attachment.originalname,
+      filename: decodeAttachmentFilename(attachment.originalname),
       content: attachment.buffer,
     }))
   }
 
-  // Вызовите эту функцию после успешной отправки письма
-  //await saveSentMessage(userSession, mailOptions)
-  //listMailboxes(userSession)
   try {
     const info = await userSession.smtpTransport.sendMail(mailOptions)
-    res.json({ message: 'Email sent', info })
+    if (globalTaskId) {
+      const normalizedId = messageId.replace(/^<|>$/g, '').trim()
+      const payload = {
+        message_id: normalizedId,
+        global_task_id: globalTaskId,
+        user_id: userId,
+      }
+      if (finalSolId) payload.final_solution_id = finalSolId
+      postToRegister('/api/project-sent-emails', payload).catch((err) =>
+        console.error('Ошибка сохранения project_sent_emails:', err)
+      )
+    }
+    res.json({ message: 'Email sent', messageId: messageId.replace(/^<|>$/g, '').trim(), info })
   } catch (error) {
     console.error('Ошибка при отправке письма:', error)
     res.status(500).send('Не удалось отправить письмо: ' + error.message)

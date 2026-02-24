@@ -8,13 +8,15 @@ import PermissionsManager from '../routes/adminMenu/permissionsManager/Permissio
 import CompanyPassword from '../routes/adminMenu/companyPassword/companyPassword.jsx'
 import Boards from '../routes/kanbanBoard/Boards/Boards.jsx'
 import WorkGroup from '../routes/workGroup/WorkGroup.jsx'
-// import InboxMail from '../routes/mail/InboxMail.jsx'
-// import ComposeMail from '../routes/mail/ComposeMail.jsx'
+import InboxMail from '../routes/mail/InboxMail.jsx'
+import ComposeMail from '../routes/mail/ComposeMail.jsx'
+import Mail from '../routes/mail/Mail.jsx'
 import DealersData from '../routes/adminMenu/dealersData/DealersData.jsx'
 import ProcessedCalls from '../routes/asterisk/processedCalls/ProcessedCalls.jsx'
 import AcceptedCalls from '../routes/asterisk/acceptedCalls/AcceptedCalls.jsx'
 import CallsSettingsUsers from '../routes/asterisk/callsSettingsUsers/CallsSettingsUsers.jsx'
 import CompetitorForm from '../routes/CompetitorForm/CompetitorForm.jsx'
+import SupplierForm from '../routes/SupplierForm/SupplierForm.jsx'
 import HierarchyTreeEmployee from '../routes/references/hierarchy/HierarchyTreeEmployee.jsx'
 import LeaveCalendar from '../routes/personnelDepartment/calendar/LeaveCalendar.jsx'
 import DealerMap from '../routes/references/dealerMap/DealerMap.jsx'
@@ -80,18 +82,17 @@ const routes = (bgSeason, roleAdministrator, isConnectBD) => [
           </div>
         ),
       },
-      // Приложения
-      /* {
+      {
         path: 'application-mail',
         element: <Mail />,
         children: [
-          { index: true, path: 'inbox', element: <InboxMail /> },
+          { index: true, element: <InboxMail /> },
+          { path: 'inbox', element: <InboxMail /> },
           { path: 'send', element: <ComposeMail /> },
         ],
-      },*/
-
-      // Телефония звонки ***
+      },
       { path: 'add-dealers', element: <DealersData /> },
+      { path: 'suppliers', element: <SupplierForm /> },
 
       {
         path: '/notifications-asterisk-missed-calls',

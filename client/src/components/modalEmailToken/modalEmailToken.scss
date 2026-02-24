@@ -1,27 +1,28 @@
-.modal-overlay {
+/* Оверлей — по образцу .calculator-overlay: на весь экран поверх родителя */
+.modal-email-token-overlay {
   position: fixed;
   top: 0;
   left: 0;
-  width: 100%;
-  height: 100%;
-  background-color: rgba(77, 75, 75, 0.5);
-  backdrop-filter: blur(5px);
+  right: 0;
+  bottom: 0;
   display: flex;
   justify-content: center;
   align-items: center;
-  z-index: 1000;
+  background-color: rgba(0, 0, 0, 0.6);
+  z-index: 1001;
 }
 
-.modal-container {
+.modal-email-token-container {
+  position: relative;
   background-color: rgb(117, 117, 117);
-  border-radius: 5px;
+  border-radius: 8px;
   padding: 20px;
-  box-shadow: 0 0 10px rgba(0, 0, 0, 0.2);
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
   max-width: 400px;
-  width: 100%;
+  width: 90%;
 }
 
-.modal-header {
+.modal-email-token-header {
   display: flex;
   justify-content: space-between;
   align-items: center;
@@ -39,70 +40,75 @@
   }
 }
 
-.modal-title {
+.modal-email-token-title {
   font-size: 20px;
   font-weight: bold;
   margin: 0;
+  color: #fff;
 }
 
-.modal-close {
+.modal-email-token-close {
   border: none;
   background: none;
-  font-size: 20px;
+  font-size: 24px;
   cursor: pointer;
+  color: #ff6b6b;
+  line-height: 1;
+  padding: 0 4px;
+
+  &:hover {
+    color: #ff4a4a;
+  }
 }
 
-.modal-content {
-  padding: 15px;
+.modal-email-token-body {
+  padding: 0 0 10px;
+
+  p {
+    margin: 0 0 12px;
+    color: #e0e0e0;
+  }
+
   a {
-    color: #0e4aef;
+    color: #90caf9;
   }
 }
 
-.modal-input {
+.modal-email-token-input-wrap {
   margin: 15px 0;
-
-  label {
-    display: block;
-    margin-bottom: 5px;
-  }
-
-  input {
-    width: 100%;
-    padding: 8px;
-    border: 1px solid #ccc;
-    border-radius: 3px;
-    background-color: rgb(206, 213, 213);
-  }
 }
 
-.modal-buttons {
+.modal-email-token-input {
+  width: 100%;
+  padding: 10px 12px;
+  border: 1px solid #555;
+  border-radius: 6px;
+  background-color: rgb(206, 213, 213);
+  font-size: 14px;
+  box-sizing: border-box;
+}
+
+.modal-email-token-buttons {
   display: flex;
   justify-content: flex-end;
+  gap: 10px;
+  margin-top: 16px;
 }
 
-.modal-button {
-  padding: 8px 15px;
-  border: none;
-  border-radius: 3px;
-  cursor: pointer;
-  margin-left: 5px;
-}
-
-.modal-button {
+.modal-email-token-btn {
   padding: 10px 20px;
   border: none;
-  border-radius: 5px;
-  font-size: 16px;
+  border-radius: 6px;
+  font-size: 14px;
   cursor: pointer;
-  transition: background-color 0.3s ease, color 0.3s ease, transform 0.3s ease;
+  transition: background-color 0.2s;
 
   &.cancel {
-    background-color: #ccc;
+    background-color: #666;
+    color: #fff;
 
     &:hover {
-      background-color: #bbb;
-      transform: scale(1.05);
+      background-color: #555;
     }
   }
 
@@ -112,10 +118,10 @@
 
     &:hover {
       background-color: #0c3dcc;
-      transform: scale(1.05);
     }
   }
 }
+
 @keyframes colorChange {
   0% {
     color: red;

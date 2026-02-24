@@ -10,8 +10,9 @@ import './mail.scss'
 
 const Mail = () => {
   const [close, setClose] = useState(false)
-  const [isSettingsModalOpen, setIsSettingsModalOpen] = useState(false) // Состояние для модального окна настроек
+  const [isSettingsModalOpen, setIsSettingsModalOpen] = useState(false)
   const [conditionMet, setConditionMet] = useState(false)
+  const [instructionOpen, setInstructionOpen] = useState(false)
 
   useEffect(() => {
     const userDataString = localStorage.getItem('userData')
@@ -65,7 +66,13 @@ const Mail = () => {
             <div className="navbar-mail-top">
               <RiMailSettingsLine
                 className="icon-pointer"
-                onClick={handleOpenSettingsModal}
+                onClick={(e) => {
+                  e.preventDefault()
+                  e.stopPropagation()
+                  handleOpenSettingsModal()
+                }}
+                role="button"
+                title="Настройки почты (ввести токен)"
               />
               {/* Добавляем обработчик клика */}
               <p>
@@ -82,13 +89,59 @@ const Mail = () => {
               >
                 Входящие <TbMessageUp />
               </Link>
-              <Link></Link>
               <Link
                 to="send"
                 className={`navbar-link ${!conditionMet ? 'disabled' : ''}`}
               >
                 Написать письмо <TfiWrite />
               </Link>
+            </div>
+            <div className="mail-instruction">
+              <button
+                type="button"
+                className="mail-instruction__toggle"
+                onClick={() => setInstructionOpen((v) => !v)}
+              >
+                Инструкция по подключению своей почты
+              </button>
+              {instructionOpen && (
+                <div className="mail-instruction__body">
+                  <ol>
+                    <li>
+                      В приложении используется почта <strong>Mail.ru</strong>. Убедитесь, что у вас в профиле сотрудника указан корректный email (Mail.ru).
+                    </li>
+                    <li>
+                      Создайте пароль приложения (токен) в настройках безопасности Mail.ru:{' '}
+                      <a
+                        href="https://account.mail.ru/user/2-step-auth/passwords?back_url=https%3A%2F%2Fid.mail.ru%2Fsecurity"
+                        target="_blank"
+                        rel="noopener noreferrer"
+                      >
+                        настройки паролей приложений
+                      </a>
+                      . Токен имеет вид, например: <code>RxfRSeye8zgfyVUhiAtg</code>.
+                    </li>
+                    <li>
+                      Нажмите на значок настроек почты (иконка конверта с шестерёнкой) выше и в открывшемся окне вставьте полученный токен.
+                    </li>
+                    <li>
+                      После сохранения токена выйдите из приложения, обновите страницу и войдите снова — тогда отправка и получение писем будут работать из раздела «Почта».
+                    </li>
+                  </ol>
+                  <button
+                    type="button"
+                    className="mail-instruction__open-settings"
+                    onClick={(e) => {
+                      e.preventDefault()
+                      e.stopPropagation()
+                      handleOpenSettingsModal()
+                    }}
+                    onMouseDown={(e) => e.stopPropagation()}
+                  >
+                    Открыть настройки (ввести токен)
+                  </button>
+                </div>
+              )}
             </div>
           </div>
         )}
@@ -103,6 +156,7 @@ const Mail = () => {
         {/* Отображение модального окна настроек */}
         <ModalEmailToken
           isOpen={isSettingsModalOpen}
+          title="Настройки почты"
           inputVisible={true}
           onClose={handleCloseSettingsModal}
         />

@@ -72,6 +72,14 @@ const {
   createFinalSolution,
   updateFinalSolution,
   deleteFinalSolution,
+  saveProjectSentEmail,
+  createFinalSolutionFromEmailReply,
+  appendThreadMessage,
+  updateThreadMessage,
+  publishFinalSolution,
+  downloadEmailAttachment,
+  addEmailAttachmentToProject,
+  updateEmailThreadContent,
   setProjectApproval,
   updateGoals,
   updateAdditionalInfo,
@@ -228,12 +236,24 @@ if (!fs.existsSync(uploadsDir)) {
   fs.mkdirSync(uploadsDir, { recursive: true })
 }
 
+// Восстановление имени файла из mojibake (UTF-8, ошибочно прочитанный как Latin-1)
+function decodeUtf8Filename(name) {
+  if (!name || typeof name !== 'string') return name
+  if (/[\u0400-\u04FF]/.test(name)) return name
+  try {
+    const decoded = Buffer.from(name, 'latin1').toString('utf8')
+    if (/[\u0400-\u04FF]/.test(decoded) || decoded.length !== name.length) return decoded
+  } catch (_) {}
+  return name
+}
+
 const storageFile = multer.diskStorage({
   destination: (req, file, cb) => {
-    cb(null, uploadsDir) // Папка для сохранения файлов
+    cb(null, uploadsDir)
   },
   filename: (req, file, cb) => {
-    cb(null, Date.now() + '-' + file.originalname) // Уникальное имя файла
+    const safeName = decodeUtf8Filename(file.originalname) || file.originalname
+    cb(null, Date.now() + '-' + safeName)
   },
 })
 const uploadFile = multer({ storage: storageFile })
@@ -508,6 +528,14 @@ app.post('/api/global-tasks/:taskId/approval', setProjectApproval(dbPool, io))
 app.post('/api/global-tasks/:taskId/final-solutions', createFinalSolution(dbPool))
 app.put('/api/global-tasks/:taskId/final-solutions/:solutionId', updateFinalSolution(dbPool))
 app.delete('/api/global-tasks/:taskId/final-solutions/:solutionId', deleteFinalSolution(dbPool))
+app.put('/api/global-tasks/:taskId/final-solutions/:solutionId/publish', publishFinalSolution(dbPool))
+app.put('/api/global-tasks/:taskId/final-solutions/:solutionId/edit-email-thread', updateEmailThreadContent(dbPool))
+app.post('/api/global-tasks/:taskId/final-solutions/:solutionId/thread-message', appendThreadMessage(dbPool))
+app.patch('/api/global-tasks/:taskId/final-solutions/:solutionId/thread-messages/:messageIndex', updateThreadMessage(dbPool))
+app.get('/api/global-tasks/:taskId/final-solutions/:solutionId/attachments/:attachmentId/download', downloadEmailAttachment(dbPool))
+app.post('/api/global-tasks/:taskId/final-solutions/:solutionId/attachments/:attachmentId/add-to-project', addEmailAttachmentToProject(dbPool))
+app.post('/api/project-sent-emails', saveProjectSentEmail(dbPool))
+app.post('/api/project-reply-to-final-solution', createFinalSolutionFromEmailReply(dbPool))
 app.put('/api/tasks/:id/update-goals', updateGoals(dbPool, io))
 app.put('/api/tasks/:id/update-additional-info', updateAdditionalInfo(dbPool, io))
 app.get('/api/global-tasks/chat/:globalTaskId', getChatMessages(dbPool))

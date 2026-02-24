@@ -1,6 +1,8 @@
 // tasksController.js
 const { DateTime } = require('luxon')
 const axios = require('axios')
+const fs = require('fs')
+const path = require('path')
 
 let _warnedMissingBpeUrl = false
 function notifyBpeTaskUpdated(taskId) {
@@ -75,13 +77,13 @@ async function checkAndEmitProgress100(dbPool, io, globalTaskId) {
           (SELECT ROUND(100.0 * (
             (SELECT COALESCE(SUM(CASE WHEN t.is_completed THEN 1 ELSE 0 END), 0) FROM tasks t WHERE t.global_task_id = gt.id)
             + (SELECT COUNT(*) FROM global_task_responsibles gtra WHERE gtra.global_task_id = gt.id AND gtra.requires_approval = true AND gtra.approval_status = 'approved')
-            + (SELECT COUNT(*) FROM global_task_final_solutions WHERE global_task_id = gt.id)
+            + (SELECT COUNT(*) FROM global_task_final_solutions WHERE global_task_id = gt.id AND (NOT COALESCE(is_from_supplier_reply, false) OR COALESCE(is_published, false)))
           ) / NULLIF(
             (SELECT COUNT(*) FROM tasks t WHERE t.global_task_id = gt.id)
             + (SELECT COUNT(*) FROM global_task_responsibles gtra WHERE gtra.global_task_id = gt.id AND gtra.requires_approval = true)
-            + (SELECT COUNT(*) FROM global_task_final_solutions WHERE global_task_id = gt.id),
+            + (SELECT COUNT(*) FROM global_task_final_solutions WHERE global_task_id = gt.id AND (NOT COALESCE(is_from_supplier_reply, false) OR COALESCE(is_published, false))),
             0
-          ), 2)
+          ), 2))
         , 0) as pct
       FROM global_tasks gt WHERE gt.id = $1`,
       [globalTaskId]
@@ -1310,11 +1312,11 @@ function getGlobalTasks(dbPool) {
         (SELECT ROUND(100.0 * (
             (SELECT COALESCE(SUM(CASE WHEN t.is_completed THEN 1 ELSE 0 END), 0) FROM tasks t WHERE t.global_task_id = gt.id)
             + (SELECT COUNT(*) FROM global_task_responsibles gtra WHERE gtra.global_task_id = gt.id AND gtra.requires_approval = true AND gtra.approval_status = 'approved')
-            + (SELECT COUNT(*) FROM global_task_final_solutions WHERE global_task_id = gt.id)
+            + (SELECT COUNT(*) FROM global_task_final_solutions WHERE global_task_id = gt.id AND (NOT COALESCE(is_from_supplier_reply, false) OR COALESCE(is_published, false)))
         ) / NULLIF(
             (SELECT COUNT(*) FROM tasks t WHERE t.global_task_id = gt.id)
             + (SELECT COUNT(*) FROM global_task_responsibles gtra WHERE gtra.global_task_id = gt.id AND gtra.requires_approval = true)
-            + (SELECT COUNT(*) FROM global_task_final_solutions WHERE global_task_id = gt.id),
+            + (SELECT COUNT(*) FROM global_task_final_solutions WHERE global_task_id = gt.id AND (NOT COALESCE(is_from_supplier_reply, false) OR COALESCE(is_published, false))),
             0
         ), 2)
         ), 0) as completion_percentage,
@@ -1326,7 +1328,7 @@ function getGlobalTasks(dbPool) {
            JOIN task_assignments ta ON t.id = ta.task_id
            WHERE t.global_task_id = gt.id AND ta.user_id = $1
            LIMIT 15) t) AS user_task_titles,
-    (SELECT COALESCE(json_agg(json_build_object('id', fs.id, 'content', fs.content, 'user_id', fs.user_id, 'author_name', TRIM(CONCAT(fsu.first_name, ' ', fsu.last_name)), 'created_at', fs.created_at, 'updated_at', fs.updated_at) ORDER BY fs.created_at), '[]'::json)
+    (SELECT COALESCE(json_agg(json_build_object('id', fs.id, 'content', fs.content, 'user_id', fs.user_id, 'author_name', COALESCE(fs.author_display_name, TRIM(CONCAT(fsu.first_name, ' ', fsu.last_name))), 'author_display_name', fs.author_display_name, 'is_from_supplier_reply', COALESCE(fs.is_from_supplier_reply, false), 'is_published', COALESCE(fs.is_published, false), 'thread_messages', COALESCE(fs.thread_messages, '[]'::jsonb), 'created_at', fs.created_at, 'updated_at', fs.updated_at) ORDER BY fs.created_at), '[]'::json)
      FROM global_task_final_solutions fs
      LEFT JOIN users fsu ON fsu.id = fs.user_id
      WHERE fs.global_task_id = gt.id) as final_solutions
@@ -1862,11 +1864,11 @@ function getGlobalTaskById(dbPool) {
             (SELECT ROUND(100.0 * (
                 (SELECT COALESCE(SUM(CASE WHEN t.is_completed THEN 1 ELSE 0 END), 0) FROM tasks t WHERE t.global_task_id = gt.id)
                 + (SELECT COUNT(*) FROM global_task_responsibles gtra WHERE gtra.global_task_id = gt.id AND gtra.requires_approval = true AND gtra.approval_status = 'approved')
-                + (SELECT COUNT(*) FROM global_task_final_solutions WHERE global_task_id = gt.id)
+                + (SELECT COUNT(*) FROM global_task_final_solutions WHERE global_task_id = gt.id AND (NOT COALESCE(is_from_supplier_reply, false) OR COALESCE(is_published, false)))
             ) / NULLIF(
                 (SELECT COUNT(*) FROM tasks t WHERE t.global_task_id = gt.id)
                 + (SELECT COUNT(*) FROM global_task_responsibles gtra WHERE gtra.global_task_id = gt.id AND gtra.requires_approval = true)
-                + (SELECT COUNT(*) FROM global_task_final_solutions WHERE global_task_id = gt.id),
+                + (SELECT COUNT(*) FROM global_task_final_solutions WHERE global_task_id = gt.id AND (NOT COALESCE(is_from_supplier_reply, false) OR COALESCE(is_published, false))),
                 0
             ), 2)
             ), 0) as completion_percentage,
@@ -1874,7 +1876,11 @@ function getGlobalTaskById(dbPool) {
             'id', fs.id,
             'content', fs.content,
             'user_id', fs.user_id,
-            'author_name', TRIM(CONCAT(fsu.first_name, ' ', fsu.last_name)),
+            'author_name', COALESCE(fs.author_display_name, TRIM(CONCAT(fsu.first_name, ' ', fsu.last_name))),
+            'author_display_name', fs.author_display_name,
+            'is_from_supplier_reply', COALESCE(fs.is_from_supplier_reply, false),
+            'is_published', COALESCE(fs.is_published, false),
+            'thread_messages', COALESCE(fs.thread_messages, '[]'::jsonb),
             'created_at', fs.created_at,
             'updated_at', fs.updated_at
         ) ORDER BY fs.created_at), '[]'::json)
@@ -2052,6 +2058,454 @@ function deleteFinalSolution(dbPool) {
   }
 }
 
+function normalizeMessageId(id) {
+  if (!id || typeof id !== 'string') return ''
+  return id.trim().replace(/^<|>$/g, '')
+}
+
+// Сохранить связь отправленного письма из проекта с Message-Id (и опционально с итогом переписки)
+function saveProjectSentEmail(dbPool) {
+  return async function (req, res) {
+    const { message_id, global_task_id, user_id, final_solution_id } = req.body
+    if (!message_id || !global_task_id || !user_id) {
+      return res.status(400).json({ error: 'Нужны message_id, global_task_id, user_id' })
+    }
+    const normalizedId = normalizeMessageId(message_id)
+    if (!normalizedId) return res.status(400).json({ error: 'Некорректный message_id' })
+    try {
+      await dbPool.query(
+        `INSERT INTO project_sent_emails (message_id, global_task_id, user_id, final_solution_id)
+         VALUES ($1, $2, $3, $4)
+         ON CONFLICT (message_id) DO UPDATE SET final_solution_id = COALESCE(EXCLUDED.final_solution_id, project_sent_emails.final_solution_id)`,
+        [normalizedId, parseInt(global_task_id, 10), parseInt(user_id, 10), final_solution_id ? parseInt(final_solution_id, 10) : null]
+      )
+      res.status(200).json({ success: true })
+    } catch (err) {
+      console.error('saveProjectSentEmail:', err)
+      res.status(500).json({ error: 'Ошибка сервера' })
+    }
+  }
+}
+
+const emailAttachmentsDir = path.join(__dirname, '..', '..', 'uploads', 'email-attachments')
+
+async function saveEmailAttachments(dbPool, finalSolutionId, messageIndex, attachments) {
+  if (!Array.isArray(attachments) || attachments.length === 0) return []
+  const dir = path.join(emailAttachmentsDir, String(finalSolutionId))
+  if (!fs.existsSync(dir)) {
+    fs.mkdirSync(dir, { recursive: true })
+  }
+  const saved = []
+  for (const a of attachments.slice(0, 20)) {
+    const filename = (a.filename || 'file').replace(/[^a-zA-Z0-9._-]/g, '_').slice(0, 200)
+    const contentBase64 = a.content_base64 || a.content_base64_str
+    if (!contentBase64) continue
+    const buf = Buffer.from(contentBase64, 'base64')
+    const safeName = `${Date.now()}-${Math.random().toString(36).slice(2)}-${filename}`
+    const filePath = path.join(dir, safeName)
+    fs.writeFileSync(filePath, buf)
+    const relPath = path.join('email-attachments', String(finalSolutionId), safeName)
+    const ins = await dbPool.query(
+      `INSERT INTO project_email_attachments (final_solution_id, message_index, filename, content_type, file_path)
+       VALUES ($1, $2, $3, $4, $5) RETURNING id, filename, content_type`,
+      [finalSolutionId, messageIndex, filename, (a.content_type || 'application/octet-stream').slice(0, 255), relPath]
+    )
+    saved.push({ id: ins.rows[0].id, filename: ins.rows[0].filename, content_type: ins.rows[0].content_type })
+  }
+  return saved
+}
+
+// Создать или дополнить итоговое решение из ответа на письмо (одна ветка переписки = один итог)
+function createFinalSolutionFromEmailReply(dbPool) {
+  return async function (req, res) {
+    const { in_reply_to_message_id, reply_message_id, content, author_display_name, from_email, attachments: attachmentsPayload } = req.body
+    if (!in_reply_to_message_id || !content) {
+      return res.status(400).json({ error: 'Нужны in_reply_to_message_id и content' })
+    }
+    const inReplyTo = normalizeMessageId(in_reply_to_message_id)
+    if (!inReplyTo) return res.status(400).json({ error: 'Некорректный in_reply_to_message_id' })
+    try {
+      const lookup = await dbPool.query(
+        `SELECT pse.global_task_id, pse.final_solution_id, gt.created_by
+         FROM project_sent_emails pse
+         JOIN global_tasks gt ON gt.id = pse.global_task_id
+         WHERE pse.message_id = $1`,
+        [inReplyTo]
+      )
+      if (lookup.rowCount === 0) {
+        return res.status(200).json({ created: false, reason: 'no_project' })
+      }
+      const { global_task_id, final_solution_id: existingSolutionId, created_by } = lookup.rows[0]
+      const replyId = reply_message_id ? String(reply_message_id).trim().replace(/^<|>$/g, '') : null
+      if (replyId) {
+        const exists = await dbPool.query(
+          'SELECT 1 FROM email_reply_final_solutions WHERE reply_message_id = $1',
+          [replyId]
+        )
+        if (exists.rowCount > 0) {
+          return res.status(200).json({ created: false, reason: 'duplicate' })
+        }
+      }
+
+      const bodyTrim = (content || '').trim().slice(0, 50000)
+      const authorTrim = (author_display_name || '').trim().slice(0, 500) || null
+      const fromEmail = (req.body.from_email || '').trim().slice(0, 255) || null
+      const newMsg = {
+        role: 'they_replied',
+        from: authorTrim,
+        from_email: fromEmail || null,
+        date: new Date().toISOString(),
+        body: bodyTrim,
+        message_id: replyId,
+        attachments: [],
+        is_published: false,
+        is_deleted: false,
+      }
+
+      let solutionId
+      if (existingSolutionId) {
+        solutionId = existingSolutionId
+        const row = await dbPool.query(
+          'SELECT thread_messages FROM global_task_final_solutions WHERE id = $1',
+          [solutionId]
+        )
+        let thread = row.rows[0]?.thread_messages
+        if (Array.isArray(thread)) {
+          thread = [...thread]
+        } else if (typeof thread === 'string') {
+          try {
+            thread = JSON.parse(thread)
+            if (!Array.isArray(thread)) thread = []
+          } catch (_) {
+            thread = []
+          }
+        } else {
+          thread = []
+        }
+        const msgIndex = thread.length
+        const savedAttachments = await saveEmailAttachments(dbPool, solutionId, msgIndex, attachmentsPayload || [])
+        newMsg.attachments = savedAttachments
+        thread.push(newMsg)
+        await dbPool.query(
+          `UPDATE global_task_final_solutions SET thread_messages = $1, content = $2, updated_at = CURRENT_TIMESTAMP WHERE id = $3`,
+          [JSON.stringify(thread), bodyTrim.slice(0, 2000), solutionId]
+        )
+        if (replyId) {
+          await dbPool.query(
+            'INSERT INTO email_reply_final_solutions (reply_message_id, final_solution_id) VALUES ($1, $2) ON CONFLICT (reply_message_id) DO NOTHING',
+            [replyId, solutionId]
+          )
+        }
+      } else {
+        const insert = await dbPool.query(
+          `INSERT INTO global_task_final_solutions (global_task_id, user_id, content, author_display_name, is_from_supplier_reply, is_published, thread_messages)
+           VALUES ($1, $2, $3, $4, true, false, $5)
+           RETURNING id`,
+          [global_task_id, created_by, bodyTrim.slice(0, 2000), authorTrim, JSON.stringify([newMsg])]
+        )
+        solutionId = insert.rows[0].id
+        const savedAttachments = await saveEmailAttachments(dbPool, solutionId, 0, attachmentsPayload || [])
+        if (savedAttachments.length > 0) {
+          newMsg.attachments = savedAttachments
+          await dbPool.query(
+            `UPDATE global_task_final_solutions SET thread_messages = $1 WHERE id = $2`,
+            [JSON.stringify([newMsg]), solutionId]
+          )
+        }
+        await dbPool.query(
+          'UPDATE project_sent_emails SET final_solution_id = $1 WHERE message_id = $2',
+          [solutionId, inReplyTo]
+        )
+        if (replyId) {
+          await dbPool.query(
+            'INSERT INTO email_reply_final_solutions (reply_message_id, final_solution_id) VALUES ($1, $2) ON CONFLICT (reply_message_id) DO NOTHING',
+            [replyId, solutionId]
+          )
+        }
+      }
+
+      notifyBpeProjectUpdated(global_task_id)
+      const io = req.app.get('io')
+      if (io) {
+        const userIds = await getGlobalTaskParticipantUserIds(dbPool, global_task_id)
+        const gt = await dbPool.query('SELECT title, created_by FROM global_tasks WHERE id = $1', [global_task_id])
+        const projectTitle = gt.rows[0]?.title || null
+        emitGlobalTaskChanged(io, userIds, global_task_id, existingSolutionId ? 'final_solution_updated' : 'final_solution_added', { title: projectTitle, authorId: created_by })
+      }
+      res.status(201).json({ created: true, global_task_id, solution_id: solutionId })
+    } catch (err) {
+      console.error('createFinalSolutionFromEmailReply:', err)
+      res.status(500).json({ error: 'Ошибка сервера' })
+    }
+  }
+}
+
+// Добавить наше сообщение в ветку переписки (после отправки письма из карточки)
+function appendThreadMessage(dbPool) {
+  return async function (req, res) {
+    const { taskId, solutionId } = req.params
+    const { userId, body, message_id } = req.body
+    if (!userId || body === undefined || !message_id) {
+      return res.status(400).json({ error: 'Нужны userId, body и message_id' })
+    }
+    try {
+      const check = await dbPool.query(
+        `SELECT id, thread_messages FROM global_task_final_solutions WHERE id = $1 AND global_task_id = $2`,
+        [solutionId, taskId]
+      )
+      if (check.rowCount === 0) {
+        return res.status(404).json({ error: 'Итоговое решение не найдено' })
+      }
+      let thread = check.rows[0].thread_messages
+      if (Array.isArray(thread)) {
+        thread = [...thread]
+      } else if (typeof thread === 'string') {
+        try {
+          thread = JSON.parse(thread)
+          if (!Array.isArray(thread)) thread = []
+        } catch (_) {
+          thread = []
+        }
+      } else {
+        thread = []
+      }
+      const newMsg = {
+        role: 'we_sent',
+        date: new Date().toISOString(),
+        body: String(body).trim().slice(0, 50000),
+        message_id: String(message_id).trim(),
+        is_published: false,
+        is_deleted: false,
+      }
+      thread.push(newMsg)
+      await dbPool.query(
+        `UPDATE global_task_final_solutions SET thread_messages = $1, updated_at = CURRENT_TIMESTAMP WHERE id = $2`,
+        [JSON.stringify(thread), solutionId]
+      )
+      notifyBpeProjectUpdated(taskId)
+      const io = req.app.get('io')
+      if (io) {
+        const userIds = await getGlobalTaskParticipantUserIds(dbPool, taskId)
+        const gt = await dbPool.query('SELECT title FROM global_tasks WHERE id = $1', [taskId])
+        emitGlobalTaskChanged(io, userIds, taskId, 'final_solution_updated', { title: gt.rows[0]?.title })
+      }
+      res.status(200).json({ success: true })
+    } catch (err) {
+      console.error('appendThreadMessage:', err)
+      res.status(500).json({ error: 'Ошибка сервера' })
+    }
+  }
+}
+
+// Обновить одно сообщение в ветке переписки (редактирование, публикация, снятие с публикации, удаление)
+function updateThreadMessage(dbPool) {
+  return async function (req, res) {
+    const { taskId, solutionId, messageIndex } = req.params
+    const { userId, body, is_published, is_deleted } = req.body
+    if (!userId) return res.status(400).json({ error: 'Нужен userId' })
+    const idx = parseInt(messageIndex, 10)
+    if (isNaN(idx) || idx < 0) return res.status(400).json({ error: 'Некорректный индекс сообщения' })
+    try {
+      const check = await dbPool.query(
+        `SELECT id, thread_messages FROM global_task_final_solutions WHERE id = $1 AND global_task_id = $2`,
+        [solutionId, taskId]
+      )
+      if (check.rowCount === 0) {
+        return res.status(404).json({ error: 'Итоговое решение не найдено' })
+      }
+      let thread = check.rows[0].thread_messages
+      if (Array.isArray(thread)) {
+        thread = [...thread]
+      } else if (typeof thread === 'string') {
+        try {
+          thread = JSON.parse(thread)
+          if (!Array.isArray(thread)) thread = []
+        } catch (_) {
+          thread = []
+        }
+      } else {
+        thread = []
+      }
+      if (idx >= thread.length) {
+        return res.status(404).json({ error: 'Сообщение не найдено' })
+      }
+      const msg = thread[idx]
+      if (body !== undefined && body !== null) {
+        msg.body = String(body).trim().slice(0, 50000)
+      }
+      if (typeof is_published === 'boolean') {
+        msg.is_published = is_published
+      }
+      if (typeof is_deleted === 'boolean') {
+        msg.is_deleted = is_deleted
+      }
+      const solutionIsPublished = thread.some(
+        (m) => !m.is_deleted && (m.is_published === true || m.is_published === undefined)
+      )
+      await dbPool.query(
+        `UPDATE global_task_final_solutions SET thread_messages = $1, is_published = $2, updated_at = CURRENT_TIMESTAMP WHERE id = $3`,
+        [JSON.stringify(thread), solutionIsPublished, solutionId]
+      )
+      notifyBpeProjectUpdated(taskId)
+      const io = req.app.get('io')
+      if (io) {
+        const userIds = await getGlobalTaskParticipantUserIds(dbPool, taskId)
+        const gt = await dbPool.query('SELECT title FROM global_tasks WHERE id = $1', [taskId])
+        emitGlobalTaskChanged(io, userIds, taskId, 'final_solution_updated', { title: gt.rows[0]?.title })
+      }
+      res.status(200).json({ success: true })
+    } catch (err) {
+      console.error('updateThreadMessage:', err)
+      res.status(500).json({ error: 'Ошибка сервера' })
+    }
+  }
+}
+
+// Скачать вложение из письма (итоговое решение)
+function downloadEmailAttachment(dbPool) {
+  return async function (req, res) {
+    const { taskId, solutionId, attachmentId } = req.params
+    try {
+      const row = await dbPool.query(
+        `SELECT pea.id, pea.file_path, pea.filename, pea.content_type
+         FROM project_email_attachments pea
+         JOIN global_task_final_solutions fs ON fs.id = pea.final_solution_id
+         WHERE pea.id = $1 AND pea.final_solution_id = $2 AND fs.global_task_id = $3`,
+        [attachmentId, solutionId, taskId]
+      )
+      if (row.rowCount === 0) {
+        return res.status(404).json({ error: 'Вложение не найдено' })
+      }
+      const { file_path, filename, content_type } = row.rows[0]
+      const uploadsDir = path.join(__dirname, '..', '..', 'uploads')
+      const fullPath = path.join(uploadsDir, file_path)
+      if (!fs.existsSync(fullPath)) {
+        return res.status(404).json({ error: 'Файл не найден на диске' })
+      }
+      res.setHeader('Content-Disposition', `attachment; filename="${encodeURIComponent(filename)}"`)
+      res.type(content_type || 'application/octet-stream')
+      res.sendFile(fullPath)
+    } catch (err) {
+      console.error('downloadEmailAttachment:', err)
+      res.status(500).json({ error: 'Ошибка сервера' })
+    }
+  }
+}
+
+// Добавить вложение из письма в документы проекта
+function addEmailAttachmentToProject(dbPool) {
+  return async function (req, res) {
+    const io = req.app.get('io')
+    const { taskId, solutionId, attachmentId } = req.params
+    const { userId } = req.body
+    if (!userId) return res.status(400).json({ error: 'Нужен userId' })
+    try {
+      const row = await dbPool.query(
+        `SELECT pea.id, pea.file_path, pea.filename, pea.content_type
+         FROM project_email_attachments pea
+         JOIN global_task_final_solutions fs ON fs.id = pea.final_solution_id
+         WHERE pea.id = $1 AND pea.final_solution_id = $2 AND fs.global_task_id = $3`,
+        [attachmentId, solutionId, taskId]
+      )
+      if (row.rowCount === 0) {
+        return res.status(404).json({ error: 'Вложение не найдено' })
+      }
+      const { file_path, filename, content_type } = row.rows[0]
+      const uploadsDir = path.join(__dirname, '..', '..', 'uploads')
+      const srcPath = path.join(uploadsDir, file_path)
+      if (!fs.existsSync(srcPath)) {
+        return res.status(404).json({ error: 'Файл не найден на диске' })
+      }
+      const safeName = (filename || 'file').replace(/[^a-zA-Z0-9._-]/g, '_').slice(0, 200)
+      const destFilename = `email-${Date.now()}-${safeName}`
+      const destPath = path.join(uploadsDir, destFilename)
+      fs.copyFileSync(srcPath, destPath)
+      const fileUrl = `/uploads/${destFilename}`
+      await dbPool.query(
+        `INSERT INTO task_attachments_global_tasks (task_id, file_url, file_type, uploaded_by, name_file)
+         VALUES ($1, $2, $3, $4, $5)`,
+        [taskId, fileUrl, (content_type || 'application/octet-stream').slice(0, 255), userId, filename || destFilename]
+      )
+      const participantIds = await getGlobalTaskParticipantUserIds(dbPool, taskId)
+      if (io && participantIds?.length) {
+        const gt = await dbPool.query('SELECT title FROM global_tasks WHERE id = $1', [taskId])
+        emitGlobalTaskChanged(io, participantIds, taskId, 'attachment', { title: gt.rows[0]?.title })
+      }
+      res.status(200).json({ success: true, file_url: fileUrl })
+    } catch (err) {
+      console.error('addEmailAttachmentToProject:', err)
+      res.status(500).json({ error: 'Ошибка сервера' })
+    }
+  }
+}
+
+// Редактировать ветку переписки перед публикацией (Диспетчер/Администратор или автор проекта)
+function updateEmailThreadContent(dbPool) {
+  return async function (req, res) {
+    const { taskId, solutionId } = req.params
+    const { userId, thread_messages, content } = req.body
+    if (!userId) return res.status(400).json({ error: 'Нужен userId' })
+    try {
+      const update = await dbPool.query(
+        `UPDATE global_task_final_solutions
+         SET thread_messages = COALESCE($1, thread_messages), content = COALESCE($2, content), updated_at = CURRENT_TIMESTAMP
+         WHERE id = $3 AND global_task_id = $4 AND is_from_supplier_reply = true AND is_published = false
+         RETURNING id`,
+        [thread_messages ? JSON.stringify(thread_messages) : null, content != null ? String(content).slice(0, 50000) : null, solutionId, taskId]
+      )
+      if (update.rowCount === 0) {
+        return res.status(404).json({ error: 'Решение не найдено или уже опубликовано' })
+      }
+      notifyBpeProjectUpdated(taskId)
+      const io = req.app.get('io')
+      if (io) {
+        const userIds = await getGlobalTaskParticipantUserIds(dbPool, taskId)
+        const gt = await dbPool.query('SELECT title FROM global_tasks WHERE id = $1', [taskId])
+        emitGlobalTaskChanged(io, userIds, taskId, 'final_solution_updated', { title: gt.rows[0]?.title })
+      }
+      res.status(200).json({ success: true })
+    } catch (err) {
+      console.error('updateEmailThreadContent:', err)
+      res.status(500).json({ error: 'Ошибка сервера' })
+    }
+  }
+}
+
+// Опубликовать итоговое решение (ответ поставщика) — видно всем
+function publishFinalSolution(dbPool) {
+  return async function (req, res) {
+    const { taskId, solutionId } = req.params
+    const { userId } = req.body
+    if (!userId) {
+      return res.status(400).json({ error: 'Не указан пользователь' })
+    }
+    try {
+      const update = await dbPool.query(
+        `UPDATE global_task_final_solutions
+         SET is_published = true, updated_at = CURRENT_TIMESTAMP
+         WHERE id = $1 AND global_task_id = $2 AND is_from_supplier_reply = true
+         RETURNING id`,
+        [solutionId, taskId]
+      )
+      if (update.rowCount === 0) {
+        return res.status(404).json({ error: 'Решение не найдено или не является ответом по почте' })
+      }
+      notifyBpeProjectUpdated(taskId)
+      const io = req.app.get('io')
+      if (io) {
+        const userIds = await getGlobalTaskParticipantUserIds(dbPool, taskId)
+        const gt = await dbPool.query('SELECT title, created_by FROM global_tasks WHERE id = $1', [taskId])
+        const projectTitle = gt.rows[0]?.title || null
+        emitGlobalTaskChanged(io, userIds, taskId, 'final_solution_updated', { title: projectTitle })
+      }
+      res.status(200).json({ success: true })
+    } catch (err) {
+      console.error('publishFinalSolution:', err)
+      res.status(500).json({ error: 'Ошибка сервера' })
+    }
+  }
+}
+
 // Получить завершённые/проваленные/удалённые проекты для пользователя (автор или участник)
 function getGlobalTasksCompleted(dbPool) {
   return async function (req, res) {
@@ -2108,15 +2562,15 @@ function getGlobalTasksCompleted(dbPool) {
         (SELECT ROUND(100.0 * (
             (SELECT COALESCE(SUM(CASE WHEN t.is_completed THEN 1 ELSE 0 END), 0) FROM tasks t WHERE t.global_task_id = gt.id)
             + (SELECT COUNT(*) FROM global_task_responsibles gtra WHERE gtra.global_task_id = gt.id AND gtra.requires_approval = true AND gtra.approval_status = 'approved')
-            + (SELECT COUNT(*) FROM global_task_final_solutions WHERE global_task_id = gt.id)
+            + (SELECT COUNT(*) FROM global_task_final_solutions WHERE global_task_id = gt.id AND (NOT COALESCE(is_from_supplier_reply, false) OR COALESCE(is_published, false)))
         ) / NULLIF(
             (SELECT COUNT(*) FROM tasks t WHERE t.global_task_id = gt.id)
             + (SELECT COUNT(*) FROM global_task_responsibles gtra WHERE gtra.global_task_id = gt.id AND gtra.requires_approval = true)
-            + (SELECT COUNT(*) FROM global_task_final_solutions WHERE global_task_id = gt.id),
+            + (SELECT COUNT(*) FROM global_task_final_solutions WHERE global_task_id = gt.id AND (NOT COALESCE(is_from_supplier_reply, false) OR COALESCE(is_published, false))),
             0
         ), 2)
         ), 0) as completion_percentage,
-    (SELECT COALESCE(json_agg(json_build_object('id', fs.id, 'content', fs.content, 'user_id', fs.user_id, 'author_name', TRIM(CONCAT(fsu.first_name, ' ', fsu.last_name)), 'created_at', fs.created_at, 'updated_at', fs.updated_at) ORDER BY fs.created_at), '[]'::json)
+    (SELECT COALESCE(json_agg(json_build_object('id', fs.id, 'content', fs.content, 'user_id', fs.user_id, 'author_name', COALESCE(fs.author_display_name, TRIM(CONCAT(fsu.first_name, ' ', fsu.last_name))), 'author_display_name', fs.author_display_name, 'is_from_supplier_reply', COALESCE(fs.is_from_supplier_reply, false), 'is_published', COALESCE(fs.is_published, false), 'thread_messages', COALESCE(fs.thread_messages, '[]'::jsonb), 'created_at', fs.created_at, 'updated_at', fs.updated_at) ORDER BY fs.created_at), '[]'::json)
      FROM global_task_final_solutions fs
      LEFT JOIN users fsu ON fsu.id = fs.user_id
      WHERE fs.global_task_id = gt.id) as final_solutions
@@ -3747,6 +4201,14 @@ module.exports = {
   createFinalSolution,
   updateFinalSolution,
   deleteFinalSolution,
+  saveProjectSentEmail,
+  createFinalSolutionFromEmailReply,
+  appendThreadMessage,
+  updateThreadMessage,
+  publishFinalSolution,
+  downloadEmailAttachment,
+  addEmailAttachmentToProject,
+  updateEmailThreadContent,
   updateTaskDescription,
   getTaskDescriptionHistory,
   getTaskById,

@@ -12,6 +12,7 @@ import {
   FaChevronLeft,
   FaChevronRight,
 } from 'react-icons/fa'
+import { MdEmail } from 'react-icons/md'
 import { MdCalendarMonth, MdAccessTime } from 'react-icons/md'
 import useUserStore from '../../../store/userStore'
 import {
@@ -28,14 +29,16 @@ import GoalsEditor from './subcomponents/GoalsEditor'
 import AdditionalInfoEditor from './subcomponents/AdditionalInfoEditor'
 import FinalSolutionsBlock from './subcomponents/FinalSolutionsBlock'
 import FinalSolutionModal from './subcomponents/FinalSolutionModal'
+import SendProjectMailModal from './subcomponents/SendProjectMailModal'
 import './styles/GlobalTaskCard.scss'
 
 const GlobalTaskCard = ({
   task,
-  onPrevious, // Обработчик для предыдущей задачи
-  onNext, // Обработчик для следующей задачи
-  hasPrevious, // Флаг: есть ли предыдущая задача
-  hasNext, // Флаг: есть ли следующая задача
+  attachments = [],
+  onPrevious,
+  onNext,
+  hasPrevious,
+  hasNext,
   setAttachments,
   onRefresh,
   isReadOnly,
@@ -54,6 +57,7 @@ const GlobalTaskCard = ({
   const [approvalModal, setApprovalModal] = useState({ open: false, status: null })
   const [approvalComment, setApprovalComment] = useState('')
   const [approvalSubmitting, setApprovalSubmitting] = useState(false)
+  const [sendMailModalOpen, setSendMailModalOpen] = useState(false)
   // Обработчик открытия редактора целей
   const handleOpenGoalsEditor = () => setIsGoalsEditorOpen(true)
   const handleCloseGoalsEditor = () => setIsGoalsEditorOpen(false)
@@ -329,7 +333,19 @@ const GlobalTaskCard = ({
       <div className="global-task-card__content">
         <div className="global-task-card__main-info">
           <h2 className="global-task-card__title">{title}</h2>
-          <p className="global-task-card__description">{description}</p>
+          <div className="global-task-card__description-row">
+            <p className="global-task-card__description">{description}</p>
+            {!isReadOnly && (
+              <button
+                type="button"
+                className="global-task-card__mail-btn"
+                onClick={() => setSendMailModalOpen(true)}
+                title="Отправить описание проекта на почту"
+              >
+                <MdEmail />
+              </button>
+            )}
+          </div>
 
           {/* Итоговые решения */}
           {solutionsList.length > 0 && (
@@ -338,6 +354,7 @@ const GlobalTaskCard = ({
               globalTaskId={id}
               onRefresh={onRefresh}
               isReadOnly={isReadOnly}
+              projectTitle={title}
             />
           )}
 
@@ -639,6 +656,14 @@ const GlobalTaskCard = ({
           }}
         />
       )}
+
+      <SendProjectMailModal
+        open={sendMailModalOpen}
+        onClose={() => setSendMailModalOpen(false)}
+        task={task}
+        attachments={attachments}
+        userId={userId}
+      />
     </div>
   )
 }

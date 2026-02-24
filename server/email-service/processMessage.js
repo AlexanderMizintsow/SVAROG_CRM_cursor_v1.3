@@ -1,63 +1,69 @@
 const { simpleParser } = require('mailparser')
-//const _ = require('lodash')
+const _ = require('lodash')
 
-// Функция обработки сообщения: парсинг текста и обработка вложений
+function formatAddress(addr) {
+  if (!addr) return ''
+  if (typeof addr === 'string') return addr.trim()
+  if (addr.text) return addr.text.trim()
+  if (Array.isArray(addr.value) && addr.value[0]) {
+    const v = addr.value[0]
+    if (typeof v === 'string') return v
+    if (v.address) return v.name ? `${v.name} <${v.address}>` : v.address
+  }
+  return ''
+}
+
+// Парсинг полного сырого письма (RFC 822) через mailparser — корректно извлекает текст при любом multipart
 async function processMessage(res) {
-  const header = _.find(res.parts, { which: 'HEADER' })
-  const textPart = _.find(res.parts, { which: 'TEXT' })
-
-  if (
-    header &&
-    header.body &&
-    header.body.subject &&
-    header.body.subject.length > 0 &&
-    header.body.from &&
-    header.body.from.length > 0
-  ) {
-    const subject = header.body.subject[0]
-    const from = header.body.from[0]
-    const to = header.body.to ? header.body.to[0] : 'Неизвестный получатель'
-    const date = header.body.date ? header.body.date[0] : null
-    const messageId = header.body['message-id']
-      ? header.body['message-id'][0]
-      : null
-
-    let body = 'Текстовое содержимое отсутствует'
-    let attachments = []
-
-    if (textPart) {
-      if (textPart.body.includes('Content-Transfer-Encoding: base64')) {
-        const base64Content = textPart.body
-          .split('Content-Transfer-Encoding: base64')[1]
-          .trim()
-        body = Buffer.from(base64Content, 'base64').toString('utf-8')
-      } else {
-        const parsed = await simpleParser(textPart.body)
-        body = parsed.text || parsed.html || 'Текстовое содержимое отсутствует'
-        attachments = parsed.attachments.map((attachment) => {
-          return {
-            filename: attachment.filename,
-            contentType: attachment.contentType,
-            content: attachment.content,
-          }
-        })
-      }
-    }
-
-    return {
-      uid: res.attributes.uid,
-      date,
-      from,
-      to,
-      subject,
-      messageId,
-      body,
-      attachments,
-      read: res.attributes.flags.includes('\\Seen'),
-    }
-  } else {
-    console.log('Отсутствует заголовок или тема сообщения:', res)
+  const fullPart = _.find(res.parts, (p) => p.which === '' || p.which === 'TEXT')
+  const raw = fullPart?.body
+  if (!raw) {
+    console.log('Нет тела письма (parts:', res.parts?.map((p) => p.which), ')')
     return null
+  }
+
+  let parsed
+  try {
+    const rawData =
+      typeof raw === 'string' ? Buffer.from(raw, 'utf-8') : raw
+    parsed = await simpleParser(rawData)
+  } catch (err) {
+    console.error('Ошибка парсинга письма:', err)
+    return null
+  }
+
+  const subject = parsed.subject?.trim() || '(без темы)'
+  const from = formatAddress(parsed.from)
+  if (!from) {
+    console.log('Письмо без отправителя:', subject)
+    return null
+  }
+
+  const to = formatAddress(parsed.to) || 'Неизвестный получатель'
+  const date = parsed.date || null
+  const messageId = parsed.messageId || null
+  const inReplyTo = parsed.inReplyTo || null
+  const body =
+    (parsed.text && parsed.text.trim()) ||
+    (parsed.html && parsed.html.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim()) ||
+    'Текстовое содержимое отсутствует'
+  const attachments = (parsed.attachments || []).map((a) => ({
+    filename: a.filename,
+    contentType: a.contentType,
+    content: a.content,
+  }))
+
+  return {
+    uid: res.attributes?.uid,
+    date,
+    from,
+    to,
+    subject,
+    messageId,
+    inReplyTo,
+    body,
+    attachments,
+    read: (res.attributes?.flags || []).includes('\\Seen'),
   }
 }
 

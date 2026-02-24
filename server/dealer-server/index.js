@@ -24,6 +24,9 @@ app.use('/api', dealersRoutes)
 const competitorRoutes = require('./competitorRoutes/competitorRoutes')(pool)
 app.use('/api/competitors', competitorRoutes)
 
+const supplierRoutes = require('./supplierRoutes/supplierRoutes')(pool)
+app.use('/api/suppliers', supplierRoutes)
+
 app.listen(port, '0.0.0.0', () => {
   console.log(`Сервер запущен на порту ${port}`)
 })

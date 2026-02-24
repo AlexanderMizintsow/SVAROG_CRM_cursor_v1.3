@@ -11,6 +11,7 @@ const FinalSolutionModal = ({
   solutionId,
   onClose,
   onSaved,
+  isEmailThread,
 }) => {
   const { user } = useUserStore()
   const [content, setContent] = useState(initialContent || '')
@@ -27,10 +28,17 @@ const FinalSolutionModal = ({
     try {
       const userId = user?.id
       if (mode === 'edit' && solutionId) {
-        await axios.put(
-          `${API_BASE_URL}5000/api/global-tasks/${globalTaskId}/final-solutions/${solutionId}`,
-          { content: text, userId }
-        )
+        if (isEmailThread) {
+          await axios.put(
+            `${API_BASE_URL}5000/api/global-tasks/${globalTaskId}/final-solutions/${solutionId}/edit-email-thread`,
+            { userId, content: text }
+          )
+        } else {
+          await axios.put(
+            `${API_BASE_URL}5000/api/global-tasks/${globalTaskId}/final-solutions/${solutionId}`,
+            { content: text, userId }
+          )
+        }
       } else {
         await axios.post(
           `${API_BASE_URL}5000/api/global-tasks/${globalTaskId}/final-solutions`,

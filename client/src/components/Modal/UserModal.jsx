@@ -2,10 +2,12 @@ import { useState, useRef, useEffect } from 'react'
 import { AiOutlineBarcode } from 'react-icons/ai'
 import { FaTelegramPlane } from 'react-icons/fa'
 import { ImExit } from 'react-icons/im'
+import { RiMailSettingsLine } from 'react-icons/ri'
 import axios from 'axios'
 import bwipjs from 'bwip-js'
 import useUserStore from '../../store/userStore'
 import ConfirmationDialog from '../confirmationDialog/ConfirmationDialog'
+import ModalEmailToken from '../modalEmailToken/ModalEmailToken'
 import { API_BASE_URL } from '../../../config'
 import MyBtn from '../btn/Btn'
 import { CiCalculator2 } from 'react-icons/ci'
@@ -22,6 +24,7 @@ const UserModal = ({ user, closeModal, exit }) => {
   const [dialogOpen, setDialogOpen] = useState(false)
   const [isVisible, setIsVisible] = useState(false)
   const [isModalOpenCalc, setIsModalOpenCalc] = useState(false)
+  const [isMailTokenModalOpen, setIsMailTokenModalOpen] = useState(false)
 
   useEffect(() => {
     if (user) {
@@ -164,6 +167,22 @@ const UserModal = ({ user, closeModal, exit }) => {
           <WeatherForecast />
 
           <div className="center">
+            <div>
+              <RiMailSettingsLine
+                className="barcode center-icon"
+                onClick={(e) => {
+                  e.stopPropagation()
+                  setIsMailTokenModalOpen(true)
+                }}
+                title="Настройки почты (ввести токен)"
+              />
+              <ModalEmailToken
+                isOpen={isMailTokenModalOpen}
+                title="Настройки почты"
+                inputVisible={true}
+                onClose={() => setIsMailTokenModalOpen(false)}
+              />
+            </div>
             <div>
               <CiCalculator2
                 className="barcode center-icon"

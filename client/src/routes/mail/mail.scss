@@ -115,6 +115,67 @@
           }
         }
       }
+
+      .mail-instruction {
+        margin-top: 16px;
+        padding-top: 12px;
+        border-top: 1px solid rgba(0, 0, 0, 0.08);
+
+        &__toggle {
+          width: 100%;
+          text-align: left;
+          padding: 8px 0;
+          background: none;
+          border: none;
+          cursor: pointer;
+          font-size: 13px;
+          color: #555;
+          text-decoration: underline;
+
+          &:hover {
+            color: $hover-text-color;
+          }
+        }
+
+        &__body {
+          font-size: 12px;
+          color: #444;
+          padding: 8px 0;
+
+          ol {
+            margin: 0 0 12px;
+            padding-left: 18px;
+
+            li {
+              margin-bottom: 6px;
+            }
+          }
+
+          a {
+            color: #1976d2;
+          }
+
+          code {
+            background: #f5f5f5;
+            padding: 1px 4px;
+            border-radius: 3px;
+          }
+        }
+
+        &__open-settings {
+          margin-top: 8px;
+          padding: 6px 12px;
+          font-size: 12px;
+          background: #e3f2fd;
+          border: 1px solid #90caf9;
+          border-radius: 5px;
+          cursor: pointer;
+
+          &:hover {
+            background: #bbdefb;
+          }
+        }
+      }
     }
 
     .content-mail {
