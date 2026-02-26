@@ -94,7 +94,8 @@ const GlobalTaskProgress = ({
   const handleDelete = async () => {
     try {
       await axios.delete(
-        `${API_BASE_URL}5000/api/global-tasks/delete/${taskId}`
+        `${API_BASE_URL}5000/api/global-tasks/delete/${taskId}`,
+        { data: { userId } }
       )
 
       onRefresh(taskId)

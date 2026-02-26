@@ -214,10 +214,11 @@ function createTask(dbPool, io) {
       const task = result.rows[0]
       task.tags = JSON.parse(task.tags)
 
+      await insertTaskHistoryForTask(dbPool, task.id, created_by, 'Создание задачи')
+
       res.status(201).json(task)
 
       // Если задача создана из бизнес-процесса — уведомляем BPE (событийные развилки).
-      // Это позволит сразу же обработать условия развилки без таймеров.
       if (businessProcessInstanceId != null) {
         notifyBpeTaskUpdated(Number(task.id))
       }
@@ -530,8 +531,15 @@ function addTaskAttachment(dbPool, io) {
         comment_file,
         name_file,
       ])
-      io.emit('taskAttachment')
       if (tableTypeNormalized === 'global' && task_id) {
+        await insertTaskHistory(
+          dbPool,
+          task_id,
+          'документ',
+          `Добавлен документ: ${name_file || 'файл'}`,
+          uploaded_by,
+          { name_file: name_file || null }
+        )
         const participantIds = await getGlobalTaskParticipantUserIds(dbPool, task_id)
         if (participantIds && participantIds.length > 0) {
           const titleRes = await dbPool.query('SELECT title FROM global_tasks WHERE id = $1', [task_id])
@@ -539,6 +547,7 @@ function addTaskAttachment(dbPool, io) {
           emitGlobalTaskChanged(io, participantIds, task_id, 'attachment', { title: projectTitle })
         }
       }
+      io.emit('taskAttachment')
       res.status(201).json({ message: 'Вложение добавлено к задаче' })
     } catch (error) {
       console.error('Ошибка при добавлении вложения:', {
@@ -757,15 +766,23 @@ function updateTaskStatus(dbPool, io) {
 function updateTaskApproval(dbPool, io) {
   return async function (req, res) {
     const { taskId, userId, approv } = req.params
+    const isApproved = approv === 'true' || approv === true
 
     try {
       await dbPool.query(
         `
         UPDATE task_approvals
-        SET is_approved = $1
+        SET is_approved = $1, responded_at = CURRENT_TIMESTAMP
         WHERE task_id = $2 AND approver_id = $3
       `,
-        [approv, taskId, userId]
+        [isApproved, taskId, userId]
+      )
+
+      await insertTaskHistoryForTask(
+        dbPool,
+        taskId,
+        parseInt(userId, 10),
+        isApproved ? 'Одобрено автором' : 'Отправка на доработку'
       )
 
       io.emit('taskApproval')
@@ -809,12 +826,12 @@ function updateTaskAccept(dbPool, io) {
           )
         }
       } else {
-        // Если isDone не равно false, выполняем исходный запрос
+        // Если isDone не равно false: отмечаем выполненной и фиксируем completed_at (один раз) для аналитики
         await dbPool.query(
           `
             UPDATE tasks
-            SET is_completed =  $1
-            WHERE id = $2 AND created_by =  $3; 
+            SET is_completed = $1, completed_at = CASE WHEN completed_at IS NULL THEN CURRENT_TIMESTAMP ELSE completed_at END
+            WHERE id = $2 AND created_by = $3;
           `,
           [isDone, taskId, userId]
         )
@@ -836,12 +853,14 @@ function updateTaskAccept(dbPool, io) {
         const { global_task_id, title, user_id } = taskResult.rows[0]
         globalTaskIdForEmit = global_task_id
 
+        await insertTaskHistoryForTask(dbPool, taskId, user_id, 'Выполнено исполнителем')
+
         await insertTaskHistory(
           dbPool,
-          global_task_id, // добавляем айди глобальной задачи
+          global_task_id,
           'завершение подзадачи',
-          `Подзадача выполнена: ${title}`, // добавляем title
-          user_id, // добавляем айди исполнителя
+          `Подзадача выполнена: ${title}`,
+          user_id,
           null
         )
       }
@@ -1783,6 +1802,7 @@ function updateGlobalTaskProcess(dbPool, io) {
 function deleteGlobalTask(dbPool, io) {
   return async function (req, res) {
     const { taskId } = req.params
+    const userId = req.body?.userId != null ? parseInt(req.body.userId, 10) : null
 
     try {
       const participantIds = await getGlobalTaskParticipantUserIds(dbPool, taskId)
@@ -1795,6 +1815,8 @@ function deleteGlobalTask(dbPool, io) {
       if (updateResult.rowCount === 0) {
         return res.status(404).json({ error: 'Глобальная задача не найдена' })
       }
+
+      await insertTaskHistory(dbPool, taskId, 'удаление', 'Проект удалён', userId, null)
 
       const projectTitle = updateResult.rows[0]?.title || null
       if (io && participantIds && participantIds.length > 0) {
@@ -2196,6 +2218,10 @@ function createFinalSolutionFromEmailReply(dbPool) {
             [replyId, solutionId]
           )
         }
+        await dbPool.query(
+          'INSERT INTO project_email_response_times (sent_message_id, reply_received_at) VALUES ($1, CURRENT_TIMESTAMP) ON CONFLICT (sent_message_id) DO NOTHING',
+          [inReplyTo]
+        )
       } else {
         const insert = await dbPool.query(
           `INSERT INTO global_task_final_solutions (global_task_id, user_id, content, author_display_name, is_from_supplier_reply, is_published, thread_messages)
@@ -2222,6 +2248,10 @@ function createFinalSolutionFromEmailReply(dbPool) {
             [replyId, solutionId]
           )
         }
+        await dbPool.query(
+          'INSERT INTO project_email_response_times (sent_message_id, reply_received_at) VALUES ($1, CURRENT_TIMESTAMP) ON CONFLICT (sent_message_id) DO NOTHING',
+          [inReplyTo]
+        )
       }
 
       notifyBpeProjectUpdated(global_task_id)
@@ -3133,6 +3163,20 @@ async function insertTaskHistory(
   )
 }
 
+/**
+ * Вставляет запись в историю задачи (канбан/подзадача) для аналитики и отчётов.
+ * @param {Object} dbPool
+ * @param {Number} taskId - id задачи (tasks.id)
+ * @param {Number|null} changedBy - id пользователя
+ * @param {String} changeDescription - описание события (например: 'Создание задачи', 'Выполнено исполнителем', 'Одобрено автором', 'Отправка на доработку', 'Дедлайн истёк')
+ */
+async function insertTaskHistoryForTask(dbPool, taskId, changedBy, changeDescription) {
+  await dbPool.query(
+    `INSERT INTO task_history (task_id, changed_by, change_description) VALUES ($1, $2, $3)`,
+    [taskId, changedBy, changeDescription]
+  )
+}
+
 // Получение всех задач, связанных с конкретной глобальной задачей по global_task_id. Функция внутри сервера без вызова из клиента
 // Функция для получения задач по глобальному ID, без req/res
 async function fetchTaskIdsByGlobalId(dbPool, globalTaskId) {
@@ -3982,7 +4026,19 @@ async function checkOverdueTasks(dbPool, io) {
 async function sendOverdueNotification(task, dbPool, io) {
   const { id, title, deadline, created_by, assignees } = task
 
-  // Если нет исполнителей - пропускаем задачу
+  // Фиксируем факт просрочки в истории задачи для аналитики (один раз на задачу)
+  try {
+    const existing = await dbPool.query(
+      `SELECT 1 FROM task_history WHERE task_id = $1 AND change_description = 'Дедлайн истёк' LIMIT 1`,
+      [id]
+    )
+    if (existing.rows.length === 0) {
+      await insertTaskHistoryForTask(dbPool, id, null, 'Дедлайн истёк')
+    }
+  } catch (e) {
+    console.error('[sendOverdueNotification] Ошибка записи в task_history:', e)
+  }
+
   if (assignees.length === 0) {
     console.log(`[Notification] У задачи ${id} нет исполнителей. Уведомления не отправлены.`)
     return

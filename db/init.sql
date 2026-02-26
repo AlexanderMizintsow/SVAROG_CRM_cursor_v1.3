@@ -941,6 +941,15 @@ CREATE TABLE task_history (
 CREATE INDEX idx_task_history_task_id ON task_history(task_id);
 CREATE INDEX idx_task_history_changed_by ON task_history(changed_by);
 
+-- Аналитика (фаза 1): поля и индексы для отчётов по проектам, задачам, отделам и сотрудникам
+ALTER TABLE tasks ADD COLUMN IF NOT EXISTS completed_at TIMESTAMP NULL;
+ALTER TABLE task_approvals ADD COLUMN IF NOT EXISTS responded_at TIMESTAMP NULL;
+CREATE INDEX IF NOT EXISTS idx_global_task_history_created_at ON global_task_history(created_at);
+CREATE INDEX IF NOT EXISTS idx_global_task_history_created_by ON global_task_history(created_by);
+CREATE INDEX IF NOT EXISTS idx_global_task_history_event_type ON global_task_history(event_type);
+CREATE INDEX IF NOT EXISTS idx_task_history_change_timestamp ON task_history(change_timestamp);
+CREATE INDEX IF NOT EXISTS idx_tasks_completed_at ON tasks(completed_at) WHERE completed_at IS NOT NULL;
+CREATE INDEX IF NOT EXISTS idx_task_approvals_responded_at ON task_approvals(responded_at) WHERE responded_at IS NOT NULL;
 
 -- отслеживания и отправки уведомлений пользователям о событиях, связанных с задачами
 CREATE TABLE notifications (
@@ -1002,6 +1011,13 @@ CREATE TABLE IF NOT EXISTS project_email_attachments (
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 CREATE INDEX IF NOT EXISTS idx_project_email_attachments_solution ON project_email_attachments(final_solution_id);
+
+-- Время ответа на письмо по проекту (для аналитики «Почта»: ожидание ответа по автору и отделу)
+CREATE TABLE IF NOT EXISTS project_email_response_times (
+  sent_message_id VARCHAR(512) PRIMARY KEY,
+  reply_received_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+CREATE INDEX IF NOT EXISTS idx_project_email_response_times_reply_at ON project_email_response_times(reply_received_at);
 
 CREATE INDEX idx_notifications_user_id ON notifications(user_id);
 CREATE INDEX idx_notifications_task_id ON notifications(task_id);

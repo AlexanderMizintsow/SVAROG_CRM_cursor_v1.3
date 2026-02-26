@@ -155,11 +155,7 @@ const NavBar = () => {
       icon: GiSwordwoman,
       link: '/add-competitor',
     },
-    {
-      name: 'Сервисные рейтинги',
-      icon: IoStarSharp,
-      link: '/reports-dealer-ratings',
-    },
+
    {/* {
       name: 'Поиск материалов',
       icon: MdSearch,
@@ -186,11 +182,24 @@ const NavBar = () => {
       icon: MdEdit,
       link: '/editor-handle',
     },
+   
     /* {
       name: 'Карта',
       icon: PiMapPinAreaLight,
       link: '/map-dealers',
     },*/
+  ]
+  const statistics = [
+    {
+      name: 'Мониторинг процессов',
+      icon: MdAssessment,
+      link: '/process-monitoring',
+    },
+    {
+      name: 'Сервисные рейтинги',
+      icon: IoStarSharp,
+      link: '/reports-dealer-ratings',
+    },
   ]
 
   return (
@@ -204,6 +213,7 @@ const NavBar = () => {
       
       {roleConfirm && <Menu title="Администрирование персонала" menuItems={personnelDepartment} />}
       <Menu title="Справочники" menuItems={references} />
+      <Menu title="Статистика" menuItems={statistics} />
 
       {/* Индикатор статуса звонков */}
       <div

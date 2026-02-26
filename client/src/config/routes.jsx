@@ -28,6 +28,7 @@ import MaterialSearchPage from '../routes/statistics/MaterialSearchPage.jsx'
 import EditorHandle from '../routes/adminMenu/editorHandle/EditorHandle.jsx'
 import MarketingAutomation from '../routes/adminMenu/marketingAutomation/MarketingAutomation.jsx'
 import BusinessProcesses from '../routes/businessProcesses/BusinessProcesses.jsx'
+import ProcessMonitoring from '../routes/statistics/ProcessMonitoring.jsx'
 
 const routes = (bgSeason, roleAdministrator, isConnectBD) => [
   {
@@ -116,6 +117,7 @@ const routes = (bgSeason, roleAdministrator, isConnectBD) => [
       { path: 'material-search', element: <MaterialSearchPage /> },
       { path: 'editor-handle', element: <EditorHandle /> },
       { path: 'marketing-automation', element: <MarketingAutomation /> },
+      { path: 'process-monitoring', element: <ProcessMonitoring /> },
 
       // ***
       // Отдел кадров

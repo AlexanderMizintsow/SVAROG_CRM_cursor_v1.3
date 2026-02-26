@@ -33,6 +33,17 @@ const {
   removeHeadFromDepartment,
   deleteDepartment,
 } = require('./departmentController/departmentController')
+const {
+  getAnalyticsSummary,
+  getAnalyticsDepartments,
+  getAnalyticsEmployees,
+  getBusinessProcessesList,
+  getBusinessProcessNodes,
+  getBusinessProcessEntities,
+  getBottlenecksByParticipants,
+  getBottlenecksByDepartments,
+  getAnalyticsDetail,
+} = require('./analyticsController/analyticsController')
 
 const { getRoles, createRole, deleteRole } = require('./roleController/roleController')
 
@@ -268,6 +279,11 @@ const dbPool = new Pool({
   password: process.env.DB_PASSWORD,
   port: process.env.DB_PORT,
 })
+// Чтобы CURRENT_DATE и сравнение дедлайнов (просрочки) учитывали локальное время
+const dbTimezone = process.env.DB_TIMEZONE || 'Europe/Moscow'
+dbPool.on('connect', (client) => {
+  client.query(`SET timezone = '${dbTimezone}'`).catch(() => {})
+})
 
 //const limiter = rateLimit({
 //windowMs: 15 * 60 * 1000, // 15 минут
@@ -331,6 +347,18 @@ app.post(
 app.post('/api/departments/:id/assign-head', assignHeadToDepartment(dbPool))
 app.post('/api/departments/:departmentId/remove-head', removeHeadFromDepartment(dbPool))
 app.delete('/api/departments/:id', deleteDepartment(dbPool))
+/*******/
+
+/*************Аналитика / Мониторинг процессов**************/
+app.get('/api/analytics/summary', getAnalyticsSummary(dbPool))
+app.get('/api/analytics/departments', getAnalyticsDepartments(dbPool))
+app.get('/api/analytics/employees', getAnalyticsEmployees(dbPool))
+app.get('/api/analytics/business-processes/list', getBusinessProcessesList(dbPool))
+app.get('/api/analytics/business-processes/:processId/nodes', getBusinessProcessNodes(dbPool))
+app.get('/api/analytics/business-processes/:processId/entities', getBusinessProcessEntities(dbPool))
+app.get('/api/analytics/bottlenecks/participants', getBottlenecksByParticipants(dbPool))
+app.get('/api/analytics/bottlenecks/departments', getBottlenecksByDepartments(dbPool))
+app.get('/api/analytics/detail', getAnalyticsDetail(dbPool))
 /*******/
 
 /*************Маршруты для работы с РОЛЯМИ**************/
