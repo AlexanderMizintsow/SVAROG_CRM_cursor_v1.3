@@ -499,8 +499,8 @@ const GlobalTasksContainer = ({ onClose, initialTask, initialTaskId, onProjectUp
                   {/* Предполагаем, что первый ответственный в массиве - главный */}
                   <span>
                     Ответственный:{' '}
-                    {task.responsibles && task.responsibles.length > 0
-                      ? task.responsibles[0].name || 'Не назначен'
+                    {Array.isArray(task.responsibles) && task.responsibles.length > 0
+                      ? (task.responsibles[0] && task.responsibles[0].name) || 'Не назначен'
                       : 'Не назначен'}
                   </span>
                   <span>

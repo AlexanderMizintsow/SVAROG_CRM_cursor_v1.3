@@ -4,6 +4,19 @@
   border-top: 1px solid var(--border, #e2e8f0);
 }
 
+.process-card-schedule--collapsed {
+  padding-top: 0.5rem;
+  margin-top: 0.5rem;
+  border-top: 1px solid var(--border, #e2e8f0);
+}
+
+.process-card-schedule__summary {
+  font-size: 0.9rem;
+  color: var(--text-secondary, #64748b);
+  display: block;
+  line-height: 1.4;
+}
+
 .process-card-schedule__loading {
   margin: 0;
   font-size: 0.9rem;

@@ -12,6 +12,17 @@ async function createTask(payload) {
   return response.data
 }
 
+/** Вызов уведомления о создании задачи (эмит taskCreated), чтобы канбан обновился без перезагрузки. */
+async function notifyTaskCreated(taskId, createdBy, assignedUsers = [], approvers = [], viewers = []) {
+  await client.post('/api/tasks/socket', {
+    id: taskId,
+    createdBy,
+    assignedUsers: Array.isArray(assignedUsers) ? assignedUsers : [],
+    approvers: Array.isArray(approvers) ? approvers : [],
+    viewers: Array.isArray(viewers) ? viewers : [],
+  })
+}
+
 async function updateTaskStatus(taskId, status) {
   const response = await client.put(`/api/tasks/${taskId}/status`, { status })
   return response.data
@@ -119,6 +130,7 @@ async function getRoles() {
 
 module.exports = {
   createTask,
+  notifyTaskCreated,
   updateTaskStatus,
   addTaskComment,
   replaceTaskAssignee,

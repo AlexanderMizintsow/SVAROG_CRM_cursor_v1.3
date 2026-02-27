@@ -298,14 +298,15 @@ const getAnalyticsSummary = (dbPool) => {
       const summary = {
         byCategory: {
           projects: {
-            total: parseInt(ps?.cnt || 0, 10),
+            total: parseInt(ps?.cnt || 0, 10) + pFromBP,
             completed: parseInt(ps?.completed || 0, 10),
             onPause: parseInt(ps?.on_pause || 0, 10),
             failed: parseInt(ps?.failed || 0, 10),
             deleted: parseInt(ps?.deleted || 0, 10),
+            fromBP: pFromBP,
           },
           businessProcesses: {
-            total: parseInt(bp?.cnt || 0, 10) + pFromBP,
+            total: parseInt(bp?.cnt || 0, 10),
             instances: parseInt(bp?.cnt || 0, 10),
             completed: parseInt(bp?.completed || 0, 10),
             failed: parseInt(bp?.failed || 0, 10),
@@ -316,15 +317,16 @@ const getAnalyticsSummary = (dbPool) => {
             projectsFromBP: pFromBP,
           },
           tasks: {
-            total: parseInt(tTasks?.cnt || 0, 10),
-            completed: parseInt(tTasks?.completed || 0, 10),
-            overdue: overdueCountInProgress !== null ? overdueCountInProgress : parseInt(tTasks?.overdue || 0, 10),
+            total: parseInt(tTasks?.cnt || 0, 10) + parseInt(tbp?.cnt || 0, 10),
+            completed: parseInt(tTasks?.completed || 0, 10) + parseInt(tbp?.completed || 0, 10),
+            overdue: overdueCountInProgress !== null ? overdueCountInProgress : parseInt(tTasks?.overdue || 0, 10) + parseInt(tbp?.overdue || 0, 10),
             fromProject: parseInt(tproj?.cnt || 0, 10),
             fromProjectCompleted: parseInt(tproj?.completed || 0, 10),
             fromProjectOverdue: parseInt(tproj?.overdue || 0, 10),
             standalone: parseInt(ts?.cnt || 0, 10),
             standaloneCompleted: parseInt(ts?.completed || 0, 10),
             standaloneOverdue: parseInt(ts?.overdue || 0, 10),
+            fromBP: parseInt(tbp?.cnt || 0, 10),
             ...(tasksByStatusInProgress && { byStatusInProgress: tasksByStatusInProgress }),
           },
         },
@@ -334,22 +336,24 @@ const getAnalyticsSummary = (dbPool) => {
       const dateTo = req.query.dateTo || null
       const dateCond = dateFrom && dateTo ? ' AND gt.created_at >= CAST($1 AS timestamp) AND gt.created_at <= CAST($2 AS timestamp)' : ''
       const dateCondT = dateFrom && dateTo ? ' AND t.created_at >= CAST($1 AS timestamp) AND t.created_at <= CAST($2 AS timestamp)' : ''
-      const byDeptParams = dateFrom && dateTo ? [dateFrom, dateTo] : []
+      const byDeptParams = [...(dateFrom && dateTo ? [dateFrom, dateTo] : []), ...(departmentId ? [departmentId] : [])]
+      const byDeptDeptCond = departmentId ? ` AND d.id = CAST($${byDeptParams.length} AS integer)` : ''
+      const empQueryParams = dateFrom && dateTo ? [dateFrom, dateTo] : []
 
       const byDepartment = await dbPool.query(
         `SELECT d.id, d.name,
                 (SELECT COUNT(DISTINCT gt.id) FROM global_tasks gt
-                 WHERE gt.id NOT IN (SELECT global_task_id FROM bp_gateway_project_waiting)
-                   ${dateCond}
+                 WHERE 1=1 ${dateCond}
                    AND (gt.created_by IN (SELECT id FROM users WHERE department_id = d.id)
                         OR gt.id IN (SELECT global_task_id FROM global_task_responsibles WHERE user_id IN (SELECT id FROM users WHERE department_id = d.id)))${projStatusCond}) AS projects_count,
-                COUNT(DISTINCT t.id) FILTER (WHERE (t.global_task_id IS NULL OR t.parent_id IS NOT NULL) AND t.business_process_instance_id IS NULL AND t.id NOT IN (SELECT task_id FROM bp_task_process_links)) AS tasks_count,
+                COUNT(DISTINCT t.id) AS tasks_count,
                 COUNT(DISTINCT t.id) FILTER (WHERE ${overdueCond}) AS overdue_count
          FROM departments d
          LEFT JOIN users u ON u.department_id = d.id
          LEFT JOIN task_assignments ta ON ta.user_id = u.id
          LEFT JOIN tasks t ON t.id = ta.task_id ${dateCondT} ${taskStatusCond}
          LEFT JOIN task_history th ON th.task_id = t.id AND th.change_description = 'Дедлайн истёк'
+         WHERE 1=1 ${byDeptDeptCond}
          GROUP BY d.id, d.name
          ORDER BY d.name`,
         byDeptParams
@@ -358,9 +362,9 @@ const getAnalyticsSummary = (dbPool) => {
       const empQuery = await dbPool.query(
         `SELECT u.id, u.first_name, u.last_name, u.department_id, d.name AS department_name,
                 (SELECT COUNT(DISTINCT gt.id) FROM global_tasks gt
-                 WHERE gt.id NOT IN (SELECT global_task_id FROM bp_gateway_project_waiting)
-                   ${dateCond}
+                 WHERE 1=1 ${dateCond}
                    AND (gt.created_by = u.id OR gt.id IN (SELECT global_task_id FROM global_task_responsibles WHERE user_id = u.id))${projStatusCond}) AS projects_count,
+                COUNT(DISTINCT t.id) AS tasks_count,
                 COUNT(DISTINCT t.id) FILTER (WHERE t.completed_at IS NOT NULL) AS tasks_completed,
                 COUNT(DISTINCT t.id) FILTER (WHERE ${overdueCond}) AS tasks_overdue
          FROM users u
@@ -371,15 +375,18 @@ const getAnalyticsSummary = (dbPool) => {
          WHERE u.id IS NOT NULL
          GROUP BY u.id, u.first_name, u.last_name, u.department_id, d.name
          ORDER BY d.name, u.last_name, u.first_name`,
-        byDeptParams
+        empQueryParams
       )
 
+      const tasksCountForFilter = (r) =>
+        statusFilter === 'completed' ? parseInt(r.tasks_completed || 0, 10) : parseInt(r.tasks_count || 0, 10)
       let byEmployee = empQuery.rows.map((r) => ({
         userId: r.id,
         userName: [r.last_name, r.first_name].filter(Boolean).join(' ') || 'Без имени',
         departmentId: r.department_id,
         departmentName: r.department_name || '—',
         projectsCount: parseInt(r.projects_count || 0, 10),
+        tasksCount: tasksCountForFilter(r),
         tasksCompleted: parseInt(r.tasks_completed || 0, 10),
         tasksOverdue: parseInt(r.tasks_overdue || 0, 10),
       }))
@@ -389,16 +396,9 @@ const getAnalyticsSummary = (dbPool) => {
 
       let loadByAuthorDepartment = []
       if (departmentId || userId) {
-        const loadParams = [...byDeptParams]
-        const loadPh = loadParams.length + 1
-        let loadExecFilter = ''
-        if (userId) {
-          loadParams.push(userId)
-          loadExecFilter = ` AND ta.user_id = CAST($${loadPh} AS integer)`
-        } else {
-          loadParams.push(departmentId)
-          loadExecFilter = ` AND u_exec.department_id = CAST($${loadPh} AS integer)`
-        }
+        const loadParams = [...empQueryParams, userId || departmentId]
+        const loadPh = loadParams.length
+        const loadExecFilter = userId ? ` AND ta.user_id = CAST($${loadPh} AS integer)` : ` AND u_exec.department_id = CAST($${loadPh} AS integer)`
         const loadJoinCond = userId ? '' : ` AND u_exec.department_id = CAST($${loadPh} AS integer)`
         const loadByAuthorTasks = await dbPool.query(
           `SELECT u_author.department_id AS author_department_id, d_author.name AS author_department_name,
@@ -1539,11 +1539,11 @@ const getAnalyticsDetail = (dbPool) => {
                    ORDER BY h.created_at DESC LIMIT 1) AS last_history_at,
                   (SELECT COUNT(*) FROM tasks t WHERE t.global_task_id = gt.id) AS tasks_count,
                   (SELECT string_agg(t.title, chr(10) ORDER BY t.created_at)
-                   FROM tasks t WHERE t.global_task_id = gt.id) AS tasks_titles
+                   FROM tasks t WHERE t.global_task_id = gt.id) AS tasks_titles,
+                  EXISTS (SELECT 1 FROM bp_gateway_project_waiting w WHERE w.global_task_id = gt.id) AS from_bp
            FROM global_tasks gt
            LEFT JOIN users u ON u.id = gt.created_by
-           WHERE gt.id NOT IN (SELECT global_task_id FROM bp_gateway_project_waiting)
-             ${dateFilter} ${projFilter} ${statusCond}
+           WHERE 1=1 ${dateFilter} ${projFilter} ${statusCond}
            ORDER BY gt.created_at DESC`,
           projParams
         )
@@ -1557,6 +1557,7 @@ const getAnalyticsDetail = (dbPool) => {
           authorName: [row.author_last, row.author_first].filter(Boolean).join(' ') || '—',
           taskCount: parseInt(row.tasks_count || 0, 10),
           taskTitles: row.tasks_titles || '',
+          fromBP: !!row.from_bp,
         })))
       }
 
@@ -1569,15 +1570,14 @@ const getAnalyticsDetail = (dbPool) => {
                   (SELECT string_agg(u2.last_name || ' ' || u2.first_name, ', ' ORDER BY u2.last_name)
                    FROM task_assignments ta2
                    JOIN users u2 ON u2.id = ta2.user_id
-                   WHERE ta2.task_id = t.id) AS assignees
+                   WHERE ta2.task_id = t.id) AS assignees,
+                  (t.business_process_instance_id IS NOT NULL OR t.id IN (SELECT task_id FROM bp_task_process_links)) AS from_bp
            FROM tasks t
            LEFT JOIN users u ON u.id = t.created_by
            LEFT JOIN global_tasks gt ON gt.id = t.global_task_id
            LEFT JOIN task_assignments ta ON ta.task_id = t.id
            LEFT JOIN users u_assignee ON u_assignee.id = ta.user_id
            WHERE ${tasksScopeCond}
-             AND t.business_process_instance_id IS NULL
-             AND t.id NOT IN (SELECT task_id FROM bp_task_process_links)
              ${dateFilterT} ${depFilterTask} ${userFilterTask} ${taskStatusCond}
            ORDER BY t.id, t.created_at DESC`,
           params
@@ -1592,6 +1592,7 @@ const getAnalyticsDetail = (dbPool) => {
           projectTitle: row.project_title,
           assignees: row.assignees || '—',
           status: row.completed_at ? 'Выполнено' : taskStatusLabel(row.task_status),
+          fromBP: !!row.from_bp,
         })))
       }
 
@@ -1606,7 +1607,20 @@ const getAnalyticsDetail = (dbPool) => {
         const r = await dbPool.query(
           `SELECT pi.id, pi.started_at, pi.finished_at, pi.status,
                   pd.name AS process_name,
-                  u.last_name AS initiator_last, u.first_name AS initiator_first
+                  u.last_name AS initiator_last, u.first_name AS initiator_first,
+                  (SELECT COUNT(*) FROM bp_gateway_project_waiting w WHERE w.instance_id = pi.id) AS project_count,
+                  (SELECT string_agg(gt.title, chr(10) ORDER BY gt.title)
+                   FROM bp_gateway_project_waiting w JOIN global_tasks gt ON gt.id = w.global_task_id WHERE w.instance_id = pi.id) AS project_titles,
+                  (SELECT COUNT(*) FROM (
+                    SELECT t.id FROM tasks t WHERE t.business_process_instance_id = pi.id
+                    UNION SELECT l.task_id FROM bp_task_process_links l WHERE l.process_instance_id = pi.id
+                  ) sub) AS task_count,
+                  (SELECT string_agg(t.title, chr(10) ORDER BY t.id)
+                   FROM tasks t
+                   WHERE t.id IN (
+                     SELECT t2.id FROM tasks t2 WHERE t2.business_process_instance_id = pi.id
+                     UNION SELECT l2.task_id FROM bp_task_process_links l2 WHERE l2.process_instance_id = pi.id
+                   )) AS task_titles
            FROM bp_process_instances pi
            LEFT JOIN bp_process_definitions pd ON pd.id = pi.process_id
            LEFT JOIN users u ON u.id = pi.initiator_id
@@ -1621,6 +1635,10 @@ const getAnalyticsDetail = (dbPool) => {
           finishedAt: row.finished_at,
           status: row.status,
           initiatorName: [row.initiator_last, row.initiator_first].filter(Boolean).join(' ') || '—',
+          projectCount: parseInt(row.project_count || 0, 10),
+          projectTitles: row.project_titles || '',
+          taskCount: parseInt(row.task_count || 0, 10),
+          taskTitles: row.task_titles || '',
         })))
       }
 

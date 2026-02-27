@@ -81,7 +81,7 @@ const CreateGlobalTaskForm = ({ onSave, onCancel, initialData }) => {
       if (!u) return r
       return {
         ...u,
-        role: r.role || responsibleRolesList[0],
+        role: r.role || ((Array.isArray(responsibleRolesList) && responsibleRolesList.includes('Участник')) ? 'Участник' : ((Array.isArray(responsibleRolesList) && responsibleRolesList[0]) || 'Исполнитель')),
         requires_approval: r.requires_approval === true,
         initials: generateInitials(u.first_name, u.last_name),
         avatarColorClass: generateRandomAvatarColorClass(),
@@ -163,7 +163,7 @@ const CreateGlobalTaskForm = ({ onSave, onCancel, initialData }) => {
           ),
           avatarColorClass: generateRandomAvatarColorClass(),
           backgroundColorClass: generateRandomBackgroundColorClass(),
-          role: responsibleRoles[0],
+          role: (Array.isArray(responsibleRolesList) && responsibleRolesList.includes('Участник')) ? 'Участник' : ((Array.isArray(responsibleRoles) && responsibleRoles[0]) || (responsibleRolesList && responsibleRolesList[0]) || 'Исполнитель'),
           requires_approval: false,
         }
         setFormData({
@@ -440,7 +440,7 @@ const CreateGlobalTaskForm = ({ onSave, onCancel, initialData }) => {
                         handleResponsibleRoleChange(resp.id, e.target.value)
                       }
                     >
-                      {responsibleRoles.map((role) => (
+                      {(Array.isArray(responsibleRoles) ? responsibleRoles : responsibleRolesList || []).map((role) => (
                         <option key={role} value={role}>
                           {role}
                         </option>
@@ -496,8 +496,8 @@ const CreateGlobalTaskForm = ({ onSave, onCancel, initialData }) => {
                   )
                   .map((user) => (
                     <option key={user.id} value={user.id}>
-                      {`${user.last_name} ${user.first_name[0]}. ${
-                        user.middle_name ? user.middle_name[0] + '.' : ''
+                      {`${user.last_name || ''} ${(user.first_name || '')[0] || ''}. ${
+                        (user.middle_name || '')[0] ? (user.middle_name || '')[0] + '.' : ''
                       }`}
                     </option>
                   ))}

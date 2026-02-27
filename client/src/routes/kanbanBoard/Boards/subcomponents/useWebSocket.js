@@ -86,20 +86,32 @@ const useWebSocket = (userId, stableSetMessages, currentTaskId) => {
       // Слушаем событие 'taskCreated' для получения новых задач
       socket.current.on('taskCreated', (data) => {
         console.log('Получено событие taskCreated:', data)
-        Toastify({
-          text: `Вам поступила новая задача!`,
-          close: true,
-          backgroundColor: 'linear-gradient(to right, #006400, #00FF00)',
-        }).showToast()
-        if (
+        const assigned = Array.isArray(data.assignedUsers) ? data.assignedUsers : []
+        const approvers = Array.isArray(data.approvers) ? data.approvers : []
+        const viewers = Array.isArray(data.viewers) ? data.viewers : []
+        const isAssignee = assigned.map(String).includes(String(userId))
+        const isApprover = approvers.map(String).includes(String(userId))
+        const isViewer = viewers.map(String).includes(String(userId))
+        const isParticipant =
           data.createdBy === userId ||
-          data.assignedUsers.map(String).includes(String(userId)) ||
-          data.approvers.map(String).includes(String(userId)) ||
-          data.viewers.map(String).includes(String(userId))
-        ) {
+          isAssignee ||
+          isApprover ||
+          isViewer
+        if (isParticipant) {
           fetchTasks(userId)
           fetchTasksManager(userId)
-          sendNotification('Задачи', 'Вам поступила новая задача!')
+          // AlertBanner: подтянуть уведомление для исполнителя, наблюдателя, утверждающего
+          if (isAssignee || isApprover || isViewer) {
+            fetchUnreadNotifications(userId)
+          }
+          if (isAssignee) {
+            Toastify({
+              text: `Вам поступила новая задача!`,
+              close: true,
+              backgroundColor: 'linear-gradient(to right, #006400, #00FF00)',
+            }).showToast()
+            sendNotification('Задачи', 'Вам поступила новая задача!')
+          }
         }
       })
 

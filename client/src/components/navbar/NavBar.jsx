@@ -207,7 +207,7 @@ const NavBar = () => {
       <Menu title="МЕНЮ" menuItems={mainManager} />
 
       {roleAdministrator && <Menu title="Администратор" menuItems={adminMenuItems} />}
-      <Menu title="Связь" menuItems={applicationMenuItems} />
+     { /*<Menu title="Связь" menuItems={applicationMenuItems} />*/}
       <Menu title="CRM" menuItems={Notifications} />
       
       

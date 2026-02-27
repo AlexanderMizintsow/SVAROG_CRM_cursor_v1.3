@@ -17,6 +17,7 @@ const MiniProjectStrip = ({ onOpenProject, refreshTrigger }) => {
   const [loading, setLoading] = useState(true)
   const userId = user?.id
   const socketRef = useRef(null)
+  const scrollRef = useRef(null)
   const projectChatUnread = useTaskStateTracker((s) => s.projectChatUnread)
   const projectBlinkGreen = useTaskStateTracker((s) => s.projectBlinkGreen)
   const projectBlinkYellow = useTaskStateTracker((s) => s.projectBlinkYellow)
@@ -109,6 +110,24 @@ const MiniProjectStrip = ({ onOpenProject, refreshTrigger }) => {
     }
   }
 
+  useEffect(() => {
+    const el = scrollRef.current
+    if (!el) return
+    const WHEEL_SPEED = 2.2
+    const handleWheel = (e) => {
+      const canScrollLeft = el.scrollLeft > 0
+      const canScrollRight = el.scrollLeft < el.scrollWidth - el.clientWidth - 1
+      if (!canScrollLeft && !canScrollRight) return
+      const delta = e.deltaY || e.deltaX
+      if (delta === 0) return
+      const step = Math.round(delta * WHEEL_SPEED)
+      el.scrollBy({ left: step, behavior: 'smooth' })
+      e.preventDefault()
+    }
+    el.addEventListener('wheel', handleWheel, { passive: false })
+    return () => el.removeEventListener('wheel', handleWheel)
+  }, [loading, projects.length])
+
   const getUserTasksTooltip = (task) => {
     const count = Number(task.user_tasks_count) || 0
     if (count === 0) return null
@@ -134,12 +153,67 @@ const MiniProjectStrip = ({ onOpenProject, refreshTrigger }) => {
     )
   }
 
-  const visibleProjects = projects.filter((task) => {
-    const creatorId = typeof task.created_by === 'object' && task.created_by != null ? task.created_by.id : task.created_by
-    const isCreator = creatorId === userId
-    const isResponsible = task.responsibles && task.responsibles.some((r) => r.id === userId)
-    return isCreator || isResponsible
-  })
+  const visibleProjects = (() => {
+    const filtered = projects.filter((task) => {
+      const creatorId = typeof task.created_by === 'object' && task.created_by != null ? task.created_by.id : task.created_by
+      const isCreator = creatorId === userId
+      const isResponsible = task.responsibles && task.responsibles.some((r) => r.id === userId)
+      return isCreator || isResponsible
+    })
+
+    const priorityRank = (p) => {
+      if (p === 'high') return 0
+      if (p === 'medium') return 1
+      if (p === 'low') return 2
+      return 1
+    }
+
+    const getCreatorId = (task) =>
+      typeof task.created_by === 'object' && task.created_by != null ? task.created_by.id : task.created_by
+
+    return filtered.slice().sort((a, b) => {
+      const isAuthorA = getCreatorId(a) === userId
+      const isAuthorB = getCreatorId(b) === userId
+      const greenFirstA = isAuthorA && projectBlinkGreen[a.id]
+      const greenFirstB = isAuthorB && projectBlinkGreen[b.id]
+      if (greenFirstA && !greenFirstB) return -1
+      if (greenFirstB && !greenFirstA) return 1
+
+      const complete100AuthorA = isAuthorA && (a.completion_percentage ?? 0) >= 100
+      const complete100AuthorB = isAuthorB && (b.completion_percentage ?? 0) >= 100
+      if (complete100AuthorA && !complete100AuthorB) return -1
+      if (complete100AuthorB && !complete100AuthorA) return 1
+
+      const hasDeadlineA = !!a.deadline
+      const hasDeadlineB = !!b.deadline
+      const deadlineTimeA = a.deadline ? new Date(a.deadline).getTime() : Infinity
+      const deadlineTimeB = b.deadline ? new Date(b.deadline).getTime() : Infinity
+      const createdA = a.created_at ? new Date(a.created_at).getTime() : 0
+      const createdB = b.created_at ? new Date(b.created_at).getTime() : 0
+      const yellowA = projectBlinkYellow[a.id]
+      const yellowB = projectBlinkYellow[b.id]
+
+      if (hasDeadlineA && hasDeadlineB) {
+        if (deadlineTimeA !== deadlineTimeB) return deadlineTimeA - deadlineTimeB
+        const prA = priorityRank(a.priority)
+        const prB = priorityRank(b.priority)
+        if (prA !== prB) return prA - prB
+        if (yellowA && !yellowB) return -1
+        if (yellowB && !yellowA) return 1
+        return 0
+      }
+      if (hasDeadlineA && !hasDeadlineB) return -1
+      if (!hasDeadlineA && hasDeadlineB) return 1
+
+      const prA = priorityRank(a.priority)
+      const prB = priorityRank(b.priority)
+      if (prA !== prB) return prA - prB
+      if (createdA !== createdB) return createdA - createdB
+      if (yellowA && !yellowB) return -1
+      if (yellowB && !yellowA) return 1
+      return 0
+    })
+  })()
 
   return (
     <div className={styles.strip}>
@@ -147,7 +221,7 @@ const MiniProjectStrip = ({ onOpenProject, refreshTrigger }) => {
       {visibleProjects.length === 0 ? (
         <div className={styles.empty}>У вас пока нет проектов в этом списке</div>
       ) : (
-      <div className={styles.scroll}>
+      <div ref={scrollRef} className={styles.scroll}>
         {visibleProjects.map((task) => {
           const myResponsible = task.responsibles?.find((r) => r.id === userId)
           const requiresApproval = myResponsible?.requires_approval === true

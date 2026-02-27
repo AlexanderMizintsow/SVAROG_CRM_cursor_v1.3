@@ -80,7 +80,7 @@ const ResponsibleSelector = ({
         ),
         avatarColorClass: generateRandomAvatarColorClass(),
         backgroundColorClass: generateRandomBackgroundColorClass(),
-        role: responsibleRolesList[0],
+        role: (Array.isArray(responsibleRolesList) && responsibleRolesList.includes('Участник')) ? 'Участник' : ((Array.isArray(responsibleRolesList) && responsibleRolesList[0]) || 'Исполнитель'),
         requires_approval: false,
       }
       setResponsibles([...responsibles, newResponsible])
@@ -131,8 +131,8 @@ const ResponsibleSelector = ({
               </div>
               <div className="create-global-task-form__responsible-details">
                 <div className="create-global-task-form__responsible-name">
-                  {`${resp.last_name} ${resp.first_name[0]}. ${
-                    resp.middle_name ? resp.middle_name[0] + '.' : ''
+                  {`${resp.last_name || ''} ${(resp.first_name || '')[0] || ''}. ${
+                    (resp.middle_name || '')[0] ? (resp.middle_name || '')[0] + '.' : ''
                   }`}
                 </div>
                 {/* Роль */}
@@ -143,7 +143,7 @@ const ResponsibleSelector = ({
                     handleResponsibleRoleChange(resp.id, e.target.value)
                   }
                 >
-                  {responsibleRolesList.map((role) => (
+                  {(Array.isArray(responsibleRolesList) ? responsibleRolesList : []).map((role) => (
                     <option key={role} value={role}>
                       {role}
                     </option>
@@ -203,8 +203,8 @@ const ResponsibleSelector = ({
               )
               .map((user) => (
                 <option key={user.id} value={user.id}>
-                  {`${user.last_name} ${user.first_name[0]}. ${
-                    user.middle_name ? user.middle_name[0] + '.' : ''
+                  {`${user.last_name || ''} ${(user.first_name || '')[0] || ''}. ${
+                    (user.middle_name || '')[0] ? (user.middle_name || '')[0] + '.' : ''
                   }`}
                 </option>
               ))}

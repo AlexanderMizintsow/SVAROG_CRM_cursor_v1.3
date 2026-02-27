@@ -15,6 +15,7 @@ import ProcessCard from './ProcessCard'
 import StartProcessModal from './StartProcessModal'
 import AddModal from '../../kanbanBoard/Modals/AddModal.jsx'
 import CreateGlobalTaskForm from '../../kanbanBoard/globalTask/CreateGlobalTaskForm.jsx'
+import ConfirmationDialog from '../../../components/confirmationDialog/ConfirmationDialog'
 import axios from 'axios'
 import { API_BASE_URL } from '../../../../config.js'
 import './ProcessList.scss'
@@ -32,13 +33,19 @@ const ProcessList = ({ showDrafts = false, onEditProcess, onCreateNew }) => {
   const [pendingTaskCreationData, setPendingTaskCreationData] = useState(null)
   const [projectCreationModalOpen, setProjectCreationModalOpen] = useState(false)
   const [pendingProjectCreationData, setPendingProjectCreationData] = useState(null)
+  const [processToDelete, setProcessToDelete] = useState(null)
   const skipReopenForInstanceIdRef = useRef(null)
 
   const loadProcesses = useCallback(async () => {
     setLoadingLocal(true)
     setLoading(true)
     try {
-      const list = await getProcesses({ is_draft: showDrafts })
+      const params = { is_draft: showDrafts }
+      if (!showDrafts && user?.id != null) {
+        params.user_id = user.id
+        params.role_name = user.role_name || ''
+      }
+      const list = await getProcesses(params)
       setProcesses(Array.isArray(list) ? list : [])
     } catch (err) {
       console.error('Ошибка загрузки процессов:', err)
@@ -53,7 +60,7 @@ const ProcessList = ({ showDrafts = false, onEditProcess, onCreateNew }) => {
       setLoadingLocal(false)
       setLoading(false)
     }
-  }, [showDrafts, setProcesses, setLoading, setError])
+  }, [showDrafts, user?.id, user?.role_name, setProcesses, setLoading, setError])
 
   useEffect(() => {
     loadProcesses()
@@ -90,10 +97,14 @@ const ProcessList = ({ showDrafts = false, onEditProcess, onCreateNew }) => {
     }
   }
 
-  const handleDelete = async (process) => {
-    const name = process?.name || 'Без названия'
-    const ok = window.confirm(`Удалить процесс «${name}»?`)
-    if (!ok) return
+  const handleDeleteClick = (process) => {
+    setProcessToDelete(process)
+  }
+
+  const handleDeleteConfirm = async () => {
+    if (!processToDelete) return
+    const process = processToDelete
+    setProcessToDelete(null)
     try {
       await deleteProcess(process.id)
       Toastify({ text: 'Процесс удалён', close: true, backgroundColor: '#059669' }).showToast()
@@ -315,10 +326,11 @@ const ProcessList = ({ showDrafts = false, onEditProcess, onCreateNew }) => {
               process={process}
               isDraft={showDrafts}
               currentUserId={user?.id}
+              roleName={user?.role_name || ''}
               onStart={() => handleStart(process)}
               onPublish={() => handlePublish(process)}
               onEdit={() => handleEdit(process)}
-              onDelete={() => handleDelete(process)}
+              onDelete={() => handleDeleteClick(process)}
             />
           ))}
         </div>
@@ -341,6 +353,18 @@ const ProcessList = ({ showDrafts = false, onEditProcess, onCreateNew }) => {
           userId={user?.id}
           initialTaskData={initialTaskDataFromTemplate}
           businessProcessInstanceId={pendingTaskCreationData.instanceId}
+        />
+      )}
+
+      {processToDelete && (
+        <ConfirmationDialog
+          open={!!processToDelete}
+          onClose={() => setProcessToDelete(null)}
+          onConfirm={handleDeleteConfirm}
+          title="Подтверждение удаления"
+          message={`Действительно удалить процесс «${processToDelete.name || 'Без названия'}»?`}
+          btn1="Нет"
+          btn2="Да"
         />
       )}
 

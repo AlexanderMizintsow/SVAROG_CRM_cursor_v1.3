@@ -764,6 +764,17 @@ CREATE TABLE global_task_history (
     data JSONB -- Дополнительные данные, например, изменения в полях, входные параметры, ошибки
 );
 CREATE INDEX idx_global_task_history_task_id ON global_task_history(global_task_id);
+
+
+-- Разрешение почтовых отправлений: не более одного ответственного на проект с правом отправки писем
+ALTER TABLE global_task_responsibles ADD COLUMN IF NOT EXISTS allow_mail BOOLEAN DEFAULT false;
+
+-- Только один участник на проект может иметь allow_mail = true
+CREATE UNIQUE INDEX IF NOT EXISTS idx_global_task_responsibles_one_allow_mail
+  ON global_task_responsibles (global_task_id) WHERE allow_mail = true;
+
+COMMENT ON COLUMN global_task_responsibles.allow_mail IS 'Разрешить участнику отправлять почту из карточки проекта (не более одного на проект)';
+
  
   -- задача
 CREATE TABLE tasks (
@@ -2431,6 +2442,34 @@ DROP TABLE IF EXISTS bp_process_schedules CASCADE;
 DROP TABLE IF EXISTS bp_process_instances CASCADE;
 DROP TABLE IF EXISTS bp_process_definitions CASCADE;
 DROP TABLE IF EXISTS bp_task_templates CASCADE;
+
+
+
+
+
+-- =============================================================================
+-- Компонент идеи и предложения
+-- =============================================================================
+-- Идеи и предложения пользователей по улучшению приложения
+CREATE TABLE IF NOT EXISTS app_ideas (
+  id SERIAL PRIMARY KEY,
+  user_id INT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  title VARCHAR(500) NOT NULL,
+  message TEXT NOT NULL,
+  file_path VARCHAR(1000) DEFAULT NULL,
+  file_name VARCHAR(500) DEFAULT NULL,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  is_applied BOOLEAN DEFAULT FALSE,
+  admin_comment TEXT,
+  applied_at TIMESTAMP
+);
+
+CREATE INDEX IF NOT EXISTS idx_app_ideas_user_id ON app_ideas(user_id);
+CREATE INDEX IF NOT EXISTS idx_app_ideas_created_at ON app_ideas(created_at DESC);
+
+
+ 
+
 -- ===================================================================
 -- КОНЕЦ ФАЙЛА
 -- ===================================================================

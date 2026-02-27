@@ -1,10 +1,11 @@
 import { useCallback, useEffect, useState } from 'react'
 import axios from 'axios'
 import { API_BASE_URL } from '../../../config'
-import { MdAssessment, MdFilterList, MdDateRange, MdRefresh } from 'react-icons/md'
+import { MdAssessment, MdFilterList, MdDateRange, MdRefresh, MdHelpOutline } from 'react-icons/md'
 import { FaChartPie, FaTable, FaUsers, FaBriefcase, FaTasks, FaExclamationTriangle } from 'react-icons/fa'
 import { FcFlowChart } from 'react-icons/fc'
 import { FcDepartment  } from 'react-icons/fc'
+import HelpModalProcessMonitoring from './HelpModalProcessMonitoring'
 import './ProcessMonitoring.scss'
 
 /** Временно: в блоке «Просрочки» показывать все задачи с дедлайном и колонки «Дедлайн», «Сейчас», «Просрочен?» для отладки. */
@@ -112,6 +113,7 @@ const ProcessMonitoring = () => {
   const [refreshing, setRefreshing] = useState(false)
   const [generalStats, setGeneralStats] = useState(false)
   const [statusFilter, setStatusFilter] = useState('in_progress')
+  const [isHelpOpen, setHelpOpen] = useState(false)
 
   /** Как в карточке Задачи и Менеджере: просрочка = дедлайн прошёл, задача не завершена. */
   const isOverdue = useCallback((task) =>
@@ -436,9 +438,13 @@ const ProcessMonitoring = () => {
     ? (statusFilter === 'in_progress' ? 'в работе (отдельные и подзадачи)' : 'выполнено')
     : `отдельные и подзадачи; завершено: ${tasks.completed ?? 0}`
 
+  /** В карточке и диаграммах БП — только число экземпляров (без проектов из БП). */
+  const bpCardValue = statusFilterActive
+    ? (statusFilter === 'in_progress' ? (bp.running ?? 0) : (bp.completed || 0) + (bp.failed || 0))
+    : (bp.instances ?? 0)
   const categoryPieData = [
     { label: 'Проекты', value: statusFilterActive ? (statusFilter === 'in_progress' ? (projects.total || 0) : (projects.completed || 0) + (projects.failed || 0) + (projects.deleted || 0)) : (projects.total || 0), color: '#3b82f6' },
-    { label: 'Бизнес-процессы', value: (bp.instances || 0) + (bp.projectsFromBP || 0), color: '#8b5cf6' },
+    { label: 'Бизнес-процессы', value: bpCardValue, color: '#8b5cf6' },
     { label: 'Задачи', value: statusFilterActive ? (statusFilter === 'in_progress' ? (tasks.total || 0) : (tasks.completed || 0)) : (tasks.total || 0), color: '#10b981' },
   ].filter((d) => d.value > 0)
 
@@ -467,12 +473,11 @@ const ProcessMonitoring = () => {
           { label: 'Завершено', value: bp.completed || 0, color: '#10b981' },
           { label: 'Провал', value: bp.failed || 0, color: '#ef4444' },
         ].filter((d) => d.value > 0)
-      : [{ label: 'В работе', value: (bp.instances || 0) + (bp.projectsFromBP || 0), color: '#3b82f6' }].filter((d) => d.value > 0))
+      : [{ label: 'В работе', value: bpCardValue, color: '#3b82f6' }].filter((d) => d.value > 0))
     : [
         { label: 'Завершено', value: bp.completed || 0, color: '#10b981' },
         { label: 'В работе', value: bp.running || 0, color: '#3b82f6' },
         { label: 'Провал', value: bp.failed || 0, color: '#ef4444' },
-        { label: 'Задачи в БП', value: bp.tasksFromBP || 0, color: '#8b5cf6' },
       ].filter((d) => d.value > 0)
 
   // Подписи статусов канбана для диаграммы «Задачи» при фильтре «В работе»
@@ -548,10 +553,20 @@ const ProcessMonitoring = () => {
    <div className="content-process-monitoring">
     <div className="process-monitoring">
       <header className="process-monitoring__header">
-        <h1 className="process-monitoring__title">
-          <MdAssessment className="process-monitoring__title-icon" />
-          Мониторинг процессов
-        </h1>
+        <div className="process-monitoring__header-row">
+          <h1 className="process-monitoring__title">
+            <MdAssessment className="process-monitoring__title-icon" />
+            Мониторинг процессов
+          </h1>
+          <button
+            type="button"
+            className="process-monitoring__help-btn"
+            onClick={() => setHelpOpen(true)}
+            title="Справка по разделу"
+          >
+            <MdHelpOutline /> Справка
+          </button>
+        </div>
         <p className="process-monitoring__subtitle">
           Нагрузка по отделам и сотрудникам, узкие места, просрочки. Карточки сверху кликабельны — по нажатию открывается список проектов, задач, экземпляров БП или просроченных с учётом текущих фильтров.
         </p>
@@ -604,8 +619,8 @@ const ProcessMonitoring = () => {
                 <option key={emp.id} value={emp.id}>{emp.name} {emp.departmentName ? `(${emp.departmentName})` : ''}</option>
               ))}
             </select>
-          </div>
-          <div className="process-monitoring__filter-group process-monitoring__filter-group--checkbox">
+          </div>  
+             <div className="process-monitoring__filter-group process-monitoring__filter-group--checkbox">
             <label>
               <input
                 type="checkbox"
@@ -613,8 +628,8 @@ const ProcessMonitoring = () => {
                 onChange={(e) => setGeneralStats(e.target.checked)}
               />
               <span>Общая статистика</span>
-            </label>
-            <span className="process-monitoring__filter-hint">За период: все созданные, по отделам и сотрудникам</span>
+            </label> 
+            <span className="process-monitoring__filter-hint">Включает все статусы</span>
           </div>
           {!generalStats && (
             <div className="process-monitoring__filter-group">
@@ -687,7 +702,7 @@ const ProcessMonitoring = () => {
               <FcFlowChart className="process-monitoring__card-icon" />
               <div className="process-monitoring__card-body">
                 <span className="process-monitoring__card-label">Бизнес-процессы</span>
-                <span className="process-monitoring__card-value">{bp.instances ?? 0}</span>
+                <span className="process-monitoring__card-value">{bpCardValue}</span>
                 <span className="process-monitoring__card-detail">задач в БП: {bp.tasksFromBP ?? 0}</span>
               </div>
             </button>
@@ -790,7 +805,7 @@ const ProcessMonitoring = () => {
                         <th>Сотрудник</th>
                         <th>Отдел</th>
                         <th>Проекты</th>
-                        <th>Выполнено задач</th>
+                        <th>{!statusFilter ? 'Задачи' : statusFilter === 'completed' ? 'Выполнено задач' : 'Задач в работе'}</th>
                         <th>Просрочки</th>
                       </tr>
                     </thead>
@@ -800,7 +815,7 @@ const ProcessMonitoring = () => {
                           <td>{row.userName}</td>
                           <td>{row.departmentName}</td>
                           <td>{row.projectsCount ?? 0}</td>
-                          <td>{row.tasksCompleted ?? 0}</td>
+                          <td>{row.tasksCount ?? row.tasksCompleted ?? 0}</td>
                           <td className={row.tasksOverdue > 0 ? 'process-monitoring__cell--overdue' : ''}>
                             {row.tasksOverdue ?? 0}
                           </td>
@@ -1053,6 +1068,8 @@ const ProcessMonitoring = () => {
         </>
       )}
 
+      <HelpModalProcessMonitoring open={isHelpOpen} onClose={() => setHelpOpen(false)} />
+
       {detailOpen && (
         <div className="process-monitoring__detail-overlay" onClick={() => setDetailOpen(false)} role="presentation">
           <div className="process-monitoring__detail-modal" onClick={(e) => e.stopPropagation()}>
@@ -1110,6 +1127,7 @@ const ProcessMonitoring = () => {
                           <th>Создан</th>
                           <th>Дедлайн</th>
                           <th>Дата завершения / провала / удаления</th>
+                          <th>Источник</th>
                         </>
                       )}
                       {detailType === 'tasks' && (
@@ -1122,6 +1140,7 @@ const ProcessMonitoring = () => {
                           <th>Создана</th>
                           <th>Выполнена</th>
                           <th>Дедлайн</th>
+                          <th>Источник</th>
                         </>
                       )}
                       {detailType === 'processes' && (
@@ -1131,6 +1150,8 @@ const ProcessMonitoring = () => {
                           <th>Начало</th>
                           <th>Завершение</th>
                           <th>Статус</th>
+                          <th>Проекты</th>
+                          <th>Задачи</th>
                         </>
                       )}
                       {detailType === 'overdue' && (
@@ -1175,6 +1196,7 @@ const ProcessMonitoring = () => {
                               ? formatDate(row.updatedAt)
                               : '—'}
                           </td>
+                          <td>{row.fromBP ? 'Создано из БП' : '—'}</td>
                         </tr>
                       ))}
                     {detailType === 'tasks' &&
@@ -1188,6 +1210,7 @@ const ProcessMonitoring = () => {
                           <td>{formatDate(row.createdAt)}</td>
                           <td>{row.completedAt ? formatDate(row.completedAt) : '—'}</td>
                           <td>{formatDateWithTime(row.deadline)}</td>
+                          <td>{row.fromBP ? 'Создано из БП' : '—'}</td>
                         </tr>
                       ))}
                     {detailType === 'processes' &&
@@ -1198,6 +1221,12 @@ const ProcessMonitoring = () => {
                           <td>{row.startedAt ? formatDate(row.startedAt) : '—'}</td>
                           <td>{row.finishedAt ? formatDate(row.finishedAt) : '—'}</td>
                           <td>{row.status || '—'}</td>
+                          <td className="process-monitoring__cell-tasks" title={row.projectTitles || undefined}>
+                            {row.projectCount != null ? row.projectCount : '—'}
+                          </td>
+                          <td className="process-monitoring__cell-tasks" title={row.taskTitles || undefined}>
+                            {row.taskCount != null ? row.taskCount : '—'}
+                          </td>
                         </tr>
                       ))}
                     {detailType === 'overdue' &&

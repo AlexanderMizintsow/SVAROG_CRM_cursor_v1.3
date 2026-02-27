@@ -7,6 +7,32 @@
   margin-bottom: 1.5rem;
 }
 
+.process-monitoring__header-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  flex-wrap: wrap;
+}
+
+.process-monitoring__help-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.45rem 0.75rem;
+  font-size: 0.875rem;
+  color: #6366f1;
+  background: #eef2ff;
+  border: 1px solid #c7d2fe;
+  border-radius: 8px;
+  cursor: pointer;
+  white-space: nowrap;
+  &:hover {
+    background: #e0e7ff;
+    color: #4f46e5;
+  }
+}
+
 .process-monitoring__title {
   display: flex;
   align-items: center;

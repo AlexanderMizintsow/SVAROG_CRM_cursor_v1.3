@@ -1,6 +1,6 @@
 // components/alertBanner/subcomponents/TaskNotifications.js Тут все из таблици notifications
 import React from 'react'
-import { FaClock, FaEnvelope } from 'react-icons/fa'
+import { FaClock, FaEnvelope, FaLightbulb } from 'react-icons/fa'
 import useTaskStateTracker from '../../../store/useTaskStateTracker'
 import { FcLeave } from 'react-icons/fc'
 import { FcPlanner } from 'react-icons/fc'
@@ -50,6 +50,12 @@ const useTaskNotifications = ({ currentUserId }) => {
           statusText: 'Одобрено',
           showDetails: true,
         },
+        task_created: {
+          icon: <FaEnvelope />,
+          className: 'extension-notification-new-task',
+          statusText: 'Новая задача',
+          showDetails: true,
+        },
         taskDeadlineOverdue: {
           icon: <FaClock color="#ff5e5e" />,
           className: 'extension-notification-overdue',
@@ -60,6 +66,12 @@ const useTaskNotifications = ({ currentUserId }) => {
           icon: <FaClock color="#FFEE00" />,
           className: 'extension-notification-updated-deadline',
           statusText: 'Срок исполнения задачи был изменен!',
+          showDetails: true,
+        },
+        idea_applied: {
+          icon: <FaLightbulb color="#27ae60" />,
+          className: 'extension-notification-idea-applied',
+          statusText: 'Идея применена в приложении',
           showDetails: true,
         },
         default: {
@@ -110,6 +122,7 @@ const useTaskNotifications = ({ currentUserId }) => {
         notificationId: id,
         createdAt: notification.createdAt,
         taskTitle: notification.taskTitle,
+        taskId: notification.taskId,
         userId: notification.userId,
         eventType: notification.eventType,
         isRead: notification.isRead,

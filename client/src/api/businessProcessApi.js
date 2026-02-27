@@ -10,7 +10,7 @@ const bpeClient = axios.create({
   headers: { 'Content-Type': 'application/json' },
 })
 
-// Определения процессов
+// Определения процессов (для «Опубликованные» передайте user_id и role_name для фильтра по видимости)
 export const getProcesses = (params = {}) =>
   bpeClient.get('/processes', { params }).then((res) => res.data)
 

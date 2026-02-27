@@ -13,6 +13,7 @@ const initialState = {
   processName: '',
   processDescription: '',
   isDraft: true,
+  visibilityUserIds: [],
   isLoading: false,
   error: null,
 }
@@ -35,6 +36,9 @@ const useBusinessProcessStore = create((set, get) => ({
   setProcessDescription: (description) => set({ processDescription: description }),
 
   setIsDraft: (isDraft) => set({ isDraft }),
+
+  setVisibilityUserIds: (visibilityUserIds) =>
+    set({ visibilityUserIds: Array.isArray(visibilityUserIds) ? visibilityUserIds : [] }),
 
   setLoading: (isLoading) => set({ isLoading }),
 
@@ -119,6 +123,7 @@ const useBusinessProcessStore = create((set, get) => ({
       processName: '',
       processDescription: '',
       isDraft: true,
+      visibilityUserIds: [],
       selectedProcess: null,
     }),
 
@@ -133,12 +138,15 @@ const useBusinessProcessStore = create((set, get) => ({
             meta: raw.meta && typeof raw.meta === 'object' ? raw.meta : { gatewayDebugNotify: false },
           }
         : { nodes: [], edges: [], meta: { gatewayDebugNotify: false } }
+    const vis = process.visibility_user_ids
+    const visibilityUserIds = Array.isArray(vis) ? vis : (typeof vis === 'string' ? (() => { try { const a = JSON.parse(vis); return Array.isArray(a) ? a : [] } catch (e) { return [] } })() : [])
     set({
       selectedProcess: process,
       scheme,
       processName: process.name || '',
       processDescription: process.description || '',
       isDraft: process.is_draft !== false,
+      visibilityUserIds,
       selectedNodeId: null,
     })
   },

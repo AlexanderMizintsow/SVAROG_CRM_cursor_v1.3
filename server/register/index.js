@@ -228,6 +228,8 @@ const {
   deleteEditorPermissions
 } = require('./handleController/handleController')
 
+const { submitAppIdea, getAppIdeas, applyAppIdea } = require('./appIdeasController/appIdeasController')
+
 const app = express()
 const server = http.createServer(app) // Создайте сервер с использованием http.createServer
 const io = socketIo(server, {
@@ -376,6 +378,11 @@ app.post(
 app.delete('/api/roles/:id', deleteRole(dbPool))
 /*******/
 
+// Время сервера (UTC) — для сверки с клиентом (только для отладки дедлайнов)
+app.get('/api/server-time', (req, res) => {
+  res.json({ serverTime: new Date().toISOString() })
+})
+
 /*************Маршруты для работы с СОТРУДНИКАМИ**************/
 app.get('/api/users', getUsers(dbPool))
 app.put('/api/users/:id', updateUser(dbPool))
@@ -473,6 +480,10 @@ app.post('/api/employees/rating', addOrUpdateReview(dbPool))
 app.get('/api/employees/rating/:userId', getReview(dbPool))
 app.get('/api/reviews/average', getAverageRating(dbPool))
 app.get('/api/reviews', getAllReviews(dbPool))
+
+app.post('/api/app-ideas', uploadFile.single('file'), submitAppIdea(dbPool))
+app.get('/api/app-ideas', getAppIdeas(dbPool))
+app.patch('/api/app-ideas/:id', applyAppIdea(dbPool))
 
 app.get('/api/introduction/version/:userId', getIntroductionNewVersion(dbPool))
 app.post('/api/introduction/version', postVersionApp(dbPool))
@@ -849,7 +860,7 @@ io.on('connection', (socket) => {
   const userId = socket.handshake.query.userId // Получаем userId из запроса
 
   if (userId) {
-    socket.join(userId) // Добавляем пользователя в комнату с его userId
+    socket.join(String(userId)) // Комната по userId (строка), чтобы io.to(String(uid)).emit доходил
   }
 
   socket.on('disconnect', () => {})

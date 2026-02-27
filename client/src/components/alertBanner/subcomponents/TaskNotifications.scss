@@ -27,12 +27,64 @@
       animation: pulse-glow-red 1.5s infinite ease-in-out;
     }
   }
+
+  // Новая задача (исполнитель / наблюдатель / утверждающий)
+  &-new-task {
+    background: linear-gradient(135deg, #2c3e506c, #4a5a6836);
+    border-left: 4px solid #2196f3;
+
+    .extension-notification-border {
+      width: 4px;
+      background: #2196f3;
+      box-shadow: -2px 0 8px #2196f3, -4px 0 16px rgba(33, 150, 243, 0.4);
+    }
+
+    .extension-notification-status {
+      color: #64b5f6;
+      font-size: 14px;
+    }
+
+    .extension-notification-title {
+      color: #64b5f6;
+    }
+
+    .extension-notification-message {
+      color: #ffffff;
+    }
+
+    .extension-notification-confirm {
+      background: linear-gradient(135deg, #1976d2, #1565c0);
+      &:hover {
+        background: linear-gradient(135deg, #1e88e5, #1976d2);
+      }
+    }
+  }
+
   &-updated-deadline {
     .extension-notification-border {
       width: 4px;
       background: #fff204;
       box-shadow: -2px 0 8px #e4f008, -4px 0 16px rgba(238, 203, 6, 0.4);
       animation: pulse-glow-yellow 1.5s infinite ease-in-out;
+    }
+  }
+
+  &-idea-applied {
+    background: linear-gradient(135deg, #e8f8f5 0%, #d5f5e3 100%);
+    border-left: 4px solid #27ae60;
+
+    .extension-notification-border {
+      width: 4px;
+      background: #27ae60;
+    }
+
+    .extension-notification-status {
+      color: #1e8449;
+    }
+
+    .extension-notification-message {
+      white-space: pre-wrap;
+      color: #1a5276;
     }
   }
 

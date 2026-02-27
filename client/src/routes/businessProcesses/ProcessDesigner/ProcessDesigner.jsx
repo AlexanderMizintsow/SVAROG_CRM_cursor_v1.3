@@ -1,26 +1,33 @@
-import { useCallback } from 'react'
+import { useCallback, useState } from 'react'
 import Toastify from 'toastify-js'
 import useBusinessProcessStore from '../../../store/useBusinessProcessStore.js'
+import useUserStore from '../../../store/userStore'
 import { createProcess, updateProcess, deleteProcess } from '../../../api/businessProcessApi.js'
 import Palette from './Palette/Palette.jsx'
 import FlowCanvas from './Canvas/FlowCanvas.jsx'
 import PropertiesPanel from './PropertiesPanel/PropertiesPanel.jsx'
 import DesignerToolbar from './DesignerToolbar.jsx'
+import ProcessDesignerVisibility from './ProcessDesignerVisibility/ProcessDesignerVisibility.jsx'
+import ConfirmationDialog from '../../../components/confirmationDialog/ConfirmationDialog'
 import './ProcessDesigner.scss'
 
 const ProcessDesigner = () => {
+  const { user } = useUserStore()
   const {
     scheme,
     selectedProcess,
     processName,
     processDescription,
     isDraft,
+    visibilityUserIds,
     setProcessName,
     setProcessDescription,
     setIsDraft,
     setScheme,
     resetDesigner,
   } = useBusinessProcessStore()
+
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
 
   const validateScheme = useCallback((forPublish = false) => {
     const nodes = Array.isArray(scheme?.nodes) ? scheme.nodes : []
@@ -208,6 +215,7 @@ const ProcessDesigner = () => {
           description: processDescription?.trim() || '',
           scheme,
           is_draft: true,
+          visibility_user_ids: Array.isArray(visibilityUserIds) ? visibilityUserIds : [],
         })
         Toastify({ text: 'Черновик сохранён', close: true, backgroundColor: '#059669' }).showToast()
       } else {
@@ -216,6 +224,8 @@ const ProcessDesigner = () => {
           description: processDescription?.trim() || '',
           scheme,
           is_draft: true,
+          visibility_user_ids: Array.isArray(visibilityUserIds) ? visibilityUserIds : [],
+          created_by: user?.id ?? null,
         })
         Toastify({ text: 'Процесс создан (черновик)', close: true, backgroundColor: '#059669' }).showToast()
         resetDesigner()
@@ -243,6 +253,7 @@ const ProcessDesigner = () => {
           description: processDescription?.trim() || '',
           scheme,
           is_draft: false,
+          visibility_user_ids: Array.isArray(visibilityUserIds) ? visibilityUserIds : [],
         })
         Toastify({ text: 'Процесс опубликован', close: true, backgroundColor: '#059669' }).showToast()
       } else {
@@ -251,6 +262,8 @@ const ProcessDesigner = () => {
           description: processDescription?.trim() || '',
           scheme,
           is_draft: false,
+          visibility_user_ids: Array.isArray(visibilityUserIds) ? visibilityUserIds : [],
+          created_by: user?.id ?? null,
         })
         Toastify({ text: 'Процесс создан и опубликован', close: true, backgroundColor: '#059669' }).showToast()
         resetDesigner()
@@ -263,13 +276,15 @@ const ProcessDesigner = () => {
         backgroundColor: '#b91c1c',
       }).showToast()
     }
-  }, [validateScheme, selectedProcess, processName, processDescription, scheme, resetDesigner])
+  }, [validateScheme, selectedProcess, processName, processDescription, scheme, visibilityUserIds, resetDesigner])
 
-  const handleDeleteProcess = useCallback(async () => {
+  const handleDeleteProcessClick = useCallback(() => {
+    setDeleteDialogOpen(true)
+  }, [])
+
+  const handleDeleteProcessConfirm = useCallback(async () => {
     if (!selectedProcess?.id) return
-    const name = selectedProcess?.name || processName || 'Без названия'
-    const ok = window.confirm(`Удалить процесс «${name}»?`)
-    if (!ok) return
+    setDeleteDialogOpen(false)
     try {
       await deleteProcess(selectedProcess.id)
       Toastify({ text: 'Процесс удалён', close: true, backgroundColor: '#059669' }).showToast()
@@ -282,16 +297,33 @@ const ProcessDesigner = () => {
         backgroundColor: '#b91c1c',
       }).showToast()
     }
-  }, [selectedProcess?.id, selectedProcess?.name, processName, resetDesigner])
+  }, [selectedProcess?.id, resetDesigner])
+
+  const deleteConfirmName = selectedProcess?.name || processName || 'Без названия'
 
   return (
     <div className="process-designer">
+      {deleteDialogOpen && (
+        <ConfirmationDialog
+          open={deleteDialogOpen}
+          onClose={() => setDeleteDialogOpen(false)}
+          onConfirm={handleDeleteProcessConfirm}
+          title="Подтверждение удаления"
+          message={`Действительно удалить процесс «${deleteConfirmName}»?`}
+          btn1="Нет"
+          btn2="Да"
+        />
+      )}
+
+      <div className="process-designer__visibility-wrap">
+        <ProcessDesignerVisibility />
+      </div>
       <DesignerToolbar
         processName={processName}
         processDescription={processDescription}
         isDraft={isDraft}
         gatewayDebugNotify={scheme?.meta?.gatewayDebugNotify === true}
-        canDelete={!!selectedProcess?.id}
+        canDelete={!!selectedProcess?.id && (user?.role_name === 'Администратор' || Number(selectedProcess?.created_by) === Number(user?.id))}
         onProcessNameChange={setProcessName}
         onProcessDescriptionChange={setProcessDescription}
         onIsDraftChange={setIsDraft}
@@ -302,7 +334,7 @@ const ProcessDesigner = () => {
         onSaveDraft={handleSaveDraft}
         onPublish={handlePublish}
         onNewProcess={resetDesigner}
-        onDelete={handleDeleteProcess}
+        onDelete={handleDeleteProcessClick}
       />
 
       <div className="process-designer__body">

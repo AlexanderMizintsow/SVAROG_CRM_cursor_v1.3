@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react'
 import axios from 'axios'
-import { FaHistory } from 'react-icons/fa'
+import { FaHistory, FaEnvelope } from 'react-icons/fa'
 import { FaPlus } from 'react-icons/fa'
 import './GlobalTaskHistory.scss'
 import { FaPencilAlt } from 'react-icons/fa'
@@ -156,6 +156,18 @@ const GlobalTaskHistory = ({ taskId, refreshHistory }) => {
           colorClass: 'bg-yellow',
           colorClassIcon: 'bg-yellow-icon',
         }
+      case 'email_sent':
+        return {
+          icon: <FaEnvelope />,
+          colorClass: 'bg-indigo',
+          colorClassIcon: 'bg-indigo-icon',
+        }
+      case 'email_reply_received':
+        return {
+          icon: <FaEnvelope />,
+          colorClass: 'bg-emerald-icon',
+          colorClassIcon: 'bg-emerald',
+        }
       default:
         return {
           icon: <FaQuestion />,
@@ -238,7 +250,9 @@ const GlobalTaskHistory = ({ taskId, refreshHistory }) => {
                 const timeString = `${createdAt.toLocaleDateString()} ${createdAt.toLocaleTimeString()}`
 
                 const creatorName =
-                  event.first_name + ' ' + event.last_name || 'Неизвестный'
+                  event.created_by != null && (event.first_name != null || event.last_name != null)
+                    ? `${event.first_name || ''} ${event.last_name || ''}`.trim()
+                    : '—'
 
                 // Детали
                 const description = event.description || ''
@@ -341,9 +355,22 @@ const GlobalTaskHistory = ({ taskId, refreshHistory }) => {
                   case 'комментарий':
                     eventDetails = description || 'Добавлен комментарий.'
                     break
+                  case 'email_sent':
+                    eventDetails = description || 'Отправлено письмо.'
+                    break
+                  case 'email_reply_received':
+                    eventDetails = description || 'Получен ответ на письмо.'
+                    break
                   default:
                     eventDetails = description || ''
                 }
+
+                const eventTypeLabel =
+                  event.event_type === 'email_sent'
+                    ? 'Отправлено письмо'
+                    : event.event_type === 'email_reply_received'
+                      ? 'Получен ответ на письмо'
+                      : event.event_type
 
                 return (
                   <div key={event.id} className="history-item">
@@ -353,7 +380,7 @@ const GlobalTaskHistory = ({ taskId, refreshHistory }) => {
                     <div className="event-content">
                       {/* Заголовок и время */}
                       <div className="event-header">
-                        <span className="event-title">{event.event_type}</span>
+                        <span className="event-title">{eventTypeLabel}</span>
                         <div className="event-time">
                           <i className="far fa-clock"></i> {timeString}
                         </div>

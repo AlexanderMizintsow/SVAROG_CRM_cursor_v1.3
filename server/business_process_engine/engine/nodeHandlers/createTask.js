@@ -228,6 +228,12 @@ async function handle(instance, node, scheme, integrations, dbPool) {
     }
   }
 
+  try {
+    await reg.notifyTaskCreated(taskId, createdBy, assigneeIds, approverIds, viewerIds)
+  } catch (e) {
+    console.warn('notifyTaskCreated (канбан не обновится без перезагрузки):', e.message)
+  }
+
   await dbPool.query('INSERT INTO bp_task_process_links (task_id, process_instance_id, node_id) VALUES ($1, $2, $3)', [
     taskId,
     instance.id,

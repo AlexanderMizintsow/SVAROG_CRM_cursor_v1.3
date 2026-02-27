@@ -689,15 +689,43 @@ function notifyTaskCreated(dbPool, io) {
       ]
       const uniqueUsers = [...new Set(usersToNotify.filter(Boolean))]
 
-      uniqueUsers.forEach((userId) => {
-        io.to(userId).emit('taskCreated', {
+      uniqueUsers.forEach((uid) => {
+        io.to(String(uid)).emit('taskCreated', {
           taskId: id,
           createdBy: createdBy,
-          assignedUsers: assignedUsers,
-          approvers: approvers,
-          viewers: viewers,
+          assignedUsers: Array.isArray(assignedUsers) ? assignedUsers : [],
+          approvers: Array.isArray(approvers) ? approvers : [],
+          viewers: Array.isArray(viewers) ? viewers : [],
         })
       })
+
+      // Записи в notifications для AlertBanner: исполнитель, наблюдатель, утверждающий (не автор)
+      const taskIdNum = typeof id === 'number' ? id : parseInt(id, 10)
+      if (Number.isFinite(taskIdNum)) {
+        const assigneeIds = (Array.isArray(assignedUsers) ? assignedUsers : []).map((u) =>
+          typeof u === 'object' && u != null && u.id != null ? u.id : u
+        )
+        const approverIds = (Array.isArray(approvers) ? approvers : []).map((u) =>
+          typeof u === 'object' && u != null && u.id != null ? u.id : u
+        )
+        const viewerIds = (Array.isArray(viewers) ? viewers : []).map((u) =>
+          typeof u === 'object' && u != null && u.id != null ? u.id : u
+        )
+        const createdById = createdBy != null ? Number(createdBy) : null
+        const recipientIds = [...new Set([...assigneeIds, ...approverIds, ...viewerIds].filter(Boolean).map(Number))]
+          .filter((uid) => uid !== createdById && Number.isFinite(uid))
+        if (recipientIds.length > 0) {
+          const taskRow = await dbPool.query('SELECT title FROM tasks WHERE id = $1', [taskIdNum])
+          const taskTitle = taskRow.rows[0]?.title || 'Без названия'
+          const message = `Новая задача: ${taskTitle}`
+          for (const uid of recipientIds) {
+            await dbPool.query(
+              `INSERT INTO notifications (user_id, task_id, message, event_type, is_sent) VALUES ($1, $2, $3, 'task_created', false)`,
+              [uid, taskIdNum, message]
+            )
+          }
+        }
+      }
 
       // Уведомление «Подзадача добавлена» только исполнителям (для проектов)
       const taskIdsToNotify = Array.isArray(id) ? id : (id != null ? [id] : [])
@@ -2095,12 +2123,15 @@ function saveProjectSentEmail(dbPool) {
     const normalizedId = normalizeMessageId(message_id)
     if (!normalizedId) return res.status(400).json({ error: 'Некорректный message_id' })
     try {
+      const gid = parseInt(global_task_id, 10)
+      const uid = parseInt(user_id, 10)
       await dbPool.query(
         `INSERT INTO project_sent_emails (message_id, global_task_id, user_id, final_solution_id)
          VALUES ($1, $2, $3, $4)
          ON CONFLICT (message_id) DO UPDATE SET final_solution_id = COALESCE(EXCLUDED.final_solution_id, project_sent_emails.final_solution_id)`,
-        [normalizedId, parseInt(global_task_id, 10), parseInt(user_id, 10), final_solution_id ? parseInt(final_solution_id, 10) : null]
+        [normalizedId, gid, uid, final_solution_id ? parseInt(final_solution_id, 10) : null]
       )
+      await insertTaskHistory(dbPool, gid, 'email_sent', 'Отправлено письмо', uid, null)
       res.status(200).json({ success: true })
     } catch (err) {
       console.error('saveProjectSentEmail:', err)
@@ -2222,6 +2253,7 @@ function createFinalSolutionFromEmailReply(dbPool) {
           'INSERT INTO project_email_response_times (sent_message_id, reply_received_at) VALUES ($1, CURRENT_TIMESTAMP) ON CONFLICT (sent_message_id) DO NOTHING',
           [inReplyTo]
         )
+        await insertTaskHistory(dbPool, global_task_id, 'email_reply_received', 'Получен ответ на письмо', null, null)
       } else {
         const insert = await dbPool.query(
           `INSERT INTO global_task_final_solutions (global_task_id, user_id, content, author_display_name, is_from_supplier_reply, is_published, thread_messages)
@@ -2252,6 +2284,7 @@ function createFinalSolutionFromEmailReply(dbPool) {
           'INSERT INTO project_email_response_times (sent_message_id, reply_received_at) VALUES ($1, CURRENT_TIMESTAMP) ON CONFLICT (sent_message_id) DO NOTHING',
           [inReplyTo]
         )
+        await insertTaskHistory(dbPool, global_task_id, 'email_reply_received', 'Получен ответ на письмо', null, null)
       }
 
       notifyBpeProjectUpdated(global_task_id)

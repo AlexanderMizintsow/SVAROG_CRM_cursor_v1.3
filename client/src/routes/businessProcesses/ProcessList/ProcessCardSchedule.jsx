@@ -27,7 +27,7 @@ function parseTime(str) {
   return { hour: Math.min(23, Math.max(0, parseInt(m[1], 10))), minute: Math.min(59, Math.max(0, parseInt(m[2], 10))) }
 }
 
-function ProcessCardSchedule({ processId, currentUserId, onSaved }) {
+function ProcessCardSchedule({ processId, currentUserId, onSaved, collapsed = false }) {
   const [enabled, setEnabled] = useState(false)
   const [scheduleType, setScheduleType] = useState('weekdays')
   const [time, setTime] = useState('09:00')
@@ -174,6 +174,21 @@ function ProcessCardSchedule({ processId, currentUserId, onSaved }) {
     return (
       <div className="process-card-schedule">
         <p className="process-card-schedule__loading">Загрузка расписания...</p>
+      </div>
+    )
+  }
+
+  // Свёрнутый вид: одна строка с датой/временем
+  if (collapsed) {
+    const summary =
+      !enabled
+        ? 'Автозапуск отключён'
+        : nextRuns.length > 0
+          ? `Запуск в ${time}: ${nextRuns.slice(0, 5).map((r) => r.label).join(', ')}${nextRuns.length > 5 ? '…' : ''}`
+          : `Время запуска: ${time}`
+    return (
+      <div className="process-card-schedule process-card-schedule--collapsed">
+        <span className="process-card-schedule__summary">{summary}</span>
       </div>
     )
   }

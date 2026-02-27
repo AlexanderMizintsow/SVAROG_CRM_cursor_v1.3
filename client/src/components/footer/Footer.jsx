@@ -5,11 +5,13 @@ import axios from 'axios'
 import useUserStore from '../../store/userStore'
 import useVersionInfo from '../../store/useVersionInfo'
 import RatingModal from './ratingModal/RatingModal'
-import { FaStar } from 'react-icons/fa'
+import IdeasModal from './ideasModal/IdeasModal'
+import { FaStar, FaLightbulb } from 'react-icons/fa'
 import { BsJournalCode } from 'react-icons/bs'
 import dextopSvarog from '../../assets/img/dextop.ico'
 import './footer.scss'
 import ConfirmationDialog from '../confirmationDialog/ConfirmationDialog'
+import AdminTimeClock from './AdminTimeClock/AdminTimeClock'
 
 const Footer = () => {
   const { user } = useUserStore()
@@ -18,6 +20,7 @@ const Footer = () => {
   const { versions } = useVersionInfo()
   const currentYear = new Date().getFullYear() // Получаем текущий год
   const [isDialogOpen, setDialogOpen] = useState(false)
+  const [isIdeasModalOpen, setIdeasModalOpen] = useState(false)
 
   useEffect(() => {
     if (user) {
@@ -78,6 +81,9 @@ const Footer = () => {
         <span title="Поставить оценку" onClick={() => setModalOpen(true)}>
           <FaStar />
         </span>
+        <span title="Идеи и предложения" onClick={() => setIdeasModalOpen(true)}>
+          <FaLightbulb />
+        </span>
         <span className="pulsing-container">
           <Link
             to="/changelog"
@@ -96,8 +102,9 @@ const Footer = () => {
         может содержать ошибки, которые будут исправлены в будущих обновлениях.
         Разработчик: Александр Мизинцов*/}
       </div>
+      {user?.role_name === 'Администратор' && <AdminTimeClock />}
       {isModalOpen && <RatingModal onClose={() => setModalOpen(false)} />}
-      {isModalOpen && <RatingModal onClose={() => setModalOpen(false)} />}
+      {isIdeasModalOpen && <IdeasModal onClose={() => setIdeasModalOpen(false)} />}
       <ConfirmationDialog
         open={isDialogOpen}
         onClose={() => setDialogOpen(false)}

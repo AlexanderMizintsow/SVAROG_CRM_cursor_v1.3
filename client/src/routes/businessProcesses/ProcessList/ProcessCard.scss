@@ -22,6 +22,24 @@
   margin-bottom: 0.75rem;
 }
 
+.process-card__toggle {
+  margin-left: auto;
+  padding: 0.25rem;
+  border: none;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--text-secondary, #64748b);
+  font-size: 1.25rem;
+  cursor: pointer;
+  flex-shrink: 0;
+  transition: color 0.2s, background 0.2s;
+
+  &:hover {
+    background: var(--bg-secondary, #f1f5f9);
+    color: var(--text-primary, #1e293b);
+  }
+}
+
 .process-card__icon {
   width: 1.5rem;
   height: 1.5rem;

@@ -1,9 +1,11 @@
 import { useState } from 'react'
 import { FcFlowChart } from 'react-icons/fc'
 import { AiOutlineUnorderedList, AiOutlineForm, AiOutlineBars, AiOutlineFileDone } from 'react-icons/ai'
+import { MdHelpOutline } from 'react-icons/md'
 import ProcessList from './ProcessList/ProcessList'
 import ProcessDesigner from './ProcessDesigner/ProcessDesigner'
 import ProcessInstances from './ProcessInstances/ProcessInstances'
+import HelpModalBusinessProcesses from './HelpModalBusinessProcesses'
 import useBusinessProcessStore from '../../store/useBusinessProcessStore'
 import './businessProcesses.scss'
 
@@ -21,6 +23,7 @@ const LIST_SUB_TABS = [
 const BusinessProcesses = () => {
   const [activeTab, setActiveTab] = useState('list')
   const [listSubTab, setListSubTab] = useState('published')
+  const [isHelpOpen, setHelpOpen] = useState(false)
   const { loadProcessIntoDesigner, resetDesigner } = useBusinessProcessStore()
 
   const handleEditProcess = (process) => {
@@ -39,6 +42,14 @@ const BusinessProcesses = () => {
         <div className="business-processes__title-row">
           <FcFlowChart className="business-processes__icon" />
           <h1 className="business-processes__title">Бизнес-процессы</h1>
+          <button
+            type="button"
+            className="business-processes__help-btn"
+            onClick={() => setHelpOpen(true)}
+            title="Справка по разделу"
+          >
+            <MdHelpOutline /> Справка
+          </button>
         </div>
         <nav className="business-processes__tabs">
           {TABS.map((tab) => (
@@ -81,6 +92,8 @@ const BusinessProcesses = () => {
         {activeTab === 'designer' && <ProcessDesigner />}
         {activeTab === 'instances' && <ProcessInstances />}
       </div>
+
+      <HelpModalBusinessProcesses open={isHelpOpen} onClose={() => setHelpOpen(false)} />
     </div>
   )
 }
