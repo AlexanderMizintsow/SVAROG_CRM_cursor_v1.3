@@ -229,12 +229,13 @@ const {
 } = require('./handleController/handleController')
 
 const { submitAppIdea, getAppIdeas, applyAppIdea } = require('./appIdeasController/appIdeasController')
+const { getCorsOrigins } = require('./config')
 
 const app = express()
-const server = http.createServer(app) // Создайте сервер с использованием http.createServer
+const server = http.createServer(app)
 const io = socketIo(server, {
   cors: {
-    origin: ['http://localhost:5173', 'http://192.168.57.112:5173', 'http://172.26.32.1:5173'],
+    origin: getCorsOrigins(),
     methods: ['GET', 'POST'],
   },
 })

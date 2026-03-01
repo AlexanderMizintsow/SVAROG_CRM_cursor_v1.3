@@ -24,8 +24,12 @@ const useWebSocket = (userId, stableSetMessages, currentTaskId) => {
 
   // Пример отправки уведомления
   const sendNotification = (title, text) => {
+    console.log('sendNotification вызван:', title, text)
+    console.log('electronAPI:', electronAPI)
     if (electronAPI && typeof electronAPI.sendNotification === 'function') {
+      console.log('Отправляем уведомление через electronAPI...')
       electronAPI.sendNotification(title, text)
+      console.log('Уведомление отправлено')
     } else {
       console.log('Electron API недоступен')
     }

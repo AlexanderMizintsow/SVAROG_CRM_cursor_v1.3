@@ -55,8 +55,8 @@ const Footer = () => {
   const handleDownload = () => {
     // Здесь вы можете указать путь к вашему файлу
     const link = document.createElement('a')
-    link.href = '/download/Dextop SVAROG Setup 1.0.0.exe'
-    link.download = 'Dextop SVAROG Setup 1.0.0.exe'
+    link.href = '/download/Dextop Setup 1.1.1.exe'
+    link.download = 'Dextop Setup 1.1.1.exe'
     document.body.appendChild(link)
     link.click()
     document.body.removeChild(link)

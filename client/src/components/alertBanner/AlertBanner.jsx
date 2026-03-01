@@ -8,10 +8,7 @@ import { AiOutlineFileDone } from 'react-icons/ai'
 import { MdHistoryEdu, MdFolder } from 'react-icons/md'
 import { GiConfirmed } from 'react-icons/gi'
 import { FcFlowChart } from 'react-icons/fc'
-import {
-  requestNotificationPermission,
-  sendCustomNotification,
-} from '../../utils/browserNotifications'
+import { requestNotificationPermission } from '../../utils/browserNotifications'
 import ChatTaskModal from '../../routes/kanbanBoard/Task/subcomponents/chatTaskModal/chatTaskModal'
 import { API_BASE_URL } from '../../../config'
 import axios from 'axios'
@@ -501,7 +498,6 @@ const AlertBanner = () => {
       const label = projectNotificationLabels[type] || 'Проект'
       const text = `${label}: ${title || 'Без названия'}`
       sendNotification('Проект', text)
-      if (typeof sendCustomNotification === 'function') sendCustomNotification(text)
     })
   }, [projectNotifications])
 

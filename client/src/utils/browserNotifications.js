@@ -1,6 +1,20 @@
 import logo_windows from '../../src/assets/img/logo_windows.png'
 import Toastify from 'toastify-js'
 
+// Получаем Electron API если доступен
+const getElectronAPI = () => {
+  return typeof window !== 'undefined' ? window.electronAPI : null
+}
+
+// Универсальная функция отправки уведомления через Electron
+// Electron сам проверяет активность окна и показывает уведомление только если окно не активно
+export const sendDesktopNotification = (title, body) => {
+  const electronAPI = getElectronAPI()
+  if (electronAPI && typeof electronAPI.sendNotification === 'function') {
+    electronAPI.sendNotification(title, body)
+  }
+}
+
 // Функция для запроса разрешения на уведомления в браузере
 export const requestNotificationPermission = async () => {
   if ('Notification' in window) {
@@ -27,32 +41,17 @@ export const requestNotificationPermission = async () => {
   }
 }
 
-// Функция для отправки уведомления в браузере
+// Функция для отправки уведомления о напоминании
 export const sendBrowserNotification = (newReminder) => {
-  if (Notification.permission === 'granted') {
-    new Notification('Новое напоминание!', {
-      body: `Необходимо выполнить: ${newReminder.comment || 'Нет комментария'}`,
-      icon: logo_windows,
-    })
-  } else {
-    console.log(
-      'Разрешение на уведомления не предоставлено:',
-      Notification.permission
-    )
-  }
+  const title = 'Новое напоминание!'
+  const body = `Необходимо выполнить: ${newReminder.comment || 'Нет комментария'}`
+  
+  // Отправляем через Electron (проверка активности окна на стороне Electron)
+  sendDesktopNotification(title, body)
 }
 
-// Новая функция для отправки произвольного текста уведомления
+// Функция для отправки произвольного текста уведомления
 export const sendCustomNotification = (text) => {
-  if (Notification.permission === 'granted') {
-    new Notification('Уведомление', {
-      body: text,
-      icon: logo_windows,
-    })
-  } else {
-    console.log(
-      'Разрешение на уведомления не предоставлено:',
-      Notification.permission
-    )
-  }
+  // Отправляем через Electron (проверка активности окна на стороне Electron)
+  sendDesktopNotification('Уведомление', text)
 }

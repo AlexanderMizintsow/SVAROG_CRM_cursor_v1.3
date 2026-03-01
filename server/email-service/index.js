@@ -13,6 +13,7 @@ const { Pool } = require('pg')
 
 const { body, validationResult } = require('express-validator')
 const { processMessage } = require('./processMessage')
+const { getCorsOrigins } = require('./config')
 const app = express()
 
 const REGISTER_URL = process.env.REGISTER_URL || 'http://localhost:5000'
@@ -46,11 +47,7 @@ app.use(express.json())
 
 app.use(
   cors({
-    origin: [
-      'http://localhost:5173', // Локальный адрес
-      'http://192.168.57.112:5173', // Локальный IP-адрес
-      'http://172.26.32.1:5173', // Альтернативный локальный IP-адрес
-    ],
+    origin: getCorsOrigins(),
     methods: ['GET', 'POST'],
     allowedHeaders: ['Content-Type'],
     credentials: true,
@@ -70,11 +67,7 @@ const dbPool = new Pool({
 const server = http.createServer(app)
 const io = new Server(server, {
   cors: {
-    origin: [
-      'http://localhost:5173', // Локальный адрес
-      'http://192.168.57.112:5173', // Локальный IP-адрес
-      'http://172.26.32.1:5173', // Альтернативный локальный IP-адрес
-    ],
+    origin: getCorsOrigins(),
     methods: ['GET', 'POST'],
     allowedHeaders: ['Content-Type'],
     credentials: true,

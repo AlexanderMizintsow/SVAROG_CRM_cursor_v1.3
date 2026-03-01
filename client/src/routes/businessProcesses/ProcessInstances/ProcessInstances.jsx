@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import Toastify from 'toastify-js'
 import { cancelInstance, deleteInstance, getInstancesOverview } from '../../../api/businessProcessApi'
+import useUserStore from '../../../store/userStore'
 import './ProcessInstances.scss'
 
 const STATUS_LABELS = {
@@ -38,6 +39,8 @@ function getWaitingText(item) {
 }
 
 const ProcessInstances = () => {
+  const { user } = useUserStore()
+  const isAdmin = user?.role_name === 'Администратор'
   const [loading, setLoading] = useState(true)
   const [items, setItems] = useState([])
   const [collapsed, setCollapsed] = useState({})
@@ -209,7 +212,7 @@ const ProcessInstances = () => {
                         <div className="bp-instances__cell-mono">{it.last_task_id ? `#${it.last_task_id}` : '—'}</div>
                         <div>{formatDateTime(it.started_at)}</div>
                         <div className="bp-instances__actions">
-                          {it.status !== 'completed' && it.status !== 'failed' && it.status !== 'cancelled' && (
+                          {isAdmin && it.status !== 'completed' && it.status !== 'failed' && it.status !== 'cancelled' && (
                             <button
                               type="button"
                               className="bp-instances__btn bp-instances__btn--secondary"
@@ -219,7 +222,7 @@ const ProcessInstances = () => {
                               Отменить
                             </button>
                           )}
-                          {(it.status === 'completed' || it.status === 'failed' || it.status === 'cancelled') && (
+                          {isAdmin && (it.status === 'completed' || it.status === 'failed' || it.status === 'cancelled') && (
                             <button
                               type="button"
                               className="bp-instances__btn bp-instances__btn--danger"

@@ -3,29 +3,28 @@ const { DateTime } = require('luxon')
 const axios = require('axios')
 const fs = require('fs')
 const path = require('path')
+const { BPE_API_URL } = require('../config')
 
 let _warnedMissingBpeUrl = false
 function notifyBpeTaskUpdated(taskId) {
-  const bpeUrl = process.env.BPE_API_URL || process.env.BPE_WEBHOOK_URL || 'http://localhost:5010'
   if (!taskId) return
   if (!_warnedMissingBpeUrl && !(process.env.BPE_API_URL || process.env.BPE_WEBHOOK_URL)) {
     _warnedMissingBpeUrl = true
-    console.warn('BPE webhook: не задан BPE_API_URL/BPE_WEBHOOK_URL, использую fallback http://localhost:5010')
+    console.warn('BPE webhook: не задан BPE_API_URL/BPE_WEBHOOK_URL в .env, использую fallback из config (localhost:5010). На другом ПК задайте BPE_API_URL.')
   }
-  const url = `${bpeUrl.replace(/\/$/, '')}/api/bp/webhooks/task-updated`
+  const url = `${BPE_API_URL.replace(/\/$/, '')}/api/bp/webhooks/task-updated`
   axios.post(url, { task_id: taskId }, { timeout: 5000 }).catch((err) => {
     console.warn('BPE webhook task-updated:', err.message)
   })
 }
 
 function notifyBpeProjectUpdated(globalTaskId) {
-  const bpeUrl = process.env.BPE_API_URL || process.env.BPE_WEBHOOK_URL || 'http://localhost:5010'
   if (!globalTaskId) return
   if (!_warnedMissingBpeUrl && !(process.env.BPE_API_URL || process.env.BPE_WEBHOOK_URL)) {
     _warnedMissingBpeUrl = true
-    console.warn('BPE webhook: не задан BPE_API_URL/BPE_WEBHOOK_URL, использую fallback http://localhost:5010')
+    console.warn('BPE webhook: не задан BPE_API_URL/BPE_WEBHOOK_URL в .env, использую fallback из config (localhost:5010). На другом ПК задайте BPE_API_URL.')
   }
-  const url = `${bpeUrl.replace(/\/$/, '')}/api/bp/webhooks/project-updated`
+  const url = `${BPE_API_URL.replace(/\/$/, '')}/api/bp/webhooks/project-updated`
   axios.post(url, { global_task_id: globalTaskId }, { timeout: 5000 }).catch((err) => {
     console.warn('BPE webhook project-updated:', err.message)
   })

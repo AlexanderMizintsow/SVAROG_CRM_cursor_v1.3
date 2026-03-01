@@ -1,0 +1,27 @@
+directories:
+  output: dist
+  buildResources: assets
+appId: com.svarog.dextop
+productName: Dextop
+files:
+  - filter:
+      - main.js
+      - preload.js
+      - package.json
+      - assets/notification.mp3
+      - assets/icon.ico
+      - assets/icon_flashing.ico
+win:
+  target:
+    - target: nsis
+      arch:
+        - x64
+        - ia32
+  icon: assets/icon.ico
+  requestedExecutionLevel: asInvoker
+nsis:
+  oneClick: false
+  allowToChangeInstallationDirectory: true
+  createDesktopShortcut: true
+  createStartMenuShortcut: true
+electronVersion: 22.3.27

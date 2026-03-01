@@ -490,19 +490,24 @@ async function handle(instance, node, scheme, integrations, dbPool) {
     })
     return { nextNodeId: chosenEdge.target }
   }
-  // В событийном режиме "else" не выполняем автоматически — продолжаем ожидать,
-  // пока не появится подходящее условие.
-  if (!((sourceType === 'task' || sourceType === 'project') && waitMode === 'event' && (taskId || projectId))) {
-    const elseEdge = edges.find((e) => getConditionForEdge(settings, e.id) === 'else')
-    if (elseEdge) {
-      await maybeSendSystemMessage({
-        message: [
-          `Развилка: «${node?.label || node?.id}»`,
-          `Выбрана ветка «Иначе» → ${elseEdge.target}`,
-        ].join('\n'),
-      })
-      return { nextNodeId: elseEdge.target }
-    }
+
+  // В событийном режиме (задача/проект): не переходим по «Иначе» и не берём единственную ветку без проверки — продолжаем ожидать, пока условие не выполнится.
+  const inEventWaitMode = (sourceType === 'task' || sourceType === 'project') && waitMode === 'event' && (taskId || projectId)
+  if (inEventWaitMode) {
+    if (sourceType === 'task' && taskId) return { waitGateway: { taskId } }
+    if (sourceType === 'project' && projectId) return { waitGatewayProject: { globalTaskId: projectId } }
+  }
+
+  // Не в событийном режиме: можно перейти по «Иначе» или по единственной ветке
+  const elseEdge = edges.find((e) => getConditionForEdge(settings, e.id) === 'else')
+  if (elseEdge) {
+    await maybeSendSystemMessage({
+      message: [
+        `Развилка: «${node?.label || node?.id}»`,
+        `Выбрана ветка «Иначе» → ${elseEdge.target}`,
+      ].join('\n'),
+    })
+    return { nextNodeId: elseEdge.target }
   }
   if (edges.length === 1) {
     await maybeSendSystemMessage({

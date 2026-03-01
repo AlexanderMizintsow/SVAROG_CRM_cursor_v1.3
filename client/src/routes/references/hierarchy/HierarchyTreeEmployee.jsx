@@ -73,14 +73,43 @@ const HierarchyTreeEmployee = () => {
     const edges = []
     const colorMapping = {} // Используем объект для хранения цветов по руководителям
 
-    const getNode = (employee, yLevel, xOffset, isRoot = false) => {
+    // Алгоритм раскладки дерева:
+    // 1) Рекурсивно вычисляем X‑позиции снизу вверх, чтобы родители
+    //    располагались по центру своих детей.
+    // 2) Проходим дерево ещё раз и создаём узлы и рёбра для React Flow.
+
+    const horizontalGap = 260
+    const verticalGap = 260
+
+    let xCounter = 0
+    const positions = {} // { [employee.id]: { x, y } }
+
+    const assignPositions = (employee, depth = 0) => {
+      const children = employee.children || []
+
+      if (!children.length) {
+        const x = xCounter++
+        positions[employee.id] = { x, y: depth }
+        return x
+      }
+
+      const childXs = children.map((child) => assignPositions(child, depth + 1))
+      const avgX = childXs.reduce((sum, val) => sum + val, 0) / childXs.length
+      positions[employee.id] = { x: avgX, y: depth }
+      return avgX
+    }
+
+    const buildGraph = (employee) => {
+      const pos = positions[employee.id]
+      if (!pos) return
+
       const supervisorId = employee.supervisor_id
       if (supervisorId && !colorMapping[supervisorId]) {
-        colorMapping[supervisorId] = `#${Math.floor(Math.random() * 16777215).toString(16)}` // Генерация случайного цвета
+        colorMapping[supervisorId] = `#${Math.floor(Math.random() * 16777215).toString(16)}`
       }
       const lineColor = supervisorId ? colorMapping[supervisorId] : '#000'
 
-      const node = {
+      nodes.push({
         id: employee.id.toString(),
         data: {
           label: (
@@ -97,7 +126,7 @@ const HierarchyTreeEmployee = () => {
               <div className="card-body">
                 <h4>{employee.name}</h4>
                 <p>{employee.job_title}</p>
-                <p>{employee.department || 'Не указан отдел'}</p> {/* Добавляем отдел */}
+                <p>{employee.department || 'Не указан отдел'}</p>
                 <div className="card-footer">
                   <TbPhoneCall className="card-footer-icon" title="Не доступно!" />
                   <LiaSmsSolid className="card-footer-icon" title="Не доступно!" />
@@ -107,27 +136,26 @@ const HierarchyTreeEmployee = () => {
             </div>
           ),
         },
-        position: { x: xOffset, y: yLevel * 300 },
-        style: { border: '1px solid black', borderRadius: '10px' },
-      }
+        position: {
+          x: pos.x * horizontalGap,
+          y: pos.y * verticalGap,
+        },
+      })
 
-      nodes.push(node)
-      employee.children.forEach((child, index) => {
-        const childXOffset = isRoot
-          ? xOffset + index * 300 - employee.children.length * 150 // Центрируем корень
-          : xOffset + index * 300
-
+      const children = employee.children || []
+      children.forEach((child) => {
         edges.push({
           id: `${employee.id}-${child.id}`,
           source: employee.id.toString(),
           target: child.id.toString(),
           style: { stroke: lineColor },
         })
-        getNode(child, yLevel + 1, childXOffset)
+        buildGraph(child)
       })
     }
 
-    hierarchicalData.forEach((root) => getNode(root, 0, 0, true))
+    hierarchicalData.forEach((root) => assignPositions(root, 0))
+    hierarchicalData.forEach((root) => buildGraph(root))
 
     return { nodes, edges }
   }

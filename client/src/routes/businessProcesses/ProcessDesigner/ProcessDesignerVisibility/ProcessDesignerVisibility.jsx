@@ -14,6 +14,7 @@ const ProcessDesignerVisibility = () => {
   const [users, setUsers] = useState([])
   const [loading, setLoading] = useState(true)
   const [expandedDeptIds, setExpandedDeptIds] = useState(new Set())
+  const [isModalOpen, setIsModalOpen] = useState(false)
 
   const selectedSet = new Set((visibilityUserIds || []).map(Number))
 
@@ -74,13 +75,45 @@ const ProcessDesignerVisibility = () => {
     return <div className="process-designer-visibility__loading">Загрузка отделов и сотрудников...</div>
   }
 
+  const summaryText =
+    selectedSet.size === 0
+      ? 'Выбрано сотрудников: 0. Процесс будет виден всем.'
+      : `Выбрано сотрудников: ${selectedSet.size}.`
+
   return (
     <div className="process-designer-visibility">
       <p className="process-designer-visibility__hint">
         Укажите, кому процесс будет виден во вкладке «Опубликованные». Администратор всегда видит все процессы. Если ни один сотрудник не выбран — процесс отображается всем.
       </p>
 
-      <div className="process-designer-visibility__section">
+      <div className="process-designer-visibility__summary-row">
+        <div className="process-designer-visibility__summary">{summaryText}</div>
+        <button
+          type="button"
+          className="process-designer-visibility__open-modal-btn"
+          onClick={() => setIsModalOpen(true)}
+        >
+          Настроить видимость процесса
+        </button>
+      </div>
+
+      {isModalOpen && (
+        <div className="process-designer-visibility__modal-backdrop">
+          <div className="process-designer-visibility__modal">
+            <div className="process-designer-visibility__modal-header">
+              <h3>Настройка видимости процесса</h3>
+              <button
+                type="button"
+                className="process-designer-visibility__modal-close"
+                onClick={() => setIsModalOpen(false)}
+                aria-label="Закрыть"
+              >
+                ×
+              </button>
+            </div>
+
+            <div className="process-designer-visibility__modal-body">
+              <div className="process-designer-visibility__section">
         <div className="process-designer-visibility__section-title">По отделам</div>
         {departments.length === 0 ? (
           <p className="process-designer-visibility__empty">Нет отделов в справочнике</p>
@@ -137,7 +170,7 @@ const ProcessDesignerVisibility = () => {
         )}
       </div>
 
-      <div className="process-designer-visibility__section">
+              <div className="process-designer-visibility__section">
         <div className="process-designer-visibility__section-title">Дополнительные сотрудники (независимо от отдела)</div>
         {users.length === 0 ? (
           <p className="process-designer-visibility__empty">Нет пользователей</p>
@@ -160,11 +193,22 @@ const ProcessDesignerVisibility = () => {
             ))}
           </div>
         )}
-      </div>
+              </div>
+            </div>
 
-      <div className="process-designer-visibility__summary">
-        Выбрано сотрудников: {selectedSet.size}. {selectedSet.size === 0 ? 'Процесс будет виден всем.' : ''}
-      </div>
+            <div className="process-designer-visibility__modal-footer">
+              <span className="process-designer-visibility__summary">{summaryText}</span>
+              <button
+                type="button"
+                className="process-designer-visibility__modal-submit"
+                onClick={() => setIsModalOpen(false)}
+              >
+                Готово
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
