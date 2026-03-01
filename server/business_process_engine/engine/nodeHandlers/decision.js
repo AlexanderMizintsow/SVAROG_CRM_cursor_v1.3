@@ -33,6 +33,33 @@ async function resolveRecipientUserIds(settings, context, registerClient) {
   return []
 }
 
+function substituteText(text, context) {
+  if (!text || typeof text !== 'string') return text
+  let out = text
+  const addInfo = context && typeof context === 'object' && context.additional_info && typeof context.additional_info === 'object'
+    ? context.additional_info
+    : {}
+  out = out.replace(/\{доп:([^}]+)\}/gi, (_, kRaw) => {
+    const k = String(kRaw || '').trim()
+    if (!k) return ''
+    const v = addInfo[k]
+    if (v === undefined || v === null) return 'false'
+    if (typeof v === 'string') return v.trim() ? v : 'false'
+    if (v === false) return 'false'
+    return String(v)
+  })
+  out = out.replace(/\{\{([^}]+)\}\}/g, (_, kRaw) => {
+    const k = String(kRaw || '').trim()
+    if (!k) return ''
+    const v = addInfo[k]
+    if (v === undefined || v === null) return ''
+    if (typeof v === 'string') return v.trim()
+    if (v === false) return ''
+    return String(v)
+  })
+  return out
+}
+
 function substituteMessage(text, context, processName) {
   if (!text || typeof text !== 'string') return text
   let out = text
@@ -42,6 +69,7 @@ function substituteMessage(text, context, processName) {
   if (processName) {
     out = out.replace(/\{название_процесса\}/gi, processName)
   }
+  out = substituteText(out, context)
   return out
 }
 

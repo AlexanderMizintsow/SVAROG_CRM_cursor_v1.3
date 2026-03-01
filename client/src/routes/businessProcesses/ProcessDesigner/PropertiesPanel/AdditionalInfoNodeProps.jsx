@@ -24,10 +24,10 @@ function normalizeKey(raw) {
 const emptyField = () => ({
   key: '',
   value: '',
+  requestAtStart: false,
   requiredAtRuntime: false,
   requiredFor: { source: 'initiator', userIds: [], departmentId: null, roleId: null },
   promptText: '',
-  // задел на будущее: заполнение из других блоков
   valueSource: { type: 'manual', config: {} },
 })
 
@@ -272,6 +272,17 @@ const AdditionalInfoNodeProps = ({ node, onUpdate }) => {
               >
                 −
               </button>
+            </div>
+
+            <div style={{ marginTop: 8 }}>
+              <label className="properties-panel__checkbox-row">
+                <input
+                  type="checkbox"
+                  checked={!!f.requestAtStart}
+                  onChange={(e) => patchField(idx, { requestAtStart: e.target.checked })}
+                />
+                <span>При запуске запрашивать параметры (модальное окно перед стартом)</span>
+              </label>
             </div>
 
             <div style={{ marginTop: 8 }}>

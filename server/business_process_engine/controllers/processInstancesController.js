@@ -8,7 +8,7 @@ const { runProcessFromStart, runProcessFromTaskCreation, runProcessFromProjectCr
  * @returns {Promise<object>} созданный экземпляр
  */
 async function startProcessInternal(dbPool, processId, options = {}) {
-  const { initiator_id, launched_by_user_id } = options
+  const { initiator_id, launched_by_user_id, initial_additional_info } = options
   if (!launched_by_user_id) {
     const err = new Error('Не указан launched_by_user_id')
     err.code = 'MISSING_LAUNCHED_BY'
@@ -54,6 +54,15 @@ async function startProcessInternal(dbPool, processId, options = {}) {
       initiatorId = launched_by_user_id
     }
   }
+
+  const initialAdditionalInfo = initial_additional_info && typeof initial_additional_info === 'object'
+    ? initial_additional_info
+    : {}
+  const context = { initiator_id: initiatorId || null }
+  if (Object.keys(initialAdditionalInfo).length > 0) {
+    context.additional_info = initialAdditionalInfo
+  }
+
   const instResult = await dbPool.query(
     `INSERT INTO bp_process_instances (process_id, initiator_id, launched_by_user_id, current_node_id, status, context)
      VALUES ($1, $2, $3, $4, 'running', $5)
@@ -63,7 +72,7 @@ async function startProcessInternal(dbPool, processId, options = {}) {
       initiatorId || null,
       launched_by_user_id || null,
       startNode.id,
-      JSON.stringify({ initiator_id: initiatorId || null }),
+      JSON.stringify(context),
     ]
   )
   const instance = instResult.rows[0]
@@ -76,8 +85,12 @@ async function startProcessInternal(dbPool, processId, options = {}) {
 async function startProcess(dbPool, req, res) {
   try {
     const processId = req.params.id
-    const { initiator_id, launched_by_user_id } = req.body
-    const instance = await startProcessInternal(dbPool, processId, { initiator_id, launched_by_user_id })
+    const { initiator_id, launched_by_user_id, initial_additional_info } = req.body || {}
+    const instance = await startProcessInternal(dbPool, processId, {
+      initiator_id,
+      launched_by_user_id,
+      initial_additional_info,
+    })
     res.status(201).json(instance)
   } catch (err) {
     if (err.code === 'MISSING_LAUNCHED_BY') return res.status(400).json({ error: err.message })

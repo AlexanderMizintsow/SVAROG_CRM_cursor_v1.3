@@ -9,6 +9,33 @@
 const { resolveProjectId, resolveParentTaskId } = require('./projectUtils')
 const { computeConditionalDeadline } = require('./deadlineUtils')
 
+function substituteText(text, context) {
+  if (!text || typeof text !== 'string') return text
+  let out = text
+  const addInfo = context && typeof context === 'object' && context.additional_info && typeof context.additional_info === 'object'
+    ? context.additional_info
+    : {}
+  out = out.replace(/\{доп:([^}]+)\}/gi, (_, kRaw) => {
+    const k = String(kRaw || '').trim()
+    if (!k) return ''
+    const v = addInfo[k]
+    if (v === undefined || v === null) return 'false'
+    if (typeof v === 'string') return v.trim() ? v : 'false'
+    if (v === false) return 'false'
+    return String(v)
+  })
+  out = out.replace(/\{\{([^}]+)\}\}/g, (_, kRaw) => {
+    const k = String(kRaw || '').trim()
+    if (!k) return ''
+    const v = addInfo[k]
+    if (v === undefined || v === null) return ''
+    if (typeof v === 'string') return v.trim()
+    if (v === false) return ''
+    return String(v)
+  })
+  return out
+}
+
 function getOutgoingEdges(scheme, nodeId) {
   const edges = scheme.edges || []
   return edges.filter((e) => e.source === nodeId)
@@ -55,8 +82,8 @@ async function handle(instance, node, scheme, integrations, dbPool) {
         ? JSON.parse(instance.context)
         : {}
 
-  let title = settings.title || 'Задача из процесса'
-  let description = settings.description || ''
+  let title = substituteText(settings.title || 'Задача из процесса', context)
+  let description = substituteText(settings.description || '', context)
   let priority = settings.priority || 'низкий'
   let tags = settings.tags
   let deadlineOffsetDays = settings.deadlineOffsetDays != null ? settings.deadlineOffsetDays : null
@@ -86,8 +113,10 @@ async function handle(instance, node, scheme, integrations, dbPool) {
     const templateResult = await dbPool.query('SELECT * FROM bp_task_templates WHERE id = $1', [settings.templateId])
     if (templateResult.rows.length) {
       const t = templateResult.rows[0]
-      if (!title || title === 'Задача из процесса') title = t.name || title
-      if (!description) description = t.description || ''
+      const templateTitle = substituteText(t.name || '', context)
+      const templateDesc = substituteText(t.description || '', context)
+      if (!title || title === 'Задача из процесса') title = templateTitle || t.name || title
+      if (!description) description = templateDesc || t.description || ''
       if (!priority) priority = t.priority_default || 'низкий'
       if (tags == null) tags = t.tags_default
       if (deadlineOffsetDays == null && t.deadline_offset_days != null) deadlineOffsetDays = t.deadline_offset_days
@@ -103,8 +132,8 @@ async function handle(instance, node, scheme, integrations, dbPool) {
       return { fail: 'Создать задачу: режим «окно при запуске» сейчас не поддерживает подзадачу задачи из схемы. Используйте режим «создать сразу».' }
     }
     const templateData = {
-      title,
-      description,
+      title: substituteText(title, context),
+      description: substituteText(description, context),
       priority: priority || 'низкий',
       assigneeUserIds: settings.assigneeUserIds || [],
       approverUserIds: settings.approverUserIds || [],

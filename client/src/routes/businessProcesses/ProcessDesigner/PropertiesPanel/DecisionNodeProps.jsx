@@ -145,9 +145,10 @@ const DecisionNodeProps = ({ node, onUpdate }) => {
           className="properties-panel__textarea"
           value={settings.messageText ?? ''}
           onChange={(e) => handleChange('messageText', e.target.value)}
-          placeholder="Подстановки: {инициатор}, {название_процесса}"
+          placeholder="Подстановки: {инициатор}, {название_процесса}, {доп:ключ}, {{ключ}}"
           rows={4}
         />
+        <div className="properties-panel__hint">Подстановка: <b>{'{доп:ключ}'}</b> или <b>{'{{ключ}}'}</b></div>
       </div>
       <div className="properties-panel__field">
         <label className="properties-panel__label">Варианты ответа (кнопки)</label>

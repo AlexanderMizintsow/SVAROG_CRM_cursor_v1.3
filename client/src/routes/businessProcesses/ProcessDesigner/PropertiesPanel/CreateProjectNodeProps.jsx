@@ -92,7 +92,7 @@ const CreateProjectNodeProps = ({ node, onUpdate }) => {
           onChange={(e) => handleChange({ title: e.target.value })}
           placeholder="Например: Заявка {доп:order_number}"
         />
-        <div className="properties-panel__hint">Поддерживается подстановка: <b>{'{доп:ключ}'}</b></div>
+        <div className="properties-panel__hint">Подстановка: <b>{'{доп:ключ}'}</b> или <b>{'{{ключ}}'}</b></div>
       </div>
 
       <div className="properties-panel__field">
@@ -104,6 +104,7 @@ const CreateProjectNodeProps = ({ node, onUpdate }) => {
           onChange={(e) => handleChange({ description: e.target.value })}
           placeholder="Краткое описание проекта"
         />
+        <div className="properties-panel__hint">Подстановка: <b>{'{доп:ключ}'}</b> или <b>{'{{ключ}}'}</b></div>
       </div>
 
       <div className="properties-panel__field">

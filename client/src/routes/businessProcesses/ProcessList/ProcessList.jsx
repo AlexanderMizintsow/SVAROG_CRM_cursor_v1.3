@@ -123,13 +123,17 @@ const ProcessList = ({ showDrafts = false, onEditProcess, onCreateNew }) => {
     setStartModalProcess(null)
   }
 
-  const handleConfirmStart = async (initiatorId) => {
+  const handleConfirmStart = async (initiatorId, initialAdditionalInfo) => {
     if (!startModalProcess) return
     try {
-      const instance = await startProcess(startModalProcess.id, {
+      const body = {
         initiator_id: initiatorId || user?.id,
         launched_by_user_id: user?.id,
-      })
+      }
+      if (initialAdditionalInfo && Object.keys(initialAdditionalInfo).length > 0) {
+        body.initial_additional_info = initialAdditionalInfo
+      }
+      const instance = await startProcess(startModalProcess.id, body)
       Toastify({
         text: 'Процесс запущен',
         close: true,

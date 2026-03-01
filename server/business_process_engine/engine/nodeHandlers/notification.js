@@ -32,18 +32,9 @@ async function resolveRecipientUserIds(settings, context, registerClient) {
   return []
 }
 
-function substituteMessage(text, context, registerClient) {
+function substituteText(text, context) {
   if (!text || typeof text !== 'string') return text
   let out = text
-  if (context.initiator_id) {
-    out = out.replace(/\{инициатор\}/gi, `Пользователь #${context.initiator_id}`)
-  }
-  if (context.last_task_id) {
-    out = out.replace(/\{задача_id\}/gi, String(context.last_task_id))
-  }
-
-  // Доп. информация: подстановка вида {доп:key}
-  // Пустые/не заданные значения трактуем как false.
   const addInfo = context && typeof context === 'object' && context.additional_info && typeof context.additional_info === 'object'
     ? context.additional_info
     : {}
@@ -56,7 +47,28 @@ function substituteMessage(text, context, registerClient) {
     if (v === false) return 'false'
     return String(v)
   })
+  out = out.replace(/\{\{([^}]+)\}\}/g, (_, kRaw) => {
+    const k = String(kRaw || '').trim()
+    if (!k) return ''
+    const v = addInfo[k]
+    if (v === undefined || v === null) return ''
+    if (typeof v === 'string') return v.trim()
+    if (v === false) return ''
+    return String(v)
+  })
+  return out
+}
 
+function substituteMessage(text, context, registerClient) {
+  if (!text || typeof text !== 'string') return text
+  let out = text
+  if (context.initiator_id) {
+    out = out.replace(/\{инициатор\}/gi, `Пользователь #${context.initiator_id}`)
+  }
+  if (context.last_task_id) {
+    out = out.replace(/\{задача_id\}/gi, String(context.last_task_id))
+  }
+  out = substituteText(out, context)
   return out
 }
 
@@ -84,7 +96,7 @@ async function handle(instance, node, scheme, integrations, dbPool) {
       if (channels.inApp) {
         // in-app: пишем в таблицу BPE и показываем в AlertBanner как «БП»
         try {
-          const title = settings.title || 'Уведомление (БП)'
+          const title = substituteText(settings.title || 'Уведомление (БП)', context)
           for (const uid of userIds) {
             await dbPool.query(
               `INSERT INTO bp_in_app_notifications (user_id, title, message, process_instance_id, node_id)

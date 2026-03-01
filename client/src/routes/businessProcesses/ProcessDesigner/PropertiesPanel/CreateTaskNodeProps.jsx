@@ -230,6 +230,7 @@ const CreateTaskNodeProps = ({ node, onUpdate }) => {
           onChange={(e) => handleChange('title', e.target.value)}
           placeholder="Подставится при создании задачи"
         />
+        <div className="properties-panel__hint">Подстановка: <b>{'{доп:ключ}'}</b> или <b>{'{{ключ}}'}</b></div>
       </div>
 
       <div className="properties-panel__field">
@@ -241,6 +242,7 @@ const CreateTaskNodeProps = ({ node, onUpdate }) => {
           placeholder="Текст/HTML как в Менеджере задач"
           rows={3}
         />
+        <div className="properties-panel__hint">Подстановка: <b>{'{доп:ключ}'}</b> или <b>{'{{ключ}}'}</b></div>
       </div>
 
       <div className="properties-panel__field">

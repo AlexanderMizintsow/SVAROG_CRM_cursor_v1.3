@@ -83,16 +83,19 @@ const Palette = () => {
 
   const additionalInfoKeys = useMemo(() => {
     const nodes = Array.isArray(scheme?.nodes) ? scheme.nodes : []
-    const keys = []
+    const keyMap = {}
     for (const n of nodes) {
       if (n.type !== BLOCK_TYPES.ADDITIONAL_INFO) continue
       const fields = Array.isArray(n.settings?.fields) ? n.settings.fields : []
       for (const f of fields) {
         const k = String(f?.key || '').trim()
-        if (k) keys.push(k)
+        if (k) {
+          keyMap[k] = keyMap[k] || { key: k, requestAtStart: !!f?.requestAtStart }
+          if (f?.requestAtStart) keyMap[k].requestAtStart = true
+        }
       }
     }
-    return Array.from(new Set(keys)).sort((a, b) => a.localeCompare(b, 'ru'))
+    return Object.values(keyMap).sort((a, b) => a.key.localeCompare(b.key, 'ru'))
   }, [scheme?.nodes])
 
   const getNextPosition = useCallback(() => {
@@ -189,7 +192,9 @@ const Palette = () => {
           <p className="palette__hint">Добавьте блок «Доп. информация» и задайте ключи.</p>
         ) : (
           <ul className="palette__list">
-            {additionalInfoKeys.map((k) => {
+            {additionalInfoKeys.map((item) => {
+              const k = typeof item === 'object' ? item.key : item
+              const requestAtStart = typeof item === 'object' ? item.requestAtStart : false
               const token = `{доп:${k}}`
               return (
                 <li key={k} className="palette__item">
@@ -202,12 +207,15 @@ const Palette = () => {
                         setCopiedKey(k)
                         setTimeout(() => setCopiedKey(''), 1200)
                       } catch (e) {
-                        // fallback: ничего, пользователь может скопировать вручную
+                        // fallback
                       }
                     }}
                     title="Скопировать"
                   >
                     <span className="palette__label" style={{ fontFamily: 'monospace' }}>{token}</span>
+                    {requestAtStart && (
+                      <span className="palette__hint" style={{ marginLeft: 4 }} title="Будет запрошено при запуске">…</span>
+                    )}
                     {copiedKey === k && <span className="palette__hint" style={{ marginLeft: 8 }}>Скопировано</span>}
                   </button>
                 </li>

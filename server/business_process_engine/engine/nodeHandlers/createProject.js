@@ -25,6 +25,15 @@ function substituteText(text, context) {
     if (v === false) return 'false'
     return String(v)
   })
+  out = out.replace(/\{\{([^}]+)\}\}/g, (_, kRaw) => {
+    const k = String(kRaw || '').trim()
+    if (!k) return ''
+    const v = addInfo[k]
+    if (v === undefined || v === null) return ''
+    if (typeof v === 'string') return v.trim()
+    if (v === false) return ''
+    return String(v)
+  })
   return out
 }
 
@@ -69,9 +78,9 @@ async function handle(instance, node, scheme, integrations, dbPool) {
       .filter((r) => r && r.id != null)
       .map((r) => ({ id: r.id, role: r.role || 'Исполнитель', requires_approval: !!r.requires_approval }))
     const templateData = {
-      title: settings.title || 'Проект из бизнес‑процесса',
-      description: settings.description || '',
-      goals: Array.isArray(settings.goals) ? settings.goals : [],
+      title: substituteText(settings.title || 'Проект из бизнес‑процесса', context),
+      description: substituteText(settings.description || '', context),
+      goals: Array.isArray(settings.goals) ? settings.goals.map((x) => substituteText(String(x || ''), context)).filter((x) => x.trim()) : [],
       deadline: templateDeadline,
       priority: settings.priority || 'medium',
       additionalInfo: Array.isArray(settings.additionalInfo) ? settings.additionalInfo : [],
