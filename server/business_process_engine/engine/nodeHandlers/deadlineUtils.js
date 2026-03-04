@@ -21,6 +21,44 @@ function setTimeToDate(date, timeStr) {
   return d
 }
 
+/**
+ * Дедлайн: дата запуска процесса + указанное время (ЧЧ:ММ).
+ * @param {Date|string} startedAt - момент запуска процесса
+ * @param {string} timeStr - время в формате "14:00"
+ * @returns {string} ISO/YYYY-MM-DDTHH:mm
+ */
+function computeStartDayDeadline(startedAt, timeStr) {
+  const d = new Date(startedAt)
+  if (!Number.isFinite(d.getTime())) return null
+  const result = setTimeToDate(d, timeStr || '23:59')
+  const y = result.getFullYear()
+  const m = String(result.getMonth() + 1).padStart(2, '0')
+  const day = String(result.getDate()).padStart(2, '0')
+  const h = String(result.getHours()).padStart(2, '0')
+  const min = String(result.getMinutes()).padStart(2, '0')
+  return `${y}-${m}-${day}T${h}:${min}`
+}
+
+/**
+ * Дедлайн: дата запуска процесса + N дней + указанное время.
+ * @param {Date|string} startedAt - момент запуска процесса
+ * @param {number} offsetDays - смещение в днях
+ * @param {string} [timeStr] - время "14:00", по умолчанию "23:59"
+ * @returns {string} ISO/YYYY-MM-DDTHH:mm
+ */
+function computeOffsetFromStartDeadline(startedAt, offsetDays, timeStr) {
+  const d = new Date(startedAt)
+  if (!Number.isFinite(d.getTime())) return null
+  d.setDate(d.getDate() + Number(offsetDays))
+  const result = setTimeToDate(d, timeStr || '23:59')
+  const y = result.getFullYear()
+  const m = String(result.getMonth() + 1).padStart(2, '0')
+  const day = String(result.getDate()).padStart(2, '0')
+  const h = String(result.getHours()).padStart(2, '0')
+  const min = String(result.getMinutes()).padStart(2, '0')
+  return `${y}-${m}-${day}T${h}:${min}`
+}
+
 function computeConditionalDeadline(rule, now = new Date()) {
   if (!rule || !rule.boundary) return null
   const boundary = parseTime(rule.boundary)
@@ -51,4 +89,10 @@ function computeConditionalDeadline(rule, now = new Date()) {
   return `${y}-${m}-${day}T${h}:${min}`
 }
 
-module.exports = { computeConditionalDeadline, parseTime, setTimeToDate }
+module.exports = {
+  computeConditionalDeadline,
+  computeStartDayDeadline,
+  computeOffsetFromStartDeadline,
+  parseTime,
+  setTimeToDate,
+}

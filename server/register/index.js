@@ -125,6 +125,8 @@ const {
   updateUserStatus,
   uploadAvatar,
   getAvatar,
+  getEmailSignature,
+  updateEmailSignature,
   getUserPhones,
   addPhone,
   updatePhone,
@@ -392,6 +394,8 @@ app.post('/api/users/new', createUser(dbPool))
 app.post('/update-status', updateUserStatus(dbPool, io))
 app.post('/api/users/:id/avatar', upload.single('avatar'), uploadAvatar(dbPool))
 app.get('/api/users/:id/avatar', getAvatar(dbPool))
+app.get('/api/users/:id/email-signature', getEmailSignature(dbPool))
+app.put('/api/users/:id/email-signature', updateEmailSignature(dbPool))
 app.get('/api/users/mpp/:id', getMppIdByCompanyId(dbPool))
 app.get('/api/users/mpr/:id', getMprIdByCompanyId(dbPool))
 app.get('/api/users/nok/:id', getNokOrMppIdByCompanyId(dbPool))

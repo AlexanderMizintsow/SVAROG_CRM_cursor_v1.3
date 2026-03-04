@@ -3,7 +3,7 @@
  * - prepared: создать проект сразу в register
  * - modal_at_runtime: поставить экземпляр на waiting_user_input и отдать templateData на клиент
  */
-const { computeConditionalDeadline } = require('./deadlineUtils')
+const { computeConditionalDeadline, computeStartDayDeadline, computeOffsetFromStartDeadline } = require('./deadlineUtils')
 
 function getOutgoingEdges(scheme, nodeId) {
   const edges = scheme.edges || []
@@ -73,6 +73,10 @@ async function handle(instance, node, scheme, integrations, dbPool) {
         nextDayTime: raw.nextDayTime ?? raw.next_day_time ?? def.nextDayTime,
       }
       templateDeadline = computeConditionalDeadline(rule)
+    } else if (settings.deadlineMode === 'start_day_time' && settings.deadlineStartDayTime && instance.started_at) {
+      templateDeadline = computeStartDayDeadline(instance.started_at, settings.deadlineStartDayTime)
+    } else if (settings.deadlineMode === 'offset' && settings.deadlineOffsetDays != null && instance.started_at) {
+      templateDeadline = computeOffsetFromStartDeadline(instance.started_at, settings.deadlineOffsetDays, settings.deadlineOffsetTime)
     }
     const templateResponsibles = (Array.isArray(settings.responsibles) ? settings.responsibles : [])
       .filter((r) => r && r.id != null)
@@ -111,6 +115,10 @@ async function handle(instance, node, scheme, integrations, dbPool) {
       nextDayTime: raw.nextDayTime ?? raw.next_day_time ?? def.nextDayTime,
     }
     deadline = computeConditionalDeadline(rule)
+  } else if (settings.deadlineMode === 'start_day_time' && settings.deadlineStartDayTime && instance.started_at) {
+    deadline = computeStartDayDeadline(instance.started_at, settings.deadlineStartDayTime)
+  } else if (settings.deadlineMode === 'offset' && settings.deadlineOffsetDays != null && instance.started_at) {
+    deadline = computeOffsetFromStartDeadline(instance.started_at, settings.deadlineOffsetDays, settings.deadlineOffsetTime)
   }
   const priority = settings.priority || 'medium'
   const additionalInfo = normalizeAdditionalInfo(settings.additionalInfo)

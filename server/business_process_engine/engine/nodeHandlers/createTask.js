@@ -7,7 +7,7 @@
  * backlog / todo / wait / doing / done / pause (+ алиасы pending/in_progress/completed/on_hold/cancelled).
  */
 const { resolveProjectId, resolveParentTaskId } = require('./projectUtils')
-const { computeConditionalDeadline } = require('./deadlineUtils')
+const { computeConditionalDeadline, computeStartDayDeadline, computeOffsetFromStartDeadline } = require('./deadlineUtils')
 
 function substituteText(text, context) {
   if (!text || typeof text !== 'string') return text
@@ -131,6 +131,24 @@ async function handle(instance, node, scheme, integrations, dbPool) {
     if (linkToParentTask) {
       return { fail: 'Создать задачу: режим «окно при запуске» сейчас не поддерживает подзадачу задачи из схемы. Используйте режим «создать сразу».' }
     }
+    let templateDeadline = null
+    if (settings.deadlineMode === 'fixed' && settings.deadline) {
+      const deadlineStr = String(settings.deadline).trim()
+      if (/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}/.test(deadlineStr)) templateDeadline = deadlineStr
+      else {
+        const dt = new Date(settings.deadline)
+        if (Number.isFinite(dt.getTime())) templateDeadline = dt.toISOString()
+      }
+    } else if (settings.deadlineMode === 'conditional') {
+      const def = { boundary: '12:00', sameDayTime: '18:00', nextDayTime: '16:00' }
+      const raw = settings.conditionalDeadline || {}
+      const rule = { boundary: raw.boundary ?? def.boundary, sameDayTime: raw.sameDayTime ?? def.sameDayTime, nextDayTime: raw.nextDayTime ?? def.nextDayTime }
+      templateDeadline = computeConditionalDeadline(rule)
+    } else if (settings.deadlineMode === 'start_day_time' && settings.deadlineStartDayTime && instance.started_at) {
+      templateDeadline = computeStartDayDeadline(instance.started_at, settings.deadlineStartDayTime)
+    } else if (settings.deadlineMode === 'offset' && deadlineOffsetDays != null && instance.started_at) {
+      templateDeadline = computeOffsetFromStartDeadline(instance.started_at, deadlineOffsetDays, settings.deadlineOffsetTime)
+    }
     const templateData = {
       title: substituteText(title, context),
       description: substituteText(description, context),
@@ -140,7 +158,7 @@ async function handle(instance, node, scheme, integrations, dbPool) {
       viewerUserIds: settings.viewerUserIds || [],
       deadlineOffsetDays: deadlineOffsetDays != null ? deadlineOffsetDays : null,
       deadlineMode: settings.deadlineMode || null,
-      deadline: settings.deadline || null,
+      deadline: templateDeadline || settings.deadline || null,
     }
     const pending = { nodeId: node.id, templateData }
     const newContext = { ...context, pending_task_creation: pending }
@@ -182,6 +200,10 @@ async function handle(instance, node, scheme, integrations, dbPool) {
       nextDayTime: raw.nextDayTime ?? raw.next_day_time ?? def.nextDayTime,
     }
     deadline = computeConditionalDeadline(rule)
+  } else if (settings.deadlineMode === 'start_day_time' && settings.deadlineStartDayTime && instance.started_at) {
+    deadline = computeStartDayDeadline(instance.started_at, settings.deadlineStartDayTime)
+  } else if (settings.deadlineMode === 'offset' && deadlineOffsetDays != null && instance.started_at) {
+    deadline = computeOffsetFromStartDeadline(instance.started_at, deadlineOffsetDays, settings.deadlineOffsetTime)
   } else if (settings.deadlineMode === 'offset' && deadlineOffsetDays != null) {
     const d = new Date()
     d.setDate(d.getDate() + Number(deadlineOffsetDays))

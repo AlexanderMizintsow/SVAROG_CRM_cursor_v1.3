@@ -43,9 +43,27 @@ async function processMessage(res) {
   const date = parsed.date || null
   const messageId = parsed.messageId || null
   const inReplyTo = parsed.inReplyTo || null
+  const htmlToText = (html) => {
+    if (!html || typeof html !== 'string') return ''
+    let t = html
+    t = t.replace(/<br\s*\/?>/gi, '\n')
+    t = t.replace(/<\/p>/gi, '\n')
+    t = t.replace(/<\/div>/gi, '\n')
+    t = t.replace(/<\/tr>/gi, '\n')
+    t = t.replace(/<\/li>/gi, '\n')
+    t = t.replace(/<hr\s*\/?>/gi, '\n')
+    t = t.replace(/<[^>]+>/g, ' ')
+    t = t.replace(/&nbsp;/g, ' ')
+    t = t.replace(/&amp;/g, '&')
+    t = t.replace(/&lt;/g, '<')
+    t = t.replace(/&gt;/g, '>')
+    t = t.replace(/&quot;/g, '"')
+    t = t.split(/\n/).map((line) => line.replace(/\s+/g, ' ').trim()).join('\n')
+    return t.replace(/\n{3,}/g, '\n\n').trim()
+  }
   const body =
     (parsed.text && parsed.text.trim()) ||
-    (parsed.html && parsed.html.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim()) ||
+    (parsed.html && htmlToText(parsed.html)) ||
     'Текстовое содержимое отсутствует'
   const attachments = (parsed.attachments || []).map((a) => ({
     filename: a.filename,

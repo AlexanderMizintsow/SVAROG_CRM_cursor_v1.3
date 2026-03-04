@@ -71,6 +71,22 @@
   margin-bottom: 0.25rem;
 }
 
+.process-card-schedule__select {
+  padding: 0.35rem 0.5rem;
+  border: 1px solid var(--border, #e2e8f0);
+  border-radius: 6px;
+  font-size: 0.9rem;
+  background: var(--bg-card, #fff);
+  min-width: 12rem;
+}
+
+.process-card-schedule__hint {
+  font-size: 0.8rem;
+  color: var(--text-secondary, #64748b);
+  margin: -0.25rem 0 0.5rem 0;
+  padding-left: 0;
+}
+
 .process-card-schedule__time,
 .process-card-schedule__number,
 .process-card-schedule__date-input {

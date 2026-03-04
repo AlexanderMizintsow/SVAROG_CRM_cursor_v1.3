@@ -3,6 +3,28 @@ import axios from 'axios'
 import { API_BASE_URL } from '../../../../../config'
 import './SendProjectMailModal.scss'
 
+function appendSignature(bodyText, signature) {
+  if (!signature || (!signature.text && !signature.imageDataUrl)) return bodyText
+  const parts = [bodyText]
+  if (signature.imageDataUrl) parts.push('-- (рисунок)')
+  if (signature.text) parts.push(signature.text)
+  return parts.join('\n\n')
+}
+
+function appendSignatureHtml(bodyText, signature) {
+  if (!signature || (!signature.text && !signature.imageDataUrl)) return null
+  const bodyHtml = bodyText.replace(/\n/g, '<br>')
+  const sigParts = []
+  if (signature.imageDataUrl) {
+    sigParts.push(`<img src="${signature.imageDataUrl}" alt="" style="max-width:200px;display:block;margin:0 0 0.25em 0;" />`)
+  }
+  if (signature.text) {
+    sigParts.push(signature.text.replace(/\n/g, '<br>'))
+  }
+  const sigHtml = sigParts.join('<br>')
+  return bodyHtml + '<br><br>' + sigHtml
+}
+
 const CATEGORY_SUPPLIERS = 'suppliers'
 const CATEGORY_EMPLOYEES = 'employees'
 const CATEGORY_DEALERS = 'dealers'
@@ -14,13 +36,15 @@ function decodeUtf8FileName(name) {
   try {
     const bytes = [...name].map((c) => c.charCodeAt(0) & 0xff)
     return new TextDecoder('utf-8').decode(new Uint8Array(bytes))
-  } catch (_) {}
+  } catch {
+    /* ignore decode error */
+  }
   return name
 }
 
 function buildBody(task, includeAdditionalInfo = false) {
   const parts = []
-  if (task.description) parts.push('Описание:\n' + task.description)
+  if (task.description) parts.push('Добрый день!\n\n' + task.description)
   if (includeAdditionalInfo && task.additional_info && Object.keys(task.additional_info).length > 0) {
     parts.push(
       'Доп. информация:\n' +
@@ -44,6 +68,7 @@ function SendProjectMailModal({ open, onClose, task, attachments: attachmentsPro
   const [includeAdditionalInfo, setIncludeAdditionalInfo] = useState(false)
   const [bodyText, setBodyText] = useState('')
   const [customFiles, setCustomFiles] = useState([])
+  const [signature, setSignature] = useState(null)
 
   const attachmentList =
     open && task?.id && attachmentsFetched.length > 0
@@ -65,9 +90,21 @@ function SendProjectMailModal({ open, onClose, task, attachments: attachmentsPro
   useEffect(() => {
     if (open && task) {
       const initial = buildBody(task, includeAdditionalInfo)
-      setBodyText((prev) => (prev === '' ? initial : prev))
+      setBodyText(initial)
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- task?.id intentionally used to avoid reset on task ref change
   }, [open, task?.id, includeAdditionalInfo])
+
+  useEffect(() => {
+    if (open && userId) {
+      axios
+        .get(`${API_BASE_URL}5000/api/users/${userId}/email-signature`)
+        .then((res) => setSignature(res.data || null))
+        .catch(() => setSignature(null))
+    } else {
+      setSignature(null)
+    }
+  }, [open, userId])
 
   useEffect(() => {
     if (!open || !task?.id) return
@@ -163,7 +200,9 @@ function SendProjectMailModal({ open, onClose, task, attachments: attachmentsPro
 
   const selectedRecipients = recipients.filter((r) => selectedIds.has(r.id))
   const toEmails = [...new Set(selectedRecipients.map((r) => r.email))].filter(Boolean)
-  const body = (bodyText !== undefined && bodyText !== '') ? bodyText : (task ? buildBody(task, includeAdditionalInfo) : '')
+  const baseBody = (bodyText !== undefined && bodyText !== '') ? bodyText : (task ? buildBody(task, includeAdditionalInfo) : '')
+  const body = appendSignature(baseBody, signature)
+  const bodyHtml = appendSignatureHtml(baseBody, signature) ?? (baseBody.replace(/\n/g, '<br>'))
   const subject = task?.title ? task.title : 'Письмо'
 
   const addCustomFiles = (e) => {
@@ -189,6 +228,7 @@ function SendProjectMailModal({ open, onClose, task, attachments: attachmentsPro
       formData.append('to', toEmails.join(', '))
       formData.append('subject', subject)
       formData.append('body', body)
+      formData.append('bodyHtml', bodyHtml)
       if (task?.id) formData.append('globalTaskId', task.id)
 
       const selectedAttachments = attachmentList.filter((_, i) => selectedAttachmentIndices.has(i))
@@ -287,10 +327,10 @@ function SendProjectMailModal({ open, onClose, task, attachments: attachmentsPro
           </div>
 
           <div className="send-project-mail-modal__body-edit">
-            <label>Текст письма (можно отредактировать):</label>
+            <label>Текст письма (можно отредактировать):{signature && (signature.text || signature.imageDataUrl) && <span className="send-project-mail-modal__signature-hint"> Подпись будет добавлена в конец.</span>}</label>
             <textarea
               className="send-project-mail-modal__textarea"
-              value={body}
+              value={baseBody}
               onChange={(e) => setBodyText(e.target.value)}
               rows={8}
               placeholder="Описание и доп. информация"

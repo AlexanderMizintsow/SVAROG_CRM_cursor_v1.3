@@ -368,7 +368,9 @@ const CreateTaskNodeProps = ({ node, onUpdate }) => {
               ? 'fixed'
               : settings.deadlineOffsetDays != null
                 ? 'offset'
-                : 'none')
+                : settings.deadlineStartDayTime
+                  ? 'start_day_time'
+                  : 'none')
           }
           onChange={(e) => {
             const mode = e.target.value
@@ -376,17 +378,28 @@ const CreateTaskNodeProps = ({ node, onUpdate }) => {
             if (mode === 'none') {
               patch.deadline = null
               patch.deadlineOffsetDays = null
+              patch.deadlineOffsetTime = null
+              patch.deadlineStartDayTime = null
               patch.conditionalDeadline = null
             } else if (mode === 'fixed') {
               patch.deadlineOffsetDays = null
+              patch.deadlineOffsetTime = null
+              patch.deadlineStartDayTime = null
               patch.conditionalDeadline = null
             } else if (mode === 'offset') {
               patch.deadline = null
+              patch.deadlineStartDayTime = null
+              patch.conditionalDeadline = null
+            } else if (mode === 'start_day_time') {
+              patch.deadline = null
+              patch.deadlineOffsetDays = null
+              patch.deadlineOffsetTime = null
               patch.conditionalDeadline = null
             } else if (mode === 'conditional') {
               patch.deadline = null
               patch.deadlineOffsetDays = null
-              // Инициализируем правило, иначе в схеме не сохранятся значения и движок не поставит дедлайн
+              patch.deadlineOffsetTime = null
+              patch.deadlineStartDayTime = null
               patch.conditionalDeadline = {
                 boundary: settings.conditionalDeadline?.boundary ?? '12:00',
                 sameDayTime: settings.conditionalDeadline?.sameDayTime ?? '18:00',
@@ -398,10 +411,11 @@ const CreateTaskNodeProps = ({ node, onUpdate }) => {
         >
           <option value="none">Без дедлайна</option>
           <option value="fixed">Конкретная дата и время</option>
-          <option value="offset">Смещение в днях</option>
+          <option value="start_day_time">Сегодня (от запуска) + время</option>
+          <option value="offset">Смещение в днях (от запуска) + время</option>
           <option value="conditional">По условию (граница времени)</option>
         </select>
-        {(settings.deadlineMode ?? (settings.deadline ? 'fixed' : settings.deadlineOffsetDays != null ? 'offset' : 'none')) === 'fixed' && (
+        {(settings.deadlineMode ?? (settings.deadline ? 'fixed' : settings.deadlineOffsetDays != null ? 'offset' : settings.deadlineStartDayTime ? 'start_day_time' : 'none')) === 'fixed' && (
           <>
             <input
               type="datetime-local"
@@ -415,16 +429,45 @@ const CreateTaskNodeProps = ({ node, onUpdate }) => {
             </p>
           </>
         )}
+        {(settings.deadlineMode ?? (settings.deadlineStartDayTime ? 'start_day_time' : 'none')) === 'start_day_time' && (
+          <div style={{ marginTop: 8 }}>
+            <label className="properties-panel__label" style={{ marginTop: 6 }}>Время (ЧЧ:ММ)</label>
+            <input
+              type="time"
+              className="properties-panel__input"
+              value={settings.deadlineStartDayTime ?? '00:00'}
+              onChange={(e) => handleChange('deadlineStartDayTime', e.target.value || '00:00')}
+              style={{ marginTop: 6 }}
+            />
+            <p className="properties-panel__hint" style={{ marginTop: 4, fontSize: '0.8rem' }}>
+              Дата берётся от дня запуска процесса, время — указанное. Например: при запуске 4 марта в 10:00 и времени 14:00 → дедлайн 4 марта 14:00.
+            </p>
+          </div>
+        )}
         {(settings.deadlineMode ?? (settings.deadline ? 'fixed' : settings.deadlineOffsetDays != null ? 'offset' : 'none')) === 'offset' && (
-          <input
-            type="number"
-            className="properties-panel__input"
-            value={settings.deadlineOffsetDays ?? ''}
-            onChange={(e) => handleChange('deadlineOffsetDays', e.target.value === '' ? null : Number(e.target.value))}
-            placeholder="Дней от текущей даты"
-            min={0}
-            style={{ marginTop: 6 }}
-          />
+          <div style={{ marginTop: 8 }}>
+            <label className="properties-panel__label" style={{ marginTop: 6 }}>Дней от запуска процесса</label>
+            <input
+              type="number"
+              className="properties-panel__input"
+              value={settings.deadlineOffsetDays ?? ''}
+              onChange={(e) => handleChange('deadlineOffsetDays', e.target.value === '' ? null : Number(e.target.value))}
+              placeholder="0 = сегодня"
+              min={0}
+              style={{ marginTop: 6 }}
+            />
+            <label className="properties-panel__label" style={{ marginTop: 6 }}>Время (ЧЧ:ММ)</label>
+            <input
+              type="time"
+              className="properties-panel__input"
+              value={settings.deadlineOffsetTime ?? '00:00'}
+              onChange={(e) => handleChange('deadlineOffsetTime', e.target.value || '00:00')}
+              style={{ marginTop: 6 }}
+            />
+            <p className="properties-panel__hint" style={{ marginTop: 4, fontSize: '0.8rem' }}>
+              Дата = день запуска процесса + указанное кол-во дней. Например: запуск 4 марта, 2 дня, 14:00 → дедлайн 6 марта 14:00.
+            </p>
+          </div>
         )}
         {(settings.deadlineMode ?? '') === 'conditional' && (
           <div style={{ marginTop: 8 }}>

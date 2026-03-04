@@ -1,6 +1,8 @@
 // Компонент содержит в себе остаьные стыковочные компоненты
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { FaArrowLeft } from 'react-icons/fa'
+import axios from 'axios'
+import { API_BASE_URL } from '../../../../config'
 import GlobalTaskHeader from './GlobalTaskHeader'
 import GlobalTaskProgress from './GlobalTaskProgress'
 import GlobalTaskCard from './GlobalTaskCard'
@@ -72,6 +74,16 @@ const GlobalTaskPage = ({
   const TERMINAL_STATUSES = ['Завершено', 'Провал', 'Удален']
   const isReadOnly = TERMINAL_STATUSES.includes(currentTask.status)
 
+  const refreshDocuments = useCallback(async () => {
+    if (!currentTask?.id) return
+    try {
+      const response = await axios.get(`${API_BASE_URL}5000/api/tasks/${currentTask.id}/attachments`)
+      setAttachments(response.data?.attachments || [])
+    } catch (e) {
+      console.error('Ошибка загрузки вложений:', e)
+    }
+  }, [currentTask?.id])
+
   // 6. Определение обработчиков событий и других функций
   const goToPreviousTask = () => {
     if (currentTaskIndex > 0) {
@@ -127,6 +139,7 @@ const GlobalTaskPage = ({
           hasNext={tasks && currentTaskIndex < tasks.length - 1}
           setAttachments={setAttachments}
           onRefresh={onRefresh}
+          onDocumentsUpdated={refreshDocuments}
           isReadOnly={isReadOnly}
         />
 

@@ -12,7 +12,7 @@ import {
   FaChevronLeft,
   FaChevronRight,
 } from 'react-icons/fa'
-import { MdEmail } from 'react-icons/md'
+import { MdEmail, MdSettings } from 'react-icons/md'
 import { MdCalendarMonth, MdAccessTime } from 'react-icons/md'
 import useUserStore from '../../../store/userStore'
 import {
@@ -30,6 +30,8 @@ import AdditionalInfoEditor from './subcomponents/AdditionalInfoEditor'
 import FinalSolutionsBlock from './subcomponents/FinalSolutionsBlock'
 import FinalSolutionModal from './subcomponents/FinalSolutionModal'
 import SendProjectMailModal from './subcomponents/SendProjectMailModal'
+import FileCommentsModal from './subcomponents/FileCommentsModal'
+import SignatureTemplateModal from './subcomponents/SignatureTemplateModal'
 import './styles/GlobalTaskCard.scss'
 
 const GlobalTaskCard = ({
@@ -41,6 +43,7 @@ const GlobalTaskCard = ({
   hasNext,
   setAttachments,
   onRefresh,
+  onDocumentsUpdated,
   isReadOnly,
 }) => {
   const cardRef = useRef(null)
@@ -58,6 +61,13 @@ const GlobalTaskCard = ({
   const [approvalComment, setApprovalComment] = useState('')
   const [approvalSubmitting, setApprovalSubmitting] = useState(false)
   const [sendMailModalOpen, setSendMailModalOpen] = useState(false)
+  const [signatureModalOpen, setSignatureModalOpen] = useState(false)
+  const [fileCommentsModal, setFileCommentsModal] = useState({
+    open: false,
+    files: [],
+    fileUrls: [],
+    taskId: null,
+  })
   // Обработчик открытия редактора целей
   const handleOpenGoalsEditor = () => setIsGoalsEditorOpen(true)
   const handleCloseGoalsEditor = () => setIsGoalsEditorOpen(false)
@@ -236,63 +246,60 @@ const GlobalTaskCard = ({
     }
   }
 
-  // Реализация handleAddFile
+  const handleFileCommentsConfirm = useCallback(
+    async (comments) => {
+      const { files, fileUrls, taskId: tid } = fileCommentsModal
+      if (!tid || !fileUrls?.length || !files?.length) return
+      try {
+        await Promise.all(
+          fileUrls.map((url, index) =>
+            axios.post(`${API_BASE_URL}5000/api/tasks/attachment/add`, {
+              task_id: tid,
+              file_url: url,
+              file_type: files[index].type,
+              comment_file: comments[index] ?? '',
+              name_file: files[index].name,
+              uploaded_by: userId,
+              tableType: 'global',
+            })
+          )
+        )
+        fetchAttachments()
+        setFileCommentsModal({ open: false, files: [], fileUrls: [], taskId: null })
+      } catch (error) {
+        console.error('Ошибка при добавлении файлов:', error)
+        setFileCommentsModal({ open: false, files: [], fileUrls: [], taskId: null })
+      }
+    },
+    [fileCommentsModal, userId]
+  )
+
   const handleAddFile = useCallback(
     async (taskId) => {
-      // Создаем input для выбора файлов
       const input = document.createElement('input')
       input.type = 'file'
-      input.multiple = true // Разрешаем выбрать несколько файлов
+      input.multiple = true
       input.onchange = async (e) => {
         const files = Array.from(e.target.files)
         if (files.length > 0) {
           try {
-            // Создаем FormData для загрузки файлов
             const formData = new FormData()
-            files.forEach((file) => {
-              formData.append('files', file)
-            })
-
-            // Отправляем файлы на сервер
+            files.forEach((file) => formData.append('files', file))
             const uploadResponse = await axios.post(
               `${API_BASE_URL}5000/api/upload`,
               formData,
-              {
-                headers: {
-                  'Content-Type': 'multipart/form-data',
-                },
-              }
+              { headers: { 'Content-Type': 'multipart/form-data' } }
             )
-
             const fileUrls = uploadResponse.data.fileUrls
-            const comments = files.map((file, index) => {
-              return prompt(`Введите комментарий для файла ${file.name}:`)
-            })
-
-            // Добавляем файлы к задаче
-            await Promise.all(
-              fileUrls.map((url, index) =>
-                axios.post(`${API_BASE_URL}5000/api/tasks/attachment/add`, {
-                  task_id: taskId,
-                  file_url: url,
-                  file_type: files[index].type,
-                  comment_file: comments[index],
-                  name_file: files[index].name,
-                  uploaded_by: userId,
-                  tableType: 'global',
-                })
-              )
-            )
-            fetchAttachments()
+            setFileCommentsModal({ open: true, files, fileUrls, taskId })
           } catch (error) {
-            console.error('Ошибка при добавлении файлов:', error)
-            alert('Произошла ошибка при добавлении файлов.')
+            console.error('Ошибка при загрузке файлов:', error)
           }
         }
       }
       input.click()
     },
-    [userId]
+    []
   )
 
   const toggleMenu = () => {
@@ -336,14 +343,24 @@ const GlobalTaskCard = ({
           <div className="global-task-card__description-row">
             <p className="global-task-card__description">{description}</p>
             {!isReadOnly && (
-              <button
-                type="button"
-                className="global-task-card__mail-btn"
-                onClick={() => setSendMailModalOpen(true)}
-                title="Отправить описание проекта на почту"
-              >
-                <MdEmail />
-              </button>
+              <div className="global-task-card__mail-btns">
+                <button
+                  type="button"
+                  className="global-task-card__mail-btn"
+                  onClick={() => setSendMailModalOpen(true)}
+                  title="Отправить описание проекта на почту"
+                >
+                  <MdEmail />
+                </button>
+                <button
+                  type="button"
+                  className="global-task-card__mail-btn global-task-card__mail-btn--settings"
+                  onClick={() => setSignatureModalOpen(true)}
+                  title="Настройки подписи к письму"
+                >
+                  <MdSettings />
+                </button>
+              </div>
             )}
           </div>
 
@@ -353,6 +370,7 @@ const GlobalTaskCard = ({
               solutions={solutionsList}
               globalTaskId={id}
               onRefresh={onRefresh}
+              onDocumentsUpdated={onDocumentsUpdated}
               isReadOnly={isReadOnly}
               projectTitle={title}
             />
@@ -662,6 +680,21 @@ const GlobalTaskCard = ({
         onClose={() => setSendMailModalOpen(false)}
         task={task}
         attachments={attachments}
+        userId={userId}
+      />
+
+      <FileCommentsModal
+        open={fileCommentsModal.open}
+        files={fileCommentsModal.files}
+        fileUrls={fileCommentsModal.fileUrls}
+        taskId={fileCommentsModal.taskId}
+        onClose={() => setFileCommentsModal({ open: false, files: [], fileUrls: [], taskId: null })}
+        onConfirm={handleFileCommentsConfirm}
+      />
+
+      <SignatureTemplateModal
+        open={signatureModalOpen}
+        onClose={() => setSignatureModalOpen(false)}
         userId={userId}
       />
     </div>

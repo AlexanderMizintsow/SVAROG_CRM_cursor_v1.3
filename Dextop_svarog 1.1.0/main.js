@@ -364,7 +364,23 @@ app.whenReady().then(() => {
   });
 
   mainWindow.loadURL("http://localhost:5173/");
-  // mainWindow.loadURL('http://localhost:5173/')
+  // mainWindow.loadURL('http://localhost:5173/') http://192.168.57.112:5173
+
+  // Скачивание файла без открытия нового окна
+  ipcMain.on("download-file", (event, { url, filename }) => {
+    if (mainWindow && !mainWindow.isDestroyed()) {
+      mainWindow.webContents.downloadURL(url);
+    }
+  });
+
+  // Перехват window.open для URL скачивания — не открывать новое окно
+  mainWindow.webContents.setWindowOpenHandler(({ url }) => {
+    if (url && url.includes("/attachments/") && url.includes("/download")) {
+      mainWindow.webContents.downloadURL(url);
+      return { action: "deny" };
+    }
+    return { action: "allow" };
+  });
 
   // Создаем меню
   const menu = Menu.buildFromTemplate([

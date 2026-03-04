@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react'
-import { getProcessSchedule, setProcessSchedule } from '../../../api/businessProcessApi'
+import { getProcessSchedule, setProcessSchedule, getReferencesUsers } from '../../../api/businessProcessApi'
 import Toastify from 'toastify-js'
 import './ProcessCardSchedule.scss'
 
@@ -36,6 +36,8 @@ function ProcessCardSchedule({ processId, currentUserId, onSaved, collapsed = fa
   const [loading, setLoading] = useState(false)
   const [saving, setSaving] = useState(false)
   const [scheduleLoaded, setScheduleLoaded] = useState(false)
+  const [users, setUsers] = useState([])
+  const [autostartInitiatorId, setAutostartInitiatorId] = useState(null)
 
   const loadSchedule = useCallback(async () => {
     if (!processId) return
@@ -49,12 +51,14 @@ function ProcessCardSchedule({ processId, currentUserId, onSaved, collapsed = fa
         setTime(data.time || '09:00')
         setConfig(data.config && typeof data.config === 'object' ? { ...data.config } : defaultConfig(data.schedule_type || 'weekdays'))
         setNextRuns(Array.isArray(data.next_runs) ? data.next_runs : [])
+        setAutostartInitiatorId(data.launched_by_user_id ?? currentUserId ?? null)
       } else {
         setEnabled(false)
         setScheduleType('weekdays')
         setTime('09:00')
         setConfig(defaultConfig('weekdays'))
         setNextRuns([])
+        setAutostartInitiatorId(currentUserId ?? null)
       }
     } catch (err) {
       console.error('Ошибка загрузки расписания:', err)
@@ -62,11 +66,17 @@ function ProcessCardSchedule({ processId, currentUserId, onSaved, collapsed = fa
     } finally {
       setLoading(false)
     }
-  }, [processId])
+  }, [processId, currentUserId])
 
   useEffect(() => {
     loadSchedule()
   }, [loadSchedule])
+
+  useEffect(() => {
+    getReferencesUsers()
+      .then((u) => setUsers(Array.isArray(u) ? u : []))
+      .catch(() => setUsers([]))
+  }, [])
 
   const handleToggleEnabled = (e) => {
     const checked = e.target.checked
@@ -78,7 +88,7 @@ function ProcessCardSchedule({ processId, currentUserId, onSaved, collapsed = fa
         schedule_type: scheduleType,
         time,
         config,
-        launched_by_user_id: currentUserId,
+        launched_by_user_id: autostartInitiatorId ?? currentUserId,
       })
         .then(() => {
           setNextRuns([])
@@ -94,6 +104,11 @@ function ProcessCardSchedule({ processId, currentUserId, onSaved, collapsed = fa
   }
 
   const handleSave = () => {
+    const initiatorId = autostartInitiatorId ?? currentUserId
+    if (!initiatorId) {
+      Toastify({ text: 'Выберите инициатора при автозапуске', close: true, backgroundColor: '#b91c1c' }).showToast()
+      return
+    }
     const { hour, minute } = parseTime(time)
     const payload = {
       enabled: true,
@@ -101,7 +116,7 @@ function ProcessCardSchedule({ processId, currentUserId, onSaved, collapsed = fa
       time_hour: hour,
       time_minute: minute,
       config: { ...config },
-      launched_by_user_id: currentUserId,
+      launched_by_user_id: initiatorId,
     }
     if (scheduleType === 'dates' && (!config.dates || !config.dates.length)) {
       Toastify({ text: 'Добавьте хотя бы одну дату', close: true, backgroundColor: '#b91c1c' }).showToast()
@@ -208,6 +223,24 @@ function ProcessCardSchedule({ processId, currentUserId, onSaved, collapsed = fa
 
       {enabled && (
         <div className="process-card-schedule__form">
+          <div className="process-card-schedule__row">
+            <span className="process-card-schedule__label">Инициатор при автозапуске:</span>
+            <select
+              className="process-card-schedule__select"
+              value={autostartInitiatorId ?? ''}
+              onChange={(e) => setAutostartInitiatorId(e.target.value ? Number(e.target.value) : null)}
+              required
+            >
+              <option value="">— Выберите пользователя —</option>
+              {users.map((u) => (
+                <option key={u.id} value={u.id}>
+                  {[u.first_name, u.last_name].filter(Boolean).join(' ') || u.username}
+                </option>
+              ))}
+            </select>
+          </div>
+          <p className="process-card-schedule__hint">Этот пользователь будет указан как инициатор при автоматическом запуске процесса по расписанию.</p>
+
           <div className="process-card-schedule__row">
             <span className="process-card-schedule__label">Время запуска:</span>
             <input

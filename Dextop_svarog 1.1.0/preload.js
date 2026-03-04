@@ -20,6 +20,10 @@ contextBridge.exposeInMainWorld("electronAPI", {
     console.log("preload: sendCallEnded вызван", callData);
     ipcRenderer.send("call-ended", callData);
   },
+
+  downloadFile: (url, filename) => {
+    ipcRenderer.send("download-file", { url, filename });
+  },
 });
 
 //npm run build

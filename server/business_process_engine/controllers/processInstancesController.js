@@ -46,13 +46,14 @@ async function startProcessInternal(dbPool, processId, options = {}) {
     }
   }
 
-  let initiatorId = initiator_id || launched_by_user_id
-  if (!initiatorId && startNode.settings) {
-    if (startNode.settings.initiatorType === 'fixed_user' && startNode.settings.fixedUserId) {
-      initiatorId = startNode.settings.fixedUserId
-    } else {
-      initiatorId = launched_by_user_id
-    }
+  // Инициатор: «Разрешить запуск всем» — только кто может запускать; инициатор определяется отдельно:
+  // — fixed_user: всегда указанный в схеме пользователь
+  // — current_user / by_role: запустивший (launched_by) или явно переданный initiator_id (при ручном запуске или автозапуске — пользователь из расписания)
+  let initiatorId
+  if (startNode.settings?.initiatorType === 'fixed_user' && startNode.settings?.fixedUserId) {
+    initiatorId = startNode.settings.fixedUserId
+  } else {
+    initiatorId = initiator_id || launched_by_user_id
   }
 
   const initialAdditionalInfo = initial_additional_info && typeof initial_additional_info === 'object'

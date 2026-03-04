@@ -124,18 +124,35 @@ const CreateProjectNodeProps = ({ node, onUpdate }) => {
         <label className="properties-panel__label">Режим дедлайна</label>
         <select
           className="properties-panel__select"
-          value={settings.deadlineMode ?? (settings.deadline ? 'fixed' : 'none')}
+          value={settings.deadlineMode ?? (settings.deadline ? 'fixed' : settings.deadlineStartDayTime ? 'start_day_time' : settings.deadlineOffsetDays != null ? 'offset' : 'none')}
           onChange={(e) => {
             const mode = e.target.value
             const patch = { deadlineMode: mode }
             if (mode === 'none') {
               patch.deadline = null
+              patch.deadlineStartDayTime = null
+              patch.deadlineOffsetDays = null
+              patch.deadlineOffsetTime = null
               patch.conditionalDeadline = null
             } else if (mode === 'fixed') {
+              patch.deadlineStartDayTime = null
+              patch.deadlineOffsetDays = null
+              patch.deadlineOffsetTime = null
+              patch.conditionalDeadline = null
+            } else if (mode === 'start_day_time') {
+              patch.deadline = null
+              patch.deadlineOffsetDays = null
+              patch.deadlineOffsetTime = null
+              patch.conditionalDeadline = null
+            } else if (mode === 'offset') {
+              patch.deadline = null
+              patch.deadlineStartDayTime = null
               patch.conditionalDeadline = null
             } else if (mode === 'conditional') {
               patch.deadline = null
-              // Инициализируем правило, иначе в схеме не сохранятся значения и движок не поставит дедлайн
+              patch.deadlineStartDayTime = null
+              patch.deadlineOffsetDays = null
+              patch.deadlineOffsetTime = null
               patch.conditionalDeadline = {
                 boundary: settings.conditionalDeadline?.boundary ?? '12:00',
                 sameDayTime: settings.conditionalDeadline?.sameDayTime ?? '18:00',
@@ -147,6 +164,8 @@ const CreateProjectNodeProps = ({ node, onUpdate }) => {
         >
           <option value="none">Без дедлайна</option>
           <option value="fixed">Конкретная дата и время</option>
+          <option value="start_day_time">Сегодня (от запуска) + время</option>
+          <option value="offset">Смещение в днях (от запуска) + время</option>
           <option value="conditional">По условию (граница времени)</option>
         </select>
         {(settings.deadlineMode ?? (settings.deadline ? 'fixed' : 'none')) === 'fixed' && (
@@ -157,6 +176,46 @@ const CreateProjectNodeProps = ({ node, onUpdate }) => {
             onChange={(e) => handleChange({ deadline: e.target.value || null })}
             style={{ marginTop: 6 }}
           />
+        )}
+        {(settings.deadlineMode ?? '') === 'start_day_time' && (
+          <div style={{ marginTop: 8 }}>
+            <label className="properties-panel__label" style={{ marginTop: 6 }}>Время (ЧЧ:ММ)</label>
+            <input
+              type="time"
+              className="properties-panel__input"
+              value={settings.deadlineStartDayTime ?? '00:00'}
+              onChange={(e) => handleChange({ deadlineStartDayTime: e.target.value || '00:00' })}
+              style={{ marginTop: 6 }}
+            />
+            <p className="properties-panel__hint" style={{ marginTop: 4, fontSize: '0.8rem' }}>
+              Дата берётся от дня запуска процесса, время — указанное.
+            </p>
+          </div>
+        )}
+        {(settings.deadlineMode ?? '') === 'offset' && (
+          <div style={{ marginTop: 8 }}>
+            <label className="properties-panel__label" style={{ marginTop: 6 }}>Дней от запуска процесса</label>
+            <input
+              type="number"
+              className="properties-panel__input"
+              value={settings.deadlineOffsetDays ?? ''}
+              onChange={(e) => handleChange({ deadlineOffsetDays: e.target.value === '' ? null : Number(e.target.value) })}
+              placeholder="0 = сегодня"
+              min={0}
+              style={{ marginTop: 6 }}
+            />
+            <label className="properties-panel__label" style={{ marginTop: 6 }}>Время (ЧЧ:ММ)</label>
+            <input
+              type="time"
+              className="properties-panel__input"
+              value={settings.deadlineOffsetTime ?? '00:00'}
+              onChange={(e) => handleChange({ deadlineOffsetTime: e.target.value || '00:00' })}
+              style={{ marginTop: 6 }}
+            />
+            <p className="properties-panel__hint" style={{ marginTop: 4, fontSize: '0.8rem' }}>
+              Дата = день запуска процесса + указанное кол-во дней.
+            </p>
+          </div>
         )}
         {(settings.deadlineMode ?? '') === 'conditional' && (
           <div style={{ marginTop: 8 }}>

@@ -177,6 +177,13 @@
     }
   }
 
+  &__mail-btns {
+    flex-shrink: 0;
+    display: flex;
+    align-items: center;
+    gap: 0.35rem;
+  }
+
   &__mail-btn {
     flex-shrink: 0;
     display: flex;
@@ -197,6 +204,10 @@
       background: #e5e7eb;
       color: #3f51b5;
       border-color: #93c5fd;
+    }
+
+    &--settings {
+      font-size: 16px;
     }
   }
 

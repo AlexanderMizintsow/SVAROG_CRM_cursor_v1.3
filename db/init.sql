@@ -1030,6 +1030,15 @@ CREATE TABLE IF NOT EXISTS project_email_response_times (
 );
 CREATE INDEX IF NOT EXISTS idx_project_email_response_times_reply_at ON project_email_response_times(reply_received_at);
 
+-- Подпись к письму для каждого пользователя (проекты)
+CREATE TABLE IF NOT EXISTS user_email_signatures (
+  user_id INT PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
+  signature_text TEXT DEFAULT '',
+  signature_image TEXT DEFAULT NULL,
+  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+CREATE INDEX IF NOT EXISTS idx_user_email_signatures_user_id ON user_email_signatures(user_id);
+
 CREATE INDEX idx_notifications_user_id ON notifications(user_id);
 CREATE INDEX idx_notifications_task_id ON notifications(task_id);
 CREATE INDEX idx_notifications_user_read ON notifications(user_id, is_read);

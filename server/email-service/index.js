@@ -406,7 +406,7 @@ setInterval(async () => {
 app.post('/send-email', upload.array('attachments', 10), async (req, res) => {
   const { userId, globalTaskId, finalSolutionId, inReplyTo } = req.body
   const finalSolId = req.body.finalSolutionId != null ? req.body.finalSolutionId : finalSolutionId
-  const { to, subject, body } = req.body
+  const { to, subject, body, bodyHtml } = req.body
   const attachments = req.files
 
   if (!userId) {
@@ -439,6 +439,7 @@ app.post('/send-email', upload.array('attachments', 10), async (req, res) => {
     to: to,
     subject: subject,
     text: body,
+    ...(bodyHtml && String(bodyHtml).trim() ? { html: String(bodyHtml).trim() } : {}),
     messageId,
     headers,
   }

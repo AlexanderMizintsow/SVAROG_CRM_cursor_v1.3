@@ -34,6 +34,7 @@ const FinalSolutionsBlock = ({
   solutions,
   globalTaskId,
   onRefresh,
+  onDocumentsUpdated,
   isReadOnly,
   projectTitle,
 }) => {
@@ -109,9 +110,29 @@ const FinalSolutionsBlock = ({
     }
   }
 
-  const handleDownloadAttachment = (attachmentId) => {
+  const handleDownloadAttachment = async (attachmentId, filename) => {
     const url = `${API_BASE_URL}5000/api/global-tasks/${globalTaskId}/final-solutions/${currentSolution.id}/attachments/${attachmentId}/download`
-    window.open(url, '_blank')
+    const electronAPI = window.electronAPI || null
+    if (electronAPI && typeof electronAPI.downloadFile === 'function') {
+      electronAPI.downloadFile(url, filename || 'Файл')
+      return
+    }
+    try {
+      const response = await fetch(url, { credentials: 'include' })
+      if (!response.ok) throw new Error(response.statusText)
+      const blob = await response.blob()
+      const objectUrl = window.URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = objectUrl
+      a.download = filename || 'Файл'
+      document.body.appendChild(a)
+      a.click()
+      document.body.removeChild(a)
+      window.URL.revokeObjectURL(objectUrl)
+    } catch (err) {
+      console.error('Ошибка при скачивании вложения:', err)
+      window.open(url, '_blank')
+    }
   }
 
   const handleAddAttachmentToProject = async (attachmentId) => {
@@ -121,6 +142,7 @@ const FinalSolutionsBlock = ({
         { userId }
       )
       onRefresh?.(globalTaskId)
+      onDocumentsUpdated?.()
     } catch (err) {
       console.error('Ошибка добавления вложения в проект:', err)
       alert(err.response?.data?.error || 'Не удалось добавить в документы')
@@ -200,7 +222,7 @@ const FinalSolutionsBlock = ({
                                   <button
                                     type="button"
                                     className="final-solutions-block__thread-att-btn"
-                                    onClick={() => handleDownloadAttachment(att.id)}
+                                    onClick={() => handleDownloadAttachment(att.id, att.filename)}
                                   >
                                     Скачать
                                   </button>

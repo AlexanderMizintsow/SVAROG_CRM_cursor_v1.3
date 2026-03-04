@@ -767,6 +767,47 @@ const deleteTag = (dbPool) => async (req, res) => {
   }
 }
 
+const getEmailSignature = (dbPool) => async (req, res) => {
+  const { id } = req.params
+  try {
+    const r = await dbPool.query(
+      'SELECT signature_text, signature_image FROM user_email_signatures WHERE user_id = $1',
+      [id]
+    )
+    if (r.rows.length === 0) {
+      return res.json(null)
+    }
+    const row = r.rows[0]
+    const text = (row.signature_text || '').trim()
+    const imageDataUrl = row.signature_image || null
+    if (!text && !imageDataUrl) return res.json(null)
+    res.json({ text, imageDataUrl })
+  } catch (error) {
+    console.error('getEmailSignature:', error)
+    res.status(500).json({ error: 'Ошибка получения подписи' })
+  }
+}
+
+const updateEmailSignature = (dbPool) => async (req, res) => {
+  const { id } = req.params
+  const { text, imageDataUrl } = req.body || {}
+  try {
+    await dbPool.query(
+      `INSERT INTO user_email_signatures (user_id, signature_text, signature_image, updated_at)
+       VALUES ($1, $2, $3, NOW())
+       ON CONFLICT (user_id) DO UPDATE SET
+         signature_text = EXCLUDED.signature_text,
+         signature_image = EXCLUDED.signature_image,
+         updated_at = NOW()`,
+      [id, text || '', imageDataUrl || null]
+    )
+    res.json({ success: true })
+  } catch (error) {
+    console.error('updateEmailSignature:', error)
+    res.status(500).json({ error: 'Ошибка сохранения подписи' })
+  }
+}
+
 module.exports = {
   getUsers,
   updateUser,
@@ -775,6 +816,8 @@ module.exports = {
   updateUserStatus,
   uploadAvatar,
   getAvatar,
+  getEmailSignature,
+  updateEmailSignature,
   getUserPhones,
   addPhone,
   updatePhone,
