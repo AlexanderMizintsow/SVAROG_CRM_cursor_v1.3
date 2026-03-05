@@ -10,6 +10,7 @@ import GlobalTaskTabs from './GlobalTaskTabs'
 import GlobalTaskSubtasks from './GlobalTaskSubtasks'
 import GlobalTaskHistory from './subcomponents/tabs/globalTaskHistory/GlobalTaskHistory'
 import GlobalTaskDocuments from './subcomponents/tabs/GlobalTaskDocuments/GlobalTaskDocuments'
+import useUserStore from '../../../store/userStore'
 import './styles/GlobalTaskPage.scss'
 
 const GlobalTaskPage = ({
@@ -20,6 +21,7 @@ const GlobalTaskPage = ({
   refreshSubTask,
   refreshHistory,
 }) => {
+  const { user } = useUserStore()
   const [attachments, setAttachments] = useState([])
   const [activeTab, setActiveTab] = useState('subtasks')
 
@@ -150,10 +152,11 @@ const GlobalTaskPage = ({
           {/* Используем класс из GlobalTaskTabs.scss для стилей контейнера содержимого */}
           {activeTab === 'subtasks' && (
             <GlobalTaskSubtasks
-              subtasks={currentTask.subtasks}
               taskId={currentTask.id}
               refreshSubTask={refreshSubTask}
               isReadOnly={isReadOnly}
+              userId={user?.id}
+              onRefresh={onRefresh}
             />
           )}
           {activeTab === 'history' && (

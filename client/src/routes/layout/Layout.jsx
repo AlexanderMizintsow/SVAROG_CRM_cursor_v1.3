@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { Outlet } from 'react-router-dom'
+import { Outlet, useNavigate, useLocation } from 'react-router-dom'
 import LoginRegister from '../../components/auth/LoginRegister'
 import TopNavBar from '../../components/topnavbar/TopNavBar'
 import NavBar from '../../components/navbar/NavBar'
@@ -21,6 +21,18 @@ function Layout({ isConnectBD }) {
   const { user } = useUserStore() // НЕ УДАЛЯТЬ!
   const token = localStorage.getItem('token')
   const [backgroundImage, setBackgroundImage] = useState('')
+  const navigate = useNavigate()
+  const location = useLocation()
+
+  useEffect(() => {
+    const onTaskDecisionNavigate = () => {
+      if (location.pathname !== '/task-manager') {
+        navigate('/task-manager')
+      }
+    }
+    window.addEventListener('task-decision-navigate', onTaskDecisionNavigate)
+    return () => window.removeEventListener('task-decision-navigate', onTaskDecisionNavigate)
+  }, [navigate, location.pathname])
 
   const getSeasonalBackground = () => {
     const currentMonth = new Date().getMonth()

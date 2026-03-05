@@ -52,6 +52,9 @@ export function handleGlobalTaskChangedPayload(payload, currentUserId) {
     case 'subtask_added':
       if (title) store.addProjectNotification(id, title, 'subtask_added')
       break
+    case 'subtask_status_done':
+      store.setProjectBlinkYellow(id)
+      break
     default:
       break
   }

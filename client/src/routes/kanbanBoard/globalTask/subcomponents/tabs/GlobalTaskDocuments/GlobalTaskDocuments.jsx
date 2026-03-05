@@ -2,7 +2,7 @@
 import { useEffect } from 'react'
 import { API_BASE_URL } from '../../../../../../../config'
 import axios from 'axios'
-import Attachments from '../../../../Task/subcomponents/Attachments'
+import ProjectDocumentsList from './ProjectDocumentsList'
 import './GlobalTaskDocuments.scss'
 
 const GlobalTaskDocuments = ({ taskId, setAttachments, attachments }) => {
@@ -25,7 +25,7 @@ const GlobalTaskDocuments = ({ taskId, setAttachments, attachments }) => {
 
   return (
     <div className="global-task-document__footer-file-view">
-      <Attachments attachments={attachments} />
+      <ProjectDocumentsList attachments={attachments} />
     </div>
   )
 }

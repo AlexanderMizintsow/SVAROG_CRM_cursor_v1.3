@@ -615,6 +615,31 @@ const AlertBanner = () => {
     }
   }
 
+  // Клик по уведомлению «Исполнитель завершил задачу. Примите решение…»
+  const handleTaskDecisionNotificationClick = async (taskId) => {
+    if (!taskId) return
+    try {
+      const task = await fetchTaskById(taskId)
+      const globalTaskId = task?.global_task_id ?? task?.global_taskId
+      const {
+        setTaskDecisionNavigate,
+        setSubtaskBlinkYellow,
+        setTaskCardBlinkYellow,
+      } = useTaskStateTracker.getState()
+
+      if (globalTaskId) {
+        setTaskDecisionNavigate({ type: 'project', globalTaskId, highlightSubtaskId: String(taskId) })
+        setSubtaskBlinkYellow(taskId)
+      } else {
+        setTaskDecisionNavigate({ type: 'taskList', taskId: String(taskId) })
+        setTaskCardBlinkYellow(taskId)
+      }
+      window.dispatchEvent(new CustomEvent('task-decision-navigate'))
+    } catch (err) {
+      console.error('Ошибка при открытии задачи по уведомлению:', err)
+    }
+  }
+
   return (
     <div
       className={`alert-banner ${allNotifications.length > 0 ? 'show' : ''} ${
@@ -644,7 +669,12 @@ const AlertBanner = () => {
                 className="alert-banner-content"
                 key={key}
                 style={{
-                  cursor: key.startsWith('global-') || key.startsWith('project-msg-') ? 'pointer' : undefined,
+                  cursor:
+                    key.startsWith('global-') ||
+                    key.startsWith('project-msg-') ||
+                    key.startsWith('task-decision-')
+                      ? 'pointer'
+                      : undefined,
                 }}
                 onClick={() => {
                   if (key.startsWith('global-')) {
@@ -662,7 +692,7 @@ const AlertBanner = () => {
                   } else if (key.startsWith('task-notification-')) {
                     handleTaskNotificationClick(taskId)
                   } else if (key.startsWith('task-decision-')) {
-                    // Обработка клика по уведомлению о решении по задаче
+                    handleTaskDecisionNotificationClick(taskId)
                   }
                 }}
               >

@@ -1,10 +1,12 @@
 // Вкладка подзадачи для отображений задачи каждого участника
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import axios from 'axios'
 import { API_BASE_URL } from '../../../../config'
 import { FaTasks, FaPlus } from 'react-icons/fa'
 import { TbSubtask } from 'react-icons/tb'
+import { FcInspection, FcRedo } from 'react-icons/fc'
 import UserStore from '../../../store/userStore'
+import useTaskStateTracker from '../../../store/useTaskStateTracker'
 import AddModal from '../Modals/AddModal'
 import SubTaskHierarchy from '../Task/subcomponents/subTaskHierarchy/SubTaskHierarchy'
 import {
@@ -15,15 +17,48 @@ import {
 } from '../Boards/subcomponents/taskUtils'
 import './styles/GlobalTaskSubtasks.scss'
 
-const GlobalTaskSubtasks = ({ taskId, refreshSubTask, isReadOnly }) => {
-  // subtasks теперь не нужен как пропс, будем получать их внутри
+const GlobalTaskSubtasks = ({ taskId, refreshSubTask, isReadOnly, userId, onRefresh }) => {
   const { user } = UserStore()
+  const removeTask = useTaskStateTracker((s) => s.removeTask)
+  const subtaskBlinkYellow = useTaskStateTracker((s) => s.subtaskBlinkYellow)
+  const tableContainerRef = useRef(null)
   const [isAddModalOpen, setIsAddModalOpen] = useState(false)
   const [subtasks, setSubtasks] = useState([]) // Состояние для хранения подзадач
   const [isLoading, setIsLoading] = useState(true) // Состояние для индикации загрузки
   const [error, setError] = useState(null) // Состояние для ошибок
-  const [hierarchyTaskId, setHierarchyTaskId] = useState(null) // ID подзадачи для показа иерархии
-  const userId = user ? user.id : null
+  const [hierarchyTaskId, setHierarchyTaskId] = useState(null)
+  const [returnDialog, setReturnDialog] = useState({ open: false, taskId: null, comment: '' })
+  const currentUserId = userId != null ? userId : (user ? user.id : null)
+
+  const canConfirmSubtask = (subtask) => {
+    if (isReadOnly || !currentUserId) return false
+    if (subtask.status !== 'done' || subtask.is_completed) return false
+    const authorId = subtask.author?.id ?? subtask.created_by
+    if (authorId == null) return false
+    return String(authorId) === String(currentUserId)
+  }
+
+  const clearSubtaskBlinkYellow = useTaskStateTracker((s) => s.clearSubtaskBlinkYellow)
+
+  const handleConfirmSubtask = async (subtaskId, isAccepted, comment = '') => {
+    if (!currentUserId) return
+    try {
+      await axios.patch(
+        `${API_BASE_URL}5000/api/task/accept/${subtaskId}/${currentUserId}/${isAccepted}`,
+        { comment: comment || null }
+      )
+      clearSubtaskBlinkYellow(subtaskId)
+      removeTask(String(subtaskId))
+      onRefresh?.(taskId)
+      setReturnDialog({ open: false, taskId: null, comment: '' })
+    } catch (err) {
+      console.error('Ошибка при принятии решения по задаче:', err)
+    }
+  }
+
+  const handleOpenReturnDialog = (subtaskId) => {
+    setReturnDialog({ open: true, taskId: subtaskId, comment: '' })
+  }
 
   const fetchSubtasks = useCallback(async () => {
     setIsLoading(true)
@@ -49,6 +84,15 @@ const GlobalTaskSubtasks = ({ taskId, refreshSubTask, isReadOnly }) => {
     }
     fetchSubtasks()
   }, [taskId, fetchSubtasks, refreshSubTask])
+
+  useEffect(() => {
+    const highlightedId = Object.keys(subtaskBlinkYellow)[0]
+    if (!highlightedId || !tableContainerRef.current) return
+    const row = tableContainerRef.current.querySelector(`tr[data-subtask-id="${highlightedId}"]`)
+    if (row) {
+      row.scrollIntoView({ behavior: 'smooth', block: 'nearest' })
+    }
+  }, [subtaskBlinkYellow, subtasks.length])
 
   // Функция для открытия модального окна
   const handleOpenAddModal = () => {
@@ -113,7 +157,7 @@ const GlobalTaskSubtasks = ({ taskId, refreshSubTask, isReadOnly }) => {
         )}
       </div>
 
-      <div className="global-task-subtasks__table-container">
+      <div className="global-task-subtasks__table-container" ref={tableContainerRef}>
         <table>
           <thead>
             <tr>
@@ -123,13 +167,14 @@ const GlobalTaskSubtasks = ({ taskId, refreshSubTask, isReadOnly }) => {
               <th>Автор задачи</th>
               <th>Срок</th>
               <th className="global-task-subtasks__th-actions">Иерархия</th>
+              {!isReadOnly && <th className="global-task-subtasks__th-actions">Действия</th>}
             </tr>
           </thead>
           <tbody>
             {isLoading && (
               <tr>
                 <td
-                  colSpan="7"
+                  colSpan={!isReadOnly ? 8 : 7}
                   style={{ textAlign: 'center', padding: '1rem' }}
                 >
                   Загрузка подзадач...
@@ -139,7 +184,7 @@ const GlobalTaskSubtasks = ({ taskId, refreshSubTask, isReadOnly }) => {
             {error && (
               <tr>
                 <td
-                  colSpan="7"
+                  colSpan={!isReadOnly ? 8 : 7}
                   style={{ textAlign: 'center', padding: '1rem', color: 'red' }}
                 >
                   {error}
@@ -150,7 +195,15 @@ const GlobalTaskSubtasks = ({ taskId, refreshSubTask, isReadOnly }) => {
               !error &&
               subtasks.length > 0 &&
               subtasks.map((subtask) => (
-                <tr key={subtask.id}>
+                <tr
+                  key={subtask.id}
+                  className={
+                    subtaskBlinkYellow[String(subtask.id)] && canConfirmSubtask(subtask)
+                      ? 'global-task-subtasks__row--blink-yellow'
+                      : ''
+                  }
+                  data-subtask-id={subtask.id}
+                >
                   <td>
                     <span
                       className={`global-task-subtasks__status ${getStatusClass(
@@ -225,12 +278,40 @@ const GlobalTaskSubtasks = ({ taskId, refreshSubTask, isReadOnly }) => {
                       <TbSubtask className="global-task-subtasks__hierarchy-icon" />
                     </button>
                   </td>
+                  {!isReadOnly && (
+                    <td className="global-task-subtasks__td-actions">
+                      {canConfirmSubtask(subtask) ? (
+                        <div className="global-task-subtasks__confirm-actions">
+                          <button
+                            type="button"
+                            className="global-task-subtasks__confirm-btn global-task-subtasks__confirm-btn--ok"
+                            onClick={() => {
+                              handleConfirmSubtask(subtask.id, true)
+                            }}
+                            title="Подтвердить выполнение задачи"
+                          >
+                            <FcInspection size={18} />
+                          </button>
+                          <button
+                            type="button"
+                            className="global-task-subtasks__confirm-btn global-task-subtasks__confirm-btn--redo"
+                            onClick={() => handleOpenReturnDialog(subtask.id)}
+                            title="Вернуть на доработку"
+                          >
+                            <FcRedo size={18} />
+                          </button>
+                        </div>
+                      ) : (
+                        '—'
+                      )}
+                    </td>
+                  )}
                 </tr>
               ))}
             {!isLoading && !error && subtasks.length === 0 && (
               <tr>
                 <td
-                  colSpan="7"
+                  colSpan={!isReadOnly ? 8 : 7}
                   style={{
                     textAlign: 'center',
                     padding: '1rem',
@@ -256,6 +337,37 @@ const GlobalTaskSubtasks = ({ taskId, refreshSubTask, isReadOnly }) => {
       {hierarchyTaskId != null && (
         <div className="global-task-subtasks__hierarchy-overlay">
           <SubTaskHierarchy taskId={hierarchyTaskId} onClose={handleCloseHierarchy} />
+        </div>
+      )}
+
+      {returnDialog.open && (
+        <div className="global-task-subtasks__return-overlay" role="dialog">
+          <div className="global-task-subtasks__return-modal">
+            <h4>Вернуть на доработку</h4>
+            <p>Укажите причину возврата (комментарий):</p>
+            <textarea
+              value={returnDialog.comment}
+              onChange={(e) =>
+                setReturnDialog((s) => ({ ...s, comment: e.target.value }))
+              }
+              rows={4}
+              placeholder="Комментарий для исполнителя..."
+            />
+            <div className="global-task-subtasks__return-btns">
+              <button
+                type="button"
+                onClick={() => handleConfirmSubtask(returnDialog.taskId, false, returnDialog.comment)}
+              >
+                Вернуть
+              </button>
+              <button
+                type="button"
+                onClick={() => setReturnDialog({ open: false, taskId: null, comment: '' })}
+              >
+                Отмена
+              </button>
+            </div>
+          </div>
         </div>
       )}
     </div>

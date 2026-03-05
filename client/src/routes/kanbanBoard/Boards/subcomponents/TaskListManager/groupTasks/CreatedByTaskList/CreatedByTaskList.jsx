@@ -195,8 +195,11 @@ const CreatedByTaskList = ({ tasks, userId, handleTaskAccept, refreshTasks }) =>
     setOpenConfirmationDialog(true) // Открываем диалог
   }
 
+  const clearTaskCardBlinkYellow = useTaskStateTracker((s) => s.clearTaskCardBlinkYellow)
+
   const handleConfirmation = (comment) => {
     if (currentTaskId) {
+      clearTaskCardBlinkYellow(currentTaskId)
       handleTaskAccept(currentTaskId, userId, false, comment)
       removeTask(currentTaskId)
     }

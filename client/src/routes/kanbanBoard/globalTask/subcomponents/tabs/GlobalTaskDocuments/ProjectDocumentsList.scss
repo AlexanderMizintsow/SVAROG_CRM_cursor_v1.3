@@ -1,0 +1,58 @@
+.project-documents-list {
+  width: 100%;
+  overflow-x: auto;
+}
+
+.project-documents-list__table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.9rem;
+}
+
+.project-documents-list__table th {
+  text-align: left;
+  padding: 0.5rem 0.75rem;
+  background: #f1f5f9;
+  color: #475569;
+  font-weight: 600;
+  border-bottom: 2px solid #e2e8f0;
+}
+
+.project-documents-list__table td {
+  padding: 0.5rem 0.75rem;
+  border-bottom: 1px solid #e2e8f0;
+  vertical-align: top;
+}
+
+.project-documents-list__row:hover {
+  background: #f8fafc;
+}
+
+.project-documents-list__file-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0;
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: #1d4ed8;
+  font-size: inherit;
+  text-decoration: none;
+
+  &:hover {
+    text-decoration: underline;
+  }
+}
+
+.project-documents-list__file-icon {
+  font-size: 1rem;
+  color: #64748b;
+  flex-shrink: 0;
+}
+
+.project-documents-list__comment {
+  margin-top: 0.25rem;
+  font-size: 0.8rem;
+  color: #64748b;
+}

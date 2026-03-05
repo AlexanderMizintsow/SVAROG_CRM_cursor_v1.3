@@ -516,10 +516,12 @@ function addTaskAttachment(dbPool, io) {
     const fileTypeToStore = normalizeFileType(file_type)
 
     // Выполняем вставку в выбранную таблицу
-    const insertQuery = `
-      INSERT INTO ${tableName} (task_id, file_url, file_type, uploaded_by, comment_file, name_file)
-      VALUES ($1, $2, $3, $4, $5, $6)
-    `
+    const insertQuery =
+      tableName === 'task_attachments_global_tasks'
+        ? `INSERT INTO task_attachments_global_tasks (task_id, file_url, file_type, uploaded_by, comment_file, name_file, source, source_task_id)
+           VALUES ($1, $2, $3, $4, $5, $6, 'project', NULL)`
+        : `INSERT INTO task_attachments (task_id, file_url, file_type, uploaded_by, comment_file, name_file)
+           VALUES ($1, $2, $3, $4, $5, $6)`
 
     try {
       await dbPool.query(insertQuery, [
@@ -530,6 +532,46 @@ function addTaskAttachment(dbPool, io) {
         comment_file,
         name_file,
       ])
+      // Если файл добавлен к задаче (local) и задача связана с проектом — дублируем в документы проекта
+      if (tableTypeNormalized === 'local') {
+        const projectRow = await dbPool.query(
+          'SELECT global_task_id FROM tasks WHERE id = $1 AND global_task_id IS NOT NULL',
+          [task_id]
+        )
+        if (projectRow.rows.length > 0) {
+          const globalTaskId = projectRow.rows[0].global_task_id
+          await dbPool.query(
+            `INSERT INTO task_attachments_global_tasks (task_id, file_url, file_type, uploaded_by, comment_file, name_file, source, source_task_id)
+             VALUES ($1, $2, $3, $4, $5, $6, 'task', $7)`,
+            [
+              globalTaskId,
+              file_url,
+              fileTypeToStore,
+              uploaded_by,
+              comment_file,
+              name_file,
+              task_id,
+            ]
+          )
+          await insertTaskHistory(
+            dbPool,
+            globalTaskId,
+            'документ',
+            `Добавлен документ из задачи: ${name_file || 'файл'}`,
+            uploaded_by,
+            { name_file: name_file || null, source_task_id: task_id }
+          )
+          const participantIds = await getGlobalTaskParticipantUserIds(dbPool, globalTaskId)
+          if (participantIds?.length > 0) {
+            const titleRes = await dbPool.query('SELECT title FROM global_tasks WHERE id = $1', [
+              globalTaskId,
+            ])
+            emitGlobalTaskChanged(io, participantIds, globalTaskId, 'attachment', {
+              title: titleRes.rows[0]?.title || null,
+            })
+          }
+        }
+      }
       if (tableTypeNormalized === 'global' && task_id) {
         await insertTaskHistory(
           dbPool,
@@ -769,8 +811,6 @@ function updateTaskStatus(dbPool, io) {
 
       if (status === 'done') {
         const updatedTask = result.rows[0]
-        console.log(status)
-
         if (updatedTask.is_completed === false) {
           io.emit('taskUpdateTaskStatus', {
             taskId: updatedTask.id,
@@ -778,6 +818,17 @@ function updateTaskStatus(dbPool, io) {
             createdBy: updatedTask.created_by,
             title: updatedTask.title,
           })
+        }
+        if (updatedTask.global_task_id) {
+          const participantIds = await getGlobalTaskParticipantUserIds(dbPool, updatedTask.global_task_id)
+          if (participantIds?.length > 0) {
+            const titleRes = await dbPool.query('SELECT title FROM global_tasks WHERE id = $1', [
+              updatedTask.global_task_id,
+            ])
+            emitGlobalTaskChanged(io, participantIds, updatedTask.global_task_id, 'subtask_status_done', {
+              title: titleRes.rows[0]?.title || null,
+            })
+          }
         }
       }
 
@@ -2699,19 +2750,22 @@ function getAttachmentsByTaskId(dbPool) {
       const result = await dbPool.query(
         `
         SELECT
-          id,
-          task_id,
-          file_url,
-          file_type,
-          uploaded_by,
-          comment_file,
-          name_file,
-          created_at
-        FROM
-          task_attachments_global_tasks
-        WHERE
-          task_id = $1
-        ORDER BY created_at DESC
+          a.id,
+          a.task_id,
+          a.file_url,
+          a.file_type,
+          a.uploaded_by,
+          a.comment_file,
+          a.name_file,
+          a.created_at,
+          COALESCE(a.source, 'project') AS source,
+          a.source_task_id,
+          u.first_name AS uploader_first_name,
+          u.last_name AS uploader_last_name
+        FROM task_attachments_global_tasks a
+        LEFT JOIN users u ON a.uploaded_by = u.id
+        WHERE a.task_id = $1
+        ORDER BY a.created_at DESC
         `,
         [id]
       )

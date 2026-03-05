@@ -1,4 +1,5 @@
-import React from 'react'
+import React, { useEffect, useRef } from 'react'
+import useTaskStateTracker from '../../../../../../../store/useTaskStateTracker'
 import {
   List,
   ListItem,
@@ -24,6 +25,7 @@ import { FaEdit } from 'react-icons/fa'
 import { LiaUserCogSolid } from 'react-icons/lia'
 import { TbSubtask } from 'react-icons/tb'
 import { getStatusLabel, stripHtmlTags } from '../../../taskUtils'
+import styles from '../../taskListManager.module.scss'
 import { getUserNames } from '../../../../../Task/utils/taskUtils'
 import ChatTaskModal from '../../../../../Task/subcomponents/chatTaskModal/chatTaskModal'
 
@@ -49,6 +51,16 @@ const TaskRenderer = ({
   handleOpenHierarchy,
   resetUnreadMessages,
 }) => {
+  const taskCardBlinkYellow = useTaskStateTracker((s) => s.taskCardBlinkYellow)
+  const clearTaskCardBlinkYellow = useTaskStateTracker((s) => s.clearTaskCardBlinkYellow)
+  const cardRefs = useRef({})
+
+  useEffect(() => {
+    const highlightedId = Object.keys(taskCardBlinkYellow)[0]
+    if (!highlightedId || !cardRefs.current[highlightedId]) return
+    cardRefs.current[highlightedId]?.scrollIntoView({ behavior: 'smooth', block: 'center' })
+  }, [taskCardBlinkYellow, filteredTasks.length])
+
   // Проверка просроченности
   const isTaskOverdue = (deadline, status) => {
     if (!deadline) return false // Нет даты — не просрочена
@@ -88,10 +100,22 @@ const TaskRenderer = ({
   // Рендер карточки задачи
   const renderTaskCard = (task) => {
     const isOverdue = isTaskOverdue(task.deadline, task.status)
+    const hasConfirmButtons = task.status === 'done'
+    const isHighlighted = hasConfirmButtons && taskCardBlinkYellow[String(task.task_id)]
 
     return (
-      <Grid item xs={12} sm={6} lg={4} key={task.task_id}>
+      <Grid
+        item
+        xs={12}
+        sm={6}
+        lg={4}
+        key={task.task_id}
+        ref={(el) => {
+          if (el) cardRefs.current[task.task_id] = el
+        }}
+      >
         <Card
+          className={isHighlighted ? styles.cardBlinkYellow : undefined}
           sx={{
             height: '100%',
             display: 'flex',
@@ -269,6 +293,7 @@ const TaskRenderer = ({
                     <IconButton
                       size="small"
                       onClick={() => {
+                        clearTaskCardBlinkYellow(task.task_id)
                         handleTaskAccept(task.task_id, userId, true)
                         removeTask(task.task_id)
                       }}
@@ -281,7 +306,10 @@ const TaskRenderer = ({
                   <Tooltip title="Вернуть на доработку">
                     <IconButton
                       size="small"
-                      onClick={() => handleOpenConfirmationDialog(task.task_id)}
+                      onClick={() => {
+                        clearTaskCardBlinkYellow(task.task_id)
+                        handleOpenConfirmationDialog(task.task_id)
+                      }}
                       sx={{ color: 'warning.main' }}
                     >
                       <FcRedo size={20} />
@@ -299,10 +327,16 @@ const TaskRenderer = ({
   // Рендер строки таблицы
   const renderTaskListItem = (task) => {
     const isOverdue = isTaskOverdue(task.deadline, task.status)
+    const hasConfirmButtons = task.status === 'done'
+    const isHighlighted = hasConfirmButtons && taskCardBlinkYellow[String(task.task_id)]
 
     return (
       <React.Fragment key={task.task_id}>
         <ListItem
+          ref={(el) => {
+            if (el) cardRefs.current[task.task_id] = el
+          }}
+          className={isHighlighted ? styles.cardBlinkYellow : undefined}
           sx={{
             borderLeft: `4px solid ${getPriorityColor(task.priority)}`,
             backgroundColor: isOverdue ? 'rgba(244, 67, 54, 0.05)' : 'inherit',

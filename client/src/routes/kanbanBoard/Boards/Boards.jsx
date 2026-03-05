@@ -1,4 +1,7 @@
 import React, { useState, useEffect, useCallback, Suspense } from 'react'
+import axios from 'axios'
+import { API_BASE_URL } from '../../../../config'
+import useTaskStateTracker from '../../../store/useTaskStateTracker'
 import Task from '../Task/Task'
 import { Box, Modal } from '@mui/material'
 import { DragDropContext, Droppable, Draggable } from 'react-beautiful-dnd'
@@ -64,6 +67,28 @@ const Boards = () => {
   const [isHelpOpen, setHelpOpen] = useState(false)
 
   const userId = user ? user.id : null
+
+  const taskDecisionNavigate = useTaskStateTracker((s) => s.taskDecisionNavigate)
+  const clearTaskDecisionNavigate = useTaskStateTracker((s) => s.clearTaskDecisionNavigate)
+  const clearTaskCardBlinkYellow = useTaskStateTracker((s) => s.clearTaskCardBlinkYellow)
+  const clearSubtaskBlinkYellow = useTaskStateTracker((s) => s.clearSubtaskBlinkYellow)
+
+  useEffect(() => {
+    if (!taskDecisionNavigate) return
+    if (taskDecisionNavigate.type === 'project') {
+      const { globalTaskId } = taskDecisionNavigate
+      axios
+        .get(`${API_BASE_URL}5000/api/global-tasks/${globalTaskId}`)
+        .then((res) => {
+          setSelectedProjectToOpen(res.data)
+          setGlobalProjectOpen(true)
+        })
+        .catch((err) => console.error('Ошибка загрузки проекта:', err))
+    } else if (taskDecisionNavigate.type === 'taskList') {
+      setTaskListManagerOpen(true)
+    }
+    clearTaskDecisionNavigate()
+  }, [taskDecisionNavigate, clearTaskDecisionNavigate])
 
   useEffect(() => {
     // Перемещаем напоминания из хранилища в уведомления
@@ -214,7 +239,10 @@ const Boards = () => {
   }
 
   const toggleTaskListManager = () => {
-    setTaskListManagerOpen((prev) => !prev)
+    setTaskListManagerOpen((prev) => {
+      if (prev) clearTaskCardBlinkYellow()
+      return !prev
+    })
   }
 
   const toggleGlobalProgect = () => {
@@ -222,6 +250,7 @@ const Boards = () => {
   }
 
   const closeGlobalProject = () => {
+    clearSubtaskBlinkYellow()
     setSelectedProjectToOpen(null)
     setGlobalProjectOpen(false)
     setStripRefreshKey((k) => k + 1)

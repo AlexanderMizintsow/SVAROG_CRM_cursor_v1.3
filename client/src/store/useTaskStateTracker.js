@@ -58,6 +58,9 @@ const useTaskStateTracker = create((set, get) => {
     projectBlinkGreen: initialState.projectBlinkGreen || {},
     projectBlinkYellow: initialState.projectBlinkYellow || {},
     projectDeadlineNotified: initialState.projectDeadlineNotified || {},
+    taskDecisionNavigate: null,
+    subtaskBlinkYellow: {},
+    taskCardBlinkYellow: {},
     notificationsTask: {},
     extensionRequests: {},
 
@@ -180,6 +183,31 @@ const useTaskStateTracker = create((set, get) => {
         return newState
       })
     },
+
+    setTaskDecisionNavigate: (payload) => set({ taskDecisionNavigate: payload }),
+    clearTaskDecisionNavigate: () => set({ taskDecisionNavigate: null }),
+    setSubtaskBlinkYellow: (subtaskId) =>
+      set((state) => ({
+        ...state,
+        subtaskBlinkYellow: { ...state.subtaskBlinkYellow, [String(subtaskId)]: true },
+      })),
+    clearSubtaskBlinkYellow: (subtaskId) =>
+      set((state) => {
+        if (!subtaskId) return { ...state, subtaskBlinkYellow: {} }
+        const { [String(subtaskId)]: _, ...rest } = state.subtaskBlinkYellow
+        return { ...state, subtaskBlinkYellow: rest }
+      }),
+    setTaskCardBlinkYellow: (taskId) =>
+      set((state) => ({
+        ...state,
+        taskCardBlinkYellow: { ...state.taskCardBlinkYellow, [String(taskId)]: true },
+      })),
+    clearTaskCardBlinkYellow: (taskId) =>
+      set((state) => {
+        if (!taskId) return { ...state, taskCardBlinkYellow: {} }
+        const { [String(taskId)]: _, ...rest } = state.taskCardBlinkYellow
+        return { ...state, taskCardBlinkYellow: rest }
+      }),
 
     setProjectDeadlineNotified: (globalTaskId) => {
       set((state) => {

@@ -1,3 +1,17 @@
+.cardBlinkYellow {
+  animation: cardBlinkYellow 1.5s ease-in-out infinite;
+}
+
+@keyframes cardBlinkYellow {
+  0%,
+  100% {
+    background-color: #ffffff;
+  }
+  50% {
+    background-color: #fef9c3;
+  }
+}
+
 .container {
   padding: 16px;
   background-color: #f8f8f8;
