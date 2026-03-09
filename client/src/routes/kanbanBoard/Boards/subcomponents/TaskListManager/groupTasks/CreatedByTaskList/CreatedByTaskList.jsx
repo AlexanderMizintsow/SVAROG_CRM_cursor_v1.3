@@ -36,6 +36,7 @@ const CreatedByTaskList = ({ tasks, userId, handleTaskAccept, refreshTasks }) =>
   const [deadlineDialogProps, setDeadlineDialogProps] = useState({
     open: false,
     initialDate: '',
+    maxDate: '', // дедлайн проекта для задач из проекта
   })
   // состояния для выбора нового исполнителя
   const [openReplaceUserModal, setOpenReplaceUserModal] = useState(false)
@@ -259,7 +260,7 @@ const CreatedByTaskList = ({ tasks, userId, handleTaskAccept, refreshTasks }) =>
     }
   }
 
-  const handleOpenDeadlineDialog = (task) => {
+  const handleOpenDeadlineDialog = async (task) => {
     setCurrentTaskForDeadline(task)
     const formatDateForInput = (dateString) => {
       if (!dateString) return ''
@@ -269,9 +270,22 @@ const CreatedByTaskList = ({ tasks, userId, handleTaskAccept, refreshTasks }) =>
       return correctedDate.toISOString().slice(0, 16)
     }
 
+    let maxDate = ''
+    const globalTaskId = task.global_task_id
+    if (globalTaskId) {
+      try {
+        const res = await axios.get(
+          `${API_BASE_URL}5000/api/global-tasks/${globalTaskId}`
+        )
+        const pd = res.data?.deadline
+        if (pd) maxDate = formatDateForInput(pd)
+      } catch (_) {}
+    }
+
     setDeadlineDialogProps({
       open: true,
       initialDate: formatDateForInput(task.deadline),
+      maxDate,
     })
     setOpenDeadlineDialog(true)
   }
@@ -312,9 +326,13 @@ const CreatedByTaskList = ({ tasks, userId, handleTaskAccept, refreshTasks }) =>
       await refreshTasks() // Обновляем задачи после успешного обновления
     } catch (error) {
       console.error('Ошибка при обновлении срока:', error)
+      const msg =
+        error?.response?.status === 400 && error?.response?.data?.error
+          ? error.response.data.error
+          : 'Ошибка при обновлении срока выполнения'
       Toastify({
-        text: 'Ошибка при обновлении срока выполнения',
-        duration: 3000,
+        text: msg,
+        duration: 4000,
         close: true,
         style: {
           background: 'linear-gradient(to right, #ff5f6d, #ffc371)',

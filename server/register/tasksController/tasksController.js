@@ -58,6 +58,7 @@ function emitGlobalTaskChanged(io, userIds, globalTaskId, reason, payload = {}) 
     reason: reason || 'changed',
     title: payload.title || null,
     authorId: payload.authorId != null ? Number(payload.authorId) : null,
+    ...(payload.deadline != null && { deadline: payload.deadline }),
   }
   for (const uid of userIds) {
     io.to(String(uid)).emit('globalTaskChanged', message)
@@ -187,6 +188,30 @@ function createTask(dbPool, io) {
           }
           if (effectiveGlobalTaskId == null && parentRow.rows[0].global_task_id != null) {
             effectiveGlobalTaskId = parentRow.rows[0].global_task_id
+          }
+        }
+      }
+
+      // Дедлайн задачи из проекта не может быть позже дедлайна проекта
+      if (effectiveGlobalTaskId != null && deadlineValue != null) {
+        const projRow = await dbPool.query(
+          'SELECT deadline FROM global_tasks WHERE id = $1',
+          [effectiveGlobalTaskId]
+        )
+        if (projRow.rows.length && projRow.rows[0].deadline != null) {
+          const projectDeadline = new Date(projRow.rows[0].deadline)
+          const taskDeadline = new Date(deadlineValue)
+          if (taskDeadline.getTime() > projectDeadline.getTime()) {
+            const minFormatted = projectDeadline.toLocaleString('ru-RU', {
+              day: '2-digit',
+              month: '2-digit',
+              year: 'numeric',
+              hour: '2-digit',
+              minute: '2-digit',
+            })
+            return res.status(400).json({
+              error: `Срок задачи не может быть позже срока проекта. Максимум: ${minFormatted}`,
+            })
           }
         }
       }
@@ -1872,6 +1897,95 @@ function updateGlobalTaskProcess(dbPool, io) {
     } catch (error) {
       console.error('Ошибка при обновлении задачи:', error)
       res.status(500).json({ error: 'Внутренняя ошибка сервера' })
+    }
+  }
+}
+
+// Установка срока проекта (только автор, только если срок ещё не задан)
+function setProjectDeadline(dbPool, io) {
+  return async function (req, res) {
+    const { taskId } = req.params
+    const { deadline, userId } = req.body || {}
+
+    if (!taskId || !userId) {
+      return res.status(400).json({ error: 'Не указан ID проекта или пользователя.' })
+    }
+    if (!deadline) {
+      return res.status(400).json({ error: 'Не указана дата срока.' })
+    }
+
+    const deadlineDate = new Date(deadline)
+    if (Number.isNaN(deadlineDate.getTime())) {
+      return res.status(400).json({ error: 'Некорректная дата срока.' })
+    }
+
+    try {
+      const r = await dbPool.query(
+        `SELECT gt.id, gt.title, gt.deadline, gt.created_by as author_id
+         FROM global_tasks gt WHERE gt.id = $1`,
+        [taskId]
+      )
+      if (r.rows.length === 0) {
+        return res.status(404).json({ error: 'Проект не найден.' })
+      }
+      const row = r.rows[0]
+      const authorId = row.author_id != null ? Number(row.author_id) : null
+      if (authorId === null || Number(userId) !== authorId) {
+        return res.status(403).json({ error: 'Установить срок может только автор проекта.' })
+      }
+      if (row.deadline != null) {
+        return res.status(400).json({ error: 'Срок проекта уже установлен.' })
+      }
+
+      const maxTask = await dbPool.query(
+        `SELECT MAX(deadline) as max_deadline
+         FROM tasks WHERE global_task_id = $1 AND deadline IS NOT NULL`,
+        [taskId]
+      )
+      const maxDeadline = maxTask.rows[0]?.max_deadline
+      if (maxDeadline != null) {
+        const maxDate = new Date(maxDeadline)
+        if (deadlineDate.getTime() < maxDate.getTime()) {
+          const maxFormatted = maxDate.toLocaleString('ru-RU', {
+            day: '2-digit',
+            month: '2-digit',
+            year: 'numeric',
+            hour: '2-digit',
+            minute: '2-digit',
+          })
+          return res.status(400).json({
+            error: `Срок проекта не может быть раньше самой поздней задачи. Минимум для проекта: ${maxFormatted}`,
+            maxDeadline: maxDeadline,
+          })
+        }
+      }
+
+      await dbPool.query(
+        'UPDATE global_tasks SET deadline = $1 WHERE id = $2',
+        [deadlineDate.toISOString(), taskId]
+      )
+      await insertTaskHistory(dbPool, taskId, 'deadline_set', 'Установлен срок проекта', userId, null)
+
+      const participantIds = await getGlobalTaskParticipantUserIds(dbPool, taskId)
+      const exceptAuthor = participantIds.filter((id) => String(id) !== String(authorId))
+      const title = row.title || 'Проект'
+      const deadlineIso = deadlineDate.toISOString()
+      if (io && exceptAuthor.length > 0) {
+        emitGlobalTaskChanged(io, exceptAuthor, taskId, 'deadline_set', {
+          title,
+          authorId,
+          deadline: deadlineIso,
+        })
+      }
+
+      const updated = await dbPool.query(
+        'SELECT id, title, deadline, status, progress, created_at, created_by FROM global_tasks WHERE id = $1',
+        [taskId]
+      )
+      res.status(200).json(updated.rows[0])
+    } catch (err) {
+      console.error('setProjectDeadline:', err)
+      res.status(500).json({ error: 'Ошибка при установке срока проекта.' })
     }
   }
 }
@@ -3594,6 +3708,7 @@ const approveExtensionRequest = (dbPool, io) => async (req, res) => {
     // 1. Проверяем существование запроса
     const requestQuery = await dbPool.query(
       `SELECT r.*, t.title AS task_title, t.deadline AS current_deadline, 
+              t.global_task_id,
               u.id AS requester_id 
        FROM task_deadline_extension_requests r
        JOIN tasks t ON r.task_id = t.id
@@ -3607,6 +3722,31 @@ const approveExtensionRequest = (dbPool, io) => async (req, res) => {
     }
 
     const request = requestQuery.rows[0]
+
+    // Дедлайн задачи из проекта не может быть позже дедлайна проекта
+    const globalTaskId = request.global_task_id
+    if (globalTaskId != null) {
+      const projRow = await dbPool.query(
+        'SELECT deadline FROM global_tasks WHERE id = $1',
+        [globalTaskId]
+      )
+      if (projRow.rows.length && projRow.rows[0].deadline != null) {
+        const projectDeadline = new Date(projRow.rows[0].deadline)
+        const taskDeadline = new Date(formattedDeadline)
+        if (taskDeadline.getTime() > projectDeadline.getTime()) {
+          const minFormatted = projectDeadline.toLocaleString('ru-RU', {
+            day: '2-digit',
+            month: '2-digit',
+            year: 'numeric',
+            hour: '2-digit',
+            minute: '2-digit',
+          })
+          return res.status(400).json({
+            error: `Срок задачи не может быть позже срока проекта. Максимум: ${minFormatted}`,
+          })
+        }
+      }
+    }
 
     // 3. Обновляем срок задачи  status = 'doing'
     await dbPool.query(
@@ -3711,6 +3851,31 @@ const updateTaskDeadline = (dbPool, io) => async (req, res) => {
     // Если переданы assigned_user_ids, используем их, иначе берем из БД
     const recipients =
       assigned_user_ids && assigned_user_ids.length > 0 ? assigned_user_ids : assignees
+
+    // Дедлайн задачи из проекта не может быть позже дедлайна проекта
+    const globalTaskId = task.global_task_id
+    if (globalTaskId != null) {
+      const projRow = await dbPool.query(
+        'SELECT deadline FROM global_tasks WHERE id = $1',
+        [globalTaskId]
+      )
+      if (projRow.rows.length && projRow.rows[0].deadline != null) {
+        const projectDeadline = new Date(projRow.rows[0].deadline)
+        const taskDeadline = new Date(formattedDeadline)
+        if (taskDeadline.getTime() > projectDeadline.getTime()) {
+          const minFormatted = projectDeadline.toLocaleString('ru-RU', {
+            day: '2-digit',
+            month: '2-digit',
+            year: 'numeric',
+            hour: '2-digit',
+            minute: '2-digit',
+          })
+          return res.status(400).json({
+            error: `Срок задачи не может быть позже срока проекта. Максимум: ${minFormatted}`,
+          })
+        }
+      }
+    }
 
     // 3. Обновляем срок задачи
     await dbPool.query(
@@ -4325,6 +4490,7 @@ module.exports = {
   updateGlobalTask,
   getSubtasksForGlobalTask,
   updateGlobalTaskProcess,
+  setProjectDeadline,
   deleteGlobalTask,
   getGlobalTaskById,
   getAttachmentsByTaskId,

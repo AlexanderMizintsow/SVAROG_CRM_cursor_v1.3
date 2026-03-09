@@ -140,10 +140,10 @@ const useTaskStateTracker = create((set, get) => {
       })
     },
 
-    addProjectNotification: (globalTaskId, title, type) => {
+    addProjectNotification: (globalTaskId, title, type, extra = {}) => {
       set((state) => {
         const key = `project-${type}-${globalTaskId}`
-        const next = { ...state.projectNotifications, [key]: { globalTaskId, title, type } }
+        const next = { ...state.projectNotifications, [key]: { globalTaskId, title, type, ...extra } }
         const newState = { ...state, projectNotifications: next }
         saveState(newState)
         return newState

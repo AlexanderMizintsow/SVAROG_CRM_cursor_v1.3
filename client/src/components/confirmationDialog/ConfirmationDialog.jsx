@@ -20,6 +20,7 @@ const ConfirmationDialog = ({
   dateInput,
   actionType, // необязательный
   initialDate = '',
+  maxDate = '', // для datetime-local, формат YYYY-MM-DDTHH:mm
 }) => {
   const [commentValue, setCommentValue] = useState('')
   const [dateValue, setDateValue] = useState(initialDate || '')
@@ -102,7 +103,8 @@ const ConfirmationDialog = ({
             InputLabelProps={{
               shrink: true,
             }}
-           
+            inputProps={maxDate ? { max: maxDate } : {}}
+            helperText={maxDate ? 'Не позже срока проекта' : null}
           />
         )}
       </DialogContent>

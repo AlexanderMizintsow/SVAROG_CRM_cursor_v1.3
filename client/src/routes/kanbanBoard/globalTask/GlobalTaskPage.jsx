@@ -55,27 +55,10 @@ const GlobalTaskPage = ({
       ? tasks[currentTaskIndex]
       : null
 
-  // 4. Добавление условного рендеринга (ранний возврат) - ЭТОТ БЛОК ОСТАЕТСЯ ЗДЕСЬ
-  if (!currentTask) {
-    console.error('GlobalTaskPage: Задача не найдена или список задач пуст.')
-    return (
-      <div className="global-task-page">
-        <div className="global-task-page__container">
-          {onBack && (
-            <button onClick={onBack} className="global-task-page__back-button">
-              <FaArrowLeft className="global-task-page__back-icon" /> Назад к
-              списку
-            </button>
-          )}
-          <p>Задача не найдена.</p>
-        </div>
-      </div>
-    )
-  }
-
   const TERMINAL_STATUSES = ['Завершено', 'Провал', 'Удален']
-  const isReadOnly = TERMINAL_STATUSES.includes(currentTask.status)
+  const isReadOnly = currentTask ? TERMINAL_STATUSES.includes(currentTask.status) : false
 
+  // ВАЖНО: все хуки до условного return — иначе "Rendered fewer hooks than expected"
   const refreshDocuments = useCallback(async () => {
     if (!currentTask?.id) return
     try {
@@ -102,6 +85,23 @@ const GlobalTaskPage = ({
   // Обработчик смены таба
   const handleTabChange = (tabId) => {
     setActiveTab(tabId)
+  }
+
+  // Ранний возврат — только ПОСЛЕ всех хуков (useState, useEffect, useCallback)
+  if (!currentTask) {
+    return (
+      <div className="global-task-page">
+        <div className="global-task-page__container">
+          {onBack && (
+            <button onClick={onBack} className="global-task-page__back-button">
+              <FaArrowLeft className="global-task-page__back-icon" /> Назад к
+              списку
+            </button>
+          )}
+          <p>Задача не найдена.</p>
+        </div>
+      </div>
+    )
   }
 
   // 7. Возврат JSX

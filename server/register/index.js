@@ -74,6 +74,7 @@ const {
   updateGlobalTask,
   getSubtasksForGlobalTask,
   updateGlobalTaskProcess,
+  setProjectDeadline,
   deleteGlobalTask,
   getGlobalTaskById,
   getAttachmentsByTaskId,
@@ -564,6 +565,7 @@ app.get('/api/tasks/subtasks/:globalTaskId', getSubtasksForGlobalTask(dbPool))
 app.delete('/api/global-tasks/delete/:taskId', deleteGlobalTask(dbPool, io))
 app.get('/api/global-tasks/:taskId', getGlobalTaskById(dbPool))
 app.put('/api/update/global-tasks/:taskId/status', updateGlobalTaskProcess(dbPool, io))
+app.put('/api/global-tasks/:taskId/deadline', setProjectDeadline(dbPool, io))
 app.get('/api/tasks/:id/attachments', getAttachmentsByTaskId(dbPool))
 app.post('/api/global-tasks/:taskId/comments', addCommentToGlobalTask(dbPool))
 app.post('/api/global-tasks/:taskId/responsibles-new', addResponsiblesToGlobalTask(dbPool, io))

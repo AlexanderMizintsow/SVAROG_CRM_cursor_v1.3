@@ -4,8 +4,10 @@
 
 .properties-panel--empty {
   display: flex;
+  flex-direction: column;
   align-items: center;
   justify-content: center;
+  gap: 1rem;
   min-height: 120px;
   color: var(--text-secondary, #64748b);
   font-size: 0.9rem;
@@ -14,10 +16,43 @@
 }
 
 .properties-panel__title {
-  margin: 0 0 1rem;
+  margin: 0 0 0.75rem;
   font-size: 1rem;
   font-weight: 600;
   color: var(--text-primary, #1e293b);
+}
+
+.properties-panel__copy-paste {
+  margin-bottom: 1rem;
+
+  &--row {
+    display: flex;
+    gap: 0.5rem;
+  }
+}
+
+.properties-panel__btn-copy-paste {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.4rem 0.65rem;
+  font-size: 0.85rem;
+  border: 1px solid var(--border, #e2e8f0);
+  border-radius: 6px;
+  background: #fff;
+  color: var(--text-secondary, #64748b);
+  cursor: pointer;
+  transition: border-color 0.2s, color 0.2s, background 0.2s;
+
+  &:hover:not(:disabled) {
+    border-color: var(--primary, #2563eb);
+    color: var(--primary, #2563eb);
+  }
+
+  &:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+  }
 }
 
 .properties-panel__hint {

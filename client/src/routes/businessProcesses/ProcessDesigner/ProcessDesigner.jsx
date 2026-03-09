@@ -1,8 +1,13 @@
-import { useCallback, useState } from 'react'
+import { useCallback, useRef, useState } from 'react'
 import Toastify from 'toastify-js'
 import useBusinessProcessStore from '../../../store/useBusinessProcessStore.js'
 import useUserStore from '../../../store/userStore'
 import { createProcess, updateProcess, deleteProcess } from '../../../api/businessProcessApi.js'
+import {
+  createExportData,
+  validateAndParseImport,
+  downloadExportFile,
+} from '../utils/businessProcessExport.js'
 import Palette from './Palette/Palette.jsx'
 import FlowCanvas from './Canvas/FlowCanvas.jsx'
 import PropertiesPanel from './PropertiesPanel/PropertiesPanel.jsx'
@@ -25,9 +30,11 @@ const ProcessDesigner = () => {
     setIsDraft,
     setScheme,
     resetDesigner,
+    loadImportedProcess,
   } = useBusinessProcessStore()
 
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
+  const importFileInputRef = useRef(null)
 
   const validateScheme = useCallback((forPublish = false) => {
     const nodes = Array.isArray(scheme?.nodes) ? scheme.nodes : []
@@ -282,6 +289,45 @@ const ProcessDesigner = () => {
     setDeleteDialogOpen(true)
   }, [])
 
+  const handleExport = useCallback(() => {
+    const nodes = Array.isArray(scheme?.nodes) ? scheme.nodes : []
+    if (nodes.length === 0) {
+      Toastify({ text: 'Нет блоков для экспорта', close: true, backgroundColor: '#b91c1c' }).showToast()
+      return
+    }
+    const exportData = createExportData({
+      name: processName,
+      description: processDescription,
+      scheme,
+      isDraft: isDraft,
+      visibilityUserIds,
+    })
+    const safeName = (processName || 'business-process').replace(/[^\w\s-а-яёА-ЯЁ]/gi, '').trim() || 'business-process'
+    downloadExportFile(exportData, safeName)
+    Toastify({ text: 'Процесс экспортирован', close: true, backgroundColor: '#059669' }).showToast()
+  }, [scheme, processName, processDescription, isDraft, visibilityUserIds])
+
+  const handleImportClick = useCallback(() => {
+    importFileInputRef.current?.click()
+  }, [])
+
+  const handleImportFileChange = useCallback((e) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+    e.target.value = ''
+    const reader = new FileReader()
+    reader.onload = () => {
+      const result = validateAndParseImport(reader.result, { clearVisibility: true })
+      if (!result.success) {
+        Toastify({ text: result.error || 'Ошибка импорта', close: true, backgroundColor: '#b91c1c' }).showToast()
+        return
+      }
+      loadImportedProcess(result.data)
+      Toastify({ text: 'Процесс импортирован', close: true, backgroundColor: '#059669' }).showToast()
+    }
+    reader.readAsText(file, 'UTF-8')
+  }, [loadImportedProcess])
+
   const handleDeleteProcessConfirm = useCallback(async () => {
     if (!selectedProcess?.id) return
     setDeleteDialogOpen(false)
@@ -301,8 +347,19 @@ const ProcessDesigner = () => {
 
   const deleteConfirmName = selectedProcess?.name || processName || 'Без названия'
 
+  const nodes = Array.isArray(scheme?.nodes) ? scheme.nodes : []
+  const canExport = nodes.length > 0
+
   return (
     <div className="process-designer">
+      <input
+        ref={importFileInputRef}
+        type="file"
+        accept=".json,application/json"
+        onChange={handleImportFileChange}
+        style={{ display: 'none' }}
+        aria-hidden="true"
+      />
       {deleteDialogOpen && (
         <ConfirmationDialog
           open={deleteDialogOpen}
@@ -335,6 +392,9 @@ const ProcessDesigner = () => {
         onPublish={handlePublish}
         onNewProcess={resetDesigner}
         onDelete={handleDeleteProcessClick}
+        canExport={canExport}
+        onExport={handleExport}
+        onImportClick={handleImportClick}
       />
 
       <div className="process-designer__body">

@@ -11,6 +11,24 @@ import './ProcessMonitoring.scss'
 /** Временно: в блоке «Просрочки» показывать все задачи с дедлайном и колонки «Дедлайн», «Сейчас», «Просрочен?» для отладки. */
 const DEBUG_OVERDUE = false
 
+/** Ячейка времени: ср. и макс. в две строки с визуальным разделением */
+const TimeAvgMaxCell = ({ avgSeconds, maxSeconds, formatSeconds }) => {
+  const avg = formatSeconds(avgSeconds)
+  const max = formatSeconds(maxSeconds)
+  const hasData = avgSeconds != null || maxSeconds != null
+  if (!hasData) return <span className="process-monitoring__time-empty">—</span>
+  return (
+    <div className="process-monitoring__time-avg-max">
+      <span className="process-monitoring__time-avg" title="Среднее время">
+        <span className="process-monitoring__time-label">ср.</span> {avg}
+      </span>
+      <span className="process-monitoring__time-max" title="Максимум за период">
+        <span className="process-monitoring__time-label">макс.</span> {max}
+      </span>
+    </div>
+  )
+}
+
 const PieChart = ({ data, size = 180, title, description, emptyLabel }) => {
   const emptyHint = emptyLabel || title ? `Нет данных по: «${title}»` : 'Нет данных'
   if (!data || data.length === 0) {
@@ -97,6 +115,8 @@ const ProcessMonitoring = () => {
   const [bpProcessesList, setBpProcessesList] = useState([])
   const [selectedBpId, setSelectedBpId] = useState('')
   const [bpNodes, setBpNodes] = useState([])
+  const [processAvgDurationSeconds, setProcessAvgDurationSeconds] = useState(null)
+  const [processMaxDurationSeconds, setProcessMaxDurationSeconds] = useState(null)
   const [loadingBpNodes, setLoadingBpNodes] = useState(false)
   const [bottlenecksParticipants, setBottlenecksParticipants] = useState([])
   const [bottlenecksDepartments, setBottlenecksDepartments] = useState([])
@@ -228,6 +248,8 @@ const ProcessMonitoring = () => {
   const loadBpNodes = useCallback(async () => {
     if (!selectedBpId) {
       setBpNodes([])
+      setProcessAvgDurationSeconds(null)
+      setProcessMaxDurationSeconds(null)
       return
     }
     setLoadingBpNodes(true)
@@ -238,10 +260,19 @@ const ProcessMonitoring = () => {
       const r = await axios.get(
         `${API_BASE_URL}5000/api/analytics/business-processes/${selectedBpId}/nodes?${params}`
       )
-      setBpNodes(r.data || [])
+      const data = r.data
+      if (data && typeof data === 'object' && Array.isArray(data.nodes)) {
+        setBpNodes(data.nodes)
+        setProcessAvgDurationSeconds(data.processAvgDurationSeconds ?? null)
+        setProcessMaxDurationSeconds(data.processMaxDurationSeconds ?? null)
+      } else {
+        setBpNodes(Array.isArray(data) ? data : [])
+      }
     } catch (e) {
       console.error('Ошибка загрузки узлов БП:', e)
       setBpNodes([])
+      setProcessAvgDurationSeconds(null)
+      setProcessMaxDurationSeconds(null)
     } finally {
       setLoadingBpNodes(false)
     }
@@ -522,13 +553,19 @@ const ProcessMonitoring = () => {
         { label: 'В работе', value: Math.max(0, (tasks.total || 0) - (tasks.completed || 0) - (tasks.overdue || 0)), color: '#3b82f6' },
       ].filter((d) => d.value > 0)
 
+  /** Форматирование времени: секунды → «X ч Y мин» (без секунд) */
   const formatSeconds = (sec) => {
     if (sec == null) return '—'
-    if (sec < 1) return sec > 0 ? `${Number(sec).toFixed(1)} с` : '0 с'
-    if (sec < 60) return `${Number(sec).toFixed(1)} с`
-    const m = Math.floor(sec / 60)
-    const s = Math.round(sec % 60)
-    return s ? `${m} мин ${s} с` : `${m} мин`
+    if (sec < 60) return sec > 0 ? '< 1 мин' : '0 мин'
+    const totalMinutes = Math.round(sec / 60)
+    if (totalMinutes >= 60) {
+      const h = Math.floor(totalMinutes / 60)
+      const m = totalMinutes % 60
+      const parts = [`${h} ч`]
+      if (m > 0) parts.push(`${m} мин`)
+      return parts.join(' ')
+    }
+    return `${totalMinutes} мин`
   }
 
   const byDept = data?.byDepartment || []
@@ -833,7 +870,7 @@ const ProcessMonitoring = () => {
               <FcFlowChart /> Детали по бизнес-процессам
             </h2>
             <p className="process-monitoring__bp-detail-desc">
-              Где уходит время: для каждого этапа считаются — время самого этапа, задачи БП (связанные с узлом), активность по проектам (чат/история), задачи и подзадачи внутри проектов этого этапа, ожидание ответов по почте. Узкое место — этапы с наибольшим суммарным временем. В колонке «Где время» — подсказка с разбивкой.
+              Сколько занимает каждый этап: «Всего (ср.)» — среднее время этапа целиком. Детализация: этап, задачи БП, проекты, задачи в проектах, почта. Узкое место — этап с наибольшим средним временем.
             </p>
             <div className="process-monitoring__bp-detail-select-wrap">
               <label className="process-monitoring__bp-detail-label">Бизнес-процесс</label>
@@ -860,38 +897,43 @@ const ProcessMonitoring = () => {
                 ) : (
                   <>
                     {(() => {
-                      const combinedScore = (n) =>
-                        n.combinedTotalSeconds != null
-                          ? n.combinedTotalSeconds
-                          : (n.totalSeconds || 0) + (n.taskTimeTotalSeconds || 0) + (n.projectTimeTotalSeconds || 0) + (n.tasksInProjectsTotalSeconds || 0) + (n.mailWaitTotalSeconds || 0)
+                      const combinedScore = (n) => n.combinedAvgSeconds ?? 0
                       const sorted = [...bpNodes].sort((a, b) => combinedScore(b) - combinedScore(a))
                       const withTime = sorted.filter((n) => combinedScore(n) > 0)
                       const bottleneckNodeId = withTime.length > 0 ? withTime[0].nodeId : null
                       return (
                         <div className="process-monitoring__table-wrap">
+                          {(processAvgDurationSeconds != null || processMaxDurationSeconds != null) ? (
+                            <div className="process-monitoring__process-summary" title="От старта до завершения каждого экземпляра (ср. и макс. по экземплярам)">
+                              Ср. время процесса: <strong>{formatSeconds(processAvgDurationSeconds)}</strong>
+                              {processMaxDurationSeconds != null && (
+                                <> · Макс.: <strong>{formatSeconds(processMaxDurationSeconds)}</strong></>
+                              )}
+                            </div>
+                          ) : null}
+                          <div className="process-monitoring__table-legend">
+                            <span className="process-monitoring__legend-item">
+                              <span className="process-monitoring__time-label process-monitoring__legend-label">ср.</span> — среднее
+                            </span>
+                            <span className="process-monitoring__legend-item">
+                              <span className="process-monitoring__time-label process-monitoring__legend-label">макс.</span> — максимум за период
+                            </span>
+                          </div>
                           <table className="process-monitoring__table process-monitoring__table--nodes">
                             <thead>
                               <tr>
                                 <th>Этап</th>
                                 <th>Проходов</th>
-                                <th>Ср./макс/всего время этапа</th>
+                                <th title="Среднее время этапа целиком (этап + задачи + проекты + почта)">Всего (ср.)</th>
+                                <th title="Время самого узла">Этап</th>
+                                <th title="Время в задачах БП">Задачи БП</th>
+                                <th title="Время по проектам">Проекты</th>
+                                <th title="Задачи внутри проектов">В проектах</th>
+                                <th title="Количество раундов переписки">Почта (раундов)</th>
+                                <th title="Сумма времени ожидания ответа между раундами (ср./макс.)">Почта (ожидание ответа)</th>
                                 <th>Задач</th>
-                                <th>С дедл.</th>
                                 <th>Просрочено</th>
-                                <th>Авторы</th>
-                                <th>Исполн.</th>
-                                <th>Время в задачах БП</th>
-                                <th>Проектов</th>
-                                <th>Завершено</th>
-                                <th>Ответств.</th>
-                                <th>Ожид. соглас.</th>
-                                <th>Док.</th>
-                                <th>Время по проектам</th>
-                                <th>Задачи в проектах</th>
-                                <th>Почта (раундов)</th>
-                                <th>Ожидание почты</th>
-                                <th title="Разбивка: этап, задачи БП, проекты, задачи в проектах, почта">Где время</th>
-                                <th title="Один этап с максимальным суммарным временем (этап + задачи + проекты + почта). При ускорении этого этапа узким местом станет следующий по времени">Узкое место</th>
+                                <th title="Этап с наибольшим средним временем">Узкое место</th>
                               </tr>
                             </thead>
                             <tbody>
@@ -900,60 +942,39 @@ const ProcessMonitoring = () => {
                                   key={node.nodeId}
                                   className={bottleneckNodeId === node.nodeId ? 'process-monitoring__row--bottleneck' : ''}
                                 >
-                                  <td>{node.nodeLabel || node.nodeId}</td>
+                                  <td className="process-monitoring__cell-stage">{node.nodeLabel || node.nodeId}</td>
                                   <td>{node.passCount ?? 0}</td>
-                                  <td>
-                                    {formatSeconds(node.avgSeconds)} / {formatSeconds(node.maxSeconds)} / {formatSeconds(node.totalSeconds)}
+                                  <td className="process-monitoring__time-cell process-monitoring__cell-total">
+                                    <strong>{formatSeconds(node.combinedAvgSeconds)}</strong>
                                   </td>
-                                  <td>{node.tasksCount ?? 0}</td>
-                                  <td>{node.tasksWithDeadline ?? 0}</td>
-                                  <td className={(node.tasksOverdue || 0) > 0 ? 'process-monitoring__cell--overdue' : ''}>
-                                    {node.tasksOverdue ?? 0}
+                                  <td className="process-monitoring__time-cell">
+                                    <TimeAvgMaxCell avgSeconds={node.avgSeconds} maxSeconds={node.maxSeconds} formatSeconds={formatSeconds} />
                                   </td>
-                                  <td>{node.authorsCount ?? 0}</td>
-                                  <td>{node.assigneesCount ?? 0}</td>
-                                  <td>{formatSeconds(node.taskTimeTotalSeconds)}</td>
-                                  <td>{node.projectsCount ?? 0}</td>
-                                  <td>{node.projectsCompleted ?? 0}</td>
-                                  <td>{node.responsiblesCount ?? 0}</td>
-                                  <td>{(node.approvalPendingCount || 0) > 0 ? node.approvalPendingCount : '—'}</td>
-                                  <td>{node.docsCount ?? 0}</td>
-                                  <td>{formatSeconds(node.projectTimeTotalSeconds)}</td>
-                                  <td title={`${node.tasksInProjectsCount ?? 0} шт.`}>
-                                    {(node.tasksInProjectsCount ?? 0) > 0 ? `${node.tasksInProjectsCount} · ${formatSeconds(node.tasksInProjectsTotalSeconds)}` : '—'}
+                                  <td className="process-monitoring__time-cell">
+                                    <TimeAvgMaxCell avgSeconds={node.taskTimeAvgSeconds} maxSeconds={node.taskTimeMaxSeconds} formatSeconds={formatSeconds} />
                                   </td>
-                                  <td>{node.mailRoundsCount ?? 0}</td>
-                                  <td>{formatSeconds(node.mailWaitTotalSeconds)}</td>
-                                  <td
-                                    className="process-monitoring__breakdown-cell"
-                                    title={
-                                      node.timeBreakdown
-                                        ? [
-                                            `Этап: ${formatSeconds(node.timeBreakdown.nodeSeconds)}`,
-                                            `Задачи БП: ${formatSeconds(node.timeBreakdown.tasksBpSeconds)}`,
-                                            `Проекты (активность): ${formatSeconds(node.timeBreakdown.projectsSeconds)}`,
-                                            `Задачи в проектах: ${formatSeconds(node.timeBreakdown.tasksInProjectsSeconds)}`,
-                                            `Почта: ${formatSeconds(node.timeBreakdown.mailSeconds)}`,
-                                            `Итого: ${formatSeconds(node.timeBreakdown.totalSeconds)}`,
-                                          ].join('\n')
-                                        : ''
-                                    }
-                                  >
-                                    {node.timeBreakdown ? (
-                                      <span className="process-monitoring__breakdown-short">
-                                        {[
-                                          formatSeconds(node.timeBreakdown.nodeSeconds),
-                                          formatSeconds(node.timeBreakdown.tasksBpSeconds),
-                                          formatSeconds(node.timeBreakdown.projectsSeconds),
-                                          formatSeconds(node.timeBreakdown.tasksInProjectsSeconds),
-                                          formatSeconds(node.timeBreakdown.mailSeconds),
-                                        ].join(' + ')}
-                                      </span>
+                                  <td className="process-monitoring__time-cell">
+                                    <TimeAvgMaxCell avgSeconds={node.projectTimeAvgSeconds} maxSeconds={node.projectTimeMaxSeconds} formatSeconds={formatSeconds} />
+                                  </td>
+                                  <td className="process-monitoring__cell-tasks-in-projects" title={`${node.tasksInProjectsCount ?? 0} шт.`}>
+                                    {(node.tasksInProjectsCount ?? 0) > 0 ? (
+                                      <div className="process-monitoring__tasks-in-projects-cell">
+                                        <span className="process-monitoring__tasks-count">{node.tasksInProjectsCount} шт.</span>
+                                        <TimeAvgMaxCell avgSeconds={node.tasksInProjectsAvgSeconds} maxSeconds={node.tasksInProjectsMaxSeconds} formatSeconds={formatSeconds} />
+                                      </div>
                                     ) : (
                                       '—'
                                     )}
                                   </td>
-                                  <td title={bottleneckNodeId === node.nodeId ? 'Самый долгий этап процесса по суммарному времени' : ''}>
+                                  <td>{node.mailRoundsCount ?? 0}</td>
+                                  <td className="process-monitoring__time-cell" title="Сумма времени ожидания ответа между раундами">
+                                    <TimeAvgMaxCell avgSeconds={node.mailWaitAvgSeconds} maxSeconds={node.mailWaitMaxSeconds} formatSeconds={formatSeconds} />
+                                  </td>
+                                  <td>{node.tasksCount ?? 0}</td>
+                                  <td className={(node.tasksOverdue || 0) > 0 ? 'process-monitoring__cell--overdue' : ''}>
+                                    {node.tasksOverdue ?? 0}
+                                  </td>
+                                  <td title={bottleneckNodeId === node.nodeId ? 'Этап с наибольшим средним временем' : ''}>
                                     {bottleneckNodeId === node.nodeId ? (
                                       <span className="process-monitoring__bottleneck-badge">Да</span>
                                     ) : (

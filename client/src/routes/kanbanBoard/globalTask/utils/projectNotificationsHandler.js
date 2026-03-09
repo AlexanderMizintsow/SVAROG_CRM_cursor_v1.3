@@ -11,6 +11,7 @@ export function handleGlobalTaskChangedPayload(payload, currentUserId) {
   const reason = payload?.reason || 'changed'
   const title = payload?.title || null
   const authorId = payload?.authorId != null ? Number(payload.authorId) : null
+  const deadline = payload?.deadline ?? null
 
   if (!id) return
 
@@ -19,7 +20,8 @@ export function handleGlobalTaskChangedPayload(payload, currentUserId) {
 
   switch (reason) {
     case 'created':
-      if (title) store.addProjectNotification(id, title, 'created')
+      // Создателю проекта не показываем — он и так в курсе, что создал
+      if (title && !isAuthor) store.addProjectNotification(id, title, 'created')
       break
     case 'participant_added':
       if (title) store.addProjectNotification(id, title, 'participant_added')
@@ -51,6 +53,10 @@ export function handleGlobalTaskChangedPayload(payload, currentUserId) {
       break
     case 'subtask_added':
       if (title) store.addProjectNotification(id, title, 'subtask_added')
+      break
+    case 'deadline_set':
+      // Участникам (кроме автора) — автор не получает, он сам установил
+      if (title && !isAuthor) store.addProjectNotification(id, title, 'deadline_set', { deadline })
       break
     case 'subtask_status_done':
       store.setProjectBlinkYellow(id)

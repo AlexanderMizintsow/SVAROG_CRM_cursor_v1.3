@@ -566,6 +566,27 @@ const getBusinessProcessNodes = (dbPool) => {
         : ''
       if (dateFrom && dateTo) params.push(dateFrom, dateTo)
 
+      // Ср. время процесса целиком: от started_at до finished_at (или NOW для активных) по каждому экземпляру
+      let processAvgDurationSeconds = null
+      let processMaxDurationSeconds = null
+      try {
+        const durationRes = await dbPool.query(
+          `SELECT
+            ROUND(AVG(EXTRACT(EPOCH FROM (COALESCE(pi.finished_at, NOW()) - pi.started_at)))::numeric, 1) AS avg_seconds,
+            ROUND(MAX(EXTRACT(EPOCH FROM (COALESCE(pi.finished_at, NOW()) - pi.started_at)))::numeric, 1) AS max_seconds
+           FROM bp_process_instances pi
+           WHERE pi.process_id = $1 ${dateCond}`,
+          params
+        )
+        const row = durationRes.rows[0]
+        if (row && (row.avg_seconds != null || row.max_seconds != null)) {
+          processAvgDurationSeconds = row.avg_seconds != null ? parseFloat(row.avg_seconds) : null
+          processMaxDurationSeconds = row.max_seconds != null ? parseFloat(row.max_seconds) : null
+        }
+      } catch (durationErr) {
+        console.warn('getBusinessProcessNodes process duration:', durationErr.message)
+      }
+
       // Время в узле = от entered_at до выхода ИЛИ до следующей записи в логе (следующий шаг экземпляра) ИЛИ до завершения/сейчас
       const r = await dbPool.query(
         `WITH log_with_end AS (
@@ -612,8 +633,8 @@ const getBusinessProcessNodes = (dbPool) => {
                   COUNT(DISTINCT link.task_id) FILTER (WHERE t.deadline IS NOT NULL AND t.completed_at IS NULL AND t.deadline <= (CURRENT_TIMESTAMP AT TIME ZONE '${APP_TZ}')) AS tasks_overdue,
                   COUNT(DISTINCT t.created_by) FILTER (WHERE t.created_by IS NOT NULL) AS authors_count,
                   COUNT(DISTINCT ta.user_id) AS assignees_count,
-                  ROUND(SUM(EXTRACT(EPOCH FROM (COALESCE(t.completed_at, NOW()) - t.created_at)))::numeric, 1) AS task_time_total_seconds,
-                  ROUND(AVG(EXTRACT(EPOCH FROM (COALESCE(t.completed_at, NOW()) - t.created_at)))::numeric, 1) AS task_time_avg_seconds
+                  ROUND(AVG(EXTRACT(EPOCH FROM (COALESCE(t.completed_at, NOW()) - t.created_at)))::numeric, 1) AS task_time_avg_seconds,
+                  ROUND(MAX(EXTRACT(EPOCH FROM (COALESCE(t.completed_at, NOW()) - t.created_at)))::numeric, 1) AS task_time_max_seconds
            FROM bp_task_process_links link
            JOIN bp_process_instances pi ON pi.id = link.process_instance_id AND pi.process_id = $1 ${taskDateCond}
            LEFT JOIN tasks t ON t.id = link.task_id
@@ -629,8 +650,8 @@ const getBusinessProcessNodes = (dbPool) => {
             tasksOverdue: parseInt(row.tasks_overdue || 0, 10),
             authorsCount: parseInt(row.authors_count || 0, 10),
             assigneesCount: parseInt(row.assignees_count || 0, 10),
-            taskTimeTotalSeconds: row.task_time_total_seconds != null ? parseFloat(row.task_time_total_seconds) : null,
             taskTimeAvgSeconds: row.task_time_avg_seconds != null ? parseFloat(row.task_time_avg_seconds) : null,
+            taskTimeMaxSeconds: row.task_time_max_seconds != null ? parseFloat(row.task_time_max_seconds) : null,
           }
         })
       } catch (taskErr) {
@@ -645,9 +666,9 @@ const getBusinessProcessNodes = (dbPool) => {
         : ''
       if (dateFrom && dateTo) projParams.push(dateFrom, dateTo)
 
-      const mergeProjectStats = (row, docsCnt, timeSec) => {
+      const mergeProjectStats = (row, docsCnt, avgSec, maxSec) => {
         const prev = projectStatsByNode[row.node_id] || {
-          projectsCount: 0, projectsCompleted: 0, responsiblesCount: 0, approvalPendingCount: 0, docsCount: 0, projectTimeTotalSeconds: null, mailRoundsCount: 0, mailWaitTotalSeconds: 0,
+          projectsCount: 0, projectsCompleted: 0, responsiblesCount: 0, approvalPendingCount: 0, docsCount: 0, projectTimeAvgSeconds: null, projectTimeMaxSeconds: null, mailRoundsCount: 0, mailWaitAvgSeconds: null, mailWaitMaxSeconds: null,
         }
         projectStatsByNode[row.node_id] = {
           projectsCount: prev.projectsCount + parseInt(row.projects_count || 0, 10),
@@ -655,9 +676,11 @@ const getBusinessProcessNodes = (dbPool) => {
           responsiblesCount: prev.responsiblesCount + parseInt(row.responsibles_count || 0, 10),
           approvalPendingCount: prev.approvalPendingCount + parseInt(row.approval_pending_count || 0, 10),
           docsCount: prev.docsCount + (docsCnt || 0),
-          projectTimeTotalSeconds: timeSec != null ? (prev.projectTimeTotalSeconds || 0) + timeSec : prev.projectTimeTotalSeconds,
+          projectTimeAvgSeconds: avgSec != null ? avgSec : prev.projectTimeAvgSeconds,
+          projectTimeMaxSeconds: maxSec != null ? maxSec : prev.projectTimeMaxSeconds,
           mailRoundsCount: prev.mailRoundsCount,
-          mailWaitTotalSeconds: prev.mailWaitTotalSeconds,
+          mailWaitAvgSeconds: prev.mailWaitAvgSeconds,
+          mailWaitMaxSeconds: prev.mailWaitMaxSeconds,
         }
       }
 
@@ -687,7 +710,7 @@ const getBusinessProcessNodes = (dbPool) => {
         const docsByNodeGateway = {}
         docsRes.rows.forEach((r) => { docsByNodeGateway[r.node_id] = parseInt(r.docs_count || 0, 10) })
         projRes.rows.forEach((row) => {
-          mergeProjectStats(row, docsByNodeGateway[row.node_id], null)
+          mergeProjectStats(row, docsByNodeGateway[row.node_id], null, null)
         })
         const lastActivityRes = await dbPool.query(
           `WITH proj_created AS (
@@ -705,14 +728,16 @@ const getBusinessProcessNodes = (dbPool) => {
              FROM proj_created pc
            )
            SELECT node_id,
-                  ROUND(SUM(EXTRACT(EPOCH FROM (last_activity - created_at)))::numeric, 1) AS project_time_total_seconds
+                  ROUND(AVG(EXTRACT(EPOCH FROM (last_activity - created_at)))::numeric, 1) AS project_time_avg_seconds,
+                  ROUND(MAX(EXTRACT(EPOCH FROM (last_activity - created_at)))::numeric, 1) AS project_time_max_seconds
            FROM proj_last_act
            GROUP BY node_id`,
           projParams
         )
         lastActivityRes.rows.forEach((r) => {
           if (projectStatsByNode[r.node_id]) {
-            projectStatsByNode[r.node_id].projectTimeTotalSeconds = r.project_time_total_seconds != null ? parseFloat(r.project_time_total_seconds) : null
+            projectStatsByNode[r.node_id].projectTimeAvgSeconds = r.project_time_avg_seconds != null ? parseFloat(r.project_time_avg_seconds) : null
+            projectStatsByNode[r.node_id].projectTimeMaxSeconds = r.project_time_max_seconds != null ? parseFloat(r.project_time_max_seconds) : null
           }
         })
       } catch (e1) {
@@ -778,17 +803,22 @@ const getBusinessProcessNodes = (dbPool) => {
              FROM proj_created pc
            )
            SELECT node_id,
-                  ROUND(SUM(EXTRACT(EPOCH FROM (last_activity - created_at)))::numeric, 1) AS project_time_total_seconds
+                  ROUND(AVG(EXTRACT(EPOCH FROM (last_activity - created_at)))::numeric, 1) AS project_time_avg_seconds,
+                  ROUND(MAX(EXTRACT(EPOCH FROM (last_activity - created_at)))::numeric, 1) AS project_time_max_seconds
            FROM proj_last_act
            GROUP BY node_id`,
           projParams
         )
         const createdTimeByNode = {}
         createdTimeRes.rows.forEach((r) => {
-          createdTimeByNode[r.node_id] = r.project_time_total_seconds != null ? parseFloat(r.project_time_total_seconds) : null
+          createdTimeByNode[r.node_id] = {
+            avg: r.project_time_avg_seconds != null ? parseFloat(r.project_time_avg_seconds) : null,
+            max: r.project_time_max_seconds != null ? parseFloat(r.project_time_max_seconds) : null,
+          }
         })
         createdProjRes.rows.forEach((row) => {
-          mergeProjectStats(row, createdDocsByNode[row.node_id], createdTimeByNode[row.node_id])
+          const t = createdTimeByNode[row.node_id]
+          mergeProjectStats(row, createdDocsByNode[row.node_id], t?.avg, t?.max)
         })
       } catch (e2) {
         console.warn('getBusinessProcessNodes project stats (created):', e2.message)
@@ -818,7 +848,8 @@ const getBusinessProcessNodes = (dbPool) => {
            )
            SELECT pn.node_id,
                   COALESCE(SUM(mbp.mail_rounds), 0)::int AS mail_rounds,
-                  COALESCE(ROUND(SUM(mbp.mail_wait_seconds)::numeric, 1), 0) AS mail_wait_total_seconds
+                  ROUND(AVG(mbp.mail_wait_seconds)::numeric, 1) AS mail_wait_avg_seconds,
+                  ROUND(MAX(mbp.mail_wait_seconds)::numeric, 1) AS mail_wait_max_seconds
            FROM project_nodes pn
              LEFT JOIN mail_by_project mbp ON mbp.global_task_id = pn.global_task_id
            GROUP BY pn.node_id`,
@@ -829,11 +860,12 @@ const getBusinessProcessNodes = (dbPool) => {
           if (!projectStatsByNode[nodeId]) {
             projectStatsByNode[nodeId] = {
               projectsCount: 0, projectsCompleted: 0, responsiblesCount: 0, approvalPendingCount: 0, docsCount: 0,
-              projectTimeTotalSeconds: null, mailRoundsCount: 0, mailWaitTotalSeconds: 0,
+              projectTimeAvgSeconds: null, projectTimeMaxSeconds: null, mailRoundsCount: 0, mailWaitAvgSeconds: null, mailWaitMaxSeconds: null,
             }
           }
           projectStatsByNode[nodeId].mailRoundsCount = parseInt(r.mail_rounds || 0, 10)
-          projectStatsByNode[nodeId].mailWaitTotalSeconds = r.mail_wait_total_seconds != null ? parseFloat(r.mail_wait_total_seconds) : 0
+          projectStatsByNode[nodeId].mailWaitAvgSeconds = r.mail_wait_avg_seconds != null ? parseFloat(r.mail_wait_avg_seconds) : null
+          projectStatsByNode[nodeId].mailWaitMaxSeconds = r.mail_wait_max_seconds != null ? parseFloat(r.mail_wait_max_seconds) : null
         })
       } catch (eMail) {
         console.warn('getBusinessProcessNodes mail stats:', eMail.message)
@@ -856,7 +888,8 @@ const getBusinessProcessNodes = (dbPool) => {
            )
            SELECT pn.node_id,
                   COUNT(DISTINCT t.id) AS tasks_in_projects_count,
-                  ROUND(SUM(EXTRACT(EPOCH FROM (COALESCE(t.completed_at, NOW()) - t.created_at)))::numeric, 1) AS tasks_in_projects_total_seconds
+                  ROUND(AVG(EXTRACT(EPOCH FROM (COALESCE(t.completed_at, NOW()) - t.created_at)))::numeric, 1) AS tasks_in_projects_avg_seconds,
+                  ROUND(MAX(EXTRACT(EPOCH FROM (COALESCE(t.completed_at, NOW()) - t.created_at)))::numeric, 1) AS tasks_in_projects_max_seconds
            FROM project_nodes pn
            JOIN tasks t ON t.global_task_id = pn.global_task_id
            GROUP BY pn.node_id`,
@@ -865,7 +898,8 @@ const getBusinessProcessNodes = (dbPool) => {
         ptRes.rows.forEach((r) => {
           projectTasksTimeByNode[r.node_id] = {
             tasksInProjectsCount: parseInt(r.tasks_in_projects_count || 0, 10),
-            tasksInProjectsTotalSeconds: r.tasks_in_projects_total_seconds != null ? parseFloat(r.tasks_in_projects_total_seconds) : 0,
+            tasksInProjectsAvgSeconds: r.tasks_in_projects_avg_seconds != null ? parseFloat(r.tasks_in_projects_avg_seconds) : null,
+            tasksInProjectsMaxSeconds: r.tasks_in_projects_max_seconds != null ? parseFloat(r.tasks_in_projects_max_seconds) : null,
           }
         })
       } catch (ePt) {
@@ -897,12 +931,18 @@ const getBusinessProcessNodes = (dbPool) => {
         const ts = taskStatsByNode[row.node_id] || {}
         const ps = projectStatsByNode[row.node_id] || {}
         const pt = projectTasksTimeByNode[row.node_id] || {}
-        const nodeTotalSeconds = (row.total_seconds != null ? parseFloat(Number(row.total_seconds).toFixed(1)) : 0) || 0
-        const taskTime = ts.taskTimeTotalSeconds ?? 0
-        const projectTime = ps.projectTimeTotalSeconds ?? 0
-        const projectTasksTime = pt.tasksInProjectsTotalSeconds ?? 0
-        const mailTime = ps.mailWaitTotalSeconds ?? 0
-        const combinedTotal = nodeTotalSeconds + taskTime + projectTime + projectTasksTime + mailTime
+        const nodeAvg = (row.avg_seconds != null ? parseFloat(Number(row.avg_seconds).toFixed(1)) : 0) || 0
+        const nodeMax = (row.max_seconds != null ? parseFloat(Number(row.max_seconds).toFixed(1)) : 0) || 0
+        const taskAvg = ts.taskTimeAvgSeconds ?? 0
+        const taskMax = ts.taskTimeMaxSeconds ?? 0
+        const projectAvg = ps.projectTimeAvgSeconds ?? 0
+        const projectMax = ps.projectTimeMaxSeconds ?? 0
+        const projectTasksAvg = pt.tasksInProjectsAvgSeconds ?? 0
+        const projectTasksMax = pt.tasksInProjectsMaxSeconds ?? 0
+        const mailAvg = ps.mailWaitAvgSeconds ?? 0
+        const mailMax = ps.mailWaitMaxSeconds ?? 0
+        const combinedAvg = nodeAvg + taskAvg + projectAvg + projectTasksAvg + mailAvg
+        const combinedMax = nodeMax + taskMax + projectMax + projectTasksMax + mailMax
         return {
           nodeId: row.node_id,
           nodeLabel: nodeLabels[row.node_id] || row.node_id,
@@ -910,38 +950,50 @@ const getBusinessProcessNodes = (dbPool) => {
           completedCount: parseInt(row.completed_count || 0, 10),
           avgSeconds: row.avg_seconds != null ? parseFloat(Number(row.avg_seconds).toFixed(1)) : null,
           maxSeconds: row.max_seconds != null ? parseFloat(Number(row.max_seconds).toFixed(1)) : null,
-          totalSeconds: row.total_seconds != null ? parseFloat(Number(row.total_seconds).toFixed(1)) : null,
           tasksCount: ts.tasksCount ?? 0,
           tasksCompleted: ts.tasksCompleted ?? 0,
           tasksWithDeadline: ts.tasksWithDeadline ?? 0,
           tasksOverdue: ts.tasksOverdue ?? 0,
           authorsCount: ts.authorsCount ?? 0,
           assigneesCount: ts.assigneesCount ?? 0,
-          taskTimeTotalSeconds: ts.taskTimeTotalSeconds ?? null,
           taskTimeAvgSeconds: ts.taskTimeAvgSeconds ?? null,
+          taskTimeMaxSeconds: ts.taskTimeMaxSeconds ?? null,
           projectsCount: ps.projectsCount ?? 0,
           projectsCompleted: ps.projectsCompleted ?? 0,
           responsiblesCount: ps.responsiblesCount ?? 0,
           approvalPendingCount: ps.approvalPendingCount ?? 0,
           docsCount: ps.docsCount ?? 0,
-          projectTimeTotalSeconds: ps.projectTimeTotalSeconds ?? null,
+          projectTimeAvgSeconds: ps.projectTimeAvgSeconds ?? null,
+          projectTimeMaxSeconds: ps.projectTimeMaxSeconds ?? null,
           tasksInProjectsCount: pt.tasksInProjectsCount ?? 0,
-          tasksInProjectsTotalSeconds: pt.tasksInProjectsTotalSeconds ?? null,
+          tasksInProjectsAvgSeconds: pt.tasksInProjectsAvgSeconds ?? null,
+          tasksInProjectsMaxSeconds: pt.tasksInProjectsMaxSeconds ?? null,
           mailRoundsCount: ps.mailRoundsCount ?? 0,
-          mailWaitTotalSeconds: ps.mailWaitTotalSeconds ?? 0,
-          combinedTotalSeconds: combinedTotal,
+          mailWaitAvgSeconds: ps.mailWaitAvgSeconds ?? null,
+          mailWaitMaxSeconds: ps.mailWaitMaxSeconds ?? null,
+          combinedAvgSeconds: combinedAvg,
+          combinedMaxSeconds: combinedMax,
           timeBreakdown: {
-            nodeSeconds: nodeTotalSeconds,
-            tasksBpSeconds: taskTime,
-            projectsSeconds: projectTime,
-            tasksInProjectsSeconds: projectTasksTime,
-            mailSeconds: mailTime,
-            totalSeconds: combinedTotal,
+            nodeAvgSeconds: nodeAvg,
+            nodeMaxSeconds: nodeMax,
+            tasksBpAvgSeconds: taskAvg,
+            tasksBpMaxSeconds: taskMax,
+            projectsAvgSeconds: projectAvg,
+            projectsMaxSeconds: projectMax,
+            tasksInProjectsAvgSeconds: projectTasksAvg,
+            tasksInProjectsMaxSeconds: projectTasksMax,
+            mailAvgSeconds: mailAvg,
+            mailMaxSeconds: mailMax,
           },
         }
       })
 
-      res.json(nodes)
+      nodes.sort((a, b) => (b.combinedAvgSeconds ?? 0) - (a.combinedAvgSeconds ?? 0))
+      res.json({
+        nodes,
+        processAvgDurationSeconds,
+        processMaxDurationSeconds,
+      })
     } catch (err) {
       console.error('getBusinessProcessNodes:', err)
       res.status(500).json({ error: 'Ошибка сервера' })

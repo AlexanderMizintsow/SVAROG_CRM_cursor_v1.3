@@ -78,6 +78,7 @@ const AddModal = ({
   const [showCommentModal, setShowCommentModal] = useState(false);
   const [currentFileIndex, setCurrentFileIndex] = useState(0);
   const [fileComments, setFileComments] = useState({});
+  const [projectDeadline, setProjectDeadline] = useState(null);
 
   const quillRef = useRef(null);
   const initialDataAppliedRef = useRef(false);
@@ -181,6 +182,26 @@ const AddModal = ({
     fetchUsers();
   }, []);
 
+  // Дедлайн проекта — ограничивает срок задачи при создании из проекта
+  useEffect(() => {
+    if (!isOpen || !globalTaskId) {
+      setProjectDeadline(null);
+      return;
+    }
+    const fetchProject = async () => {
+      try {
+        const response = await axios.get(
+          `${API_BASE_URL}5000/api/global-tasks/${globalTaskId}`
+        );
+        const deadline = response.data?.deadline ?? null;
+        setProjectDeadline(deadline || null);
+      } catch (err) {
+        setProjectDeadline(null);
+      }
+    };
+    fetchProject();
+  }, [isOpen, globalTaskId]);
+
   const handleChange = useCallback((e) => {
     const { name, value } = e.target;
     setTaskData((prev) => ({ ...prev, [name]: value }));
@@ -214,6 +235,19 @@ const AddModal = ({
           backgroundColor: "linear-gradient(to right, #8B0000, #ff0000)",
         }).showToast();
         return;
+      }
+
+      if (globalTaskId && projectDeadline && taskData.deadline) {
+        const taskD = new Date(taskData.deadline);
+        const projD = new Date(projectDeadline);
+        if (!Number.isNaN(taskD.getTime()) && !Number.isNaN(projD.getTime()) && taskD.getTime() > projD.getTime()) {
+          Toastify({
+            text: "Срок задачи не может быть позже срока проекта",
+            close: true,
+            backgroundColor: "linear-gradient(to right, #8B0000, #ff0000)",
+          }).showToast();
+          return;
+        }
       }
 
       try {
@@ -473,6 +507,11 @@ const AddModal = ({
           <div>
             <label htmlFor="deadline" style={{ fontWeight: "bold" }}>
               Срок исполнения задачи
+              {projectDeadline && (
+                <span style={{ fontSize: "0.8em", color: "#6b7280", fontWeight: "normal", marginLeft: 6 }}>
+                  (не позже срока проекта)
+                </span>
+              )}
             </label>
             <input
               type="datetime-local"
@@ -480,8 +519,22 @@ const AddModal = ({
               name="deadline"
               onChange={handleChange}
               value={taskData.deadline || ""}
-              onClick={handleInputClick} // Обработчик клика
-              onFocus={handleFocus} // Обработчик фокуса
+              onClick={handleInputClick}
+              onFocus={handleFocus}
+              max={
+                projectDeadline
+                  ? (() => {
+                      const d = new Date(projectDeadline);
+                      if (Number.isNaN(d.getTime())) return undefined;
+                      const y = d.getFullYear();
+                      const m = String(d.getMonth() + 1).padStart(2, "0");
+                      const day = String(d.getDate()).padStart(2, "0");
+                      const h = String(d.getHours()).padStart(2, "0");
+                      const min = String(d.getMinutes()).padStart(2, "0");
+                      return `${y}-${m}-${day}T${h}:${min}`;
+                    })()
+                  : undefined
+              }
             />
           </div>
 
@@ -585,8 +638,16 @@ const AddModal = ({
         </Suspense>
       )}
       {showCommentModal && (
-        <div className={styles.commentModal}>
-          <div className={styles.commentModalContent}>
+        <div
+          className={styles.commentModal}
+          onClick={(e) => {
+            if (e.target === e.currentTarget) setShowCommentModal(false);
+          }}
+        >
+          <div
+            className={styles.commentModalContent}
+            onClick={(e) => e.stopPropagation()}
+          >
             <h3>
               Комментарий для файла: {selectedFiles[currentFileIndex]?.name}
             </h3>
@@ -598,6 +659,19 @@ const AddModal = ({
             />
             <div className={styles.commentModalButtons}>
               <button
+                type="button"
+                onClick={() => {
+                  setShowCommentModal(false);
+                  setCommentInput("");
+                  setCurrentFileIndex(0);
+                  setFileComments({});
+                }}
+                className={styles.commentCancelButton}
+              >
+                Отмена
+              </button>
+              <button
+                type="button"
                 onClick={handleCommentSubmit}
                 className={styles.commentSubmitButton}
               >

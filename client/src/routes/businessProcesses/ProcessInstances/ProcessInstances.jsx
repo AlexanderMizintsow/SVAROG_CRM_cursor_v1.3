@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react'
 import Toastify from 'toastify-js'
 import { cancelInstance, deleteInstance, getInstancesOverview } from '../../../api/businessProcessApi'
 import useUserStore from '../../../store/userStore'
+import { formatLocalDateTime } from '../../../utils/dateUtils'
 import './ProcessInstances.scss'
 
 const STATUS_LABELS = {
@@ -14,13 +15,6 @@ const STATUS_LABELS = {
   cancelled: 'Отменён',
 }
 
-function formatDateTime(v) {
-  if (!v) return '—'
-  const d = new Date(v)
-  if (Number.isNaN(d.getTime())) return String(v)
-  return d.toLocaleString('ru-RU')
-}
-
 function getWaitingText(item) {
   const w = item.waiting
   if (!w) return '—'
@@ -30,10 +24,10 @@ function getWaitingText(item) {
     const status = w.last_status || w.last_status_raw
     if (status) parts.push(`статус: ${status}`)
     if (w.last_resume_reason) parts.push(`событие: ${w.last_resume_reason}`)
-    if (w.last_checked_at) parts.push(`проверено: ${formatDateTime(w.last_checked_at)}`)
+    if (w.last_checked_at) parts.push(`проверено: ${formatLocalDateTime(w.last_checked_at)}`)
     return parts.join(' · ')
   }
-  if (w.type === 'timer') return w.resume_at ? `До ${formatDateTime(w.resume_at)}` : 'Таймер'
+  if (w.type === 'timer') return w.resume_at ? `До ${formatLocalDateTime(w.resume_at)}` : 'Таймер'
   if (w.type === 'user_input') return 'Создание задачи (модалка)'
   return '—'
 }
@@ -210,7 +204,7 @@ const ProcessInstances = () => {
                         <div title={it.current_node_id || ''}>{it.current_node_label || '—'}</div>
                         <div>{getWaitingText(it)}</div>
                         <div className="bp-instances__cell-mono">{it.last_task_id ? `#${it.last_task_id}` : '—'}</div>
-                        <div>{formatDateTime(it.started_at)}</div>
+                        <div>{formatLocalDateTime(it.started_at)}</div>
                         <div className="bp-instances__actions">
                           {isAdmin && it.status !== 'completed' && it.status !== 'failed' && it.status !== 'cancelled' && (
                             <button

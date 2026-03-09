@@ -312,7 +312,7 @@
     transform: scale(1);
   }
 }
-//1
+//1 Модал комментариев к файлам — z-index выше контента модала (10000), чтобы отображаться поверх
 .commentModal {
   position: fixed;
   top: 0;
@@ -323,7 +323,7 @@
   display: flex;
   justify-content: center;
   align-items: center;
-  z-index: 1000;
+  z-index: 100001;
 }
 
 .commentModalContent {
@@ -347,6 +347,21 @@
 .commentModalButtons {
   display: flex;
   justify-content: flex-end;
+  gap: 0.75rem;
+}
+
+.commentCancelButton {
+  padding: 8px 16px;
+  background-color: #f0f0f0;
+  color: #333;
+  border: 1px solid #ccc;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: background-color 0.3s;
+
+  &:hover {
+    background-color: #e0e0e0;
+  }
 }
 
 .commentSubmitButton {

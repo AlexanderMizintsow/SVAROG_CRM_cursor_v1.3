@@ -1,7 +1,9 @@
 // Отображение прогресса общего проекта
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import axios from 'axios'
+import DatePicker from 'react-datepicker'
+import { ru } from 'date-fns/locale'
 import { API_BASE_URL } from '../../../../config'
 import useUserStore from '../../../store/userStore'
 import ConfirmationDialog from '../../../components/confirmationDialog/ConfirmationDialog'
@@ -12,9 +14,11 @@ import {
   FaExclamationTriangle,
   FaSync,
   FaPlay,
+  FaCalendarAlt,
 } from 'react-icons/fa'
 import Toastify from 'toastify-js'
 import { getRemainingDays, formatDeadlineDateTime } from './utils/globalTaskUtils'
+import 'react-datepicker/dist/react-datepicker.css'
 import './styles/GlobalTaskProgress.scss'
 
 const GlobalTaskProgress = ({
@@ -32,8 +36,38 @@ const GlobalTaskProgress = ({
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
   const [confirmProgressDialogOpen, setConfirmProgressDialogOpen] =
     useState(false)
+  const [isEditingDeadline, setIsEditingDeadline] = useState(false)
+  const [newDeadline, setNewDeadline] = useState(null)
+  const [deadlineSaving, setDeadlineSaving] = useState(false)
+  const [minDeadlineForProject, setMinDeadlineForProject] = useState(null)
   const userId = user.id
   const isAuthor = authorId != null && String(authorId) === String(userId)
+
+  useEffect(() => {
+    if (!isEditingDeadline || !taskId) return
+    let cancelled = false
+    const loadMaxTaskDeadline = async () => {
+      try {
+        const res = await axios.get(
+          `${API_BASE_URL}5000/api/tasks/subtasks/${taskId}`
+        )
+        if (cancelled || !Array.isArray(res.data)) return
+        const deadlines = (res.data || [])
+          .map((t) => t.deadline)
+          .filter(Boolean)
+        if (deadlines.length === 0) {
+          setMinDeadlineForProject(null)
+          return
+        }
+        const maxD = new Date(Math.max(...deadlines.map((d) => new Date(d).getTime())))
+        setMinDeadlineForProject(maxD)
+      } catch {
+        setMinDeadlineForProject(null)
+      }
+    }
+    loadMaxTaskDeadline()
+    return () => { cancelled = true }
+  }, [isEditingDeadline, taskId])
 
   const handleMarkAsFailed = async (commentValue, actionType) => {
     try {
@@ -120,6 +154,43 @@ const GlobalTaskProgress = ({
     setConfirmProgressDialogOpen(true)
   }
 
+  const handleSaveDeadline = async () => {
+    if (!newDeadline) {
+      Toastify({
+        text: 'Выберите дату и время срока',
+        close: true,
+        backgroundColor: '#8B8000',
+      }).showToast()
+      return
+    }
+    setDeadlineSaving(true)
+    try {
+      await axios.put(
+        `${API_BASE_URL}5000/api/global-tasks/${taskId}/deadline`,
+        { deadline: newDeadline.toISOString(), userId },
+        { headers: { 'Content-Type': 'application/json' } }
+      )
+      onRefresh(taskId)
+      setIsEditingDeadline(false)
+      setNewDeadline(null)
+      setMinDeadlineForProject(null)
+      Toastify({
+        text: 'Срок проекта установлен',
+        close: true,
+        backgroundColor: '#006400',
+      }).showToast()
+    } catch (err) {
+      const msg = err.response?.data?.error || 'Не удалось установить срок'
+      Toastify({
+        text: msg,
+        close: true,
+        backgroundColor: '#b91c1c',
+      }).showToast()
+    } finally {
+      setDeadlineSaving(false)
+    }
+  }
+
   const handleConfirmAsComplete = async () => {
     try {
       await updateTaskStatus('Завершено')
@@ -172,7 +243,60 @@ const GlobalTaskProgress = ({
       <div className="global-task-progress__dates">
         <span>Начало</span>
         <span>
-          Завершение{deadline ? `: ${formatDeadlineDateTime(deadline)} (${remainingDays})` : ''}
+          Завершение
+          {deadline
+            ? `: ${formatDeadlineDateTime(deadline)} (${remainingDays})`
+            : isAuthor && !isEditingDeadline && (
+                <button
+                  type="button"
+                  className="global-task-progress__set-deadline-btn"
+                  onClick={() => setIsEditingDeadline(true)}
+                  title="Установить срок проекта"
+                >
+                  <FaCalendarAlt /> Установить срок
+                </button>
+              )}
+          {isAuthor && !deadline && isEditingDeadline && (
+            <div className="global-task-progress__deadline-editor">
+              <DatePicker
+                selected={newDeadline}
+                onChange={(d) => setNewDeadline(d)}
+                showTimeSelect
+                timeFormat="HH:mm"
+                timeIntervals={15}
+                dateFormat="dd.MM.yyyy HH:mm"
+                placeholderText="Выберите дату и время"
+                locale={ru}
+                minDate={minDeadlineForProject || undefined}
+                className="global-task-progress__date-picker"
+              />
+              {minDeadlineForProject && (
+                <span className="global-task-progress__deadline-hint">
+                  Не раньше самой поздней задачи: {formatDeadlineDateTime(minDeadlineForProject)}
+                </span>
+              )}
+              <button
+                type="button"
+                className="global-task-progress__controller-button global-task-progress__controller-button--complete"
+                onClick={handleSaveDeadline}
+                disabled={deadlineSaving || !newDeadline}
+              >
+                Сохранить
+              </button>
+              <button
+                type="button"
+                className="global-task-progress__controller-button"
+                onClick={() => {
+                  setIsEditingDeadline(false)
+                  setNewDeadline(null)
+                  setMinDeadlineForProject(null)
+                }}
+                disabled={deadlineSaving}
+              >
+                Отмена
+              </button>
+            </div>
+          )}
         </span>
       </div>
 

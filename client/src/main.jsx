@@ -122,3 +122,26 @@ pm2 delete all
 pm2 save
 
 */
+
+// *** Ветки Git: main, bp_project_block, crm_development
+/*
+СОЗДАТЬ ветку CRM (от bp_project_block, где уже много сделано):
+  git checkout bp_project_block
+  git pull origin bp_project_block
+  git checkout -b crm_development
+
+ПЕРЕКЛЮЧИТЬСЯ между ветками:
+  git checkout main
+  git checkout bp_project_block
+  git checkout crm_development
+
+СОХРАНИТЬ изменения перед переключением:
+  git add .
+  git commit -m "описание"
+
+ОБЪЕДИНИТЬ ветки (когда всё готово):
+  git checkout main
+  git merge crm_development
+  git merge bp_project_block
+  git push origin main
+*/

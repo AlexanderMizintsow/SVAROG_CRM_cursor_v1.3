@@ -329,6 +329,9 @@ function safeParseContext(ctx) {
   }
 }
 
+// Зона хранения timestamps в БД (БЕЗ time zone) — чтобы корректно конвертировать в UTC для клиента
+const DB_TZ = (process.env.DB_TIMEZONE || 'Europe/Moscow').replace(/'/g, "''")
+
 async function getInstancesOverview(dbPool, req, res) {
   try {
     const limitRaw = req.query.limit != null ? Number(req.query.limit) : 200
@@ -338,8 +341,8 @@ async function getInstancesOverview(dbPool, req, res) {
       `SELECT
          i.id,
          i.process_id,
-         i.started_at,
-         i.finished_at,
+         (i.started_at AT TIME ZONE '${DB_TZ}') AS started_at,
+         (i.finished_at AT TIME ZONE '${DB_TZ}') AS finished_at,
          i.initiator_id,
          i.launched_by_user_id,
          i.current_node_id,
@@ -347,7 +350,7 @@ async function getInstancesOverview(dbPool, req, res) {
          i.context,
          i.error_message,
          gw.task_id AS waiting_task_id,
-         tw.resume_at AS waiting_resume_at
+         (tw.resume_at AT TIME ZONE '${DB_TZ}') AS waiting_resume_at
        FROM bp_process_instances i
        LEFT JOIN bp_gateway_waiting gw ON gw.instance_id = i.id
        LEFT JOIN bp_timer_waiting tw ON tw.instance_id = i.id

@@ -1,18 +1,36 @@
+/**
+ * AdminTimeClock — сверка времени клиента и сервера для отладки.
+ *
+ * ВАЖНО: Референс для исправления проблем с часовыми поясами
+ * =============================================================
+ *
+ * ЭТАЛОН: Время создания Задач и Проектов (register, tasks/global_tasks) — там отображается верно.
+ * Любые другие даты в приложении должны соответствовать этому.
+ *
+ * ПРОБЛЕМА (сдвиг на 1 час и т.п.):
+ * - В PostgreSQL колонки типа TIMESTAMP WITHOUT TIME ZONE хранят только "голую" дату/время
+ * - При INSERT с NOW() используется session timezone (Europe/Moscow), значение пишется как московское
+ * - Node.js драйвер pg при SELECT интерпретирует такие timestamp'ы как ЛОКАЛЬНОЕ время СЕРВЕРА (часто UTC)
+ * - В итоге клиент получает некорректный момент (сдвиг на 1 час для Саратова UTC+4 vs Москва UTC+3)
+ *
+ * РЕШЕНИЕ:
+ * 1) СЕРВЕР (Node/PostgreSQL): в SQL-запросах явно указать зону хранения:
+ *    (column_name AT TIME ZONE 'Europe/Moscow') AS column_name
+ *    Тогда PostgreSQL вернёт timestamptz с правильным UTC → JSON сериализует верно
+ *
+ * 2) КЛИЕНТ: использовать formatLocalDateTime из utils/dateUtils.js
+ *    — форматирует через getDate(), getHours() и т.д. в локальной зоне браузера
+ *    — время всегда соответствует часам пользователя (как в этом компоненте)
+ *
+ * 3) BPE/Register pool: SET timezone = 'Europe/Moscow' при connect для единообразия NOW()
+ *
+ * Пример: ProcessInstances (запуск БП), BPE processInstancesController getInstancesOverview
+ */
 import { useEffect, useState } from 'react'
 import axios from 'axios'
 import { API_BASE_URL } from '../../../../config'
+import { formatLocalDateTime } from '../../../utils/dateUtils'
 import './AdminTimeClock.scss'
-
-const formatLocal = (date) => {
-  if (!date || Number.isNaN(date.getTime())) return '—'
-  const d = String(date.getDate()).padStart(2, '0')
-  const m = String(date.getMonth() + 1).padStart(2, '0')
-  const y = date.getFullYear()
-  const h = String(date.getHours()).padStart(2, '0')
-  const min = String(date.getMinutes()).padStart(2, '0')
-  const s = String(date.getSeconds()).padStart(2, '0')
-  return `${d}.${m}.${y} ${h}:${min}:${s}`
-}
 
 const AdminTimeClock = () => {
   const [clientTime, setClientTime] = useState(() => new Date())
@@ -52,7 +70,7 @@ const AdminTimeClock = () => {
   return (
     <div className="admin-time-clock" title="Сверка времени клиента и сервера для отладки дедлайнов">
       <span className="admin-time-clock__label">Клиент:</span>
-      <span className="admin-time-clock__value">{formatLocal(clientTime)}</span>
+      <span className="admin-time-clock__value">{formatLocalDateTime(clientTime)}</span>
       <span className="admin-time-clock__divider">|</span>
       <span className="admin-time-clock__label">Сервер (UTC):</span>
       <span className="admin-time-clock__value">
@@ -60,7 +78,7 @@ const AdminTimeClock = () => {
       </span>
       {serverTime != null && (
         <span className="admin-time-clock__hint" title="Время сервера в вашей локальной зоне">
-          ({formatLocal(serverTime)})
+          ({formatLocalDateTime(serverTime)})
         </span>
       )}
     </div>

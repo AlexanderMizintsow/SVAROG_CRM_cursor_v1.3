@@ -451,6 +451,44 @@
   overflow-x: auto;
 }
 
+.process-monitoring__process-summary {
+  font-size: 0.9375rem;
+  color: #475569;
+  margin-bottom: 0.75rem;
+  padding: 0.6rem 0;
+
+  strong {
+    color: #1e293b;
+    font-size: 1rem;
+  }
+}
+
+.process-monitoring__cell-total {
+  font-weight: 600;
+  color: #334155;
+}
+
+.process-monitoring__table-legend {
+  display: flex;
+  gap: 1.25rem;
+  margin-bottom: 0.75rem;
+  padding: 0.5rem 0;
+  font-size: 0.8125rem;
+  color: #64748b;
+}
+
+.process-monitoring__legend-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+}
+
+.process-monitoring__legend-label {
+  font-weight: 600;
+  color: #475569;
+  min-width: 2.25rem;
+}
+
 .process-monitoring__table {
   width: 100%;
   border-collapse: collapse;
@@ -534,6 +572,81 @@
 
 .process-monitoring__table--nodes {
   margin-top: 0.5rem;
+
+  th {
+    white-space: nowrap;
+  }
+}
+
+.process-monitoring__cell-stage {
+  font-weight: 500;
+  min-width: 120px;
+  position: sticky;
+  left: 0;
+  background: inherit;
+  z-index: 1;
+  box-shadow: 2px 0 4px -2px rgba(0, 0, 0, 0.06);
+}
+
+.process-monitoring__table--nodes thead th:first-child {
+  position: sticky;
+  left: 0;
+  z-index: 2;
+  background: #f8fafc;
+}
+
+.process-monitoring__time-cell {
+  min-width: 7rem;
+  white-space: nowrap;
+}
+
+.process-monitoring__time-empty {
+  color: #94a3b8;
+}
+
+.process-monitoring__time-avg-max {
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+  line-height: 1.3;
+}
+
+.process-monitoring__time-label {
+  display: inline-block;
+  font-size: 0.7rem;
+  font-weight: 600;
+  color: #6366f1;
+  margin-right: 0.35rem;
+  min-width: 2rem;
+}
+
+.process-monitoring__time-avg {
+  font-weight: 500;
+  color: #334155;
+}
+
+.process-monitoring__time-max {
+  font-size: 0.8125rem;
+  color: #64748b;
+}
+
+.process-monitoring__cell-tasks-in-projects {
+  min-width: 8rem;
+}
+
+.process-monitoring__tasks-in-projects-cell {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+
+  .process-monitoring__tasks-count {
+    font-size: 0.8125rem;
+    color: #64748b;
+  }
+
+  .process-monitoring__time-avg-max {
+    margin-top: 0;
+  }
 }
 
 .process-monitoring__row--bottleneck {
@@ -542,6 +655,18 @@
   td {
     font-weight: 500;
   }
+
+  .process-monitoring__cell-stage {
+    background: rgba(239, 68, 68, 0.08);
+  }
+}
+
+.process-monitoring__table--nodes tbody tr:hover .process-monitoring__cell-stage {
+  background: #f8fafc;
+}
+
+.process-monitoring__row--bottleneck:hover .process-monitoring__cell-stage {
+  background: rgba(239, 68, 68, 0.12);
 }
 
 .process-monitoring__bottleneck-badge {
@@ -582,14 +707,32 @@
 .process-monitoring__breakdown-cell {
   font-size: 0.8125rem;
   color: #475569;
-  max-width: 320px;
+  min-width: 140px;
+  max-width: 200px;
   white-space: normal;
+  cursor: help;
 }
 
-.process-monitoring__breakdown-short {
-  font-size: 0.75rem;
-  word-break: break-word;
-  cursor: help;
+.process-monitoring__breakdown-list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+
+  li {
+    display: flex;
+    gap: 0.35rem;
+    line-height: 1.35;
+  }
+}
+
+.process-monitoring__breakdown-label {
+  flex-shrink: 0;
+  font-weight: 600;
+  color: #64748b;
+  min-width: 3.5rem;
 }
 
 .process-monitoring__detail-overlay {

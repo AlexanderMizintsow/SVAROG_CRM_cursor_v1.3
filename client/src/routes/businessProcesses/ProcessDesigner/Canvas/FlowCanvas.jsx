@@ -195,8 +195,11 @@ function FlowCanvasInner() {
   const {
     scheme,
     selectedNodeId,
+    copiedNodeData,
     setScheme,
     setSelectedNodeId,
+    copySelectedNode,
+    pasteNode,
     removeNodeFromScheme,
   } = useBusinessProcessStore()
 
@@ -252,10 +255,6 @@ function FlowCanvasInner() {
 
   useEffect(() => {
     const handleKeyDown = (event) => {
-      // Удаление блока только по клавише Delete (Backspace — для редактирования текста)
-      if (event.key !== 'Delete' || !selectedNodeId) return
-
-      // Не удалять, если пользователь редактирует текст в input/textarea/select
       const activeEl = document.activeElement
       const isEditing =
         activeEl &&
@@ -263,20 +262,37 @@ function FlowCanvasInner() {
           activeEl.tagName === 'TEXTAREA' ||
           activeEl.tagName === 'SELECT' ||
           activeEl.isContentEditable)
+
+      if (event.ctrlKey || event.metaKey) {
+        if (event.key === 'c') {
+          if (!isEditing) {
+            event.preventDefault()
+            copySelectedNode()
+          }
+          return
+        }
+        if (event.key === 'v') {
+          if (!isEditing && copiedNodeData) {
+            event.preventDefault()
+            pasteNode()
+          }
+          return
+        }
+      }
+
+      if (event.key !== 'Delete' || !selectedNodeId) return
       if (isEditing) return
 
       event.preventDefault()
 
       const nodesList = Array.isArray(scheme?.nodes) ? scheme.nodes : []
       const node = nodesList.find((n) => n.id === selectedNodeId)
-      if (node?.type === 'start') {
-        return
-      }
+      if (node?.type === 'start') return
       removeNodeFromScheme(selectedNodeId)
     }
     document.addEventListener('keydown', handleKeyDown)
     return () => document.removeEventListener('keydown', handleKeyDown)
-  }, [selectedNodeId, scheme?.nodes, removeNodeFromScheme])
+  }, [selectedNodeId, scheme?.nodes, copiedNodeData, removeNodeFromScheme, copySelectedNode, pasteNode])
 
   const onConnect = useCallback(
     (params) => {

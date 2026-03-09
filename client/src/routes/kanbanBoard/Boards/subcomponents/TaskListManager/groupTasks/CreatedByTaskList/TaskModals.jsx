@@ -184,6 +184,7 @@ const TaskModals = ({
         dateInput={true}
         actionType="updateDeadlineTask"
         initialDate={deadlineDialogProps.initialDate}
+        maxDate={deadlineDialogProps.maxDate}
       />
 
       {/* Модальное окно замены исполнителя */}

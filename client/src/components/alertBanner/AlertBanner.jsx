@@ -27,6 +27,7 @@ import {
   getAdditionalInfoRequests,
   respondAdditionalInfo,
 } from '../../api/businessProcessApi'
+import { formatDeadlineDateTime } from '../../routes/kanbanBoard/globalTask/utils/globalTaskUtils'
 
 const AlertBanner = () => {
   // ==================== Инициализация состояний и хуков ====================
@@ -423,10 +424,15 @@ const AlertBanner = () => {
     final_solution_updated: 'Изменено итоговое решение по проекту',
     final_solution_deleted: 'Удалено итоговое решение по проекту',
     deadline_expired: 'Истёк срок по проекту',
+    deadline_set: 'Установлен срок проекта',
     subtask_added: 'Вам назначена подзадача в проекте',
   }
-  Object.entries(projectNotifications).forEach(([key, { globalTaskId, title, type }]) => {
-    const label = projectNotificationLabels[type] || 'Проект'
+  Object.entries(projectNotifications).forEach(([key, { globalTaskId, title, type, deadline: notifDeadline }]) => {
+    let label = projectNotificationLabels[type] || 'Проект'
+    if (type === 'deadline_set' && notifDeadline) {
+      const formatted = formatDeadlineDateTime(notifDeadline)
+      label = formatted ? `Установлен срок проекта до ${formatted}` : 'Установлен срок проекта'
+    }
     notifications.push({
       key: `project-msg-${key}`,
       text: `${label}: ${title || 'Без названия'}`,
@@ -434,6 +440,7 @@ const AlertBanner = () => {
       taskId: globalTaskId,
       title: title || 'Проект',
       projectNotificationKey: key,
+      projectNotificationType: type,
     })
   })
 
@@ -492,10 +499,14 @@ const AlertBanner = () => {
   // Десктоп/браузер: уведомления по проектам (создание, статус, дедлайн и т.д.)
   const projectNotifKeysRef = useRef(new Set())
   useEffect(() => {
-    Object.entries(projectNotifications).forEach(([key, { title, type }]) => {
+    Object.entries(projectNotifications).forEach(([key, { title, type, deadline: notifDeadline }]) => {
       if (projectNotifKeysRef.current.has(key)) return
       projectNotifKeysRef.current.add(key)
-      const label = projectNotificationLabels[type] || 'Проект'
+      let label = projectNotificationLabels[type] || 'Проект'
+      if (type === 'deadline_set' && notifDeadline) {
+        const formatted = formatDeadlineDateTime(notifDeadline)
+        label = formatted ? `Установлен срок проекта до ${formatted}` : 'Установлен срок проекта'
+      }
       const text = `${label}: ${title || 'Без названия'}`
       sendNotification('Проект', text)
     })
@@ -664,7 +675,7 @@ const AlertBanner = () => {
           extensionNotifications.length > 0 ||
           taskNotifications.length > 0) ? (
           <div className="notifications-container">
-            {[...allNotifications].map(({ key, text, icon, taskId, title, projectNotificationKey }) => (
+            {[...allNotifications].map(({ key, text, icon, taskId, title, projectNotificationKey, projectNotificationType }) => (
               <div
                 className="alert-banner-content"
                 key={key}
@@ -680,6 +691,22 @@ const AlertBanner = () => {
                   if (key.startsWith('global-')) {
                     handleGlobalNotificationClick({ taskId, title })
                   } else if (key.startsWith('project-msg-')) {
+                    const projectClickTypes = [
+                      'progress_100',
+                      'created',
+                      'participant_added',
+                      'status',
+                      'final_solution_added',
+                      'final_solution_updated',
+                      'final_solution_deleted',
+                      'deadline_expired',
+                      'deadline_set',
+                    ]
+                    if (projectClickTypes.includes(projectNotificationType) && taskId) {
+                      const { setTaskDecisionNavigate } = useTaskStateTracker.getState()
+                      setTaskDecisionNavigate({ type: 'project', globalTaskId: taskId })
+                      window.dispatchEvent(new CustomEvent('task-decision-navigate'))
+                    }
                     if (projectNotificationKey) removeProjectNotification(projectNotificationKey)
                   } else if (key.startsWith('bp-')) {
                     handleBpNotificationClick(key)

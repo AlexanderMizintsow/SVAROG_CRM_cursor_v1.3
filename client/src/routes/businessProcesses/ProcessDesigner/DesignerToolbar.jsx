@@ -1,4 +1,4 @@
-import { IoDocumentTextOutline, IoCreateOutline } from 'react-icons/io5'
+import { IoDocumentTextOutline, IoCreateOutline, IoDownloadOutline, IoFolderOpenOutline } from 'react-icons/io5'
 import { MdSave, MdPublish } from 'react-icons/md'
 import { IoTrashOutline } from 'react-icons/io5'
 import './DesignerToolbar.scss'
@@ -9,6 +9,7 @@ const DesignerToolbar = ({
   isDraft,
   gatewayDebugNotify,
   canDelete,
+  canExport,
   onProcessNameChange,
   onProcessDescriptionChange,
   onIsDraftChange,
@@ -17,6 +18,8 @@ const DesignerToolbar = ({
   onPublish,
   onNewProcess,
   onDelete,
+  onExport,
+  onImportClick,
 }) => {
   return (
     <div className="designer-toolbar">
@@ -66,6 +69,23 @@ const DesignerToolbar = ({
           onClick={onNewProcess}
         >
           <IoCreateOutline /> Новый процесс
+        </button>
+        <button
+          type="button"
+          className="designer-toolbar__btn designer-toolbar__btn--secondary"
+          onClick={onImportClick}
+          title="Загрузить процесс из JSON-файла"
+        >
+          <IoFolderOpenOutline /> Импорт
+        </button>
+        <button
+          type="button"
+          className="designer-toolbar__btn designer-toolbar__btn--secondary"
+          onClick={onExport}
+          disabled={!canExport}
+          title={canExport ? 'Сохранить процесс в JSON-файл' : 'Добавьте блоки на схему для экспорта'}
+        >
+          <IoDownloadOutline /> Экспорт
         </button>
         {canDelete && (
           <button

@@ -1,6 +1,7 @@
 import { useMemo } from 'react'
 import useBusinessProcessStore from '../../../../store/useBusinessProcessStore'
 import { BLOCK_TYPES, BLOCK_LABELS } from '../../constants/blockTypes'
+import { IoCopyOutline, IoClipboardOutline } from 'react-icons/io5'
 import StartNodeProps from './StartNodeProps'
 import EndNodeProps from './EndNodeProps'
 import CreateTaskNodeProps from './CreateTaskNodeProps'
@@ -55,7 +56,14 @@ const NODE_PROPS_MAP = {
 }
 
 const PropertiesPanel = () => {
-  const { scheme, selectedNodeId, updateNodeInScheme } = useBusinessProcessStore()
+  const {
+    scheme,
+    selectedNodeId,
+    copiedNodeData,
+    updateNodeInScheme,
+    copySelectedNode,
+    pasteNode,
+  } = useBusinessProcessStore()
 
   const selectedNode = useMemo(() => {
     if (!selectedNodeId) return null
@@ -63,10 +71,26 @@ const PropertiesPanel = () => {
     return nodesList.find((n) => n.id === selectedNodeId) || null
   }, [scheme?.nodes, selectedNodeId])
 
+  const canCopy = selectedNode && selectedNode.type !== BLOCK_TYPES.START
+  const canPaste = !!copiedNodeData
+
   if (!selectedNode) {
     return (
       <div className="properties-panel properties-panel--empty">
         <p>Выберите блок на схеме для настройки</p>
+        {canPaste && (
+          <div className="properties-panel__copy-paste">
+            <button
+              type="button"
+              className="properties-panel__btn-copy-paste"
+              onClick={pasteNode}
+              title="Вставить скопированный блок (Ctrl+V)"
+            >
+              <IoClipboardOutline />
+              Вставить блок
+            </button>
+          </div>
+        )}
       </div>
     )
   }
@@ -76,6 +100,29 @@ const PropertiesPanel = () => {
   return (
     <div className="properties-panel">
       <h3 className="properties-panel__title">{BLOCK_LABELS[selectedNode.type] || selectedNode.type}</h3>
+
+      <div className="properties-panel__copy-paste properties-panel__copy-paste--row">
+        <button
+          type="button"
+          className="properties-panel__btn-copy-paste"
+          onClick={copySelectedNode}
+          disabled={!canCopy}
+          title={canCopy ? 'Копировать блок (Ctrl+C)' : 'Блок «Старт» копировать нельзя'}
+        >
+          <IoCopyOutline />
+          Копировать
+        </button>
+        <button
+          type="button"
+          className="properties-panel__btn-copy-paste"
+          onClick={pasteNode}
+          disabled={!canPaste}
+          title={canPaste ? 'Вставить скопированный блок (Ctrl+V)' : 'Сначала скопируйте блок'}
+        >
+          <IoClipboardOutline />
+          Вставить
+        </button>
+      </div>
 
       <div className="properties-panel__fields">
         <div className="properties-panel__field">
