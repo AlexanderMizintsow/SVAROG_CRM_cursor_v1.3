@@ -84,6 +84,7 @@ const {
   createFinalSolution,
   updateFinalSolution,
   deleteFinalSolution,
+  createFirstSentEmailSolution,
   saveProjectSentEmail,
   createFinalSolutionFromEmailReply,
   appendThreadMessage,
@@ -580,6 +581,7 @@ app.post('/api/global-tasks/:taskId/final-solutions/:solutionId/thread-message',
 app.patch('/api/global-tasks/:taskId/final-solutions/:solutionId/thread-messages/:messageIndex', updateThreadMessage(dbPool))
 app.get('/api/global-tasks/:taskId/final-solutions/:solutionId/attachments/:attachmentId/download', downloadEmailAttachment(dbPool))
 app.post('/api/global-tasks/:taskId/final-solutions/:solutionId/attachments/:attachmentId/add-to-project', addEmailAttachmentToProject(dbPool))
+app.post('/api/global-tasks/:taskId/first-sent-email', createFirstSentEmailSolution(dbPool))
 app.post('/api/project-sent-emails', saveProjectSentEmail(dbPool))
 app.post('/api/project-reply-to-final-solution', createFinalSolutionFromEmailReply(dbPool))
 app.put('/api/tasks/:id/update-goals', updateGoals(dbPool, io))

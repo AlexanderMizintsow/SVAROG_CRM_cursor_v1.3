@@ -1450,7 +1450,7 @@ function getGlobalTasks(dbPool) {
            JOIN task_assignments ta ON t.id = ta.task_id
            WHERE t.global_task_id = gt.id AND ta.user_id = $1
            LIMIT 15) t) AS user_task_titles,
-    (SELECT COALESCE(json_agg(json_build_object('id', fs.id, 'content', fs.content, 'user_id', fs.user_id, 'author_name', COALESCE(fs.author_display_name, TRIM(CONCAT(fsu.first_name, ' ', fsu.last_name))), 'author_display_name', fs.author_display_name, 'is_from_supplier_reply', COALESCE(fs.is_from_supplier_reply, false), 'is_published', COALESCE(fs.is_published, false), 'thread_messages', COALESCE(fs.thread_messages, '[]'::jsonb), 'created_at', fs.created_at, 'updated_at', fs.updated_at) ORDER BY fs.created_at), '[]'::json)
+    (SELECT COALESCE(json_agg(json_build_object('id', fs.id, 'content', fs.content, 'user_id', fs.user_id, 'author_name', COALESCE(fs.author_display_name, TRIM(CONCAT(fsu.first_name, ' ', fsu.last_name))), 'author_display_name', fs.author_display_name, 'is_from_supplier_reply', COALESCE(fs.is_from_supplier_reply, false), 'is_published', COALESCE(fs.is_published, false), 'thread_messages', COALESCE(fs.thread_messages, '[]'::jsonb), 'created_at', fs.created_at, 'updated_at', fs.updated_at, 'sender_user_ids', COALESCE((SELECT to_jsonb(array_agg(DISTINCT pse.user_id)) FROM project_sent_emails pse WHERE pse.final_solution_id = fs.id), '[]'::jsonb)) ORDER BY fs.created_at), '[]'::json)
      FROM global_task_final_solutions fs
      LEFT JOIN users fsu ON fsu.id = fs.user_id
      WHERE fs.global_task_id = gt.id) as final_solutions
@@ -2096,7 +2096,8 @@ function getGlobalTaskById(dbPool) {
             'is_published', COALESCE(fs.is_published, false),
             'thread_messages', COALESCE(fs.thread_messages, '[]'::jsonb),
             'created_at', fs.created_at,
-            'updated_at', fs.updated_at
+            'updated_at', fs.updated_at,
+            'sender_user_ids', COALESCE((SELECT to_jsonb(array_agg(DISTINCT pse.user_id)) FROM project_sent_emails pse WHERE pse.final_solution_id = fs.id), '[]'::jsonb)
         ) ORDER BY fs.created_at), '[]'::json)
         FROM global_task_final_solutions fs
         LEFT JOIN users fsu ON fsu.id = fs.user_id
@@ -2275,6 +2276,60 @@ function deleteFinalSolution(dbPool) {
 function normalizeMessageId(id) {
   if (!id || typeof id !== 'string') return ''
   return id.trim().replace(/^<|>$/g, '')
+}
+
+// Создать итоговое решение с первым отправленным письмом (из SendProjectMailModal) и связать с project_sent_emails
+function createFirstSentEmailSolution(dbPool) {
+  return async function (req, res) {
+    const { taskId } = req.params
+    const { userId, body, message_id } = req.body
+    if (!taskId || !userId || body === undefined || !message_id) {
+      return res.status(400).json({ error: 'Нужны taskId, userId, body и message_id' })
+    }
+    const normalizedId = normalizeMessageId(String(message_id))
+    if (!normalizedId) return res.status(400).json({ error: 'Некорректный message_id' })
+    try {
+      const gid = parseInt(taskId, 10)
+      const uid = parseInt(userId, 10)
+      const bodyTrim = String(body).trim().slice(0, 50000)
+      const newMsg = {
+        role: 'we_sent',
+        date: new Date().toISOString(),
+        body: bodyTrim,
+        message_id: normalizedId,
+        is_published: false,
+        is_deleted: false,
+        attachments: [],
+      }
+      const insert = await dbPool.query(
+        `INSERT INTO global_task_final_solutions (global_task_id, user_id, content, author_display_name, is_from_supplier_reply, is_published, thread_messages)
+         VALUES ($1, $2, $3, 'Мы', true, false, $4)
+         RETURNING id`,
+        [gid, uid, bodyTrim.slice(0, 2000), JSON.stringify([newMsg])]
+      )
+      const solutionId = insert.rows[0].id
+      await dbPool.query(
+        `INSERT INTO project_sent_emails (message_id, global_task_id, user_id, final_solution_id)
+         VALUES ($1, $2, $3, $4)
+         ON CONFLICT (message_id) DO UPDATE SET final_solution_id = EXCLUDED.final_solution_id`,
+        [normalizedId, gid, uid, solutionId]
+      )
+      const io = req.app.get('io')
+      if (io) {
+        const userIds = await getGlobalTaskParticipantUserIds(dbPool, gid)
+        const gt = await dbPool.query('SELECT title, created_by FROM global_tasks WHERE id = $1', [gid])
+        emitGlobalTaskChanged(io, userIds, gid, 'final_solution_added', {
+          title: gt.rows[0]?.title,
+          authorId: gt.rows[0]?.created_by,
+        })
+      }
+      notifyBpeProjectUpdated(gid)
+      res.status(201).json({ solutionId, id: solutionId })
+    } catch (err) {
+      console.error('createFirstSentEmailSolution:', err)
+      res.status(500).json({ error: 'Ошибка сервера' })
+    }
+  }
 }
 
 // Сохранить связь отправленного письма из проекта с Message-Id (и опционально с итогом переписки)
@@ -2797,7 +2852,7 @@ function getGlobalTasksCompleted(dbPool) {
             0
         ), 2)
         ), 0) as completion_percentage,
-    (SELECT COALESCE(json_agg(json_build_object('id', fs.id, 'content', fs.content, 'user_id', fs.user_id, 'author_name', COALESCE(fs.author_display_name, TRIM(CONCAT(fsu.first_name, ' ', fsu.last_name))), 'author_display_name', fs.author_display_name, 'is_from_supplier_reply', COALESCE(fs.is_from_supplier_reply, false), 'is_published', COALESCE(fs.is_published, false), 'thread_messages', COALESCE(fs.thread_messages, '[]'::jsonb), 'created_at', fs.created_at, 'updated_at', fs.updated_at) ORDER BY fs.created_at), '[]'::json)
+    (SELECT COALESCE(json_agg(json_build_object('id', fs.id, 'content', fs.content, 'user_id', fs.user_id, 'author_name', COALESCE(fs.author_display_name, TRIM(CONCAT(fsu.first_name, ' ', fsu.last_name))), 'author_display_name', fs.author_display_name, 'is_from_supplier_reply', COALESCE(fs.is_from_supplier_reply, false), 'is_published', COALESCE(fs.is_published, false), 'thread_messages', COALESCE(fs.thread_messages, '[]'::jsonb), 'created_at', fs.created_at, 'updated_at', fs.updated_at, 'sender_user_ids', COALESCE((SELECT to_jsonb(array_agg(DISTINCT pse.user_id)) FROM project_sent_emails pse WHERE pse.final_solution_id = fs.id), '[]'::jsonb)) ORDER BY fs.created_at), '[]'::json)
      FROM global_task_final_solutions fs
      LEFT JOIN users fsu ON fsu.id = fs.user_id
      WHERE fs.global_task_id = gt.id) as final_solutions
@@ -4509,6 +4564,7 @@ module.exports = {
   createFinalSolution,
   updateFinalSolution,
   deleteFinalSolution,
+  createFirstSentEmailSolution,
   saveProjectSentEmail,
   createFinalSolutionFromEmailReply,
   appendThreadMessage,

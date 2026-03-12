@@ -30,6 +30,12 @@ const canSeeUnpublishedReply = (user) => {
   return user?.role_name === 'Администратор' || user?.position === 'Диспетчер'
 }
 
+const isSenderInThread = (solution, userId) => {
+  if (!userId || !solution?.sender_user_ids) return false
+  const ids = Array.isArray(solution.sender_user_ids) ? solution.sender_user_ids : []
+  return ids.some((id) => String(id) === String(userId))
+}
+
 const FinalSolutionsBlock = ({
   solutions,
   globalTaskId,
@@ -43,7 +49,11 @@ const FinalSolutionsBlock = ({
   const canSeeAll = canSeeUnpublishedReply(user)
   const rawList = Array.isArray(solutions) ? solutions : []
   const list = rawList.filter(
-    (s) => !s?.is_from_supplier_reply || s?.is_published || canSeeAll
+    (s) =>
+      !s?.is_from_supplier_reply ||
+      s?.is_published ||
+      canSeeAll ||
+      isSenderInThread(s, userId)
   )
   const [currentPage, setCurrentPage] = useState(1)
   const [modal, setModal] = useState({ open: false, mode: 'add', solution: null })
@@ -54,15 +64,18 @@ const FinalSolutionsBlock = ({
   const currentIndex = Math.min(currentPage - 1, list.length - 1)
   const currentSolution = list[currentIndex] || null
 
-  const threadMessages = Array.isArray(currentSolution?.thread_messages)
+  const threadMessagesRaw = Array.isArray(currentSolution?.thread_messages)
     ? currentSolution.thread_messages
     : []
+  const threadMessages = [...threadMessagesRaw].reverse()
   const isEmailThread = currentSolution?.is_from_supplier_reply && threadMessages.length > 0
+  const canSeeAsSender = isSenderInThread(currentSolution, userId)
+  const canManageThread = canSeeAll || canSeeAsSender
 
-  const lastMessageId = threadMessages.length > 0
-    ? (threadMessages[threadMessages.length - 1].message_id || '')
+  const lastMessageId = threadMessagesRaw.length > 0
+    ? (threadMessagesRaw[threadMessagesRaw.length - 1].message_id || '')
     : ''
-  const lastTheyReplied = [...threadMessages]
+  const lastTheyReplied = [...threadMessagesRaw]
     .reverse()
     .find((m) => m.role === 'they_replied' && !m.is_deleted)
   const replyToEmail =
@@ -194,19 +207,30 @@ const FinalSolutionsBlock = ({
               <div className="final-solutions-block__thread">
                 {threadMessages.map((msg, idx) => {
                   if (msg.is_deleted) return null
-                  const visible = canSeeAll || (msg.is_published !== false)
+                  const visible =
+                    canSeeAll ||
+                    msg.is_published !== false ||
+                    isSenderInThread(currentSolution, userId)
                   if (!visible) return null
+                  const originalIndex = threadMessagesRaw.length - 1 - idx
                   return (
                     <div
-                      key={idx}
+                      key={originalIndex}
                       className={`final-solutions-block__thread-msg final-solutions-block__thread-msg--${msg.role || 'they_replied'}`}
                     >
                       <div className="final-solutions-block__thread-msg-head">
                         <span className="final-solutions-block__thread-msg-author">
                           {msg.role === 'we_sent' ? 'Мы' : (msg.from || 'Получатель')}
                         </span>
-                        <span className="final-solutions-block__thread-msg-date">
-                          {formatDateTime(msg.date)}
+                        <span className="final-solutions-block__thread-msg-meta">
+                          {msg.role === 'we_sent' && (
+                            <span className="final-solutions-block__thread-msg-sent" title="Письмо отправлено">
+                              ✓ Отправлено
+                            </span>
+                          )}
+                          <span className="final-solutions-block__thread-msg-date">
+                            {formatDateTime(msg.date)}
+                          </span>
                         </span>
                       </div>
                       <div className="final-solutions-block__thread-msg-body">
@@ -239,13 +263,13 @@ const FinalSolutionsBlock = ({
                           ))}
                         </div>
                       )}
-                      {!isReadOnly && canSeeAll && (
+                      {!isReadOnly && canManageThread && (
                         <div className="final-solutions-block__thread-msg-actions">
                           {(msg.is_published === false) && (
                             <button
                               type="button"
                               className="final-solutions-block__thread-action final-solutions-block__thread-action--publish"
-                              onClick={() => handlePublishMessage(idx)}
+                              onClick={() => handlePublishMessage(originalIndex)}
                             >
                               Опубликовать
                             </button>
@@ -254,7 +278,7 @@ const FinalSolutionsBlock = ({
                             <button
                               type="button"
                               className="final-solutions-block__thread-action final-solutions-block__thread-action--unpublish"
-                              onClick={() => handleUnpublishMessage(idx)}
+                              onClick={() => handleUnpublishMessage(originalIndex)}
                             >
                               Снять с публикации
                             </button>
@@ -262,14 +286,14 @@ const FinalSolutionsBlock = ({
                           <button
                             type="button"
                             className="final-solutions-block__thread-action final-solutions-block__thread-action--edit"
-                            onClick={() => handleEditMessage(idx, msg.body)}
+                            onClick={() => handleEditMessage(originalIndex, msg.body)}
                           >
                             Редактировать
                           </button>
                           <button
                             type="button"
                             className="final-solutions-block__thread-action final-solutions-block__thread-action--delete"
-                            onClick={() => handleDeleteMessage(idx)}
+                            onClick={() => handleDeleteMessage(originalIndex)}
                           >
                             Удалить
                           </button>
@@ -297,7 +321,7 @@ const FinalSolutionsBlock = ({
               </>
             )}
 
-            {!isReadOnly && canSeeAll && isEmailThread && (
+            {!isReadOnly && canManageThread && isEmailThread && (
               <div className="final-solutions-block__actions">
                 <button
                   type="button"

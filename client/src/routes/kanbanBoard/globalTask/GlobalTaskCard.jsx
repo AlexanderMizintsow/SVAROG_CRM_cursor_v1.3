@@ -681,6 +681,7 @@ const GlobalTaskCard = ({
         task={task}
         attachments={attachments}
         userId={userId}
+        onRefresh={onRefresh}
       />
 
       <FileCommentsModal

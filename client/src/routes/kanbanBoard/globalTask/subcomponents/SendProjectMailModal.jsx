@@ -56,7 +56,7 @@ function buildBody(task, includeAdditionalInfo = false) {
   return parts.join('\n\n') || 'Нет описания.'
 }
 
-function SendProjectMailModal({ open, onClose, task, attachments: attachmentsProp, userId }) {
+function SendProjectMailModal({ open, onClose, task, attachments: attachmentsProp, userId, onRefresh }) {
   const [category, setCategory] = useState(CATEGORY_SUPPLIERS)
   const [recipients, setRecipients] = useState([])
   const [selectedIds, setSelectedIds] = useState(new Set())
@@ -246,9 +246,21 @@ function SendProjectMailModal({ open, onClose, task, attachments: attachmentsPro
         formData.append('attachments', customFiles[i])
       }
 
-      await axios.post(`${API_BASE_URL}5001/send-email`, formData, {
+      const res = await axios.post(`${API_BASE_URL}5001/send-email`, formData, {
         headers: { 'Content-Type': 'multipart/form-data' },
       })
+      const messageId = res.data?.messageId
+      if (messageId && task?.id) {
+        try {
+          await axios.post(
+            `${API_BASE_URL}5000/api/global-tasks/${task.id}/first-sent-email`,
+            { userId, body: body.trim(), message_id: messageId }
+          )
+          onRefresh?.(task.id)
+        } catch (err) {
+          console.error('Ошибка сохранения первого письма в переписку:', err)
+        }
+      }
       onClose()
     } catch (err) {
       console.error(err)

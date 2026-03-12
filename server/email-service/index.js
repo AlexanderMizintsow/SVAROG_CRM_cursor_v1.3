@@ -194,6 +194,27 @@ function decodeAttachmentFilename(name) {
   return name
 }
 
+// Загрузить сессии только для пользователей, которые отправляли письма из проектов
+// (ответы приходят в их ящик). Это снижает нагрузку vs опроса всех с email_token.
+async function ensureProjectEmailSenderSessions() {
+  try {
+    const res = await dbPool.query(
+      `SELECT DISTINCT pse.user_id AS id
+       FROM project_sent_emails pse
+       JOIN users u ON u.id = pse.user_id
+       WHERE u.email_token IS NOT NULL AND TRIM(u.email_token) != ''`
+    )
+    for (const row of res.rows || []) {
+      const uid = String(row.id)
+      if (!userSessions[uid] || !userSessions[uid].smtpTransport) {
+        await ensureUserSession(uid).catch(() => {})
+      }
+    }
+  } catch (err) {
+    console.error('ensureProjectEmailSenderSessions:', err?.message || err)
+  }
+}
+
 // Подгрузить сессию из БД, если её ещё нет (после сохранения токена без перезахода)
 async function ensureUserSession(userId) {
   if (userSessions[userId] && userSessions[userId].smtpTransport) {
@@ -395,11 +416,23 @@ async function notifyUserOfNewEmails(userId) {
   }
 }
 
+// Подгружаем сессии отправителей проектных писем (ответы приходят в их ящик).
+// Интервал 2 мин — новые сессии после перезапуска подтянутся без лишней нагрузки.
+ensureProjectEmailSenderSessions()
+setInterval(ensureProjectEmailSenderSessions, 120000)
+
+let isPolling = false
 setInterval(async () => {
-  for (const userId in userSessions) {
-    if (userSessions[userId] && userSessions[userId].emailToken) {
-      await notifyUserOfNewEmails(userId)
+  if (isPolling) return
+  isPolling = true
+  try {
+    for (const userId in userSessions) {
+      if (userSessions[userId] && userSessions[userId].emailToken) {
+        await notifyUserOfNewEmails(userId)
+      }
     }
+  } finally {
+    isPolling = false
   }
 }, 10000)
 
