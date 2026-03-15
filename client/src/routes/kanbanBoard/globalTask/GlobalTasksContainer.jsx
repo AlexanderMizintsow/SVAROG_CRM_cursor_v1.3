@@ -181,6 +181,18 @@ const GlobalTasksContainer = ({ onClose, initialTask, initialTaskId, onProjectUp
     }
   }, [initialTaskId, initialTask])
 
+  const setOpenedProjectCardId = useTaskStateTracker((s) => s.setOpenedProjectCardId)
+  const clearOpenedProjectCardId = useTaskStateTracker((s) => s.clearOpenedProjectCardId)
+
+  useEffect(() => {
+    const id = selectedTask?.id
+    if (id) {
+      setOpenedProjectCardId(id)
+      useTaskStateTracker.getState().removeProjectNotificationByTypeAndTask(id, 'project_email_message')
+    }
+    return () => clearOpenedProjectCardId()
+  }, [selectedTask?.id, setOpenedProjectCardId, clearOpenedProjectCardId])
+
   // Функция для выбора задачи из списка (сброс мигания при открытии карточки)
   const handleSelectTask = useCallback((task) => {
     setSelectedTask(task)

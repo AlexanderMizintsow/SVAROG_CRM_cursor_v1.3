@@ -1,4 +1,4 @@
-import { useState, forwardRef, useCallback, useEffect, useMemo } from 'react'
+import { useState, forwardRef, useCallback, useEffect, useMemo, useRef } from 'react'
 import axios from 'axios'
 import { API_BASE_URL } from '../../../../config'
 import { ReactFlowProvider } from 'react-flow-renderer'
@@ -20,7 +20,6 @@ import Attachments from './subcomponents/Attachments'
 import CommentsTaskModal from './subcomponents/commentsTaskModal/CommentsTaskModal'
 import ChatTaskModal from './subcomponents/chatTaskModal/chatTaskModal'
 import useTasksManageStore from '../../../store/useTasksManageStore'
-import useTasksStore from '../../../store/useTasksStore'
 import TaskActions from './subcomponents/TaskActions'
 import ConfirmationDialog from '../../../components/confirmationDialog/ConfirmationDialog'
 import SubTaskHierarchy from './subcomponents/subTaskHierarchy/SubTaskHierarchy'
@@ -60,7 +59,6 @@ const Task = forwardRef(({ task, provided, actionIcon, column }, ref) => {
   const [hasUnreadMessages, setHasUnreadMessages] = useState(false)
   const { unreadMessages, addUnreadMessage, resetUnreadMessages, updateTaskAttachments } =
     useTasksManageStore()
-  const { updateTaskAttachments: updateTasksStoreAttachments } = useTasksStore()
   const [projectTitle, setProjectTitle] = useState('')
   const [projectStatus, setProjectStatus] = useState('')
   const [descriptionHistory, setDescriptionHistory] = useState([])
@@ -88,10 +86,18 @@ const Task = forwardRef(({ task, provided, actionIcon, column }, ref) => {
 
   const isExecutor = assigned_user_ids && assigned_user_ids.includes(userId)
 
-  // Обновляем локальное состояние attachments при изменении task.attachments
+  const prevTaskIdRef = useRef(id)
   useEffect(() => {
-    setAttachments(initialAttachments || [])
-  }, [initialAttachments])
+    const incoming = Array.isArray(initialAttachments) ? initialAttachments : []
+    setAttachments((prev) => {
+      if (prevTaskIdRef.current !== id) {
+        prevTaskIdRef.current = id
+        return incoming
+      }
+      if (incoming.length >= prev.length) return incoming
+      return prev
+    })
+  }, [initialAttachments, id])
 
   useEffect(() => {
     if (global_task_id) {
@@ -254,13 +260,14 @@ const Task = forwardRef(({ task, provided, actionIcon, column }, ref) => {
 
       await axios.post(`${API_BASE_URL}5000/api/tasks/attachment/add`, newAttachment)
 
-      // Обновляем локальное состояние attachments сразу после успешного добавления
+      // Обновляем только локальное состояние — не трогаем useTasksStore, чтобы не вызывать
+      // полную пересборку колонок (handleAddTask) и не сбрасывать позицию карточки
       const updatedAttachments = [...attachments, newAttachment]
       setAttachments(updatedAttachments)
 
-      // Обновляем глобальное состояние в store
-      updateTaskAttachments(task.id, updatedAttachments)
-      updateTasksStoreAttachments(task.id, updatedAttachments)
+      // Обновляем useTasksManageStore для отображения в модалке «Мои задачи»
+      const taskIdForStore = Number(id) || id
+      updateTaskAttachments(taskIdForStore, updatedAttachments)
 
       if (currentFileIndex < filesToUpload.length - 1) {
         setCurrentFileIndex(currentFileIndex + 1)

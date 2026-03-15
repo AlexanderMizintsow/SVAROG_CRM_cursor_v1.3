@@ -412,7 +412,7 @@ const AlertBanner = () => {
     })
   })
 
-  // Уведомления по проектам (создание, участники, статус, итоговые решения, дедлайн, подзадачи)
+  // Уведомления по проектам (создание, участники, статус, итоговые решения, дедлайн, подзадачи, почтовые сообщения)
   const projectNotificationLabels = {
     created: 'Создан проект',
     participant_added: 'Вас добавили в проект',
@@ -423,6 +423,7 @@ const AlertBanner = () => {
     final_solution_added: 'Добавлено итоговое решение по проекту',
     final_solution_updated: 'Изменено итоговое решение по проекту',
     final_solution_deleted: 'Удалено итоговое решение по проекту',
+    project_email_message: 'Почтовое сообщение по проекту',
     deadline_expired: 'Истёк срок по проекту',
     deadline_set: 'Установлен срок проекта',
     subtask_added: 'Вам назначена подзадача в проекте',
@@ -436,7 +437,7 @@ const AlertBanner = () => {
     notifications.push({
       key: `project-msg-${key}`,
       text: `${label}: ${title || 'Без названия'}`,
-      icon: <MdFolder style={{ fontSize: '16px', color: '#6366f1' }} />,
+      icon: type === 'project_email_message' ? <FaEnvelope style={{ fontSize: '16px', color: '#6366f1' }} /> : <MdFolder style={{ fontSize: '16px', color: '#6366f1' }} />,
       taskId: globalTaskId,
       title: title || 'Проект',
       projectNotificationKey: key,
@@ -699,6 +700,7 @@ const AlertBanner = () => {
                       'final_solution_added',
                       'final_solution_updated',
                       'final_solution_deleted',
+                      'project_email_message',
                       'deadline_expired',
                       'deadline_set',
                     ]

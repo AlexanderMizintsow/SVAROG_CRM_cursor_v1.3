@@ -39,10 +39,29 @@ export function handleGlobalTaskChangedPayload(payload, currentUserId) {
       break
     case 'final_solution_added':
     case 'final_solution_updated':
-    case 'final_solution_deleted':
-      if (title && isAuthor) store.addProjectNotification(id, title, reason)
-      else store.setProjectBlinkYellow(id)
+    case 'final_solution_deleted': {
+      const isEmailReply = payload?.isEmailReply === true
+      const isUnpublishedEmailChange = payload?.isUnpublishedEmailChange === true
+      const senderUserIds = Array.isArray(payload?.senderUserIds) ? payload.senderUserIds : []
+      const isSender = currentUserId != null && senderUserIds.some((uid) => Number(uid) === Number(currentUserId))
+      const openedId = store.openedProjectCardId != null ? Number(store.openedProjectCardId) : null
+      const cardIsOpenWithThisProject = openedId === id
+
+      if (isUnpublishedEmailChange) {
+        break
+      }
+      if (isEmailReply && isSender && !cardIsOpenWithThisProject) {
+        if (title) store.addProjectNotification(id, title, 'project_email_message')
+      } else if (!isEmailReply && title) {
+        const performedBy = payload?.performedByUserId != null ? Number(payload.performedByUserId) : null
+        const isActor = performedBy != null && currentUserId != null && Number(performedBy) === Number(currentUserId)
+        if (!isActor) {
+          store.addProjectNotification(id, title, reason)
+          store.setProjectBlinkYellow(id)
+        }
+      }
       break
+    }
     case 'responsiblesAdded':
     case 'responsibleRemoved':
     case 'approval':

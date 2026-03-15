@@ -335,6 +335,13 @@ function notifyRegisterAboutReplies(messages) {
   }
 }
 
+// количество дней назад для поиска новых писем
+function getSinceDate(daysBack = 1) {
+  const d = new Date()
+  d.setDate(d.getDate() - daysBack)
+  return d
+}
+
 async function getUnreadMails(userId) {
   const userSession = userSessions[userId]
   if (!userSession || !userSession.emailToken) {
@@ -345,7 +352,9 @@ async function getUnreadMails(userId) {
   try {
     connection = await connectWithRetry(userSession)
     await connection.openBox('INBOX')
-    const searchCriteria = ['UNSEEN']
+    //const searchCriteria = ['UNSEEN']
+    // SINCE 2 дня — включаем прочитанные, иначе ответ не попадёт в карточку если открыли в почте до опроса
+    const searchCriteria = [['SINCE', getSinceDate(2)]]
     const fetchOptions = { bodies: [''], markSeen: false }
     const results = await connection.search(searchCriteria, fetchOptions)
     const messages = await Promise.all(results.map(processMessage))
@@ -387,6 +396,58 @@ app.get('/get-unread-emails', async (req, res) => {
     res.json([])
   }
 })
+
+// Пометить письмо прочитанным в ящике (при просмотре ответа в карточке проекта)
+app.post(
+  '/mark-email-read',
+  [body('userId').isNumeric(), body('messageId').isString()],
+  async (req, res) => {
+    const errors = validationResult(req)
+    if (!errors.isEmpty()) {
+      return res.status(400).json({ error: 'Нужны userId и messageId' })
+    }
+    const { userId, messageId } = req.body
+    const raw = String(messageId).trim().replace(/^<|>$/g, '')
+    if (!raw) return res.status(400).json({ error: 'Некорректный messageId' })
+    const userSession = await ensureUserSession(userId)
+    if (!userSession || !userSession.imapConfig) {
+      return res.status(400).json({ error: 'Нет доступа к почте пользователя' })
+    }
+    let connection
+    try {
+      connection = await connectWithRetry(userSession)
+      await connection.openBox('INBOX', false)
+      const msgIdVariants = raw.startsWith('<') ? [raw] : [raw, `<${raw}>`]
+      let results = []
+      for (const msgId of msgIdVariants) {
+        if (!msgId) continue
+        try {
+          results = await connection.search([['HEADER', 'Message-ID', msgId]], { bodies: [''], struct: true })
+          if (results.length > 0) break
+        } catch (_) {
+          continue
+        }
+      }
+      if (results.length === 0) {
+        return res.status(200).json({ marked: false, reason: 'not_found' })
+      }
+      const uid = results[0].attributes?.uid
+      if (uid) {
+        await connection.addFlags(uid, '\\Seen')
+      }
+      res.json({ marked: true })
+    } catch (err) {
+      console.error('mark-email-read:', err?.message || err)
+      res.status(500).json({ error: err?.message || 'Ошибка пометки письма' })
+    } finally {
+      if (connection) {
+        try {
+          await connection.end()
+        } catch (_) {}
+      }
+    }
+  }
+)
 
 io.on('connection', (socket) => {
   const userId = socket.handshake.query.userId // Предполагается, что userId передается как query parameter
@@ -486,6 +547,9 @@ app.post('/send-email', upload.array('attachments', 10), async (req, res) => {
 
   try {
     const info = await userSession.smtpTransport.sendMail(mailOptions)
+    saveSentMessage(userSession, mailOptions).catch((err) =>
+      console.error('Ошибка сохранения в «Отправленные»:', err?.message || err)
+    )
     if (globalTaskId) {
       const normalizedId = messageId.replace(/^<|>$/g, '').trim()
       const payload = {
@@ -505,16 +569,33 @@ app.post('/send-email', upload.array('attachments', 10), async (req, res) => {
   }
 })
 async function saveSentMessage(userSession, mailOptions) {
+  if (!userSession?.imapConfig) return
+  const MailComposer = require('nodemailer/lib/mail-composer')
+  let rawBuffer
   try {
-    const connection = await imaps.connect(userSession.imapConfig)
-    await connection.openBox('[Gmail]/Sent Mail') // Попробуйте через атрибут \Sent
-
-    const rawMessage = `From: ${mailOptions.from}\r\nTo: ${mailOptions.to}\r\nSubject: ${mailOptions.subject}\r\n\r\n${mailOptions.text}`
-
-    await connection.append('Отправленные', rawMessage, { flags: ['\\Seen'] })
-    await connection.end()
+    const mail = new MailComposer(mailOptions)
+    rawBuffer = await new Promise((resolve, reject) => {
+      mail.compile().build((err, msg) => (err ? reject(err) : resolve(msg)))
+    })
+  } catch (err) {
+    console.error('Ошибка сборки письма для Sent:', err?.message || err)
+    return
+  }
+  const rawMessage =
+    Buffer.isBuffer(rawBuffer) ? rawBuffer.toString('binary') : String(rawBuffer)
+  let connection
+  try {
+    connection = await imaps.connect(userSession.imapConfig)
+    const sentFolder = 'Отправленные'
+    await connection.append(rawMessage, { mailbox: sentFolder, flags: ['\\Seen'] })
   } catch (error) {
-    console.error('Ошибка при сохранении отправленного письма:', error)
+    throw error
+  } finally {
+    if (connection) {
+      try {
+        await connection.end()
+      } catch (_) {}
+    }
   }
 }
 

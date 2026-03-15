@@ -58,6 +58,7 @@ const useTaskStateTracker = create((set, get) => {
     projectBlinkGreen: initialState.projectBlinkGreen || {},
     projectBlinkYellow: initialState.projectBlinkYellow || {},
     projectDeadlineNotified: initialState.projectDeadlineNotified || {},
+    openedProjectCardId: null,
     taskDecisionNavigate: null,
     subtaskBlinkYellow: {},
     taskCardBlinkYellow: {},
@@ -157,6 +158,10 @@ const useTaskStateTracker = create((set, get) => {
         return newState
       })
     },
+    removeProjectNotificationByTypeAndTask: (globalTaskId, type) => {
+      const key = `project-${type}-${globalTaskId}`
+      get().removeProjectNotification(key)
+    },
 
     setProjectBlinkGreen: (globalTaskId) => {
       set((state) => ({
@@ -184,6 +189,8 @@ const useTaskStateTracker = create((set, get) => {
       })
     },
 
+    setOpenedProjectCardId: (globalTaskId) => set({ openedProjectCardId: globalTaskId ?? null }),
+    clearOpenedProjectCardId: () => set({ openedProjectCardId: null }),
     setTaskDecisionNavigate: (payload) => set({ taskDecisionNavigate: payload }),
     clearTaskDecisionNavigate: () => set({ taskDecisionNavigate: null }),
     setSubtaskBlinkYellow: (subtaskId) =>

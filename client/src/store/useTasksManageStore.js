@@ -55,14 +55,19 @@ const useTasksManageStore = create((set, get) => ({
     })),
 
   // Метод для обновления вложений конкретной задачи
+  // taskId может быть number или string (id из column item)
   updateTaskAttachments: (taskId, newAttachments) =>
-    set((state) => ({
-      tasksManager: state.tasksManager.map((task) =>
-        task.id === taskId || task.task_id === taskId
-          ? { ...task, attachments: newAttachments }
-          : task
-      ),
-    })),
+    set((state) => {
+      const tid = Number(taskId)
+      return {
+        tasksManager: state.tasksManager.map((task) =>
+          (task.id != null && (task.id === taskId || task.id === tid)) ||
+          (task.task_id != null && (task.task_id === taskId || task.task_id === tid))
+            ? { ...task, attachments: newAttachments }
+            : task
+        ),
+      }
+    }),
 
   // Метод для добавления ID задачи с непрочитанным сообщением
   addUnreadMessage: (taskId) =>

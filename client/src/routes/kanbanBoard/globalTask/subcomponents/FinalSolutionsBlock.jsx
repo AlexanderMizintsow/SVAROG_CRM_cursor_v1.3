@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import axios from 'axios'
 import { API_BASE_URL } from '../../../../../config'
 import useUserStore from '../../../../store/userStore'
@@ -26,10 +26,6 @@ function extractEmail(fromStr) {
   return m ? m[1].trim() : fromStr.trim()
 }
 
-const canSeeUnpublishedReply = (user) => {
-  return user?.role_name === 'Администратор' || user?.position === 'Диспетчер'
-}
-
 const isSenderInThread = (solution, userId) => {
   if (!userId || !solution?.sender_user_ids) return false
   const ids = Array.isArray(solution.sender_user_ids) ? solution.sender_user_ids : []
@@ -46,16 +42,15 @@ const FinalSolutionsBlock = ({
 }) => {
   const { user } = useUserStore()
   const userId = user?.id
-  const canSeeAll = canSeeUnpublishedReply(user)
   const rawList = Array.isArray(solutions) ? solutions : []
   const list = rawList.filter(
     (s) =>
       !s?.is_from_supplier_reply ||
       s?.is_published ||
-      canSeeAll ||
       isSenderInThread(s, userId)
   )
   const [currentPage, setCurrentPage] = useState(1)
+  const markedAsReadRef = useRef(new Set())
   const [modal, setModal] = useState({ open: false, mode: 'add', solution: null })
   const [replyModal, setReplyModal] = useState({ open: false, solution: null })
   const [editMessageModal, setEditMessageModal] = useState({ open: false, messageIndex: null, body: '' })
@@ -70,7 +65,7 @@ const FinalSolutionsBlock = ({
   const threadMessages = [...threadMessagesRaw].reverse()
   const isEmailThread = currentSolution?.is_from_supplier_reply && threadMessages.length > 0
   const canSeeAsSender = isSenderInThread(currentSolution, userId)
-  const canManageThread = canSeeAll || canSeeAsSender
+  const canManageThread = canSeeAsSender
 
   const lastMessageId = threadMessagesRaw.length > 0
     ? (threadMessagesRaw[threadMessagesRaw.length - 1].message_id || '')
@@ -90,6 +85,22 @@ const FinalSolutionsBlock = ({
 
   const canEdit = (s) =>
     !s?.is_from_supplier_reply && !isReadOnly && userId != null && String(s?.user_id) === String(userId)
+
+  // Пометить письма прочитанными в ящике при просмотре ответов в карточке
+  useEffect(() => {
+    if (!userId || !canSeeAsSender || !isEmailThread || !threadMessagesRaw.length) return
+    const toMark = threadMessagesRaw
+      .filter((m) => m.role === 'they_replied' && !m.is_deleted && m.message_id)
+      .map((m) => String(m.message_id).trim().replace(/^<|>$/g, ''))
+      .filter(Boolean)
+    for (const msgId of toMark) {
+      if (markedAsReadRef.current.has(msgId)) continue
+      markedAsReadRef.current.add(msgId)
+      axios
+        .post(`${API_BASE_URL}5001/mark-email-read`, { userId, messageId: msgId })
+        .catch(() => {})
+    }
+  }, [userId, canSeeAsSender, isEmailThread, threadMessagesRaw])
 
   const handleDelete = async (solutionId) => {
     if (!window.confirm('Удалить это итоговое решение?')) return
@@ -208,7 +219,6 @@ const FinalSolutionsBlock = ({
                 {threadMessages.map((msg, idx) => {
                   if (msg.is_deleted) return null
                   const visible =
-                    canSeeAll ||
                     msg.is_published !== false ||
                     isSenderInThread(currentSolution, userId)
                   if (!visible) return null
@@ -241,7 +251,7 @@ const FinalSolutionsBlock = ({
                           {msg.attachments.map((att) => (
                             <div key={att.id} className="final-solutions-block__thread-att">
                               <span>{att.filename || 'Файл'}</span>
-                              {canSeeAll && (
+                              {canManageThread && (
                                 <>
                                   <button
                                     type="button"

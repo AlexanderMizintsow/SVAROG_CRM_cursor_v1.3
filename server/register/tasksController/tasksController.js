@@ -59,6 +59,9 @@ function emitGlobalTaskChanged(io, userIds, globalTaskId, reason, payload = {}) 
     title: payload.title || null,
     authorId: payload.authorId != null ? Number(payload.authorId) : null,
     ...(payload.deadline != null && { deadline: payload.deadline }),
+    ...(payload.isEmailReply === true && { isEmailReply: true, senderUserIds: payload.senderUserIds || [] }),
+    ...(payload.isUnpublishedEmailChange === true && { isUnpublishedEmailChange: true }),
+    ...(payload.performedByUserId != null && { performedByUserId: Number(payload.performedByUserId) }),
   }
   for (const uid of userIds) {
     io.to(String(uid)).emit('globalTaskChanged', message)
@@ -2169,7 +2172,7 @@ function createFinalSolution(dbPool) {
         const gt = await dbPool.query('SELECT title, created_by FROM global_tasks WHERE id = $1', [taskId])
         const projectTitle = gt.rows[0]?.title || null
         const authorId = gt.rows[0]?.created_by || null
-        emitGlobalTaskChanged(io, userIds, taskId, 'final_solution_added', { title: projectTitle, authorId })
+        emitGlobalTaskChanged(io, userIds, taskId, 'final_solution_added', { title: projectTitle, authorId, performedByUserId: uid })
       }
       res.status(201).json({
         id: row.id,
@@ -2221,7 +2224,7 @@ function updateFinalSolution(dbPool) {
         const gt = await dbPool.query('SELECT title, created_by FROM global_tasks WHERE id = $1', [taskId])
         const projectTitle = gt.rows[0]?.title || null
         const authorId = gt.rows[0]?.created_by || null
-        emitGlobalTaskChanged(io, userIds, taskId, 'final_solution_updated', { title: projectTitle, authorId })
+        emitGlobalTaskChanged(io, userIds, taskId, 'final_solution_updated', { title: projectTitle, authorId, performedByUserId: uid })
       }
       res.status(200).json({
         id: row.id,
@@ -2263,7 +2266,7 @@ function deleteFinalSolution(dbPool) {
         const gt = await dbPool.query('SELECT title, created_by FROM global_tasks WHERE id = $1', [taskId])
         const projectTitle = gt.rows[0]?.title || null
         const authorId = gt.rows[0]?.created_by || null
-        emitGlobalTaskChanged(io, userIds, taskId, 'final_solution_deleted', { title: projectTitle, authorId })
+        emitGlobalTaskChanged(io, userIds, taskId, 'final_solution_deleted', { title: projectTitle, authorId, performedByUserId: userId })
       }
       res.status(200).json({ success: true })
     } catch (err) {
@@ -2321,6 +2324,7 @@ function createFirstSentEmailSolution(dbPool) {
         emitGlobalTaskChanged(io, userIds, gid, 'final_solution_added', {
           title: gt.rows[0]?.title,
           authorId: gt.rows[0]?.created_by,
+          isUnpublishedEmailChange: true,
         })
       }
       notifyBpeProjectUpdated(gid)
@@ -2512,7 +2516,17 @@ function createFinalSolutionFromEmailReply(dbPool) {
         const userIds = await getGlobalTaskParticipantUserIds(dbPool, global_task_id)
         const gt = await dbPool.query('SELECT title, created_by FROM global_tasks WHERE id = $1', [global_task_id])
         const projectTitle = gt.rows[0]?.title || null
-        emitGlobalTaskChanged(io, userIds, global_task_id, existingSolutionId ? 'final_solution_updated' : 'final_solution_added', { title: projectTitle, authorId: created_by })
+        const senderRows = await dbPool.query(
+          'SELECT user_id FROM project_sent_emails WHERE final_solution_id = $1',
+          [solutionId]
+        )
+        const senderUserIds = (senderRows.rows || []).map((r) => Number(r.user_id)).filter(Boolean)
+        emitGlobalTaskChanged(io, userIds, global_task_id, existingSolutionId ? 'final_solution_updated' : 'final_solution_added', {
+          title: projectTitle,
+          authorId: created_by,
+          isEmailReply: true,
+          senderUserIds,
+        })
       }
       res.status(201).json({ created: true, global_task_id, solution_id: solutionId })
     } catch (err) {
@@ -2532,7 +2546,7 @@ function appendThreadMessage(dbPool) {
     }
     try {
       const check = await dbPool.query(
-        `SELECT id, thread_messages FROM global_task_final_solutions WHERE id = $1 AND global_task_id = $2`,
+        `SELECT id, thread_messages, COALESCE(is_from_supplier_reply, false) as is_from_supplier_reply, COALESCE(is_published, false) as is_published FROM global_task_final_solutions WHERE id = $1 AND global_task_id = $2`,
         [solutionId, taskId]
       )
       if (check.rowCount === 0) {
@@ -2569,7 +2583,10 @@ function appendThreadMessage(dbPool) {
       if (io) {
         const userIds = await getGlobalTaskParticipantUserIds(dbPool, taskId)
         const gt = await dbPool.query('SELECT title FROM global_tasks WHERE id = $1', [taskId])
-        emitGlobalTaskChanged(io, userIds, taskId, 'final_solution_updated', { title: gt.rows[0]?.title })
+        emitGlobalTaskChanged(io, userIds, taskId, 'final_solution_updated', {
+          title: gt.rows[0]?.title,
+          isUnpublishedEmailChange: true,
+        })
       }
       res.status(200).json({ success: true })
     } catch (err) {
@@ -2633,7 +2650,8 @@ function updateThreadMessage(dbPool) {
       if (io) {
         const userIds = await getGlobalTaskParticipantUserIds(dbPool, taskId)
         const gt = await dbPool.query('SELECT title FROM global_tasks WHERE id = $1', [taskId])
-        emitGlobalTaskChanged(io, userIds, taskId, 'final_solution_updated', { title: gt.rows[0]?.title })
+        const uid = userId ? parseInt(userId, 10) : null
+        emitGlobalTaskChanged(io, userIds, taskId, 'final_solution_updated', { title: gt.rows[0]?.title, performedByUserId: uid })
       }
       res.status(200).json({ success: true })
     } catch (err) {
@@ -2743,7 +2761,7 @@ function updateEmailThreadContent(dbPool) {
       if (io) {
         const userIds = await getGlobalTaskParticipantUserIds(dbPool, taskId)
         const gt = await dbPool.query('SELECT title FROM global_tasks WHERE id = $1', [taskId])
-        emitGlobalTaskChanged(io, userIds, taskId, 'final_solution_updated', { title: gt.rows[0]?.title })
+        emitGlobalTaskChanged(io, userIds, taskId, 'final_solution_updated', { title: gt.rows[0]?.title, isUnpublishedEmailChange: true })
       }
       res.status(200).json({ success: true })
     } catch (err) {
@@ -2778,7 +2796,8 @@ function publishFinalSolution(dbPool) {
         const userIds = await getGlobalTaskParticipantUserIds(dbPool, taskId)
         const gt = await dbPool.query('SELECT title, created_by FROM global_tasks WHERE id = $1', [taskId])
         const projectTitle = gt.rows[0]?.title || null
-        emitGlobalTaskChanged(io, userIds, taskId, 'final_solution_updated', { title: projectTitle })
+        const uid = userId ? parseInt(userId, 10) : null
+        emitGlobalTaskChanged(io, userIds, taskId, 'final_solution_updated', { title: projectTitle, performedByUserId: uid })
       }
       res.status(200).json({ success: true })
     } catch (err) {
