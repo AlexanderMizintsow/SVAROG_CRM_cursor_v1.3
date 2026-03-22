@@ -2,7 +2,7 @@ import React, { useEffect, useRef, useState } from 'react'
 import UserStore from '../../store/userStore'
 import useTaskStateTracker from '../../store/useTaskStateTracker'
 import { FaEnvelope } from 'react-icons/fa'
-import { MdDoneOutline } from 'react-icons/md'
+import { MdDoneOutline, MdClose } from 'react-icons/md'
 import GlobalTaskChat from '../../routes/kanbanBoard/globalTask/subcomponents/globalChat/GlobalTaskChat'
 import { AiOutlineFileDone } from 'react-icons/ai'
 import { MdHistoryEdu, MdFolder } from 'react-icons/md'
@@ -132,6 +132,7 @@ const AlertBanner = () => {
 
   // ==================== Получение данных из store ====================
   const removeTask = useTaskStateTracker((state) => state.removeTask)
+  const removeNotificationTask = useTaskStateTracker((state) => state.removeNotificationTask)
   const notificationsTask = useTaskStateTracker((state) => state.notificationsTask)
   const extensionRequests = useTaskStateTracker((state) => state.extensionRequests)
   const fetchExtensionRequests = useTaskStateTracker((state) => state.fetchExtensionRequests)
@@ -142,6 +143,7 @@ const AlertBanner = () => {
   const globalNotifications = useTaskStateTracker((state) => state.globalNotifications)
   const projectNotifications = useTaskStateTracker((state) => state.projectNotifications)
   const descriptionChangeNotifications = useTaskStateTracker((state) => state.notifications)
+  const removeGlobalTaskNotification = useTaskStateTracker((state) => state.removeGlobalTaskNotification)
   const removeProjectNotification = useTaskStateTracker((state) => state.removeProjectNotification)
 
   // ==================== Вспомогательные хуки ====================
@@ -547,6 +549,65 @@ const AlertBanner = () => {
     setSelectedGlobalTask({ taskId, title })
   }
 
+  // Закрыть/прочитать все уведомления в баннере (в основном те, которые действительно имеют "read"-семантику)
+  const handleCloseAllNotifications = async () => {
+    if (!currentUserId) return
+
+    try {
+      // 1) BPE in-app уведомления: помечаем прочитанными на сервере
+      const bpIds = Array.isArray(bpNotifications) ? bpNotifications.map((n) => n?.id).filter(Boolean) : []
+      await Promise.all(
+        bpIds.map(async (id) => {
+          try {
+            await markBpNotificationRead(id)
+          } catch (_) {
+            // даже если сервер не ответил — всё равно очистим локально, чтобы баннер не мешал
+          }
+        })
+      )
+      setBpNotifications([])
+    } catch (_) {
+      // не ломаем UI
+    }
+
+    try {
+      // 2) Уведомления задач: помечаем прочитанными на сервере и чистим локальный стор
+      const ids = notificationsTask && typeof notificationsTask === 'object' ? Object.keys(notificationsTask) : []
+      await Promise.all(
+        ids.map(async (id) => {
+          try {
+            await axios.patch(`${API_BASE_URL}5000/api/notifications/${id}/read`)
+          } catch (_) {
+            // игнорируем ошибки "прочтения"
+          } finally {
+            removeNotificationTask(id)
+          }
+        })
+      )
+    } catch (_) {
+      // не ломаем UI
+    }
+
+    // 3) Локальные in-app уведомления проекта/чата/изменения описания: просто убираем из сторa
+    try {
+      Object.keys(projectNotifications || {}).forEach((key) => removeProjectNotification(key))
+      Object.keys(globalNotifications || {}).forEach((taskId) => removeGlobalTaskNotification(taskId))
+      Object.keys(descriptionChangeNotifications || {}).forEach((key) =>
+        useTaskStateTracker.getState().removeNotification(key)
+      )
+    } catch (_) {
+      // не ломаем UI
+    }
+
+    // закрываем активные карточки/модалки, если они открыты из баннера
+    setSelectedGlobalTask(null)
+    setSelectedAuthorTask(null)
+    setSelectedTaskId(null)
+    setMessageType(null)
+    setCurrentTaskId(null)
+    setOpenConfirmationDialog(false)
+  }
+
   // Обработчик клика по уведомлению от автора
   const handleAuthorNotificationClick = async (taskId) => {
     try {
@@ -664,6 +725,18 @@ const AlertBanner = () => {
             {isCollapsed && allNotifications.length > 0 && (
               <span className="collapse-title">Уведомления ({allNotifications.length})</span>
             )}
+            <button
+              type="button"
+              className="alert-banner-close-all"
+              onClick={(e) => {
+                e.stopPropagation()
+                handleCloseAllNotifications()
+              }}
+              title="Прочитать все уведомления"
+              aria-label="Прочитать все уведомления"
+            >
+              <MdClose />
+            </button>
             <button onClick={toggleCollapse} className="collapse-btn">
               {isCollapsed ? 'Развернуть' : 'Свернуть'}
             </button>

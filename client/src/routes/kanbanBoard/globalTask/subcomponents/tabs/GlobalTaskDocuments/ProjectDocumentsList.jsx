@@ -1,6 +1,13 @@
+import { useState, useCallback } from 'react'
 import { API_BASE_URL } from '../../../../../../../config'
-import { FaFile, FaFileImage } from 'react-icons/fa'
+import { FaFile, FaFileImage, FaDownload, FaExternalLinkAlt } from 'react-icons/fa'
+import ImageViewer from '../../../../Task/subcomponents/ImageViewer'
 import './ProjectDocumentsList.scss'
+
+const isPdf = (fileType, fileName) => {
+  if (fileType && (fileType === 'application/pdf' || fileType.includes('pdf'))) return true
+  return fileName && fileName.toLowerCase().endsWith('.pdf')
+}
 
 function formatDateTime(str) {
   if (!str) return '—'
@@ -32,9 +39,9 @@ function getUploaderName(att) {
 }
 
 const ProjectDocumentsList = ({ attachments }) => {
-  if (!attachments || attachments.length === 0) return null
+  const [viewingImage, setViewingImage] = useState(null)
 
-  const handleFileDownload = async (fileUrl, fileName) => {
+  const handleFileDownload = useCallback(async (fileUrl, fileName) => {
     try {
       const response = await fetch(fileUrl)
       const blob = await response.blob()
@@ -50,7 +57,9 @@ const ProjectDocumentsList = ({ attachments }) => {
       console.error('Ошибка при скачивании:', error)
       window.open(fileUrl, '_blank', 'noopener,noreferrer')
     }
-  }
+  }, [])
+
+  if (!attachments || attachments.length === 0) return null
 
   return (
     <div className="project-documents-list">
@@ -69,22 +78,57 @@ const ProjectDocumentsList = ({ attachments }) => {
             const fileUrl = encodeURI(`${API_BASE_URL}5000/api/task${att.file_url}`)
             const fileName = att.name_file || 'Файл'
             const source = att.source || 'project'
+            const pdf = isPdf(att.file_type, fileName)
 
             return (
               <tr key={att.id} className="project-documents-list__row">
                 <td>
-                  <button
-                    type="button"
-                    className="project-documents-list__file-link"
-                    onClick={() => handleFileDownload(fileUrl, fileName)}
-                  >
+                  <div className="project-documents-list__file-cell">
                     {isImage ? (
-                      <FaFileImage className="project-documents-list__file-icon" />
+                      <>
+                        <button
+                          type="button"
+                          className="project-documents-list__thumb-wrap"
+                          onClick={() => setViewingImage({ fileUrl, fileName })}
+                          title="Просмотреть"
+                        >
+                          <img src={fileUrl} alt="" className="project-documents-list__thumb" loading="lazy" />
+                        </button>
+                        <span className="project-documents-list__file-name" title={fileName}>{fileName}</span>
+                        <button
+                          type="button"
+                          className="project-documents-list__action-btn project-documents-list__action-btn--download"
+                          onClick={() => handleFileDownload(fileUrl, fileName)}
+                          title="Скачать"
+                        >
+                          <FaDownload />
+                        </button>
+                      </>
                     ) : (
-                      <FaFile className="project-documents-list__file-icon" />
+                      <>
+                        <FaFile className="project-documents-list__file-icon" />
+                        <span className="project-documents-list__file-name" title={fileName}>{fileName}</span>
+                        {pdf && (
+                          <button
+                            type="button"
+                            className="project-documents-list__action-btn project-documents-list__action-btn--open"
+                            onClick={() => window.open(fileUrl, '_blank', 'noopener,noreferrer')}
+                            title="Открыть PDF"
+                          >
+                            <FaExternalLinkAlt />
+                          </button>
+                        )}
+                        <button
+                          type="button"
+                          className="project-documents-list__action-btn project-documents-list__action-btn--download"
+                          onClick={() => handleFileDownload(fileUrl, fileName)}
+                          title="Скачать"
+                        >
+                          <FaDownload />
+                        </button>
+                      </>
                     )}
-                    {fileName}
-                  </button>
+                  </div>
                   {att.comment_file && (
                     <div className="project-documents-list__comment">{att.comment_file}</div>
                   )}
@@ -97,6 +141,17 @@ const ProjectDocumentsList = ({ attachments }) => {
           })}
         </tbody>
       </table>
+
+      {viewingImage && (
+        <ImageViewer
+          imageUrl={viewingImage.fileUrl}
+          imageName={viewingImage.fileName}
+          onClose={() => setViewingImage(null)}
+          onDownload={() => {
+            handleFileDownload(viewingImage.fileUrl, viewingImage.fileName)
+          }}
+        />
+      )}
     </div>
   )
 }

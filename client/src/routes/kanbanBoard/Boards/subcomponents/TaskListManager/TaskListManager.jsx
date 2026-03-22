@@ -164,24 +164,25 @@ const TaskListManager = ({ onClose, onOpenProject, stripRefreshKey }) => {
           )}
         </Box>
       )}
-      {groupedTasks.created_by.length > 0 && (
-        <Box>
-          <Box onClick={() => toggleGroup('created_by')} style={{ cursor: 'pointer' }}>
-            <Typography variant="h6" className={styles.taskTitle}>
-              Созданные задачи {expandedGroups.created_by ? '▼' : '▲'}
-            </Typography>
-          </Box>
-          {expandedGroups.created_by && (
-            <CreatedByTaskList
-              tasks={filterTasks(groupedTasks.created_by)}
-              approvalStatus={approvalStatus}
-              userId={userId}
-              handleTaskAccept={handleTaskAccept}
-              refreshTasks={refreshTasks}
-            />
+          {groupedTasks.created_by.length > 0 && (
+            <Box>
+              <Box onClick={() => toggleGroup('created_by')} style={{ cursor: 'pointer' }}>
+                <Typography variant="h6" className={styles.taskTitle}>
+                  Созданные задачи {expandedGroups.created_by ? '▼' : '▲'}
+                </Typography>
+              </Box>
+              {expandedGroups.created_by && (
+                <CreatedByTaskList
+                  tasks={filterTasks(groupedTasks.created_by)}
+                  approvalStatus={approvalStatus}
+                  userId={userId}
+                  handleTaskAccept={handleTaskAccept}
+                  refreshTasks={refreshTasks}
+                  onOpenProject={onOpenProject}
+                />
+              )}
+            </Box>
           )}
-        </Box>
-      )}
       {groupedTasks.visible.length > 0 && (
         <Box>
           <Box onClick={() => toggleGroup('visible')} style={{ cursor: 'pointer' }}>

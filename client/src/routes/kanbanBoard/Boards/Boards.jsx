@@ -256,10 +256,26 @@ const Boards = () => {
     setStripRefreshKey((k) => k + 1)
   }
 
-  const handleOpenProjectFromMini = (task) => {
-    setSelectedProjectToOpen(task)
-    setGlobalProjectOpen(true)
-  }
+  const handleOpenProjectFromMini = useCallback(
+    async (task) => {
+      const projectId = task?.id ?? task?.global_task_id
+      if (!projectId || !userId) return
+      try {
+        const res = await axios.get(`${API_BASE_URL}5000/api/global-tasks/${projectId}`)
+        const data = res.data
+        const isAuthor = data?.created_by?.id === userId
+        const isResponsible = Array.isArray(data?.responsibles)
+          ? data.responsibles.some((r) => r?.id === userId)
+          : false
+        if (!isAuthor && !isResponsible) return
+        setSelectedProjectToOpen(data)
+        setGlobalProjectOpen(true)
+      } catch (_) {
+        // проект не найден или нет доступа — ничего не делаем
+      }
+    },
+    [userId]
+  )
 
   const toggleCompletedHistory = () => {
     setCompletedHistoryOpen((prev) => !prev)

@@ -7,7 +7,12 @@
  * backlog / todo / wait / doing / done / pause (+ алиасы pending/in_progress/completed/on_hold/cancelled).
  */
 const { resolveProjectId, resolveParentTaskId } = require('./projectUtils')
-const { computeConditionalDeadline, computeStartDayDeadline, computeOffsetFromStartDeadline } = require('./deadlineUtils')
+const {
+  computeConditionalDeadline,
+  computeStartDayDeadline,
+  computeOffsetFromStartDeadline,
+  computeOffsetFromNowDeadline,
+} = require('./deadlineUtils')
 
 function substituteText(text, context) {
   if (!text || typeof text !== 'string') return text
@@ -87,6 +92,9 @@ async function handle(instance, node, scheme, integrations, dbPool) {
   let priority = settings.priority || 'низкий'
   let tags = settings.tags
   let deadlineOffsetDays = settings.deadlineOffsetDays != null ? settings.deadlineOffsetDays : null
+  let deadlineOffsetFromNowValue =
+    settings.deadlineOffsetFromNowValue != null ? settings.deadlineOffsetFromNowValue : null
+  let deadlineOffsetFromNowUnit = settings.deadlineOffsetFromNowUnit || 'hours'
 
   // Опционально: создать задачу как подзадачу проекта (global_task_id)
   const linkToProject = settings.linkToProject === true
@@ -148,6 +156,10 @@ async function handle(instance, node, scheme, integrations, dbPool) {
       templateDeadline = computeStartDayDeadline(instance.started_at, settings.deadlineStartDayTime)
     } else if (settings.deadlineMode === 'offset' && deadlineOffsetDays != null && instance.started_at) {
       templateDeadline = computeOffsetFromStartDeadline(instance.started_at, deadlineOffsetDays, settings.deadlineOffsetTime)
+    } else if (settings.deadlineMode === 'offset_from_now' && deadlineOffsetFromNowValue != null && instance.started_at) {
+      const valueNum = Number(deadlineOffsetFromNowValue)
+      const minutes = deadlineOffsetFromNowUnit === 'hours' ? valueNum * 60 : valueNum
+      templateDeadline = computeOffsetFromNowDeadline(instance.started_at, minutes)
     }
     const templateData = {
       title: substituteText(title, context),
@@ -208,6 +220,14 @@ async function handle(instance, node, scheme, integrations, dbPool) {
     const d = new Date()
     d.setDate(d.getDate() + Number(deadlineOffsetDays))
     deadline = d.toISOString()
+  } else if (settings.deadlineMode === 'offset_from_now' && deadlineOffsetFromNowValue != null && instance.started_at) {
+    const valueNum = Number(deadlineOffsetFromNowValue)
+    const minutes = deadlineOffsetFromNowUnit === 'hours' ? valueNum * 60 : valueNum
+    deadline = computeOffsetFromNowDeadline(instance.started_at, minutes)
+  } else if (settings.deadlineMode === 'offset_from_now' && deadlineOffsetFromNowValue != null) {
+    const valueNum = Number(deadlineOffsetFromNowValue)
+    const minutes = deadlineOffsetFromNowUnit === 'hours' ? valueNum * 60 : valueNum
+    deadline = computeOffsetFromNowDeadline(new Date(), minutes)
   }
 
   // Статус

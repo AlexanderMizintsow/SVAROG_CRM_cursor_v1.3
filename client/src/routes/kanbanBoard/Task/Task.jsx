@@ -12,7 +12,7 @@ import { getTimeAndPriority, getUserNames } from './utils/taskUtils'
 import { RxWidth } from 'react-icons/rx'
 import { TbUserCheck, TbUserScreen, TbUserEdit, TbSubtask } from 'react-icons/tb'
 import { MdHistoryEdu, MdAutorenew } from 'react-icons/md'
-import { FaHashtag, FaFile } from 'react-icons/fa'
+import { FaHashtag, FaFile, FaPaperclip } from 'react-icons/fa'
 import { CiTimer } from 'react-icons/ci'
 import useUserStore from '../../../store/userStore'
 import TaskModal from './subcomponents/TaskModal'
@@ -378,6 +378,16 @@ const Task = forwardRef(({ task, provided, actionIcon, column }, ref) => {
         </p>
         <p className="task-id">№:{id}</p>
         <div className="task-header">
+          {attachments && attachments.length > 0 && (
+            <span
+              className="task-attachments-badge"
+              title={`Вложений: ${attachments.length}`}
+              aria-label={`Вложений: ${attachments.length}`}
+            >
+              <FaPaperclip />
+              {attachments.length}
+            </span>
+          )}
           <RxWidth title="Развернуть" onClick={toggleModal} className="task-expand-icon" />
           {actionIcon}
         </div>
@@ -620,6 +630,7 @@ const Task = forwardRef(({ task, provided, actionIcon, column }, ref) => {
           description={description}
           formatElapsedTime={formatElapsedTime}
           priority={priority}
+          attachments={attachments}
         />
       )}
 

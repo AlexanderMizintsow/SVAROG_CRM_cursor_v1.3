@@ -124,7 +124,18 @@ const CreateProjectNodeProps = ({ node, onUpdate }) => {
         <label className="properties-panel__label">Режим дедлайна</label>
         <select
           className="properties-panel__select"
-          value={settings.deadlineMode ?? (settings.deadline ? 'fixed' : settings.deadlineStartDayTime ? 'start_day_time' : settings.deadlineOffsetDays != null ? 'offset' : 'none')}
+            value={
+              settings.deadlineMode ??
+              (settings.deadline
+                ? 'fixed'
+                : settings.deadlineOffsetFromNowValue != null
+                  ? 'offset_from_now'
+                  : settings.deadlineStartDayTime
+                    ? 'start_day_time'
+                    : settings.deadlineOffsetDays != null
+                      ? 'offset'
+                      : 'none')
+            }
           onChange={(e) => {
             const mode = e.target.value
             const patch = { deadlineMode: mode }
@@ -133,31 +144,47 @@ const CreateProjectNodeProps = ({ node, onUpdate }) => {
               patch.deadlineStartDayTime = null
               patch.deadlineOffsetDays = null
               patch.deadlineOffsetTime = null
+                patch.deadlineOffsetFromNowValue = null
+                patch.deadlineOffsetFromNowUnit = null
               patch.conditionalDeadline = null
             } else if (mode === 'fixed') {
               patch.deadlineStartDayTime = null
               patch.deadlineOffsetDays = null
               patch.deadlineOffsetTime = null
+                patch.deadlineOffsetFromNowValue = null
+                patch.deadlineOffsetFromNowUnit = null
               patch.conditionalDeadline = null
             } else if (mode === 'start_day_time') {
               patch.deadline = null
               patch.deadlineOffsetDays = null
               patch.deadlineOffsetTime = null
               patch.conditionalDeadline = null
+                patch.deadlineOffsetFromNowValue = null
+                patch.deadlineOffsetFromNowUnit = null
             } else if (mode === 'offset') {
               patch.deadline = null
               patch.deadlineStartDayTime = null
               patch.conditionalDeadline = null
+                patch.deadlineOffsetFromNowValue = null
+                patch.deadlineOffsetFromNowUnit = null
             } else if (mode === 'conditional') {
               patch.deadline = null
               patch.deadlineStartDayTime = null
               patch.deadlineOffsetDays = null
               patch.deadlineOffsetTime = null
+                patch.deadlineOffsetFromNowValue = null
+                patch.deadlineOffsetFromNowUnit = null
               patch.conditionalDeadline = {
                 boundary: settings.conditionalDeadline?.boundary ?? '12:00',
                 sameDayTime: settings.conditionalDeadline?.sameDayTime ?? '18:00',
                 nextDayTime: settings.conditionalDeadline?.nextDayTime ?? '16:00',
               }
+              } else if (mode === 'offset_from_now') {
+                patch.deadline = null
+                patch.deadlineStartDayTime = null
+                patch.deadlineOffsetDays = null
+                patch.deadlineOffsetTime = null
+                patch.conditionalDeadline = null
             }
             handleChange(patch)
           }}
@@ -166,6 +193,7 @@ const CreateProjectNodeProps = ({ node, onUpdate }) => {
           <option value="fixed">Конкретная дата и время</option>
           <option value="start_day_time">Сегодня (от запуска) + время</option>
           <option value="offset">Смещение в днях (от запуска) + время</option>
+            <option value="offset_from_now">От текущего времени запуска + (мин/часов)</option>
           <option value="conditional">По условию (граница времени)</option>
         </select>
         {(settings.deadlineMode ?? (settings.deadline ? 'fixed' : 'none')) === 'fixed' && (
@@ -214,6 +242,38 @@ const CreateProjectNodeProps = ({ node, onUpdate }) => {
             />
             <p className="properties-panel__hint" style={{ marginTop: 4, fontSize: '0.8rem' }}>
               Дата = день запуска процесса + указанное кол-во дней.
+            </p>
+          </div>
+        )}
+        {(settings.deadlineMode ?? '') === 'offset_from_now' && (
+          <div style={{ marginTop: 8 }}>
+            <label className="properties-panel__label" style={{ marginTop: 6 }}>
+              Смещение от времени запуска
+            </label>
+            <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+              <input
+                type="number"
+                className="properties-panel__input"
+                value={settings.deadlineOffsetFromNowValue ?? ''}
+                onChange={(e) =>
+                  handleChange({ deadlineOffsetFromNowValue: e.target.value === '' ? null : Number(e.target.value) })
+                }
+                placeholder="Например: 120"
+                min={0}
+                style={{ marginTop: 6, flex: '1 1 120px' }}
+              />
+              <select
+                className="properties-panel__select"
+                value={settings.deadlineOffsetFromNowUnit ?? 'hours'}
+                onChange={(e) => handleChange({ deadlineOffsetFromNowUnit: e.target.value })}
+                style={{ marginTop: 6, flex: '0 0 120px' }}
+              >
+                <option value="hours">Часов</option>
+                <option value="minutes">Минут</option>
+              </select>
+            </div>
+            <p className="properties-panel__hint" style={{ marginTop: 4, fontSize: '0.8rem' }}>
+              Дедлайн = момент запуска процесса + указанное смещение. Например: запуск в 12:00 и +2 часа → дедлайн 14:00.
             </p>
           </div>
         )}

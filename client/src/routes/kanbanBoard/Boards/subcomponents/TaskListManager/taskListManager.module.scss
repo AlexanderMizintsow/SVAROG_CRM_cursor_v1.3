@@ -2,6 +2,12 @@
   animation: cardBlinkYellow 1.5s ease-in-out infinite;
 }
 
+.taskCardAttachments {
+  :global(.attachments) {
+    margin-bottom: 0;
+  }
+}
+
 @keyframes cardBlinkYellow {
   0%,
   100% {

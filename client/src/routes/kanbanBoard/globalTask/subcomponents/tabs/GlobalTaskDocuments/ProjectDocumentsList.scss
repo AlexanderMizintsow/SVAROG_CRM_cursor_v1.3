@@ -28,6 +28,78 @@
   background: #f8fafc;
 }
 
+.project-documents-list__file-cell {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+
+.project-documents-list__thumb-wrap {
+  display: block;
+  padding: 0;
+  border: none;
+  border-radius: 6px;
+  overflow: hidden;
+  cursor: pointer;
+  background: #f1f5f9;
+  flex-shrink: 0;
+
+  &:hover {
+    opacity: 0.9;
+  }
+}
+
+.project-documents-list__thumb {
+  display: block;
+  width: 48px;
+  height: 48px;
+  object-fit: cover;
+}
+
+.project-documents-list__file-name {
+  flex: 1;
+  min-width: 0;
+  font-size: inherit;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.project-documents-list__action-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  flex-shrink: 0;
+  transition: background 0.2s, color 0.2s;
+
+  &--open {
+    background: #e8f5e9;
+    color: #2e7d32;
+
+    &:hover {
+      background: #2e7d32;
+      color: #fff;
+    }
+  }
+
+  &--download {
+    background: #e3f2fd;
+    color: #1976d2;
+
+    &:hover {
+      background: #1976d2;
+      color: #fff;
+    }
+  }
+}
+
 .project-documents-list__file-link {
   display: inline-flex;
   align-items: center;

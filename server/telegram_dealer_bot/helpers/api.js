@@ -733,7 +733,8 @@ async function saveClaimsToDatabase(claims) {
              ) SELECT * FROM UNNEST(
                 \$1::text[], \$2::text[], \$3::text[], 
                 \$4::text[], \$5::text[], \$6::timestamp[], \$7::boolean[]
-             )`,
+             )
+             ON CONFLICT (claim_number) DO NOTHING`,
       [
         values.map((v) => v[0]),
         values.map((v) => v[1]),
@@ -963,9 +964,13 @@ function initReclamationCron(bot, cronManager) {
         async () => {
           console.log('[CRON][V6Z] Запрос данных...')
           const result = await getReclamationClose('V6Z')
-          console.log('[CRON][V6Z] Получено записей:', result.length)
+          const hasPayload =
+            typeof result === 'string' &&
+            (result.includes('<b>Контрагент:</b>') || result.includes('<b>Заявка №:</b>'))
 
-          if (result.length > 0) {
+          console.log('[CRON][V6Z] Получено данных:', typeof result, hasPayload ? 'payload' : 'no-data')
+
+          if (hasPayload) {
             console.log('[CRON][V6Z] Обработка результатов...')
             await processReclamationResult(result, bot)
             console.log('[CRON][V6Z] Обработка завершена')
@@ -1142,6 +1147,7 @@ async function handleReclamationRating(
   rating,
   userSessions
 ) {
+  let callbackAnswered = false
   try {
     // Сохраняем оценку в БД
     await saveReclamationRating({
@@ -1169,6 +1175,7 @@ async function handleReclamationRating(
       text: `Спасибо за оценку ${rating} ⭐!`,
       show_alert: false,
     })
+    callbackAnswered = true
 
     // Запрашиваем комментарий
     await bot.sendMessage(
@@ -1189,10 +1196,17 @@ async function handleReclamationRating(
     await sendReclamationRating(`V0N${requestNumber}Q${rating}`)
   } catch (error) {
     console.error('Ошибка при обработке оценки:', error)
-    await bot.answerCallbackQuery(callbackQuery.id, {
-      text: 'Произошла ошибка при сохранении оценки',
-      show_alert: true,
-    })
+    if (!callbackAnswered) {
+      try {
+        await bot.answerCallbackQuery(callbackQuery.id, {
+          text: 'Произошла ошибка при сохранении оценки',
+          show_alert: true,
+        })
+      } catch (answerError) {
+        // Игнорируем частный случай: callback уже устарел/уже был подтвержден
+        console.error('Ошибка answerCallbackQuery:', answerError?.message || answerError)
+      }
+    }
   }
 }
 

@@ -306,6 +306,8 @@ function getDefaultSettings(type) {
         deadlineMode: null,
         deadline: null,
         deadlineOffsetDays: null,
+        deadlineOffsetFromNowValue: null,
+        deadlineOffsetFromNowUnit: 'hours',
         linkToProject: false,
         projectSource: 'last',
         projectNodeId: null,

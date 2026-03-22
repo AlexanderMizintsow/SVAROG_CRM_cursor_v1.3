@@ -1,36 +1,162 @@
 .attachments {
   display: flex;
   flex-wrap: wrap;
-  gap: 1px;
+  gap: 8px;
   margin: 0 0 10px 0;
+}
+
+.attachment-item {
+  width: 100%;
+  padding: 6px 8px;
+  border: 1px solid #e0e0e0;
+  border-radius: 8px;
+  background: #fafafa;
+  transition: border-color 0.2s, background 0.2s;
+
+  &:hover {
+    border-color: #bdbdbd;
+    background: #f5f5f5;
+  }
+}
+
+.attachment-thumb-wrap {
+  display: block;
+  position: relative;
+  width: 100%;
+  border: none;
+  padding: 0;
+  margin: 0 0 6px 0;
+  border-radius: 6px;
+  overflow: hidden;
+  cursor: pointer;
+  background: #eee;
+  transition: transform 0.15s, box-shadow 0.15s;
+
+  &:hover {
+    transform: scale(1.02);
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.12);
+
+    .attachment-thumb-label {
+      opacity: 1;
+    }
+  }
+
+  &:focus {
+    outline: 2px solid #3498db;
+    outline-offset: 2px;
+  }
+}
+
+.attachment-thumb {
+  display: block;
+  width: 100%;
+  height: 80px;
+  object-fit: cover;
+  border-radius: 6px;
+}
+
+.attachment-thumb-label {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(0, 0, 0, 0.5);
+  color: #fff;
+  font-size: 12px;
+  font-weight: 500;
+  opacity: 0;
+  transition: opacity 0.2s;
+}
+
+.attachment-meta,
+.attachment-file-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.attachment-file-actions {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  flex-shrink: 0;
+}
+
+.attachment-open-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  border: none;
+  border-radius: 6px;
+  background: #e8f5e9;
+  color: #2e7d32;
+  cursor: pointer;
+  transition: background 0.2s, color 0.2s;
+
+  &:hover {
+    background: #2e7d32;
+    color: #fff;
+  }
+}
+
+.attachment-file-row {
+  .attachment-file-icon {
+    font-size: 20px;
+    color: #666;
+    flex-shrink: 0;
+  }
+}
+
+.attachment-name {
+  flex: 1;
+  font-size: 12px;
+  color: #333;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  min-width: 0;
+}
+
+.attachment-download-btn {
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  border: none;
+  border-radius: 6px;
+  background: #e3f2fd;
+  color: #1976d2;
+  cursor: pointer;
+  transition: background 0.2s, color 0.2s;
+
+  &:hover {
+    background: #1976d2;
+    color: #fff;
+  }
+
+  &:focus {
+    outline: 2px solid #1976d2;
+    outline-offset: 1px;
+  }
+}
+
+/* Вариант в модалке задачи — можно чуть крупнее превью */
+.task-modal-content .attachments {
+  margin-top: 12px;
+
+  .attachment-thumb {
+    height: 100px;
+  }
 
   .attachment-item {
-    display: flex;
-    align-items: center;
-    width: 100%;
-    padding: 3px;
-    border: 1px solid #ddd;
-    border-radius: 4px;
-
-    .attachment-image {
-      width: 50px;
-      height: 50px;
-      object-fit: cover;
-      border-radius: 4px;
-    }
-
-    .file-icon {
-      font-size: 24px;
-      color: #667;
-    }
-
-    a {
-      text-decoration: none;
-      font-size: 12px;
-
-      &:hover {
-        text-decoration: underline;
-      }
-    }
+    max-width: 200px;
   }
 }

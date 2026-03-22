@@ -19,7 +19,7 @@ import {
 } from '@mui/material'
 import { Person, Schedule, Assignment, CheckCircle, Error } from '@mui/icons-material'
 import { IoCalendarOutline } from 'react-icons/io5'
-import { FcInspection, FcRedo } from 'react-icons/fc'
+import { FcInspection, FcRedo, FcMindMap } from 'react-icons/fc'
 import { IoIosChatboxes } from 'react-icons/io'
 import { FaEdit } from 'react-icons/fa'
 import { LiaUserCogSolid } from 'react-icons/lia'
@@ -28,6 +28,7 @@ import { getStatusLabel, stripHtmlTags } from '../../../taskUtils'
 import styles from '../../taskListManager.module.scss'
 import { getUserNames } from '../../../../../Task/utils/taskUtils'
 import ChatTaskModal from '../../../../../Task/subcomponents/chatTaskModal/chatTaskModal'
+import Attachments from '../../../../../Task/subcomponents/Attachments'
 
 const TaskRenderer = ({
   filteredTasks,
@@ -50,6 +51,8 @@ const TaskRenderer = ({
   handleOpenConfirmationDialog,
   handleOpenHierarchy,
   resetUnreadMessages,
+  projectTitles = {},
+  onOpenProject,
 }) => {
   const taskCardBlinkYellow = useTaskStateTracker((s) => s.taskCardBlinkYellow)
   const clearTaskCardBlinkYellow = useTaskStateTracker((s) => s.clearTaskCardBlinkYellow)
@@ -238,6 +241,39 @@ const TaskRenderer = ({
                 <Typography variant="caption" color="text.secondary" ml={1}>
                   Подзадачи
                 </Typography>
+              </Box>
+            )}
+
+            {/* Значок «Задача проекта» */}
+            {task.global_task_id && (
+              <Box display="flex" alignItems="center" mb={1}>
+                <Tooltip title={projectTitles[task.global_task_id] || `Проект #${task.global_task_id}`}>
+                  <Chip
+                    icon={<FcMindMap style={{ fontSize: 16 }} />}
+                    label={projectTitles[task.global_task_id] || `Проект #${task.global_task_id}`}
+                    size="small"
+                    onClick={
+                      typeof onOpenProject === 'function'
+                        ? () => onOpenProject({ id: task.global_task_id, title: projectTitles[task.global_task_id] })
+                        : undefined
+                    }
+                    sx={{
+                      cursor: typeof onOpenProject === 'function' ? 'pointer' : 'default',
+                      maxWidth: '100%',
+                      '& .MuiChip-label': { overflow: 'hidden', textOverflow: 'ellipsis' },
+                    }}
+                  />
+                </Tooltip>
+              </Box>
+            )}
+
+            {/* Вложения (только для задач без проекта) */}
+            {!task.global_task_id && Array.isArray(task.attachments) && task.attachments.length > 0 && (
+              <Box mb={1} className={styles.taskCardAttachments}>
+                <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mb: 0.5 }}>
+                  Вложения
+                </Typography>
+                <Attachments attachments={task.attachments} compact />
               </Box>
             )}
 
@@ -433,6 +469,37 @@ const TaskRenderer = ({
                     Исполнитель: {getUserNames(task.assigned_user_ids, users)}
                   </Typography>
                 </Box>
+
+                {task.global_task_id && (
+                  <Box display="flex" alignItems="center" mb={1}>
+                    <Tooltip title={projectTitles[task.global_task_id] || `Проект #${task.global_task_id}`}>
+                      <Chip
+                        icon={<FcMindMap style={{ fontSize: 14 }} />}
+                        label={projectTitles[task.global_task_id] || `Проект #${task.global_task_id}`}
+                        size="small"
+                        onClick={
+                          typeof onOpenProject === 'function'
+                            ? () => onOpenProject({ id: task.global_task_id, title: projectTitles[task.global_task_id] })
+                            : undefined
+                        }
+                        sx={{
+                          cursor: typeof onOpenProject === 'function' ? 'pointer' : 'default',
+                          maxWidth: 240,
+                          '& .MuiChip-label': { overflow: 'hidden', textOverflow: 'ellipsis' },
+                        }}
+                      />
+                    </Tooltip>
+                  </Box>
+                )}
+
+                {!task.global_task_id && Array.isArray(task.attachments) && task.attachments.length > 0 && (
+                  <Box mb={1} className={styles.taskCardAttachments}>
+                    <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mb: 0.5 }}>
+                      Вложения
+                    </Typography>
+                    <Attachments attachments={task.attachments} compact />
+                  </Box>
+                )}
 
                 <Box display="flex" alignItems="center" justifyContent="space-between">
                   <Box display="flex" alignItems="center" gap={2}>

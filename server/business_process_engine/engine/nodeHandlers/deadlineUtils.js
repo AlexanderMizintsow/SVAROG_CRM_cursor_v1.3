@@ -59,6 +59,26 @@ function computeOffsetFromStartDeadline(startedAt, offsetDays, timeStr) {
   return `${y}-${m}-${day}T${h}:${min}`
 }
 
+/**
+ * Дедлайн: момент запуска процесса + смещение в минутах.
+ * @param {Date|string} startedAt
+ * @param {number} offsetMinutes
+ * @returns {string|null} YYYY-MM-DDTHH:mm (локальное время)
+ */
+function computeOffsetFromNowDeadline(startedAt, offsetMinutes) {
+  const d = new Date(startedAt)
+  if (!Number.isFinite(d.getTime())) return null
+  const mins = Number(offsetMinutes)
+  if (!Number.isFinite(mins)) return null
+  d.setMinutes(d.getMinutes() + mins)
+  const y = d.getFullYear()
+  const m = String(d.getMonth() + 1).padStart(2, '0')
+  const day = String(d.getDate()).padStart(2, '0')
+  const h = String(d.getHours()).padStart(2, '0')
+  const min = String(d.getMinutes()).padStart(2, '0')
+  return `${y}-${m}-${day}T${h}:${min}`
+}
+
 function computeConditionalDeadline(rule, now = new Date()) {
   if (!rule || !rule.boundary) return null
   const boundary = parseTime(rule.boundary)
@@ -93,6 +113,7 @@ module.exports = {
   computeConditionalDeadline,
   computeStartDayDeadline,
   computeOffsetFromStartDeadline,
+  computeOffsetFromNowDeadline,
   parseTime,
   setTimeToDate,
 }

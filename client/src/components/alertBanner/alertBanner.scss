@@ -160,6 +160,31 @@
   }
 }
 
+.alert-banner-close-all {
+  position: absolute;
+  top: -25px;
+  right: -8px;
+  width: 18px;
+  height: 18px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: none;
+  border-radius: 50%;
+  cursor: pointer;
+  color: #ec3c24;
+   
+
+  &:hover {
+    transform: scale(1.08);
+    background: rgb(216, 200, 198);
+  }
+
+  svg {
+    font-size: 18px;
+  }
+}
+
 .collapse-title {
   position: absolute;
   top: -1px;

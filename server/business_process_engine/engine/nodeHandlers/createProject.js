@@ -3,7 +3,12 @@
  * - prepared: создать проект сразу в register
  * - modal_at_runtime: поставить экземпляр на waiting_user_input и отдать templateData на клиент
  */
-const { computeConditionalDeadline, computeStartDayDeadline, computeOffsetFromStartDeadline } = require('./deadlineUtils')
+const {
+  computeConditionalDeadline,
+  computeStartDayDeadline,
+  computeOffsetFromStartDeadline,
+  computeOffsetFromNowDeadline,
+} = require('./deadlineUtils')
 
 function getOutgoingEdges(scheme, nodeId) {
   const edges = scheme.edges || []
@@ -77,6 +82,15 @@ async function handle(instance, node, scheme, integrations, dbPool) {
       templateDeadline = computeStartDayDeadline(instance.started_at, settings.deadlineStartDayTime)
     } else if (settings.deadlineMode === 'offset' && settings.deadlineOffsetDays != null && instance.started_at) {
       templateDeadline = computeOffsetFromStartDeadline(instance.started_at, settings.deadlineOffsetDays, settings.deadlineOffsetTime)
+    } else if (
+      settings.deadlineMode === 'offset_from_now' &&
+      settings.deadlineOffsetFromNowValue != null &&
+      instance.started_at
+    ) {
+      const valueNum = Number(settings.deadlineOffsetFromNowValue)
+      const unit = settings.deadlineOffsetFromNowUnit || 'hours'
+      const minutes = unit === 'hours' ? valueNum * 60 : valueNum
+      templateDeadline = computeOffsetFromNowDeadline(instance.started_at, minutes)
     }
     const templateResponsibles = (Array.isArray(settings.responsibles) ? settings.responsibles : [])
       .filter((r) => r && r.id != null)
@@ -119,6 +133,15 @@ async function handle(instance, node, scheme, integrations, dbPool) {
     deadline = computeStartDayDeadline(instance.started_at, settings.deadlineStartDayTime)
   } else if (settings.deadlineMode === 'offset' && settings.deadlineOffsetDays != null && instance.started_at) {
     deadline = computeOffsetFromStartDeadline(instance.started_at, settings.deadlineOffsetDays, settings.deadlineOffsetTime)
+  } else if (
+    settings.deadlineMode === 'offset_from_now' &&
+    settings.deadlineOffsetFromNowValue != null &&
+    instance.started_at
+  ) {
+    const valueNum = Number(settings.deadlineOffsetFromNowValue)
+    const unit = settings.deadlineOffsetFromNowUnit || 'hours'
+    const minutes = unit === 'hours' ? valueNum * 60 : valueNum
+    deadline = computeOffsetFromNowDeadline(instance.started_at, minutes)
   }
   const priority = settings.priority || 'medium'
   const additionalInfo = normalizeAdditionalInfo(settings.additionalInfo)

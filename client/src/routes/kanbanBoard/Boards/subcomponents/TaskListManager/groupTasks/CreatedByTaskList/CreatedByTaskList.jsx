@@ -13,9 +13,10 @@ import TaskRenderer from './TaskRenderer'
 import TaskModals from './TaskModals'
 import HelpModalCreatedByTaskList from './HelpModalCreatedByTaskList'
 
-const CreatedByTaskList = ({ tasks, userId, handleTaskAccept, refreshTasks }) => {
+const CreatedByTaskList = ({ tasks, userId, handleTaskAccept, refreshTasks, onOpenProject }) => {
   const { user, users } = useUserStore()
   const [updatedTasks] = useState(tasks)
+  const [projectTitles, setProjectTitles] = useState({})
   const { unreadMessages, addUnreadMessage, resetUnreadMessages } = useTasksManageStore()
   const [openConfirmationDialog, setOpenConfirmationDialog] = useState(false)
   const [currentTaskId, setCurrentTaskId] = useState(null)
@@ -58,6 +59,27 @@ const CreatedByTaskList = ({ tasks, userId, handleTaskAccept, refreshTasks }) =>
 
   useEffect(() => {
     setFilteredTasks(tasks)
+  }, [tasks])
+
+  // Загрузка названий проектов для задач с global_task_id
+  useEffect(() => {
+    const ids = [...new Set(tasks.map((t) => t.global_task_id).filter(Boolean))]
+    if (ids.length === 0) return
+    const load = async () => {
+      const next = {}
+      await Promise.all(
+        ids.map(async (id) => {
+          try {
+            const res = await axios.get(`${API_BASE_URL}5000/api/global-tasks/${id}/title`)
+            next[id] = res.data?.title || `Проект #${id}`
+          } catch {
+            next[id] = `Проект #${id}`
+          }
+        })
+      )
+      setProjectTitles((prev) => ({ ...prev, ...next }))
+    }
+    load()
   }, [tasks])
 
   // Фильтрация задач
@@ -438,6 +460,8 @@ const CreatedByTaskList = ({ tasks, userId, handleTaskAccept, refreshTasks }) =>
           handleOpenConfirmationDialog={handleOpenConfirmationDialog}
           handleOpenHierarchy={handleOpenHierarchy}
           resetUnreadMessages={resetUnreadMessages}
+          projectTitles={projectTitles}
+          onOpenProject={onOpenProject}
         />
       </Box>
 
