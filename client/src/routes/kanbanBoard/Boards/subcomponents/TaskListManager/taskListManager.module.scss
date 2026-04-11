@@ -19,6 +19,7 @@
 }
 
 .container {
+  position: relative;
   padding: 16px;
   background-color: #f8f8f8;
   border-radius: 20px;
@@ -29,25 +30,42 @@
   flex: 1;
 }
 
+/* Закрыть список задач — правый верх контейнера (рядом с JSX: вне scrollContent) */
+.close {
+  position: absolute;
+  top: 10px;
+  right: 18px;
+  z-index: 10;
+  cursor: pointer;
+  width: 42px;
+  height: 42px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 32px;
+  line-height: 1;
+  font-weight: 600;
+  color: #333;
+  border-radius: 10px;
+  user-select: none;
+  transition:
+    color 0.2s ease,
+    background-color 0.2s ease;
+
+  &:hover {
+    color: #ff3b30;
+    background-color: rgba(0, 0, 0, 0.05);
+  }
+}
+
 .scrollContent {
   flex: 1;
   min-height: 0;
   overflow-y: auto;
   overflow-x: hidden;
-
-  .close {
-    position: absolute;
-    top: 10px;
-    right: 10px;
-    cursor: pointer;
-    font-size: 24px; // Увеличенный размер шрифта
-    font-weight: bold;
-    color: #333;
-
-    &:hover {
-      color: #ff3b30; // Цвет при наведении, как на iPhone
-    }
-  }
+  /* запас под абсолютный крестик закрытия в правом верху контейнера */
+  padding-right: 48px;
+  padding-top: 4px;
 
   .taskList {
     margin-bottom: 24px;
@@ -226,4 +244,278 @@
 .editingDescriptionCancelButton {
   background-color: #f50057;
   color: white;
+}
+
+/* Фильтры «Завершённые задачи» (как вкладка «Завершённые» в списке проектов) */
+.completedExtra {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 0.75rem 1.25rem;
+  padding: 0.75rem 0.85rem;
+  margin-bottom: 8px;
+  background: #fff;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+}
+
+.completedDateRange {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem 0.75rem;
+}
+
+.completedFilterLabel {
+  font-size: 0.875rem;
+  color: #4b5563;
+}
+
+.completedDateField {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  font-size: 0.875rem;
+  color: #4b5563;
+}
+
+.completedDateFieldLabel {
+  color: #6b7280;
+  min-width: 1.1rem;
+}
+
+.completedDateInput {
+  padding: 0.35rem 0.5rem;
+  font-size: 0.875rem;
+  border: 1px solid #d1d5db;
+  border-radius: 6px;
+  color: #1f2937;
+  background: #fff;
+
+  &:focus {
+    outline: none;
+    border-color: #3b82f6;
+    box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.2);
+  }
+}
+
+.completedSearchWrap {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem;
+  flex: 1 1 200px;
+  min-width: min(100%, 220px);
+}
+
+.completedSearchLabel {
+  font-size: 0.875rem;
+  color: #6b7280;
+  white-space: nowrap;
+}
+
+.completedSearchInput {
+  flex: 1 1 180px;
+  min-width: 0;
+  padding: 0.4rem 0.65rem;
+  font-size: 0.875rem;
+  border: 1px solid #d1d5db;
+  border-radius: 6px;
+  color: #1f2937;
+  background: #fff;
+
+  &::placeholder {
+    color: #9ca3af;
+  }
+
+  &:focus {
+    outline: none;
+    border-color: #3b82f6;
+    box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.2);
+  }
+}
+
+.completedFilterReset {
+  padding: 0.4rem 0.75rem;
+  font-size: 0.8125rem;
+  color: #374151;
+  background: #f3f4f6;
+  border: 1px solid #d1d5db;
+  border-radius: 6px;
+  cursor: pointer;
+
+  &:hover {
+    background: #e5e7eb;
+  }
+}
+
+/* Вкладки «Созданные» / «Завершённые» */
+.createdTabSearch {
+  margin-bottom: 0.75rem;
+
+  :global(.search-container) {
+    max-width: 100%;
+  }
+}
+
+.createdCompletedTabs {
+  margin-bottom: 1rem;
+}
+
+.tabsBar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+  margin-bottom: 0.75rem;
+  padding: 0.2rem;
+  background: #eef2f7;
+  border-radius: 10px;
+  border: 1px solid #e5e7eb;
+}
+
+.tabButton {
+  flex: 1 1 auto;
+  min-width: 140px;
+  padding: 0.55rem 0.85rem;
+  font-size: 0.9375rem;
+  font-weight: 600;
+  color: #4b5563;
+  background: transparent;
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+  transition:
+    background 0.2s ease,
+    color 0.2s ease,
+    box-shadow 0.2s ease;
+
+  &:hover {
+    color: #1f2937;
+    background: rgba(255, 255, 255, 0.65);
+  }
+}
+
+.tabButtonActive {
+  color: #0f172a;
+  background: #fff;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
+}
+
+.tabPanel {
+  min-height: 0;
+}
+
+.tabEmpty {
+  padding: 1.25rem 1rem;
+  text-align: center;
+  color: #6b7280;
+  font-size: 0.9375rem;
+  background: #fff;
+  border: 1px dashed #d1d5db;
+  border-radius: 10px;
+  margin-bottom: 0.5rem;
+}
+
+.completedMyTasksCheck {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin: 0 0 0.75rem;
+  padding: 0.5rem 0.65rem;
+  font-size: 0.875rem;
+  color: #374151;
+  cursor: pointer;
+  user-select: none;
+
+  input {
+    width: 1.05rem;
+    height: 1.05rem;
+    cursor: pointer;
+    accent-color: #3b82f6;
+  }
+}
+
+/* Полное описание задачи (двойной клик по карточке во вкладке завершённых) */
+.descriptionModalBackdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 1400;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1rem;
+  background: rgba(15, 23, 42, 0.45);
+}
+
+.descriptionModalPanel {
+  max-width: 640px;
+  width: 100%;
+  max-height: min(85vh, 720px);
+  display: flex;
+  flex-direction: column;
+  background: #fff;
+  border-radius: 12px;
+  box-shadow: 0 20px 50px rgba(0, 0, 0, 0.2);
+  overflow: hidden;
+}
+
+.descriptionModalHeader {
+  position: relative;
+  display: flex;
+  align-items: flex-start;
+  justify-content: flex-start;
+  gap: 0.75rem;
+  padding: 1rem 3.5rem 0.75rem 1rem;
+  border-bottom: 1px solid #e5e7eb;
+}
+
+.descriptionModalTitle {
+  margin: 0;
+  font-size: 1.125rem;
+  font-weight: 600;
+  color: #111827;
+  line-height: 1.35;
+  flex: 1;
+  min-width: 0;
+}
+
+.descriptionModalClose {
+  position: absolute;
+  top: 0.6rem;
+  right: 0.6rem;
+  z-index: 1;
+  flex-shrink: 0;
+  width: 2.75rem;
+  height: 2.75rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.875rem;
+  line-height: 1;
+  color: #6b7280;
+  background: transparent;
+  border: none;
+  border-radius: 10px;
+  cursor: pointer;
+
+  &:hover {
+    background: #f3f4f6;
+    color: #111827;
+  }
+}
+
+.descriptionModalBody {
+  padding: 1rem 1.25rem 1.25rem;
+  overflow-y: auto;
+  font-size: 0.9375rem;
+  color: #374151;
+  line-height: 1.5;
+
+  :global(p) {
+    margin: 0 0 0.5rem;
+  }
+
+  :global(p:last-child) {
+    margin-bottom: 0;
+  }
 }

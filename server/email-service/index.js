@@ -18,6 +18,50 @@ const app = express()
 
 const REGISTER_URL = process.env.REGISTER_URL || 'http://localhost:5000'
 
+// Интервал опроса новых писем (мс). По умолчанию 30 с — быстрее чем 5 мин, без лавины как при 10 с + полной перекачке.
+const EMAIL_POLL_INTERVAL_MS = Math.max(
+  5000,
+  parseInt(process.env.EMAIL_POLL_INTERVAL_MS || '30000', 10) || 30000
+)
+
+// Уже отправленные в register Message-ID (на пользователя), чтобы не дублировать при полном GET /get-unread-emails
+const registerNotifiedMessageIds = {}
+
+// Неактивные сессии без привязки к проектным отправителям удаляются из памяти (см. evictStaleUserSessions).
+const SESSION_USER_TTL_MS = Math.max(
+  600000,
+  parseInt(process.env.SESSION_USER_TTL_MS || String(7 * 24 * 60 * 60 * 1000), 10) ||
+    7 * 24 * 60 * 60 * 1000
+)
+const SESSION_EVICT_INTERVAL_MS = Math.max(
+  60000,
+  parseInt(process.env.SESSION_EVICT_INTERVAL_MS || '900000', 10) || 900000
+)
+
+function touchUserSession(userId) {
+  const s = userSessions[String(userId)]
+  if (s) s.lastActivityAt = Date.now()
+}
+
+function removeUserSessionEntry(userId) {
+  const uid = String(userId)
+  delete userSessions[uid]
+  delete registerNotifiedMessageIds[uid]
+}
+
+function evictStaleUserSessions() {
+  const now = Date.now()
+  for (const uid of Object.keys(userSessions)) {
+    const s = userSessions[uid]
+    if (!s) continue
+    if (s.pinned) continue
+    const t = s.lastActivityAt
+    if (t != null && now - t > SESSION_USER_TTL_MS) {
+      removeUserSessionEntry(uid)
+    }
+  }
+}
+
 function postToRegister(path, bodyObj) {
   const url = new URL(path, REGISTER_URL)
   const data = JSON.stringify(bodyObj)
@@ -92,7 +136,7 @@ app.post('/emailAuth', [body('userId').isNumeric()], async (req, res) => {
     const hasToken = userEmailToken != null && String(userEmailToken).trim() !== ''
 
     if (!hasToken) {
-      delete userSessions[userId]
+      removeUserSessionEntry(userId)
       return res.status(200).json({
         message: 'Токен почты не задан. Задайте токен в настройках — тогда будут доступны входящие и уведомления.',
       })
@@ -103,6 +147,8 @@ app.post('/emailAuth', [body('userId').isNumeric()], async (req, res) => {
       emailToken: userEmailToken,
       imapConfig: await initializeImapConfig(userEmail, userEmailToken),
       smtpTransport: await initializeSmtpTransport(userEmail, userEmailToken),
+      lastActivityAt: Date.now(),
+      pinned: false,
     }
 
     res.status(200).json({ message: 'Код подтверждения отправлен' })
@@ -204,11 +250,16 @@ async function ensureProjectEmailSenderSessions() {
        JOIN users u ON u.id = pse.user_id
        WHERE u.email_token IS NOT NULL AND TRIM(u.email_token) != ''`
     )
+    const pinnedIds = new Set((res.rows || []).map((r) => String(r.id)))
     for (const row of res.rows || []) {
       const uid = String(row.id)
       if (!userSessions[uid] || !userSessions[uid].smtpTransport) {
-        await ensureUserSession(uid).catch(() => {})
+        await ensureUserSession(uid, { touch: false }).catch(() => {})
       }
+      if (userSessions[uid]) userSessions[uid].pinned = true
+    }
+    for (const uid of Object.keys(userSessions)) {
+      if (userSessions[uid]) userSessions[uid].pinned = pinnedIds.has(uid)
     }
   } catch (err) {
     console.error('ensureProjectEmailSenderSessions:', err?.message || err)
@@ -216,8 +267,11 @@ async function ensureProjectEmailSenderSessions() {
 }
 
 // Подгрузить сессию из БД, если её ещё нет (после сохранения токена без перезахода)
-async function ensureUserSession(userId) {
+// touch: false — фоновая подгрузка (ensureProjectEmailSenderSessions), не продлевает «жизнь» не-pinned сессии
+async function ensureUserSession(userId, opts = {}) {
+  const touch = opts.touch !== false
   if (userSessions[userId] && userSessions[userId].smtpTransport) {
+    if (touch) touchUserSession(userId)
     return userSessions[userId]
   }
   const userQuery = `SELECT email, email_token FROM users WHERE id = $1`
@@ -232,7 +286,10 @@ async function ensureUserSession(userId) {
     emailToken: userEmailToken,
     imapConfig: await initializeImapConfig(userEmail, userEmailToken),
     smtpTransport: await initializeSmtpTransport(userEmail, userEmailToken),
+    lastActivityAt: Date.now(),
+    pinned: false,
   }
+  if (touch) touchUserSession(userId)
   return userSessions[userId]
 }
 
@@ -280,11 +337,11 @@ async function getAllMails(userId) {
     const results = await connection.search(searchCriteria, fetchOptions)
     const messages = await Promise.all(results.map(processMessage))
     const list = messages.filter((message) => message !== null)
-    notifyRegisterAboutReplies(list)
+    notifyRegisterAboutReplies(list, userId)
     return list
   } catch (error) {
     if (isAuthError(error)) {
-      delete userSessions[userId]
+      removeUserSessionEntry(userId)
     }
     return []
   } finally {
@@ -310,10 +367,24 @@ function extractEmail(from) {
   return ''
 }
 
-function notifyRegisterAboutReplies(messages) {
+function notifyRegisterAboutReplies(messages, userId) {
   if (!Array.isArray(messages)) return
+  const uid = userId != null ? String(userId) : ''
+  const seen = uid ? registerNotifiedMessageIds[uid] || (registerNotifiedMessageIds[uid] = new Set()) : null
   for (const msg of messages) {
     if (!msg || !msg.inReplyTo || !msg.body) continue
+    const mid = msg.messageId ? String(msg.messageId).trim() : ''
+    if (mid && seen && seen.has(mid)) continue
+    if (mid && seen) {
+      seen.add(mid)
+      if (seen.size > 8000) {
+        let n = 0
+        for (const k of seen) {
+          seen.delete(k)
+          if (++n >= 2000) break
+        }
+      }
+    }
     const author = formatFrom(msg.from)
     const attachments = (msg.attachments || []).slice(0, 10).map((a) => {
       const buf = a.content && Buffer.isBuffer(a.content) ? a.content : Buffer.from(a.content || '')
@@ -342,7 +413,34 @@ function getSinceDate(daysBack = 1) {
   return d
 }
 
-async function getUnreadMails(userId) {
+function updateImapInboxState(userSession, box, results) {
+  if (!userSession) return
+  const state = userSession.imapInboxState || { uidValidity: null, lastUid: 0 }
+  if (box && box.uidvalidity != null) {
+    if (state.uidValidity != null && state.uidValidity !== box.uidvalidity) {
+      state.lastUid = 0
+    }
+    state.uidValidity = box.uidvalidity
+  }
+  if (results.length > 0) {
+    const max = Math.max(...results.map((r) => r.attributes?.uid || 0))
+    state.lastUid = Math.max(state.lastUid || 0, max)
+  } else if (box && box.uidnext != null) {
+    // Нет писем по критерию — выравниваем lastUid по ящику, чтобы инкрементальный опрос не крутил SINCE зря
+    const hi = box.uidnext > 1 ? box.uidnext - 1 : 0
+    state.lastUid = Math.max(state.lastUid || 0, hi)
+  }
+  userSession.imapInboxState = state
+}
+
+/**
+ * @param {string} userId
+ * @param {{ incremental?: boolean }} [options]
+ * incremental: true — только UID выше последнего успешного опроса (для сокета), без повторной перекачки «за 2 дня».
+ * incremental: false — полный список за SINCE (для GET /get-unread-emails при открытии UI).
+ */
+async function getUnreadMails(userId, options = {}) {
+  const incremental = options.incremental === true
   const userSession = userSessions[userId]
   if (!userSession || !userSession.emailToken) {
     return []
@@ -351,19 +449,36 @@ async function getUnreadMails(userId) {
   let connection
   try {
     connection = await connectWithRetry(userSession)
-    await connection.openBox('INBOX')
-    //const searchCriteria = ['UNSEEN']
-    // SINCE 2 дня — включаем прочитанные, иначе ответ не попадёт в карточку если открыли в почте до опроса
-    const searchCriteria = [['SINCE', getSinceDate(2)]]
+    const box = await connection.openBox('INBOX')
+    const state = userSession.imapInboxState || { uidValidity: null, lastUid: 0 }
+    if (box && box.uidvalidity != null && state.uidValidity != null && state.uidValidity !== box.uidvalidity) {
+      state.lastUid = 0
+      userSession.imapInboxState = state
+    }
+
+    // SINCE 2 дня — включаем прочитанные, иначе ответ не попадёт в карточку если открыли в почте до опроса.
+    // При incremental после первой синхронизации — только новые UID (без повторной загрузки тел старых писем).
+    let searchCriteria
+    const last = userSession.imapInboxState?.lastUid
+    if (incremental && last != null && last > 0) {
+      searchCriteria = [['UID', `${last + 1}:*`]]
+    } else {
+      searchCriteria = [['SINCE', getSinceDate(2)]]
+    }
+
     const fetchOptions = { bodies: [''], markSeen: false }
     const results = await connection.search(searchCriteria, fetchOptions)
-    const messages = await Promise.all(results.map(processMessage))
-    const list = messages.filter((message) => message !== null)
-    notifyRegisterAboutReplies(list)
+    const list = []
+    for (const res of results) {
+      const message = await processMessage(res)
+      if (message !== null) list.push(message)
+    }
+    notifyRegisterAboutReplies(list, userId)
+    updateImapInboxState(userSession, box, results)
     return list
   } catch (error) {
     if (isAuthError(error)) {
-      delete userSessions[userId]
+      removeUserSessionEntry(userId)
     }
     return []
   } finally {
@@ -422,7 +537,7 @@ app.post(
       for (const msgId of msgIdVariants) {
         if (!msgId) continue
         try {
-          results = await connection.search([['HEADER', 'Message-ID', msgId]], { bodies: [''], struct: true })
+          results = await connection.search([['HEADER', 'Message-ID', msgId]], { struct: true })
           if (results.length > 0) break
         } catch (_) {
           continue
@@ -452,6 +567,7 @@ app.post(
 io.on('connection', (socket) => {
   const userId = socket.handshake.query.userId // Предполагается, что userId передается как query parameter
   if (userId) {
+    touchUserSession(userId)
     console.log(userId)
     socket.join(userId)
     console.log(
@@ -467,7 +583,7 @@ io.on('connection', (socket) => {
 // Функция для отправки уведомления о новых письмах конкретному пользователю
 async function notifyUserOfNewEmails(userId) {
   try {
-    const unreadEmails = await getUnreadMails(userId)
+    const unreadEmails = await getUnreadMails(userId, { incremental: true })
 
     if (unreadEmails.length > 0) {
       io.to(userId).emit('new-emails', unreadEmails)
@@ -482,6 +598,9 @@ async function notifyUserOfNewEmails(userId) {
 ensureProjectEmailSenderSessions()
 setInterval(ensureProjectEmailSenderSessions, 120000)
 
+evictStaleUserSessions()
+setInterval(evictStaleUserSessions, SESSION_EVICT_INTERVAL_MS)
+
 let isPolling = false
 setInterval(async () => {
   if (isPolling) return
@@ -495,7 +614,7 @@ setInterval(async () => {
   } finally {
     isPolling = false
   }
-}, 10000)
+}, EMAIL_POLL_INTERVAL_MS)
 
 app.post('/send-email', upload.array('attachments', 10), async (req, res) => {
   const { userId, globalTaskId, finalSolutionId, inReplyTo } = req.body

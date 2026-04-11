@@ -1,10 +1,16 @@
 import { create } from 'zustand'
 import axios from 'axios'
 import { API_BASE_URL } from '../../config'
+import { getLocalMonthDateRangeYyyyMmDd } from '../routes/kanbanBoard/Boards/subcomponents/taskUtils'
 import useTaskStateTracker from './useTaskStateTracker'
+
+const defaultCompletedTasksRange = getLocalMonthDateRangeYyyyMmDd()
+
 const useTasksManageStore = create((set, get) => ({
   tasksManager: [],
   completedTasks: [], // Новое состояние для завершенных задач
+  /** Диапазон дат последней загрузки завершённых (для refetch по WebSocket и т.п.) */
+  lastCompletedTasksRange: defaultCompletedTasksRange,
   unreadMessages: new Set(),
   messagesGlobalTask: [],
   isLoading: false,
@@ -33,18 +39,30 @@ const useTasksManageStore = create((set, get) => ({
     }
   },
 
-  // Метод для загрузки завершенных задач
-  fetchCompletedTasks: async (userId) => {
+  // Метод для загрузки завершенных задач (опционально по дате создания — см. created_from / created_to на сервере)
+  fetchCompletedTasks: async (userId, opts = {}) => {
+    if (!userId) return
     try {
       set({ isLoading: true })
-      const response = await axios.get(
-        `${API_BASE_URL}5000/api/tasks/user/${userId}?filter=completed_tasks`
-      )
-
+      const prev = get().lastCompletedTasksRange
+      const createdFrom = opts.createdFrom ?? prev?.from
+      const createdTo = opts.createdTo ?? prev?.to
+      let url = `${API_BASE_URL}5000/api/tasks/user/${userId}?filter=completed_tasks`
+      if (createdFrom && createdTo) {
+        url += `&created_from=${encodeURIComponent(createdFrom)}&created_to=${encodeURIComponent(createdTo)}`
+      }
+      const response = await axios.get(url)
       const data = await response.data
-      set({ completedTasks: data, isLoading: false })
+      set({
+        completedTasks: data,
+        isLoading: false,
+        ...(createdFrom && createdTo
+          ? { lastCompletedTasksRange: { from: createdFrom, to: createdTo } }
+          : {}),
+      })
     } catch (error) {
       console.error('Ошибка при загрузке завершенных задач:', error)
+      set({ isLoading: false })
     }
   },
 

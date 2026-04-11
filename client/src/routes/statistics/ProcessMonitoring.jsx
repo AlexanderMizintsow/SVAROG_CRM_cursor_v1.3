@@ -11,6 +11,26 @@ import './ProcessMonitoring.scss'
 /** Временно: в блоке «Просрочки» показывать все задачи с дедлайном и колонки «Дедлайн», «Сейчас», «Просрочен?» для отладки. */
 const DEBUG_OVERDUE = false
 
+/** Id колонок канбана задач (как в БД / boards) */
+const KANBAN_TASK_STATUS_IDS = ['backlog', 'todo', 'wait', 'doing', 'done', 'pause']
+
+/**
+ * getAnalyticsDetail (type=tasks) отдаёт task.status через taskStatusLabel на русском:
+ * doing → «В работе», done → «Выполнено» и т.д. Раньше сравнивали только с английскими id → всё считалось backlog («Список задач»).
+ */
+function normalizeTaskKanbanStatusId(task) {
+  const raw = task?.status
+  if (raw && KANBAN_TASK_STATUS_IDS.includes(raw)) return raw
+  const ruToId = {
+    'В работе': 'doing',
+    Выполнено: 'done',
+    'В ожидании': 'wait',
+    Пауза: 'pause',
+  }
+  if (raw && ruToId[raw]) return ruToId[raw]
+  return 'backlog'
+}
+
 /** Ячейка времени: ср. и макс. в две строки с визуальным разделением */
 const TimeAvgMaxCell = ({ avgSeconds, maxSeconds, formatSeconds }) => {
   const avg = formatSeconds(avgSeconds)
@@ -197,12 +217,13 @@ const ProcessMonitoring = () => {
       if (summaryData.summary?.byCategory?.tasks) {
         const overdueCount = rawList.filter(isOverdue).length
         if (isInProgress) {
-          const TASK_STATUS_IDS = ['backlog', 'todo', 'wait', 'doing', 'done', 'pause']
           const byStatusInProgress = {}
-          TASK_STATUS_IDS.forEach((sid) => { byStatusInProgress[sid] = 0 })
+          KANBAN_TASK_STATUS_IDS.forEach((sid) => {
+            byStatusInProgress[sid] = 0
+          })
           rawList.forEach((task) => {
             if (!isOverdue(task)) {
-              const s = (task.status && TASK_STATUS_IDS.includes(task.status)) ? task.status : 'backlog'
+              const s = normalizeTaskKanbanStatusId(task)
               byStatusInProgress[s] = (byStatusInProgress[s] || 0) + 1
             }
           })
@@ -479,6 +500,8 @@ const ProcessMonitoring = () => {
     { label: 'Задачи', value: statusFilterActive ? (statusFilter === 'in_progress' ? (tasks.total || 0) : (tasks.completed || 0)) : (tasks.total || 0), color: '#10b981' },
   ].filter((d) => d.value > 0)
 
+  /** Проекты: 100% прогресс, но статус ещё не финальный — отдельный сектор; не входит в «В работе». */
+  const projectsAwaitingConfirm = projects.awaitingCompletionConfirm ?? 0
   const projectsPieData = statusFilterActive
     ? (statusFilter === 'completed'
       ? [
@@ -488,11 +511,40 @@ const ProcessMonitoring = () => {
         ].filter((d) => d.value > 0)
       : [
           { label: 'На паузе', value: projects.onPause || 0, color: '#f59e0b' },
-          { label: 'В работе', value: Math.max(0, (projects.total || 0) - (projects.onPause || 0)), color: '#3b82f6' },
+          {
+            label: 'Ожидает подтверждение',
+            value: projectsAwaitingConfirm,
+            color: '#eab308',
+          },
+          {
+            label: 'В работе',
+            value: Math.max(
+              0,
+              (projects.total || 0) - (projects.onPause || 0) - projectsAwaitingConfirm
+            ),
+            color: '#3b82f6',
+          },
         ].filter((d) => d.value > 0))
     : [
         { label: 'Завершено', value: projects.completed || 0, color: '#10b981' },
-        { label: 'В работе', value: Math.max(0, (projects.total || 0) - (projects.completed || 0) - (projects.failed || 0) - (projects.deleted || 0) - (projects.onPause || 0)), color: '#3b82f6' },
+        {
+          label: 'Ожидает подтверждение',
+          value: projectsAwaitingConfirm,
+          color: '#eab308',
+        },
+        {
+          label: 'В работе',
+          value: Math.max(
+            0,
+            (projects.total || 0) -
+              (projects.completed || 0) -
+              (projects.failed || 0) -
+              (projects.deleted || 0) -
+              (projects.onPause || 0) -
+              projectsAwaitingConfirm
+          ),
+          color: '#3b82f6',
+        },
         { label: 'На паузе', value: projects.onPause || 0, color: '#f59e0b' },
         { label: 'Провал', value: projects.failed || 0, color: '#ef4444' },
         { label: 'Удалено', value: projects.deleted || 0, color: '#6b7280' },

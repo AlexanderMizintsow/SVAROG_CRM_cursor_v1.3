@@ -161,6 +161,10 @@
   font-size: 1rem;
   color: #fff;
   max-width: 100%;
+  white-space: pre-wrap;
+  tab-size: 4;
+  word-wrap: break-word;
+  overflow-wrap: break-word;
 }
 
 .text-bubble.other {
@@ -279,7 +283,8 @@ input[type='text']:focus {
   resize: none;
   padding: 8px 10px;
   font-size: 14px;
-  white-space: pre-line; /* перенос строк */
+  white-space: pre-wrap;
+  tab-size: 4;
   box-sizing: border-box; /* чтобы padding не влиял на размер */
 }
 .emoji-picker-container {
@@ -334,10 +339,12 @@ input[type='text']:focus {
 
   .reply-text {
     color: #555;
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
     font-size: 0.85rem;
+    white-space: pre-wrap;
+    tab-size: 4;
+    word-break: break-word;
+    max-height: 4.5em;
+    overflow: hidden;
   }
 }
 
@@ -390,7 +397,9 @@ input[type='text']:focus {
 .reply-text {
   font-size: 0.85rem;
   color: #555;
-  white-space: nowrap;
+  white-space: pre-wrap;
+  tab-size: 4;
+  word-break: break-word;
+  max-height: 4.5em;
   overflow: hidden;
-  text-overflow: ellipsis;
 }

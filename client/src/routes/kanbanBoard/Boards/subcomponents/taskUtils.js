@@ -210,6 +210,20 @@ export const stripHtmlTags = (html) => {
   return html.replace(/<[^>]+>/g, '')
 }
 
+/** Границы текущего календарного месяца (локальная TZ), YYYY-MM-DD для input type="date" */
+export const getLocalMonthDateRangeYyyyMmDd = () => {
+  const now = new Date()
+  const y = now.getFullYear()
+  const m = now.getMonth()
+  const lastDay = new Date(y, m + 1, 0).getDate()
+  const pad = (n) => String(n).padStart(2, '0')
+  const mm = pad(m + 1)
+  return {
+    from: `${y}-${mm}-01`,
+    to: `${y}-${mm}-${pad(lastDay)}`,
+  }
+}
+
 export const getStatusLabel = (statusId) => {
   switch (statusId) {
     case 'notifications':

@@ -66,10 +66,6 @@ const AddModal = ({
   const [selectedTemplate, setSelectedTemplate] = useState(null);
   const [selectedFiles, setSelectedFiles] = useState([]);
   const [hasDangerousFiles, setHasDangerousFiles] = useState(false);
-  const [isTagSelected, setIsTagSelected] = useState(false);
-  const [isApprovingSelected, setIsApprovingSelected] = useState(false);
-  const [isViewersSelected, setIsViewersSelected] = useState(false);
-  const [isImplementersSelected, setIsImplementersSelected] = useState(false);
   const [checkedComment, setCheckedComment] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [isTagsManagerOpen, setIsTagsManagerOpen] = useState(false);
@@ -106,10 +102,6 @@ const AddModal = ({
       setSelectedTag,
       setSelectedFiles,
       setHasDangerousFiles,
-      setIsTagSelected,
-      setIsApprovingSelected,
-      setIsViewersSelected,
-      setIsImplementersSelected,
       setDbTags,
       setIsTagsManagerOpen,
       setCheckedComment,
@@ -207,17 +199,119 @@ const AddModal = ({
     setTaskData((prev) => ({ ...prev, [name]: value }));
   }, []);
 
-  const closeModal = () => {
+  const resetAuxiliaryFormState = useCallback(() => {
+    setSelectedTag("");
+    setSelectedImplementer("");
+    setSelectedApprover("");
+    setSelectedViewer("");
+    setSelectedFiles([]);
+    setHasDangerousFiles(false);
+    setCheckedComment(false);
+    setCommentInput("");
+    setShowCommentModal(false);
+    setCurrentFileIndex(0);
+    setFileComments({});
+    setSelectedTemplate(null);
+  }, []);
+
+  /** После успешного создания задачи — пустая форма (без подстановки externalInitialTaskData). */
+  const resetFormAfterSuccessfulCreate = useCallback(() => {
+    setTaskData({
+      title: "",
+      description: "",
+      deadline: "",
+      priority: "низкий",
+      status: "",
+      notification_status: false,
+      tags: "",
+      created_by: userId,
+      implementers: [],
+      approvers: [],
+      viewers: [],
+      file_url: "",
+      file_type: "",
+      comment_file: "",
+      name_file: "",
+      global_task_id: globalTaskId,
+      parentTaskId,
+      rootTaskId,
+    });
+    resetAuxiliaryFormState();
+    if (quillInstance?.root) {
+      quillInstance.root.innerHTML = "";
+    }
+    quillInitialSetRef.current = false;
+  }, [
+    userId,
+    globalTaskId,
+    parentTaskId,
+    rootTaskId,
+    quillInstance,
+    resetAuxiliaryFormState,
+  ]);
+
+  const closeModal = useCallback(() => {
     setOpen(false);
     onClose();
-    setTaskData(initialTaskData);
-    setSelectedTemplate(null);
-  };
+    const baseDefaults = {
+      title: "",
+      description: "",
+      deadline: "",
+      priority: "низкий",
+      status: "",
+      notification_status: false,
+      tags: "",
+      created_by: userId,
+      implementers: [],
+      approvers: [],
+      viewers: [],
+      file_url: "",
+      file_type: "",
+      comment_file: "",
+      name_file: "",
+      global_task_id: globalTaskId,
+      parentTaskId,
+      rootTaskId,
+    };
+    setTaskData(
+      externalInitialTaskData
+        ? { ...baseDefaults, ...externalInitialTaskData }
+        : baseDefaults
+    );
+    resetAuxiliaryFormState();
+    if (quillInstance?.root) {
+      if (externalInitialTaskData?.description) {
+        quillInstance.root.innerHTML = externalInitialTaskData.description;
+      } else {
+        quillInstance.root.innerHTML = "";
+      }
+    }
+    quillInitialSetRef.current = false;
+  }, [
+    setOpen,
+    onClose,
+    userId,
+    globalTaskId,
+    parentTaskId,
+    rootTaskId,
+    externalInitialTaskData,
+    resetAuxiliaryFormState,
+    quillInstance,
+  ]);
 
   const handleSubmitWithComments = useCallback(async () => {
     if (taskData.implementers.length === 0) {
       Toastify({
         text: "Необходимо указать ИСПОЛНИТЕЛЯ",
+        close: true,
+        backgroundColor: "linear-gradient(to right, #8B0000, #ff0000)",
+      }).showToast();
+      return;
+    }
+
+    if (!String(taskData.title || "").trim()) {
+      Toastify({
+        text: "Необходимо указать НАИМЕНОВАНИЕ ЗАДАЧИ",
         close: true,
         backgroundColor: "linear-gradient(to right, #8B0000, #ff0000)",
       }).showToast();
@@ -331,7 +425,7 @@ const AddModal = ({
               await axios.post(`${API_BASE_URL}5000/api/tasks/attachment/add`, {
                 task_id: taskId,
                 file_url: fileUrls[i],
-                file_type: file.type,
+                file_type: file.type || "application/octet-stream",
                 comment_file: comment,
                 name_file: file.name,
                 uploaded_by: userId,
@@ -354,7 +448,8 @@ const AddModal = ({
           close: true,
           backgroundColor: "linear-gradient(to right, #006400, #00FF00)",
         }).showToast();
-        quillInstance.root.innerHTML = "";
+
+        resetFormAfterSuccessfulCreate();
 
         // Возвращаем ID первой созданной задачи через callback
         if (onClose && typeof onClose === "function") {
@@ -382,6 +477,12 @@ const AddModal = ({
     parentTaskId,
     rootTaskId,
     fileComments,
+    globalTaskId,
+    projectDeadline,
+    businessProcessInstanceId,
+    resetFormAfterSuccessfulCreate,
+    onClose,
+    closeModal,
   ]);
 
   const handleCommentSubmit = () => {
@@ -468,6 +569,7 @@ const AddModal = ({
             value={taskData.title}
             onChange={handleChange}
             placeholder="Наименование задачи"
+            required
             onClick={(e) => e.stopPropagation()}
             onMouseDown={(e) => e.stopPropagation()}
             onFocus={(e) => e.stopPropagation()}
@@ -579,10 +681,8 @@ const AddModal = ({
             taskData={taskData}
             selectedTag={selectedTag}
             setSelectedTag={setSelectedTag}
-            isTagSelected={isTagSelected}
-            setIsTagSelected={setIsTagSelected}
             handleOpenDropdown={handleOpenDropdown}
-            handleAddTag={() => handleAddTag()}
+            handleAddTag={handleAddTag}
             handleRemoveTag={handleRemoveTag}
             availableTags={availableTags}
             handleOpenTagsManager={handleOpenTagsManager}
@@ -594,8 +694,6 @@ const AddModal = ({
             roleKey="implementers"
             selectedUser={selectedImplementer}
             setSelectedUser={setSelectedImplementer}
-            isSelected={isImplementersSelected}
-            setIsSelected={setIsImplementersSelected}
             taskData={taskData}
             users={users}
             remainingUsersForRole={remainingUsersForRole}
@@ -608,8 +706,6 @@ const AddModal = ({
             roleKey="viewers"
             selectedUser={selectedViewer}
             setSelectedUser={setSelectedViewer}
-            isSelected={isViewersSelected}
-            setIsSelected={setIsViewersSelected}
             taskData={taskData}
             users={users}
             remainingUsersForRole={remainingUsersForRole}
@@ -622,8 +718,6 @@ const AddModal = ({
             roleKey="approvers"
             selectedUser={selectedApprover}
             setSelectedUser={setSelectedApprover}
-            isSelected={isApprovingSelected}
-            setIsSelected={setIsApprovingSelected}
             taskData={taskData}
             users={users}
             remainingUsersForRole={remainingUsersForRole}

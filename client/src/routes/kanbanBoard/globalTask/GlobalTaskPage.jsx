@@ -69,6 +69,10 @@ const GlobalTaskPage = ({
     }
   }, [currentTask?.id])
 
+  useEffect(() => {
+    refreshDocuments()
+  }, [refreshDocuments])
+
   // 6. Определение обработчиков событий и других функций
   const goToPreviousTask = () => {
     if (currentTaskIndex > 0) {
@@ -146,7 +150,11 @@ const GlobalTaskPage = ({
         />
 
         {/* Используем GlobalTaskTabs и передаем ему состояние и колбэк */}
-        <GlobalTaskTabs activeTab={activeTab} onTabChange={handleTabChange} />
+        <GlobalTaskTabs
+          activeTab={activeTab}
+          onTabChange={handleTabChange}
+          documentsCount={Array.isArray(attachments) ? attachments.length : 0}
+        />
 
         <div className="global-task-tabs__content mt-4">
           {/* Используем класс из GlobalTaskTabs.scss для стилей контейнера содержимого */}

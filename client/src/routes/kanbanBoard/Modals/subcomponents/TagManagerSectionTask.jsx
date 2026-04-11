@@ -1,6 +1,6 @@
 // блок управления тегами
 
-import { CiBookmarkPlus, CiHashtag } from 'react-icons/ci'
+import { CiBookmarkPlus } from 'react-icons/ci'
 import { LuDelete } from 'react-icons/lu'
 import styles from '../AddModal.module.scss'
 
@@ -8,8 +8,6 @@ const TagManagerSectionTask = ({
   taskData,
   selectedTag,
   setSelectedTag,
-  isTagSelected,
-  setIsTagSelected,
   handleOpenDropdown,
   handleAddTag,
   handleRemoveTag,
@@ -33,8 +31,12 @@ const TagManagerSectionTask = ({
             value={selectedTag}
             onFocus={handleOpenDropdown}
             onChange={(e) => {
-              setSelectedTag(e.target.value)
-              setIsTagSelected(e.target.value !== '')
+              const value = e.target.value
+              if (value) {
+                handleAddTag(value)
+              } else {
+                setSelectedTag('')
+              }
             }}
             required
           >
@@ -63,16 +65,6 @@ const TagManagerSectionTask = ({
               ))}
             </div>
           )}
-        </div>
-
-        <div>
-          <CiHashtag
-            title="Добавить в список"
-            className={`${styles.addButton} ${styles['submit-button']} ${
-              isTagSelected ? styles.pulse : ''
-            }`}
-            onClick={handleAddTag}
-          />
         </div>
       </div>
     </div>

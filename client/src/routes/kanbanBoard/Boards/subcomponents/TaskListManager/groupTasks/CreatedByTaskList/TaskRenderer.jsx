@@ -1,4 +1,4 @@
-import React, { useEffect, useRef } from 'react'
+import React, { useEffect, useRef, useState } from 'react'
 import useTaskStateTracker from '../../../../../../../store/useTaskStateTracker'
 import {
   List,
@@ -24,7 +24,7 @@ import { IoIosChatboxes } from 'react-icons/io'
 import { FaEdit } from 'react-icons/fa'
 import { LiaUserCogSolid } from 'react-icons/lia'
 import { TbSubtask } from 'react-icons/tb'
-import { getStatusLabel, stripHtmlTags } from '../../../taskUtils'
+import { getStatusLabel } from '../../../taskUtils'
 import styles from '../../taskListManager.module.scss'
 import { getUserNames } from '../../../../../Task/utils/taskUtils'
 import ChatTaskModal from '../../../../../Task/subcomponents/chatTaskModal/chatTaskModal'
@@ -53,10 +53,23 @@ const TaskRenderer = ({
   resetUnreadMessages,
   projectTitles = {},
   onOpenProject,
+  completedArchiveMode = false,
+  /** Двойной клик по карточке/строке — полное описание (вкладка «Созданные» и при необходимости др.) */
+  openFullDescriptionOnDoubleClick = true,
 }) => {
   const taskCardBlinkYellow = useTaskStateTracker((s) => s.taskCardBlinkYellow)
   const clearTaskCardBlinkYellow = useTaskStateTracker((s) => s.clearTaskCardBlinkYellow)
   const cardRefs = useRef({})
+  const [descriptionModalTask, setDescriptionModalTask] = useState(null)
+
+  useEffect(() => {
+    if (!descriptionModalTask) return
+    const onKey = (e) => {
+      if (e.key === 'Escape') setDescriptionModalTask(null)
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [descriptionModalTask])
 
   useEffect(() => {
     const highlightedId = Object.keys(taskCardBlinkYellow)[0]
@@ -102,8 +115,10 @@ const TaskRenderer = ({
 
   // Рендер карточки задачи
   const renderTaskCard = (task) => {
-    const isOverdue = isTaskOverdue(task.deadline, task.status)
-    const hasConfirmButtons = task.status === 'done'
+    const isArchive = completedArchiveMode
+    const allowDescDblClick = openFullDescriptionOnDoubleClick || isArchive
+    const isOverdue = !isArchive && isTaskOverdue(task.deadline, task.status)
+    const hasConfirmButtons = !isArchive && task.status === 'done'
     const isHighlighted = hasConfirmButtons && taskCardBlinkYellow[String(task.task_id)]
 
     return (
@@ -119,6 +134,16 @@ const TaskRenderer = ({
       >
         <Card
           className={isHighlighted ? styles.cardBlinkYellow : undefined}
+          title={allowDescDblClick ? 'Двойной клик — полное описание' : undefined}
+          onDoubleClick={
+            allowDescDblClick
+              ? () =>
+                  setDescriptionModalTask({
+                    title: task.title,
+                    description: task.description || '',
+                  })
+              : undefined
+          }
           sx={{
             height: '100%',
             display: 'flex',
@@ -130,6 +155,7 @@ const TaskRenderer = ({
               transform: 'translateY(-2px)',
               transition: 'all 0.2s ease-in-out',
             },
+            ...(allowDescDblClick ? { cursor: 'pointer' } : {}),
           }}
         >
           <CardContent sx={{ flexGrow: 1, pb: 1 }}>
@@ -139,14 +165,14 @@ const TaskRenderer = ({
                 {task.title}
               </Typography>
               <Chip
-                icon={getStatusIcon(task.status)}
-                label={getStatusLabel(task.status)}
+                icon={getStatusIcon(isArchive ? 'done' : task.status)}
+                label={isArchive ? 'Завершено' : getStatusLabel(task.status)}
                 size="small"
                 color={
-                  task.status === 'doing'
-                    ? 'primary'
-                    : task.status === 'done'
+                  isArchive || task.status === 'done'
                     ? 'success'
+                    : task.status === 'doing'
+                    ? 'primary'
                     : 'default'
                 }
               />
@@ -163,7 +189,7 @@ const TaskRenderer = ({
                 WebkitBoxOrient: 'vertical',
                 overflow: 'hidden',
               }}
-              dangerouslySetInnerHTML={{ __html: task.description }}
+              dangerouslySetInnerHTML={{ __html: task.description || '' }}
             />
 
             {/* Приоритет */}
@@ -184,11 +210,19 @@ const TaskRenderer = ({
               <Person sx={{ fontSize: 18, mr: 1, color: 'text.secondary' }} />
               <Typography
                 variant="body2"
-                sx={{
-                  cursor: 'pointer',
-                  '&:hover': { color: 'primary.main', textDecoration: 'underline' },
-                }}
-                onClick={() => setSelectedAssignee(task.assigned_user_ids[0]?.toString() || 'all')}
+                sx={
+                  isArchive
+                    ? { color: 'text.secondary' }
+                    : {
+                        cursor: 'pointer',
+                        '&:hover': { color: 'primary.main', textDecoration: 'underline' },
+                      }
+                }
+                onClick={
+                  isArchive
+                    ? undefined
+                    : () => setSelectedAssignee(task.assigned_user_ids[0]?.toString() || 'all')
+                }
               >
                 {getUserNames(task.assigned_user_ids, users)}
               </Typography>
@@ -278,7 +312,7 @@ const TaskRenderer = ({
             )}
 
             {/* Уведомления */}
-            {unreadMessages.has(task.task_id) && (
+            {!isArchive && unreadMessages.has(task.task_id) && (
               <Box display="flex" alignItems="center">
                 <Badge color="error" variant="dot">
                   <Typography variant="caption" color="error.main" fontWeight={600}>
@@ -289,72 +323,72 @@ const TaskRenderer = ({
             )}
           </CardContent>
 
-          <CardActions sx={{ pt: 0, px: 2, pb: 2 }}>
-            <Box display="flex" justifyContent="space-between" width="100%" alignItems="center">
-              {/* Действия */}
-              <Box display="flex" gap={1}>
-                <Tooltip title="Редактировать описание">
-                  <IconButton size="small" onClick={() => handleEditDescription(task)}>
-                    <FaEdit size={16} />
-                  </IconButton>
-                </Tooltip>
-
-                <Tooltip title="Изменить срок исполнения">
-                  <IconButton size="small" onClick={() => handleOpenDeadlineDialog(task)}>
-                    <IoCalendarOutline size={16} />
-                  </IconButton>
-                </Tooltip>
-
-                <Tooltip title="Заменить исполнителя">
-                  <IconButton size="small" onClick={() => handleOpenReplaceUserModal(task)}>
-                    <LiaUserCogSolid size={18} />
-                  </IconButton>
-                </Tooltip>
-
-                <Tooltip title="Чат задачи">
-                  <IconButton
-                    size="small"
-                    onClick={() => handleChatModal(task.task_id)}
-                    color={unreadMessages.has(task.task_id) ? 'error' : 'default'}
-                  >
-                    <IoIosChatboxes size={18} />
-                  </IconButton>
-                </Tooltip>
-              </Box>
-
-              {/* Кнопки для выполненных задач */}
-              {task.status === 'done' && (
+          {!isArchive && (
+            <CardActions sx={{ pt: 0, px: 2, pb: 2 }}>
+              <Box display="flex" justifyContent="space-between" width="100%" alignItems="center">
                 <Box display="flex" gap={1}>
-                  <Tooltip title="Подтвердить выполнение">
-                    <IconButton
-                      size="small"
-                      onClick={() => {
-                        clearTaskCardBlinkYellow(task.task_id)
-                        handleTaskAccept(task.task_id, userId, true)
-                        removeTask(task.task_id)
-                      }}
-                      sx={{ color: 'success.main' }}
-                    >
-                      <FcInspection size={20} />
+                  <Tooltip title="Редактировать описание">
+                    <IconButton size="small" onClick={() => handleEditDescription(task)}>
+                      <FaEdit size={16} />
                     </IconButton>
                   </Tooltip>
 
-                  <Tooltip title="Вернуть на доработку">
+                  <Tooltip title="Изменить срок исполнения">
+                    <IconButton size="small" onClick={() => handleOpenDeadlineDialog(task)}>
+                      <IoCalendarOutline size={16} />
+                    </IconButton>
+                  </Tooltip>
+
+                  <Tooltip title="Заменить исполнителя">
+                    <IconButton size="small" onClick={() => handleOpenReplaceUserModal(task)}>
+                      <LiaUserCogSolid size={18} />
+                    </IconButton>
+                  </Tooltip>
+
+                  <Tooltip title="Чат задачи">
                     <IconButton
                       size="small"
-                      onClick={() => {
-                        clearTaskCardBlinkYellow(task.task_id)
-                        handleOpenConfirmationDialog(task.task_id)
-                      }}
-                      sx={{ color: 'warning.main' }}
+                      onClick={() => handleChatModal(task.task_id)}
+                      color={unreadMessages.has(task.task_id) ? 'error' : 'default'}
                     >
-                      <FcRedo size={20} />
+                      <IoIosChatboxes size={18} />
                     </IconButton>
                   </Tooltip>
                 </Box>
-              )}
-            </Box>
-          </CardActions>
+
+                {task.status === 'done' && (
+                  <Box display="flex" gap={1}>
+                    <Tooltip title="Подтвердить выполнение">
+                      <IconButton
+                        size="small"
+                        onClick={() => {
+                          clearTaskCardBlinkYellow(task.task_id)
+                          handleTaskAccept(task.task_id, userId, true)
+                          removeTask(task.task_id)
+                        }}
+                        sx={{ color: 'success.main' }}
+                      >
+                        <FcInspection size={20} />
+                      </IconButton>
+                    </Tooltip>
+
+                    <Tooltip title="Вернуть на доработку">
+                      <IconButton
+                        size="small"
+                        onClick={() => {
+                          clearTaskCardBlinkYellow(task.task_id)
+                          handleOpenConfirmationDialog(task.task_id)
+                        }}
+                        sx={{ color: 'warning.main' }}
+                      >
+                        <FcRedo size={20} />
+                      </IconButton>
+                    </Tooltip>
+                  </Box>
+                )}
+              </Box>
+            </CardActions>
+          )}
         </Card>
       </Grid>
     )
@@ -362,8 +396,10 @@ const TaskRenderer = ({
 
   // Рендер строки таблицы
   const renderTaskListItem = (task) => {
-    const isOverdue = isTaskOverdue(task.deadline, task.status)
-    const hasConfirmButtons = task.status === 'done'
+    const isArchive = completedArchiveMode
+    const allowDescDblClick = openFullDescriptionOnDoubleClick || isArchive
+    const isOverdue = !isArchive && isTaskOverdue(task.deadline, task.status)
+    const hasConfirmButtons = !isArchive && task.status === 'done'
     const isHighlighted = hasConfirmButtons && taskCardBlinkYellow[String(task.task_id)]
 
     return (
@@ -373,12 +409,23 @@ const TaskRenderer = ({
             if (el) cardRefs.current[task.task_id] = el
           }}
           className={isHighlighted ? styles.cardBlinkYellow : undefined}
+          title={allowDescDblClick ? 'Двойной клик — полное описание' : undefined}
+          onDoubleClick={
+            allowDescDblClick
+              ? () =>
+                  setDescriptionModalTask({
+                    title: task.title,
+                    description: task.description || '',
+                  })
+              : undefined
+          }
           sx={{
             borderLeft: `4px solid ${getPriorityColor(task.priority)}`,
             backgroundColor: isOverdue ? 'rgba(244, 67, 54, 0.05)' : 'inherit',
             '&:hover': {
               backgroundColor: 'rgba(0, 0, 0, 0.04)',
             },
+            ...(allowDescDblClick ? { cursor: 'pointer' } : {}),
           }}
         >
           <ListItemText
@@ -389,14 +436,14 @@ const TaskRenderer = ({
                 </Typography>
                 <Box display="flex" gap={1} alignItems="center">
                   <Chip
-                    icon={getStatusIcon(task.status)}
-                    label={getStatusLabel(task.status)}
+                    icon={getStatusIcon(isArchive ? 'done' : task.status)}
+                    label={isArchive ? 'Завершено' : getStatusLabel(task.status)}
                     size="small"
                     color={
-                      task.status === 'doing'
-                        ? 'primary'
-                        : task.status === 'done'
+                      isArchive || task.status === 'done'
                         ? 'success'
+                        : task.status === 'doing'
+                        ? 'primary'
                         : 'default'
                     }
                   />
@@ -415,28 +462,42 @@ const TaskRenderer = ({
             secondary={
               <>
                 <Box display="flex" alignItems="flex-start" mb={1}>
-                  <IconButton
-                    size="small"
-                    onClick={() => handleEditDescription(task)}
-                    sx={{ mt: -0.5, mr: 1 }}
-                  >
-                    <FaEdit size={14} />
-                  </IconButton>
+                  {!isArchive && (
+                    <IconButton
+                      size="small"
+                      onClick={() => handleEditDescription(task)}
+                      sx={{ mt: -0.5, mr: 1 }}
+                    >
+                      <FaEdit size={14} />
+                    </IconButton>
+                  )}
                   <Typography
                     variant="body2"
-                    dangerouslySetInnerHTML={{ __html: task.description }}
-                    sx={{ flex: 1 }}
+                    dangerouslySetInnerHTML={{ __html: task.description || '' }}
+                    sx={{
+                      flex: 1,
+                      ...(isArchive
+                        ? {
+                            display: '-webkit-box',
+                            WebkitLineClamp: 3,
+                            WebkitBoxOrient: 'vertical',
+                            overflow: 'hidden',
+                          }
+                        : {}),
+                    }}
                   />
                 </Box>
 
                 <Box display="flex" alignItems="center" mb={1}>
-                  <IconButton
-                    size="small"
-                    onClick={() => handleOpenDeadlineDialog(task)}
-                    sx={{ mr: 1 }}
-                  >
-                    <IoCalendarOutline size={14} />
-                  </IconButton>
+                  {!isArchive && (
+                    <IconButton
+                      size="small"
+                      onClick={() => handleOpenDeadlineDialog(task)}
+                      sx={{ mr: 1 }}
+                    >
+                      <IoCalendarOutline size={14} />
+                    </IconButton>
+                  )}
                   <Typography
                     variant="caption"
                     color={isOverdue ? 'error.main' : 'text.secondary'}
@@ -449,21 +510,30 @@ const TaskRenderer = ({
                 </Box>
 
                 <Box display="flex" alignItems="center" mb={2}>
-                  <IconButton
-                    size="small"
-                    onClick={() => handleOpenReplaceUserModal(task)}
-                    sx={{ mr: 1 }}
-                  >
-                    <LiaUserCogSolid size={16} />
-                  </IconButton>
+                  {!isArchive && (
+                    <IconButton
+                      size="small"
+                      onClick={() => handleOpenReplaceUserModal(task)}
+                      sx={{ mr: 1 }}
+                    >
+                      <LiaUserCogSolid size={16} />
+                    </IconButton>
+                  )}
                   <Typography
                     variant="caption"
-                    sx={{
-                      cursor: 'pointer',
-                      '&:hover': { color: 'primary.main', textDecoration: 'underline' },
-                    }}
-                    onClick={() =>
-                      setSelectedAssignee(task.assigned_user_ids[0]?.toString() || 'all')
+                    sx={
+                      isArchive
+                        ? { color: 'text.secondary' }
+                        : {
+                            cursor: 'pointer',
+                            '&:hover': { color: 'primary.main', textDecoration: 'underline' },
+                          }
+                    }
+                    onClick={
+                      isArchive
+                        ? undefined
+                        : () =>
+                            setSelectedAssignee(task.assigned_user_ids[0]?.toString() || 'all')
                     }
                   >
                     Исполнитель: {getUserNames(task.assigned_user_ids, users)}
@@ -503,7 +573,6 @@ const TaskRenderer = ({
 
                 <Box display="flex" alignItems="center" justifyContent="space-between">
                   <Box display="flex" alignItems="center" gap={2}>
-                    {/* Подзадачи */}
                     {hasSubtasks[task.task_id] && !isCheckingSubtasks[task.task_id] && (
                       <Tooltip
                         title={
@@ -526,27 +595,26 @@ const TaskRenderer = ({
                       </Tooltip>
                     )}
 
-                    {/* Чат */}
-                    <Tooltip title="Чат задачи">
-                      <IconButton
-                        size="small"
-                        onClick={() => handleChatModal(task.task_id)}
-                        color={unreadMessages.has(task.task_id) ? 'error' : 'default'}
-                      >
-                        <IoIosChatboxes size={18} />
-                      </IconButton>
-                    </Tooltip>
+                    {!isArchive && (
+                      <Tooltip title="Чат задачи">
+                        <IconButton
+                          size="small"
+                          onClick={() => handleChatModal(task.task_id)}
+                          color={unreadMessages.has(task.task_id) ? 'error' : 'default'}
+                        >
+                          <IoIosChatboxes size={18} />
+                        </IconButton>
+                      </Tooltip>
+                    )}
 
-                    {/* Уведомления */}
-                    {unreadMessages.has(task.task_id) && (
+                    {!isArchive && unreadMessages.has(task.task_id) && (
                       <Typography variant="caption" color="error.main" fontWeight={600}>
                         (Новые сообщения)
                       </Typography>
                     )}
                   </Box>
 
-                  {/* Действия для выполненных задач */}
-                  {task.status === 'done' && (
+                  {!isArchive && task.status === 'done' && (
                     <Box display="flex" gap={1}>
                       <Tooltip title="Подтвердить выполнение задачи">
                         <IconButton
@@ -579,8 +647,7 @@ const TaskRenderer = ({
         </ListItem>
         <Divider />
 
-        {/* Модальные окна для каждой задачи */}
-        {openChatModals[task.task_id] && (
+        {!isArchive && openChatModals[task.task_id] && (
           <ChatTaskModal
             task={task}
             onClose={() => handleChatModal(task.task_id)}
@@ -607,28 +674,67 @@ const TaskRenderer = ({
     )
   }
 
-  return viewMode === 'cards' ? (
-    <Grid container spacing={3}>
-      {filteredTasks.map(renderTaskCard)}
-      {/* Модальные окна для режима карточек */}
-      {filteredTasks.map(
-        (task) =>
-          openChatModals[task.task_id] && (
-            <ChatTaskModal
-              key={`chat-${task.task_id}`}
-              task={task}
-              onClose={() => handleChatModal(task.task_id)}
-              isOpen={openChatModals[task.task_id]}
-              currentUser={user.id}
-              onMessageRead={() => resetUnreadMessages(task.task_id)}
-            />
-          )
+  const descriptionModal = descriptionModalTask && (
+    <div
+      className={styles.descriptionModalBackdrop}
+      onClick={() => setDescriptionModalTask(null)}
+      role="presentation"
+    >
+      <div
+        className={styles.descriptionModalPanel}
+        onClick={(e) => e.stopPropagation()}
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="task-description-modal-title"
+      >
+        <div className={styles.descriptionModalHeader}>
+          <h3 id="task-description-modal-title" className={styles.descriptionModalTitle}>
+            {descriptionModalTask.title}
+          </h3>
+          <button
+            type="button"
+            className={styles.descriptionModalClose}
+            onClick={() => setDescriptionModalTask(null)}
+            aria-label="Закрыть"
+          >
+            ×
+          </button>
+        </div>
+        <div
+          className={styles.descriptionModalBody}
+          dangerouslySetInnerHTML={{ __html: descriptionModalTask.description || '' }}
+        />
+      </div>
+    </div>
+  )
+
+  return (
+    <>
+      {descriptionModal}
+      {viewMode === 'cards' ? (
+        <Grid container spacing={3}>
+          {filteredTasks.map(renderTaskCard)}
+          {!completedArchiveMode &&
+            filteredTasks.map(
+              (task) =>
+                openChatModals[task.task_id] && (
+                  <ChatTaskModal
+                    key={`chat-${task.task_id}`}
+                    task={task}
+                    onClose={() => handleChatModal(task.task_id)}
+                    isOpen={openChatModals[task.task_id]}
+                    currentUser={user.id}
+                    onMessageRead={() => resetUnreadMessages(task.task_id)}
+                  />
+                )
+            )}
+        </Grid>
+      ) : (
+        <Paper sx={{ borderRadius: 2 }}>
+          <List>{filteredTasks.map(renderTaskListItem)}</List>
+        </Paper>
       )}
-    </Grid>
-  ) : (
-    <Paper sx={{ borderRadius: 2 }}>
-      <List>{filteredTasks.map(renderTaskListItem)}</List>
-    </Paper>
+    </>
   )
 }
 

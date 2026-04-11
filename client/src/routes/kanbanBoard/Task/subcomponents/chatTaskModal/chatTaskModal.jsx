@@ -10,6 +10,28 @@ import ChatFileViewer from './ChatFileViewer'
 import ChatFileManager from './ChatFileManager'
 import './chatTaskModal.scss'
 
+/** Отпечаток файла: SHA-256 при наличии crypto.subtle, иначе FNV (не-secure context). */
+async function fingerprintArrayBuffer(arrayBuffer) {
+  const subtle = typeof window !== 'undefined' ? window.crypto?.subtle : undefined
+  if (subtle && typeof subtle.digest === 'function') {
+    try {
+      const hash = await subtle.digest('SHA-256', arrayBuffer)
+      return Array.from(new Uint8Array(hash))
+        .map((b) => b.toString(16).padStart(2, '0'))
+        .join('')
+    } catch {
+      /* ниже fallback */
+    }
+  }
+  const u8 = new Uint8Array(arrayBuffer)
+  let h = 2166136261 >>> 0
+  for (let i = 0; i < u8.length; i++) {
+    h ^= u8[i]
+    h = Math.imul(h, 16777619) >>> 0
+  }
+  return `fnv${(h >>> 0).toString(16).padStart(8, '0')}${u8.length.toString(16).padStart(8, '0')}`
+}
+
 const ChatTaskModal = ({
   task,
   onClose,
@@ -84,44 +106,20 @@ const ChatTaskModal = ({
     async (message) => {
       if (!message || !message.id) return
 
-      console.log('🔍 Проверяем сообщение:', message.id, 'текст:', message.text)
-
       if (
         message.text.includes('Отправлено') &&
         (message.text.includes('файл') || message.text.includes('изображений'))
       ) {
-        console.log('✅ Сообщение содержит файлы, загружаем...')
         try {
-          console.log(
-            '🔍 Загружаем файлы для сообщения:',
-            message.id,
-            'задачи:',
-            task.id || task.task_id
-          )
-
           const chatFilesResponse = await axios.get(
             `${API_BASE_URL}5000/api/chat-files/${task.id || task.task_id}`
           )
 
-          console.log('📁 Ответ от сервера chat-files:', chatFilesResponse.data)
-
-          // Ищем файлы ТОЛЬКО для этого конкретного сообщения
-          const relevantFiles =
-            chatFilesResponse.data.files?.filter((file) => {
-              console.log('🔍 Проверяем файл:', file.message_id, 'сообщение:', message.id)
-
-              // Строгая проверка по ID сообщения
-              if (file.message_id === message.id) {
-                console.log('✅ Найден файл по message_id:', file.original_name)
-                return true
-              }
-
-              // Если ID не совпадает, файл НЕ подходит
-              console.log('❌ Файл не подходит по message_id:', file.original_name)
-              return false
-            }) || []
-
-          console.log('📋 Найденные файлы:', relevantFiles)
+          const allFiles = chatFilesResponse.data.files || []
+          const msgId = Number(message.id)
+          const relevantFiles = allFiles.filter(
+            (file) => Number(file.message_id) === msgId
+          )
 
           setMessages((prevMessages) =>
             prevMessages.map((msg) =>
@@ -279,16 +277,11 @@ const ChatTaskModal = ({
                 `${API_BASE_URL}5000/api/chat-files/${task.id || task.task_id}`
               )
 
-              // Фильтруем файлы, которые точно принадлежат этому сообщению
+              const msgId = Number(message.id)
               const relevantFiles =
-                chatFilesResponse.data.files?.filter((file) => {
-                  // Строгая проверка по ID сообщения
-                  if (file.message_id === message.id) {
-                    return true
-                  }
-                  // Если ID не совпадает, файл НЕ подходит
-                  return false
-                }) || []
+                (chatFilesResponse.data.files || []).filter(
+                  (file) => Number(file.message_id) === msgId
+                )
 
               return {
                 ...message,
@@ -451,10 +444,7 @@ const ChatTaskModal = ({
       const imageHashes = await Promise.all(
         images.map(async (image) => {
           const arrayBuffer = await image.arrayBuffer()
-          const hash = await crypto.subtle.digest('SHA-256', arrayBuffer)
-          return Array.from(new Uint8Array(hash))
-            .map((b) => b.toString(16).padStart(2, '0'))
-            .join('')
+          return fingerprintArrayBuffer(arrayBuffer)
         })
       )
 
@@ -680,8 +670,11 @@ const ChatTaskModal = ({
 
       if (imageFiles.length > 0) {
         event.preventDefault()
-        // Автоматически загружаем скриншоты
-        await handleSendImages(imageFiles)
+        try {
+          await handleSendImages(imageFiles)
+        } catch (e) {
+          console.error('Ошибка при вставке изображения:', e)
+        }
       }
       setIsProcessingPaste(false)
     },
@@ -755,9 +748,7 @@ const ChatTaskModal = ({
               ) : (
                 <span className="sender-label">{replyingTo.sender_name || 'Отправитель'}:</span>
               )}
-              {replyingTo.text.length > 50
-                ? `${replyingTo.text.substring(0, 50)}...`
-                : replyingTo.text}
+              {replyingTo.text}
             </div>
           </div>
         )}
@@ -791,9 +782,7 @@ const ChatTaskModal = ({
                         {message.replied_message.sender_name || 'Отправитель'}:
                       </span>
                     )}
-                    {message.replied_message.text.length > 50
-                      ? `${message.replied_message.text.substring(0, 50)}...`
-                      : message.replied_message.text}
+                    {message.replied_message.text}
                   </div>
                 </div>
               )}
@@ -867,7 +856,7 @@ const ChatTaskModal = ({
               onPaste={handlePaste}
               placeholder="Напишите сообщение..."
               rows={2}
-              style={{ resize: 'none', whiteSpace: 'pre-line' }}
+              style={{ resize: 'none', whiteSpace: 'pre-wrap' }}
             />
             <div className="input-buttons">
               <button onClick={() => setShowEmojiPicker((prev) => !prev)}>😊</button>

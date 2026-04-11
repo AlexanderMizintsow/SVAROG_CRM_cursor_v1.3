@@ -14,10 +14,6 @@ export const useTaskHandlers = (state, setters) => {
     setSelectedTag,
     setSelectedFiles,
     setHasDangerousFiles,
-    setIsTagSelected,
-    setIsApprovingSelected,
-    setIsViewersSelected,
-    setIsImplementersSelected,
     setDbTags,
     setIsTagsManagerOpen,
     setCheckedComment,
@@ -80,23 +76,29 @@ export const useTaskHandlers = (state, setters) => {
     [setTaskData]
   )
 
-  const handleAddTag = useCallback(() => {
-    if (!selectedTag?.trim()) return // Защита от undefined
+  const handleAddTag = useCallback(
+    (explicitTag) => {
+      const tagToAdd =
+        explicitTag !== undefined && explicitTag !== null && String(explicitTag).trim() !== ''
+          ? String(explicitTag).trim()
+          : String(selectedTag || '').trim()
+      if (!tagToAdd) return
 
-    try {
-      const { bg, text } = getRandomColors()
-      const currentTags = taskData.tags ? JSON.parse(taskData.tags) : []
+      try {
+        const { bg, text } = getRandomColors()
+        const currentTags = taskData.tags ? JSON.parse(taskData.tags) : []
 
-      setTaskData((prev) => ({
-        ...prev,
-        tags: JSON.stringify([...currentTags, { title: selectedTag.trim(), bg, text }]),
-      }))
-      setSelectedTag('')
-      setIsTagSelected(false)
-    } catch (error) {
-      console.error('Error adding tag:', error)
-    }
-  }, [selectedTag, taskData.tags, setTaskData, setSelectedTag, setIsTagSelected])
+        setTaskData((prev) => ({
+          ...prev,
+          tags: JSON.stringify([...currentTags, { title: tagToAdd, bg, text }]),
+        }))
+        setSelectedTag('')
+      } catch (error) {
+        console.error('Error adding tag:', error)
+      }
+    },
+    [selectedTag, taskData.tags, setTaskData, setSelectedTag]
+  )
 
   const handleRemoveTag = useCallback(
     (index) => {
@@ -136,21 +138,9 @@ export const useTaskHandlers = (state, setters) => {
           [roleKey]: [...prev[roleKey], selectedUser],
         }))
         setSelectedUser('')
-
-        switch (roleKey) {
-          case 'approvers':
-            setIsApprovingSelected(false)
-            break
-          case 'viewers':
-            setIsViewersSelected(false)
-            break
-          case 'implementers':
-            setIsImplementersSelected(false)
-            break
-        }
       }
     },
-    [taskData, setTaskData, setIsApprovingSelected, setIsViewersSelected, setIsImplementersSelected]
+    [taskData, setTaskData]
   )
 
   const handleRemoveUser = useCallback(

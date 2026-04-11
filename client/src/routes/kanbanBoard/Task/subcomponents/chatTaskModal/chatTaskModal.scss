@@ -201,6 +201,9 @@ $transition: all 0.3s ease;
         font-size: 14px;
         line-height: 1.5;
         word-wrap: break-word;
+        overflow-wrap: break-word;
+        white-space: pre-wrap;
+        tab-size: 4;
         margin-bottom: 8px;
       }
 
@@ -258,6 +261,8 @@ $transition: all 0.3s ease;
         resize: none;
         min-height: 44px;
         max-height: 120px;
+        white-space: pre-wrap;
+        tab-size: 4;
 
         &:focus {
           border-color: #667eea;
@@ -422,9 +427,11 @@ $transition: all 0.3s ease;
   .reply-content {
     font-size: 13px;
     color: #495057;
-    white-space: nowrap;
+    white-space: pre-wrap;
+    tab-size: 4;
+    word-break: break-word;
+    max-height: 4.5em;
     overflow: hidden;
-    text-overflow: ellipsis;
     cursor: pointer;
     transition: color 0.2s ease;
 
@@ -476,6 +483,11 @@ $transition: all 0.3s ease;
 
     .reply-content {
       padding-left: 12px;
+      white-space: pre-wrap;
+      tab-size: 4;
+      word-break: break-word;
+      max-height: 4.5em;
+      overflow: hidden;
 
       .you-label,
       .sender-label {

@@ -163,6 +163,10 @@
   &__description {
     color: #4b5563;
     margin-bottom: 1rem;
+    white-space: pre-line;
+    word-wrap: break-word;
+    overflow-wrap: break-word;
+    hyphens: auto;
   }
 
   &__description-row {
@@ -571,11 +575,5 @@
         }
       }
     }
-  }
-
-  .global-task-card__description {
-    word-wrap: break-word;
-    overflow-wrap: break-word;
-    hyphens: auto;
   }
 }

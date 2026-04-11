@@ -496,7 +496,29 @@
   font-weight: bold;
   pointer-events: none;
   width: 50%;
-  text-align: center; 
+  text-align: center;
+}
+
+/* Колонка «Выполнено»: тот же вид, но без pointer-events — двойной клик, чат, раскрытие файлов работают */
+.task--done-column {
+  cursor: not-allowed;
+  filter: grayscale(0.8);
+  position: relative;
+
+  &::after {
+    content: 'Ожидание одобрения';
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-80%, 50%) rotate(-45deg);
+    font-size: 18px;
+    color: rgba(241, 33, 33, 0.822);
+    white-space: nowrap;
+    font-weight: bold;
+    pointer-events: none;
+    width: 50%;
+    text-align: center;
+  }
 }
 
 .pulse {

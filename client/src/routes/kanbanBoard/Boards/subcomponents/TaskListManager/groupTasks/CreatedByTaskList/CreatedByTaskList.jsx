@@ -1,7 +1,6 @@
-import React, { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import axios from 'axios'
 import { Box } from '@mui/material'
-import Quill from 'quill'
 import { API_BASE_URL } from '../../../../../../../../config'
 import useUserStore from '../../../../../../../store/userStore'
 import useTasksManageStore from '../../../../../../../store/useTasksManageStore'
@@ -13,7 +12,15 @@ import TaskRenderer from './TaskRenderer'
 import TaskModals from './TaskModals'
 import HelpModalCreatedByTaskList from './HelpModalCreatedByTaskList'
 
-const CreatedByTaskList = ({ tasks, userId, handleTaskAccept, refreshTasks, onOpenProject }) => {
+const CreatedByTaskList = ({
+  tasks,
+  userId,
+  handleTaskAccept,
+  refreshTasks,
+  onOpenProject,
+  completedArchiveMode = false,
+  openFullDescriptionOnDoubleClick = true,
+}) => {
   const { user, users } = useUserStore()
   const [updatedTasks] = useState(tasks)
   const [projectTitles, setProjectTitles] = useState({})
@@ -60,6 +67,10 @@ const CreatedByTaskList = ({ tasks, userId, handleTaskAccept, refreshTasks, onOp
   useEffect(() => {
     setFilteredTasks(tasks)
   }, [tasks])
+
+  useEffect(() => {
+    if (completedArchiveMode) setViewMode('cards')
+  }, [completedArchiveMode])
 
   // Загрузка названий проектов для задач с global_task_id
   useEffect(() => {
@@ -301,7 +312,9 @@ const CreatedByTaskList = ({ tasks, userId, handleTaskAccept, refreshTasks, onOp
         )
         const pd = res.data?.deadline
         if (pd) maxDate = formatDateForInput(pd)
-      } catch (_) {}
+      } catch {
+        /* нет дедлайна проекта */
+      }
     }
 
     setDeadlineDialogProps({
@@ -415,27 +428,29 @@ const CreatedByTaskList = ({ tasks, userId, handleTaskAccept, refreshTasks, onOp
 
   return (
     <Box sx={{ minHeight: '100vh', backgroundColor: '#f5f5f5' }}>
-      {/* Header с фильтрами */}
-      <TaskFiltersHeader
-        stats={stats}
-        isFiltersOpen={isFiltersOpen}
-        setIsFiltersOpen={setIsFiltersOpen}
-        viewMode={viewMode}
-        setViewMode={setViewMode}
-        searchTerm={searchTerm}
-        setSearchTerm={setSearchTerm}
-        selectedStatus={selectedStatus}
-        setSelectedStatus={setSelectedStatus}
-        selectedPriority={selectedPriority}
-        setSelectedPriority={setSelectedPriority}
-        sortBy={sortBy}
-        setSortBy={setSortBy}
-        selectedAssignee={selectedAssignee}
-        setSelectedAssignee={setSelectedAssignee}
-        users={users}
-        updatedTasks={updatedTasks}
-        onOpenHelp={() => setIsHelpModalOpen(true)}
-      />
+      {/* Header с фильтрами (во вкладке архива завершённых — фильтры сверху в TaskListManager) */}
+      {!completedArchiveMode && (
+        <TaskFiltersHeader
+          stats={stats}
+          isFiltersOpen={isFiltersOpen}
+          setIsFiltersOpen={setIsFiltersOpen}
+          viewMode={viewMode}
+          setViewMode={setViewMode}
+          searchTerm={searchTerm}
+          setSearchTerm={setSearchTerm}
+          selectedStatus={selectedStatus}
+          setSelectedStatus={setSelectedStatus}
+          selectedPriority={selectedPriority}
+          setSelectedPriority={setSelectedPriority}
+          sortBy={sortBy}
+          setSortBy={setSortBy}
+          selectedAssignee={selectedAssignee}
+          setSelectedAssignee={setSelectedAssignee}
+          users={users}
+          updatedTasks={updatedTasks}
+          onOpenHelp={() => setIsHelpModalOpen(true)}
+        />
+      )}
 
       {/* Рендеринг задач */}
       <Box sx={{ px: 3 }}>
@@ -462,6 +477,8 @@ const CreatedByTaskList = ({ tasks, userId, handleTaskAccept, refreshTasks, onOp
           resetUnreadMessages={resetUnreadMessages}
           projectTitles={projectTitles}
           onOpenProject={onOpenProject}
+          completedArchiveMode={completedArchiveMode}
+          openFullDescriptionOnDoubleClick={openFullDescriptionOnDoubleClick}
         />
       </Box>
 
@@ -498,10 +515,12 @@ const CreatedByTaskList = ({ tasks, userId, handleTaskAccept, refreshTasks, onOp
       />
 
       {/* Справка */}
-      <HelpModalCreatedByTaskList
-        isOpen={isHelpModalOpen}
-        onClose={() => setIsHelpModalOpen(false)}
-      />
+      {!completedArchiveMode && (
+        <HelpModalCreatedByTaskList
+          isOpen={isHelpModalOpen}
+          onClose={() => setIsHelpModalOpen(false)}
+        />
+      )}
     </Box>
   )
 }

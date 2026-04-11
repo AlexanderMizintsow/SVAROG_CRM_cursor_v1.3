@@ -251,7 +251,7 @@ const Task = forwardRef(({ task, provided, actionIcon, column }, ref) => {
       const newAttachment = {
         task_id: task.id,
         file_url: uploadResponse.data.fileUrls[0],
-        file_type: file.type,
+        file_type: file.type || 'application/octet-stream',
         comment_file: comment,
         name_file: file.name,
         uploaded_by: userId,
@@ -352,7 +352,11 @@ const Task = forwardRef(({ task, provided, actionIcon, column }, ref) => {
         {...(provided ? provided.draggableProps : {})}
         {...(provided ? provided.dragHandleProps : {})}
         className={`task ${
-          hasUnapprovedApprovers() || column.id === 'done' ? 'disabled-task' : ''
+          hasUnapprovedApprovers()
+            ? 'disabled-task'
+            : column.id === 'done'
+            ? 'task--done-column'
+            : ''
         } ${global_task_id ? 'highlighted' : ''}`}
         onDoubleClick={toggleModal}
       >

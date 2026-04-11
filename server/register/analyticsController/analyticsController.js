@@ -21,6 +21,22 @@ const NOT_OVERDUE_IN_PROGRESS = `(t.deadline IS NULL OR t.deadline > (CURRENT_TI
 /** Проекты: финальные статусы (работа больше не ведётся). */
 const PROJECT_STATUS_COMPLETED = `(gt.status IN ('Завершено', 'Провал', 'Удален'))`
 const PROJECT_STATUS_IN_PROGRESS = `(gt.status IS NULL OR gt.status NOT IN ('Завершено', 'Провал', 'Удален'))`
+/**
+ * Процент выполнения проекта (как completion_percentage в global-tasks), алиас таблицы — gt.
+ * Не полагаться на gt.progress: в UI используется расчёт по задачам/апруву/итоговым решениям.
+ */
+const GLOBAL_TASK_COMPLETION_PCT_SQL = `COALESCE(
+  (SELECT ROUND(100.0 * (
+    (SELECT COALESCE(SUM(CASE WHEN t.is_completed THEN 1 ELSE 0 END), 0) FROM tasks t WHERE t.global_task_id = gt.id)
+    + (SELECT COUNT(*) FROM global_task_responsibles gtra WHERE gtra.global_task_id = gt.id AND gtra.requires_approval = true AND gtra.approval_status = 'approved')
+    + (SELECT COUNT(*) FROM global_task_final_solutions WHERE global_task_id = gt.id AND (NOT COALESCE(is_from_supplier_reply, false) OR COALESCE(is_published, false)))
+  ) / NULLIF(
+    (SELECT COUNT(*) FROM tasks t WHERE t.global_task_id = gt.id)
+    + (SELECT COUNT(*) FROM global_task_responsibles gtra WHERE gtra.global_task_id = gt.id AND gtra.requires_approval = true)
+    + (SELECT COUNT(*) FROM global_task_final_solutions WHERE global_task_id = gt.id AND (NOT COALESCE(is_from_supplier_reply, false) OR COALESCE(is_published, false))),
+    0
+  ), 2))
+, 0)`
 /** Задачи: по completed_at. */
 const TASK_STATUS_COMPLETED = `(t.completed_at IS NOT NULL)`
 const TASK_STATUS_IN_PROGRESS = `(t.completed_at IS NULL)`
@@ -122,7 +138,11 @@ const getAnalyticsSummary = (dbPool) => {
                 COUNT(*) FILTER (WHERE gt.status = 'Завершено') AS completed,
                 COUNT(*) FILTER (WHERE gt.status = 'Пауза') AS on_pause,
                 COUNT(*) FILTER (WHERE gt.status = 'Провал') AS failed,
-                COUNT(*) FILTER (WHERE gt.status = 'Удален') AS deleted
+                COUNT(*) FILTER (WHERE gt.status = 'Удален') AS deleted,
+                COUNT(*) FILTER (
+                  WHERE (${GLOBAL_TASK_COMPLETION_PCT_SQL}) >= 100
+                    AND (gt.status IS NULL OR gt.status NOT IN ('Завершено', 'Провал', 'Удален', 'Пауза'))
+                ) AS awaiting_completion_confirm
          FROM global_tasks gt
          WHERE gt.id NOT IN (SELECT global_task_id FROM bp_gateway_project_waiting)
            ${dateFilter} ${projFilter} ${projStatusCond}`,
@@ -304,6 +324,8 @@ const getAnalyticsSummary = (dbPool) => {
             failed: parseInt(ps?.failed || 0, 10),
             deleted: parseInt(ps?.deleted || 0, 10),
             fromBP: pFromBP,
+            /** 100% прогресс, статус ещё не финальный (не на паузе) — ожидание подтверждения у автора */
+            awaitingCompletionConfirm: parseInt(ps?.awaiting_completion_confirm || 0, 10),
           },
           businessProcesses: {
             total: parseInt(bp?.cnt || 0, 10),

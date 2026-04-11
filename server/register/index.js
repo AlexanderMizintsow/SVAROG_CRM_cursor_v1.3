@@ -616,6 +616,7 @@ app.post('/api/upload', uploadFile.array('files'), (req, res) => {
       'application/x-httpd-php', // .php
       'application/x-httpd-php-source', // .php
     ]
+    const explicitlyAllowedExtensions = ['.awds', '.awos', '.awoo']
 
     // Максимальный размер файла (250 МБ)
     const maxSize = 250 * 1024 * 1024
@@ -624,7 +625,10 @@ app.post('/api/upload', uploadFile.array('files'), (req, res) => {
 
     // Проверка каждого файла
     req.files.forEach((file) => {
-      if (forbiddenTypes.includes(file.mimetype)) {
+      const ext = path.extname(file.originalname || '').toLowerCase()
+      const isExplicitlyAllowed = explicitlyAllowedExtensions.includes(ext)
+
+      if (!isExplicitlyAllowed && forbiddenTypes.includes(file.mimetype)) {
         return res.status(400).json({ error: `Тип файла ${file.originalname} запрещен.` })
       }
 
@@ -752,6 +756,9 @@ function getMimeType(filename) {
     '.odt': 'application/vnd.oasis.opendocument.text',
     '.ods': 'application/vnd.oasis.opendocument.spreadsheet',
     '.odp': 'application/vnd.oasis.opendocument.presentation',
+    '.awds': 'application/octet-stream',
+    '.awos': 'application/octet-stream',
+    '.awoo': 'application/octet-stream',
   }
 
   return mimeTypes[ext] || 'application/octet-stream'

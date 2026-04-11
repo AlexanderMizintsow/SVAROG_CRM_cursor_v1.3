@@ -124,12 +124,6 @@ const GlobalTaskChat = ({
     setReplyingTo(null) // Сбрасываем ответ после отправки
   }
 
-  const handleKeyPress = (e) => {
-    if (e.key === 'Enter') {
-      handleSendMessage()
-    }
-  }
-
   // Создаём функцию для форматирования даты
   const formatTimestamp = (timestamp) => {
     const date = new Date(timestamp)
@@ -314,7 +308,7 @@ const GlobalTaskChat = ({
                   }
                 }}
                 rows={2}
-                style={{ resize: 'none', whiteSpace: 'pre-line' }}
+                style={{ resize: 'none', whiteSpace: 'pre-wrap' }}
               />
 
               {showEmojiPicker && ( // Изменено

@@ -486,8 +486,8 @@ function addTaskAttachment(dbPool, io) {
       tableType, // параметр для выбора таблицы: 'local' или 'global'
     } = req.body
 
-    // Проверка обязательных полей
-    if (!task_id || !file_url || !file_type || !uploaded_by || !name_file) {
+    // Проверка обязательных полей (file_type может быть пустым — браузер не знает MIME для редких расширений)
+    if (!task_id || !file_url || !uploaded_by || !name_file) {
       return res.status(400).json({
         error: 'Некорректные или отсутствующие обязательные параметры',
       })
@@ -633,7 +633,7 @@ function addTaskAttachment(dbPool, io) {
 function getUserTasks(dbPool) {
   return async function (req, res) {
     const { userId } = req.params // Получаем userId из параметров запроса
-    const { filter, is_completed } = req.query
+    const { filter, is_completed, created_from, created_to } = req.query
 
     // Разрешенные значения для filter
     const allowedFilters = ['my_tasks', 'tasks_manager', 'completed_tasks']
@@ -669,6 +669,24 @@ function getUserTasks(dbPool) {
         whereClause += ` AND t.is_completed = ${isCompleted}`
       }
 
+      const queryParams = [userId]
+      const dateRe = /^\d{4}-\d{2}-\d{2}$/
+      if (
+        filter === 'completed_tasks' &&
+        created_from &&
+        created_to &&
+        dateRe.test(created_from) &&
+        dateRe.test(created_to)
+      ) {
+        whereClause += ` AND t.created_at::date >= $2::date AND t.created_at::date <= $3::date`
+        queryParams.push(created_from, created_to)
+      }
+
+      const orderByClause =
+        filter === 'completed_tasks'
+          ? ' ORDER BY t.completed_at DESC NULLS LAST, t.created_at DESC'
+          : ''
+
       const result = await dbPool.query(
         `WITH unique_approvals AS (
           SELECT DISTINCT 
@@ -696,6 +714,7 @@ unique_comments AS (
         SELECT
           t.id AS task_id,
           t.created_at,
+          t.completed_at,
           t.title,
           t.description,
           t.created_by,
@@ -731,8 +750,8 @@ unique_comments AS (
         LEFT JOIN task_visibility tv ON t.id = tv.task_id
         LEFT JOIN unique_approvals ua ON t.id = ua.task_id
         WHERE ${whereClause}  
-        GROUP BY t.id, t.title, t.description, t.created_by, t.deadline, t.priority, t.tags, t.status, t.global_task_id, t.parent_id, t.root_id`,
-        [userId]
+        GROUP BY t.id, t.title, t.description, t.created_by, t.created_at, t.completed_at, t.deadline, t.priority, t.tags, t.status, t.global_task_id, t.parent_id, t.root_id${orderByClause}`,
+        queryParams
       )
 
       const tasks = result.rows

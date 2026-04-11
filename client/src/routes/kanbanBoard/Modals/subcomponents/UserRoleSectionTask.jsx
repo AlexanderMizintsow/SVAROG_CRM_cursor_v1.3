@@ -1,5 +1,4 @@
 import { LuDelete } from 'react-icons/lu'
-import { IoPersonAddOutline } from 'react-icons/io5'
 import styles from '../AddModal.module.scss'
 
 const UserRoleSectionTask = ({
@@ -7,14 +6,11 @@ const UserRoleSectionTask = ({
   roleKey,
   selectedUser,
   setSelectedUser,
-  isSelected,
-  setIsSelected,
   taskData,
   users,
   remainingUsersForRole,
   handleAddUser,
   handleRemoveUser,
-  IconComponent = IoPersonAddOutline,
 }) => {
   return (
     <div className={styles.border}>
@@ -24,8 +20,11 @@ const UserRoleSectionTask = ({
           <select
             value={selectedUser}
             onChange={(e) => {
-              setSelectedUser(e.target.value)
-              setIsSelected(e.target.value !== '')
+              const value = e.target.value
+              setSelectedUser(value)
+              if (value) {
+                handleAddUser(roleKey, value, setSelectedUser)
+              }
             }}
           >
             <option value="">Выберите {title.toLowerCase()}</option>
@@ -59,17 +58,6 @@ const UserRoleSectionTask = ({
               ) : null
             })}
           </div>
-        </div>
-        <div>
-          <IconComponent
-            title="Добавить в список"
-            className={`${styles.addButton} ${styles['submit-button']} ${
-              isSelected ? styles.pulse : ''
-            }`}
-            onClick={() =>
-              handleAddUser(roleKey, selectedUser, setSelectedUser)
-            }
-          />
         </div>
       </div>
     </div>

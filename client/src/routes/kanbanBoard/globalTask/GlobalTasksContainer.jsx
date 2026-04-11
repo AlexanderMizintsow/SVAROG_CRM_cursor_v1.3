@@ -1,5 +1,5 @@
 // Самый верхний компонент глобальных задач, он же их список
-import React, { useState, useEffect, useCallback, useRef } from 'react'
+import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react'
 import { API_BASE_URL } from '../../../../config'
 import { MdClose } from 'react-icons/md'
 import { FaPlus } from 'react-icons/fa'
@@ -16,6 +16,19 @@ import axios from 'axios'
 
 const TERMINAL_STATUSES = ['Завершено', 'Провал', 'Удален']
 
+/** Локальная полночь / конец дня для input type="date" (YYYY-MM-DD) */
+function parseLocalDayStartMs(yyyyMmDd) {
+  if (!yyyyMmDd || !/^\d{4}-\d{2}-\d{2}$/.test(yyyyMmDd)) return null
+  const [y, m, d] = yyyyMmDd.split('-').map((n) => parseInt(n, 10))
+  return new Date(y, m - 1, d, 0, 0, 0, 0).getTime()
+}
+
+function parseLocalDayEndMs(yyyyMmDd) {
+  if (!yyyyMmDd || !/^\d{4}-\d{2}-\d{2}$/.test(yyyyMmDd)) return null
+  const [y, m, d] = yyyyMmDd.split('-').map((n) => parseInt(n, 10))
+  return new Date(y, m - 1, d, 23, 59, 59, 999).getTime()
+}
+
 const GlobalTasksContainer = ({ onClose, initialTask, initialTaskId, onProjectUpdated }) => {
   const { user } = UserStore()
   const [tasks, setTasks] = useState([])
@@ -30,6 +43,10 @@ const GlobalTasksContainer = ({ onClose, initialTask, initialTaskId, onProjectUp
   const [completedFilter, setCompletedFilter] = useState('all') // 'all' | 'completed' | 'failed' | 'deleted'
   const [completedTasks, setCompletedTasks] = useState([])
   const [completedLoading, setCompletedLoading] = useState(false)
+  /** Фильтры вкладки «Завершённые» (применяются к уже отфильтрованному по типу API списку) */
+  const [completedDateFrom, setCompletedDateFrom] = useState('')
+  const [completedDateTo, setCompletedDateTo] = useState('')
+  const [completedSearch, setCompletedSearch] = useState('')
   const userId = user ? user.id : null
 
   // *** Функция для обновление задачи по id ***
@@ -139,6 +156,42 @@ const GlobalTasksContainer = ({ onClose, initialTask, initialTaskId, onProjectUp
   useEffect(() => {
     if (listTab === 'completed') fetchCompletedTasks()
   }, [listTab, fetchCompletedTasks])
+
+  const completedTasksFiltered = useMemo(() => {
+    let list = completedTasks
+
+    if (completedDateFrom || completedDateTo) {
+      const fromMs = completedDateFrom ? parseLocalDayStartMs(completedDateFrom) : null
+      const toMs = completedDateTo ? parseLocalDayEndMs(completedDateTo) : null
+      list = list.filter((task) => {
+        if (!task.created_at) return false
+        const created = new Date(task.created_at).getTime()
+        if (Number.isNaN(created)) return false
+        if (fromMs != null && created < fromMs) return false
+        if (toMs != null && created > toMs) return false
+        return true
+      })
+    }
+
+    const q = completedSearch.trim()
+    if (q) {
+      const words = q.split(/\s+/).filter(Boolean)
+      list = list.filter((task) => {
+        const title = (task.title || '').toLowerCase()
+        const desc = (task.description || '').toLowerCase()
+        const hay = `${title} ${desc}`
+        return words.every((w) => hay.includes(w.toLowerCase()))
+      })
+    }
+
+    return list
+  }, [completedTasks, completedDateFrom, completedDateTo, completedSearch])
+
+  const clearCompletedExtraFilters = useCallback(() => {
+    setCompletedDateFrom('')
+    setCompletedDateTo('')
+    setCompletedSearch('')
+  }, [])
 
   // Мгновенное обновление при изменениях по сокету
   const handleRefreshTaskRef = useRef(handleRefreshTask)
@@ -409,7 +462,10 @@ const GlobalTasksContainer = ({ onClose, initialTask, initialTaskId, onProjectUp
     )
   }
 
-  const displayList = listTab === 'current' ? tasks : completedTasks
+  const displayList = listTab === 'current' ? tasks : completedTasksFiltered
+  const hasCompletedExtraFilters = Boolean(
+    completedDateFrom || completedDateTo || completedSearch.trim()
+  )
 
   return (
     <div className="global-tasks-container">
@@ -455,23 +511,71 @@ const GlobalTasksContainer = ({ onClose, initialTask, initialTaskId, onProjectUp
         </div>
 
         {listTab === 'completed' && (
-          <div className="global-tasks-container__completed-filters">
-            <span className="global-tasks-container__filter-label">Показать:</span>
-            {[
-              { key: 'all', label: 'Все' },
-              { key: 'completed', label: 'Выполненные' },
-              { key: 'failed', label: 'Неудача' },
-              { key: 'deleted', label: 'Удалённые' },
-            ].map(({ key, label }) => (
-              <button
-                key={key}
-                type="button"
-                className={`global-tasks-container__filter-btn ${completedFilter === key ? 'global-tasks-container__filter-btn--active' : ''}`}
-                onClick={() => setCompletedFilter(key)}
-              >
-                {label}
-              </button>
-            ))}
+          <div className="global-tasks-container__completed-toolbar">
+            <div className="global-tasks-container__completed-filters">
+              <span className="global-tasks-container__filter-label">Показать:</span>
+              {[
+                { key: 'all', label: 'Все' },
+                { key: 'completed', label: 'Выполненные' },
+                { key: 'failed', label: 'Неудача' },
+                { key: 'deleted', label: 'Удалённые' },
+              ].map(({ key, label }) => (
+                <button
+                  key={key}
+                  type="button"
+                  className={`global-tasks-container__filter-btn ${completedFilter === key ? 'global-tasks-container__filter-btn--active' : ''}`}
+                  onClick={() => setCompletedFilter(key)}
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
+            <div className="global-tasks-container__completed-extra">
+              <div className="global-tasks-container__date-range">
+                <span className="global-tasks-container__filter-label">Создано:</span>
+                <label className="global-tasks-container__date-field">
+                  <span className="global-tasks-container__date-field-label">с</span>
+                  <input
+                    type="date"
+                    value={completedDateFrom}
+                    onChange={(e) => setCompletedDateFrom(e.target.value)}
+                    className="global-tasks-container__date-input"
+                  />
+                </label>
+                <label className="global-tasks-container__date-field">
+                  <span className="global-tasks-container__date-field-label">по</span>
+                  <input
+                    type="date"
+                    value={completedDateTo}
+                    onChange={(e) => setCompletedDateTo(e.target.value)}
+                    className="global-tasks-container__date-input"
+                  />
+                </label>
+              </div>
+              <div className="global-tasks-container__search-wrap">
+                <label className="global-tasks-container__search-label" htmlFor="global-tasks-completed-search">
+                  Поиск:
+                </label>
+                <input
+                  id="global-tasks-completed-search"
+                  type="search"
+                  value={completedSearch}
+                  onChange={(e) => setCompletedSearch(e.target.value)}
+                  placeholder="Название или описание…"
+                  className="global-tasks-container__search-input"
+                  autoComplete="off"
+                />
+              </div>
+              {hasCompletedExtraFilters && (
+                <button
+                  type="button"
+                  className="global-tasks-container__filter-reset"
+                  onClick={clearCompletedExtraFilters}
+                >
+                  Сбросить период и поиск
+                </button>
+              )}
+            </div>
           </div>
         )}
 
@@ -547,7 +651,9 @@ const GlobalTasksContainer = ({ onClose, initialTask, initialTaskId, onProjectUp
             <div className="global-tasks-container__empty-list">
               {listTab === 'current'
                 ? 'Проекты не найдены. Нажмите Создать проект, чтобы добавить новый.'
-                : 'Нет проектов по выбранному фильтру.'}
+                : completedTasks.length === 0
+                ? 'Нет проектов по выбранному фильтру.'
+                : 'Нет проектов по выбранному периоду создания и условиям поиска. Измените фильтры или нажмите «Сбросить».'}
             </div>
           )}
         </div>

@@ -379,7 +379,10 @@ const Boards = () => {
                               key={task.id.toString()}
                               draggableId={task.id.toString()}
                               index={index}
-                              isDragDisabled={!task.assigned_user_ids.includes(userId)}
+                              isDragDisabled={
+                                !task.assigned_user_ids?.includes(userId) ||
+                                columnId === 'done'
+                              }
                             >
                               {(provided) => (
                                 <Task

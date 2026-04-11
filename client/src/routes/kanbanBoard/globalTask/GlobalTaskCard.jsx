@@ -256,7 +256,7 @@ const GlobalTaskCard = ({
             axios.post(`${API_BASE_URL}5000/api/tasks/attachment/add`, {
               task_id: tid,
               file_url: url,
-              file_type: files[index].type,
+              file_type: files[index].type || 'application/octet-stream',
               comment_file: comments[index] ?? '',
               name_file: files[index].name,
               uploaded_by: userId,
@@ -586,8 +586,8 @@ const GlobalTaskCard = ({
           </div>
           {deadline && (
             <div className="global-task-card__footer-item">
-              <MdAccessTime className="global-task-card__footer-icon" />
-              <span>Осталось: {remainingDays}</span>
+             { /* <MdAccessTime className="global-task-card__footer-icon" />
+             <span>Осталось: {remainingDays}</span>*/}
             </div>
           )}
         </div>

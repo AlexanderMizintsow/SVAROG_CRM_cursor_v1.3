@@ -22,6 +22,57 @@ const amiPassword = "S2s14q98svf32a";
 // Создание клиента для подключения к Asterisk AMI
 const client = new net.Socket();
 let currentCall = {};
+const reconnectConfig = {
+  minDelayMs: 5000,
+  maxDelayMs: 30000,
+  multiplier: 2,
+};
+let reconnectDelayMs = reconnectConfig.minDelayMs;
+let reconnectTimer = null;
+let isAmiConnected = false;
+let lastAmiVerboseLogAt = 0;
+const amiVerboseLogCooldownMs = 10000;
+
+const clearReconnectTimer = () => {
+  if (reconnectTimer) {
+    clearTimeout(reconnectTimer);
+    reconnectTimer = null;
+  }
+};
+
+const connectToAmi = () => {
+  if (isAmiConnected) {
+    return;
+  }
+
+  try {
+    client.connect(amiPort, amiHost);
+  } catch (error) {
+    console.error("Ошибка запуска подключения к AMI:", error.message);
+  }
+};
+
+const scheduleReconnect = () => {
+  if (reconnectTimer) {
+    return;
+  }
+
+  console.log(
+    `Connection closed. Reconnecting in ${Math.floor(
+      reconnectDelayMs / 1000
+    )}s...`
+  );
+
+  reconnectTimer = setTimeout(() => {
+    reconnectTimer = null;
+    connectToAmi();
+  }, reconnectDelayMs);
+
+  reconnectDelayMs = Math.min(
+    reconnectDelayMs * reconnectConfig.multiplier,
+    reconnectConfig.maxDelayMs
+  );
+};
 
 // Подключение к CRM серверу для отправки уведомлений
 const crmSocket = io("http://127.0.0.1:5004");
@@ -323,6 +374,9 @@ const sendCallEndedNotification = async (callData, callId) => {
 };
 
 client.connect(amiPort, amiHost, () => {
+  isAmiConnected = true;
+  reconnectDelayMs = reconnectConfig.minDelayMs;
+  clearReconnectTimer();
   console.log("Connected to Asterisk AMI");
   client.write(
     `Action: Login\r\nUsername: ${amiUser}\r\nSecret: ${amiPassword}\r\n\r\n`
@@ -332,14 +386,21 @@ client.connect(amiPort, amiHost, () => {
 client.on("data", async (data) => {
   const response = data.toString().split("\r\n");
 
-  // Логируем все события для отладки
-  console.log("=== AMI EVENT ===");
-  response.forEach((line) => {
-    if (line.trim()) {
-      console.log(`AMI: ${line}`);
-    }
-  });
-  console.log("=================");
+  // Логируем AMI-события ограниченно, чтобы не засорять консоль.
+  const now = Date.now();
+  const shouldPrintVerboseAmiLog =
+    now - lastAmiVerboseLogAt >= amiVerboseLogCooldownMs;
+
+  if (shouldPrintVerboseAmiLog) {
+    lastAmiVerboseLogAt = now;
+    console.log("=== AMI EVENT ===");
+    response.forEach((line) => {
+      if (line.trim()) {
+        console.log(`AMI: ${line}`);
+      }
+    });
+    console.log("=================");
+  }
 
   for (const line of response) {
     if (line.startsWith("Event: Newchannel")) {
@@ -651,10 +712,11 @@ client.on("error", (err) => {
 });
 
 client.on("end", () => {
+  isAmiConnected = false;
   console.log("Connection ended.");
 });
 
 client.on("close", () => {
-  console.log("Connection closed. Reconnecting...");
-  setTimeout(() => client.connect(amiPort, amiHost), 5000);
+  isAmiConnected = false;
+  scheduleReconnect();
 });
