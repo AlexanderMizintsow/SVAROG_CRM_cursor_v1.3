@@ -3,7 +3,8 @@
   top: 50%;
   left: 50%;
   transform: translate(-50%, -50%);
-  z-index: 9999; /* поверх всего */
+  /* Выше .content модалки AddModal (10000), ниже модалки комментариев к файлам (100001) */
+  z-index: 100050;
   width: 100%;
   max-width: 500px;
   padding: 20px;

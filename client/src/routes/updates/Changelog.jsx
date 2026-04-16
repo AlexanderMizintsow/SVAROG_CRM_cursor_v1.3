@@ -45,6 +45,13 @@ const Changelog = () => {
   // Установите статичные изменения
   const [updates] = useState([
     {
+      title: 'Версия 1.4.12',
+      date: '12.04.2026г.',
+      description: `Общие правки и улучшения.<br /><br />
+      `,
+      images: [versionTitle],
+    },
+    {
       title: 'Версия 1.4.11',
       date: '28.02.2026г.',
       description: `Обновление с новыми разделами и возможностями.<br /><br />

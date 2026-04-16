@@ -1,0 +1,12 @@
+{
+  "name": "apk-plan-docx",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Генерация плана в Word для мобильного приложения",
+  "scripts": {
+    "gen-plan": "node generate-plan-docx.js"
+  },
+  "dependencies": {
+    "docx": "^8.5.0"
+  }
+}
