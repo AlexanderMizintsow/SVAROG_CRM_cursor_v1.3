@@ -260,7 +260,8 @@ CREATE TABLE companies (
     is_self_service BOOLEAN DEFAULT FALSE,             -- Самостоятельный клиент (булево значение)
     created_at TIMESTAMP WITHOUT TIME ZONE DEFAULT NOW(), -- Дата создания записи
     updated_at TIMESTAMP WITHOUT TIME ZONE DEFAULT NOW(),  -- Дата последнего обновления записи
-    telegram_password VARCHAR(255) NOT NULL DEFAULT 'NOTACCES'   -- Пароль компании (хранится в хэшированном виде)
+    telegram_password VARCHAR(255) NOT NULL DEFAULT 'NOTACCES',   -- Пароль компании для Telegram
+    mobile_password VARCHAR(255) NOT NULL DEFAULT 'NOTACCES'      -- Пароль компании для мобильного приложения
 );
 
 
@@ -270,6 +271,11 @@ CREATE TABLE companies (
 CREATE UNIQUE INDEX unique_telegram_password
 ON companies(telegram_password)
 WHERE telegram_password <> 'NOTACCES';
+
+-- для mobile_password
+CREATE UNIQUE INDEX unique_mobile_password
+ON companies(mobile_password)
+WHERE mobile_password <> 'NOTACCES';
 
 -- Адреса компании
 CREATE TABLE company_addresses (
@@ -2475,6 +2481,44 @@ CREATE TABLE IF NOT EXISTS app_ideas (
 
 CREATE INDEX IF NOT EXISTS idx_app_ideas_user_id ON app_ideas(user_id);
 CREATE INDEX IF NOT EXISTS idx_app_ideas_created_at ON app_ideas(created_at DESC);
+
+-- =============================================================================
+-- Mobile app security: refresh sessions + auth audit
+-- =============================================================================
+CREATE TABLE IF NOT EXISTS mobile_refresh_sessions (
+  id SERIAL PRIMARY KEY,
+  refresh_token_id UUID NOT NULL UNIQUE,
+  company_id INTEGER NOT NULL REFERENCES companies(id) ON DELETE CASCADE,
+  refresh_token_hash VARCHAR(255) NOT NULL,
+  created_at TIMESTAMP WITHOUT TIME ZONE DEFAULT NOW(),
+  expires_at TIMESTAMP WITHOUT TIME ZONE NOT NULL,
+  revoked_at TIMESTAMP WITHOUT TIME ZONE,
+  revoke_reason VARCHAR(120)
+);
+
+CREATE INDEX IF NOT EXISTS idx_mobile_refresh_sessions_company_id
+ON mobile_refresh_sessions(company_id);
+
+CREATE INDEX IF NOT EXISTS idx_mobile_refresh_sessions_expires_at
+ON mobile_refresh_sessions(expires_at);
+
+CREATE TABLE IF NOT EXISTS mobile_auth_audit_logs (
+  id SERIAL PRIMARY KEY,
+  company_id INTEGER REFERENCES companies(id) ON DELETE SET NULL,
+  company_name VARCHAR(255),
+  event_type VARCHAR(30) NOT NULL,
+  status VARCHAR(20) NOT NULL,
+  message VARCHAR(500),
+  ip_address VARCHAR(120),
+  user_agent VARCHAR(500),
+  created_at TIMESTAMP WITHOUT TIME ZONE DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_mobile_auth_audit_logs_company_id
+ON mobile_auth_audit_logs(company_id);
+
+CREATE INDEX IF NOT EXISTS idx_mobile_auth_audit_logs_created_at
+ON mobile_auth_audit_logs(created_at DESC);
 
 
  

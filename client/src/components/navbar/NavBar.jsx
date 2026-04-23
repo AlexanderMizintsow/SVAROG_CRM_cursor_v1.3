@@ -125,6 +125,17 @@ const NavBar = () => {
       link: '/marketing-automation',
     },
     {
+      name: 'Управление мобильным приложением',
+      icon: TbApps,
+      subMenuItems: [
+        {
+          name: 'Управление новостями',
+          icon: FaRegMessage,
+          link: '/mobile-news-management',
+        },
+      ],
+    },
+    {
       name: 'Телефония (asterisk)',
       icon: DiAsterisk,
       subMenuItems: [

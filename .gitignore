@@ -24,3 +24,6 @@ level_*.json
 Dextop_svarog/dist/
 Dextop_svarog/build/
 *.exe
+
+# Мобильное приложение ПОЗ — отдельный репозиторий (git init внутри apk/POZ, свой remote)
+apk/POZ/

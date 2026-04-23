@@ -1,7 +1,6 @@
 import { useEffect, useState } from 'react'
 import { API_BASE_URL } from '../../../../config'
 import {
-  Container,
   Table,
   TableBody,
   TableCell,
@@ -9,7 +8,13 @@ import {
   TableHead,
   TableRow,
   Button,
+  Tab,
+  Tabs,
   Typography,
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  DialogActions,
 } from '@mui/material'
 import { ToastContainer, toast } from 'react-toastify'
 import { MdContactSupport } from 'react-icons/md'
@@ -18,6 +23,7 @@ import ConfirmationDialog from '../../../components/confirmationDialog/Confirmat
 import SearchBar from '../../../components/searchBar/SearchBar'
 import 'react-toastify/dist/ReactToastify.css'
 import HelpModalCompanyPassword from './HelpModalCompanyPassword'
+import useUserStore from '../../../store/userStore'
 
 const generateRandomPassword = (length = 12) => {
   const charset =
@@ -31,12 +37,19 @@ const generateRandomPassword = (length = 12) => {
 }
 
 const CompanyPassword = () => {
+  const { user } = useUserStore()
   const [companies, setCompanies] = useState([])
   const [dialogOpen, setDialogOpen] = useState(false)
   const [selectedCompanyId, setSelectedCompanyId] = useState(null)
   const [selectedCompanyName, setSelectedCompanyName] = useState('') // Добавляем состояние для имени компании
   const [searchTerm, setSearchTerm] = useState('')
   const [openHelpModal, setOpenHelpModal] = useState(false)
+  const [passwordMode, setPasswordMode] = useState('telegram')
+  const [issuedPasswordModal, setIssuedPasswordModal] = useState({
+    open: false,
+    companyName: '',
+    password: '',
+  })
 
   useEffect(() => {
     fetchCompanies()
@@ -53,18 +66,22 @@ const CompanyPassword = () => {
   }
 
   const handlePasswordChange = async (companyId, newPassword) => {
+    const isTelegramMode = passwordMode === 'telegram'
+    const endpoint = isTelegramMode
+      ? `${API_BASE_URL}5003/api/companies/password/${companyId}`
+      : `${API_BASE_URL}5003/api/companies/mobile-password/${companyId}`
+    const payload = isTelegramMode
+      ? { telegram_password: newPassword }
+      : { mobile_password: newPassword, userId: user?.id || null }
+
     try {
-      await axios.put(
-        `${API_BASE_URL}5003/api/companies/password/${companyId}`,
-        {
-          telegram_password: newPassword,
-        }
-      )
+      await axios.put(endpoint, payload)
       toast.success('Пароль успешно обновлён')
-      await fetchCompanies()
+      return true
     } catch (error) {
       console.error('Ошибка при обновлении пароля:', error)
       toast.error('Ошибка при обновлении пароля')
+      return false
     }
   }
 
@@ -75,25 +92,58 @@ const CompanyPassword = () => {
   }
 
   const confirmDelete = async () => {
-    await handlePasswordChange(selectedCompanyId, 'NOTACCES')
+    const isUpdated = await handlePasswordChange(selectedCompanyId, 'NOTACCES')
+    if (isUpdated) {
+      await fetchCompanies()
+    }
     setDialogOpen(false)
     setSelectedCompanyName('')
+  }
+
+  const getPasswordByMode = (company) =>
+    passwordMode === 'telegram' ? company.telegram_password : company.mobile_password
+
+  const handleCopyPassword = async (password) => {
+    try {
+      await navigator.clipboard.writeText(password)
+      toast.success('Пароль скопирован')
+    } catch (error) {
+      console.error('Ошибка при копировании пароля:', error)
+      toast.error('Не удалось скопировать пароль')
+    }
+  }
+
+  const handleGeneratePassword = async (company) => {
+    const newPassword = generateRandomPassword()
+    if (!newPassword) {
+      return
+    }
+
+    const isUpdated = await handlePasswordChange(company.id, newPassword)
+    if (!isUpdated) {
+      return
+    }
+
+    if (passwordMode === 'mobile') {
+      setIssuedPasswordModal({
+        open: true,
+        companyName: company.name_companies,
+        password: newPassword,
+      })
+    }
+
+    await fetchCompanies()
   }
 
   const renderTableCellActions = (company) => (
     <TableCell>
       <Button
         variant="contained"
-        onClick={() => {
-          const newPassword = generateRandomPassword()
-          if (newPassword) {
-            handlePasswordChange(company.id, newPassword)
-          }
-        }}
+        onClick={() => handleGeneratePassword(company)}
       >
         Установить пароль
       </Button>
-      {company.telegram_password !== 'NOTACCES' && (
+      {getPasswordByMode(company) !== 'NOTACCES' && (
         <Button
           variant="contained"
           color="secondary"
@@ -137,13 +187,36 @@ const CompanyPassword = () => {
       <Typography variant="h4" gutterBottom>
         Управление паролями доступа дилеров
       </Typography>
+      <Tabs
+        value={passwordMode}
+        onChange={(_, value) => setPasswordMode(value)}
+        sx={{ marginBottom: 2 }}
+      >
+        <Tab
+          value="telegram"
+          label="Пароли для Telegram-бота"
+        />
+        <Tab
+          value="mobile"
+          label="Пароли для мобильного приложения"
+        />
+      </Tabs>
+      <Typography variant="body2" sx={{ marginBottom: 2 }}>
+        {passwordMode === 'telegram'
+          ? 'Вкладка для выдачи пароля доступа в Telegram-бот.'
+          : 'Вкладка для выдачи пароля доступа в мобильное приложение ПОЗ.'}
+      </Typography>
 
       <TableContainer>
         <Table>
           <TableHead>
             <TableRow>
               <TableCell>Название компании</TableCell>
-              <TableCell>Пароль Telegram</TableCell>
+              <TableCell>
+                {passwordMode === 'telegram'
+                  ? 'Пароль Telegram'
+                  : 'Пароль мобильного приложения'}
+              </TableCell>
               <TableCell>Действия</TableCell>
             </TableRow>
           </TableHead>
@@ -152,11 +225,15 @@ const CompanyPassword = () => {
               <TableRow key={company.id}>
                 <TableCell>{company.name_companies}</TableCell>
                 <TableCell>
-                  {company.telegram_password === 'NOTACCES' ? (
+                  {getPasswordByMode(company) === 'NOTACCES' ? (
                     'NOTACCES'
+                  ) : passwordMode === 'mobile' ? (
+                    <Typography variant="body2">
+                      Установлен. Для передачи дилеру перевыпустите пароль.
+                    </Typography>
                   ) : (
                     <Typography variant="body1">
-                      {company.telegram_password}
+                      {getPasswordByMode(company)}
                     </Typography>
                   )}
                 </TableCell>
@@ -167,6 +244,46 @@ const CompanyPassword = () => {
         </Table>
       </TableContainer>
       <ToastContainer />
+      <Dialog
+        open={issuedPasswordModal.open}
+        onClose={() =>
+          setIssuedPasswordModal({
+            open: false,
+            companyName: '',
+            password: '',
+          })
+        }
+        maxWidth="sm"
+        fullWidth
+      >
+        <DialogTitle>Новый пароль для мобильного приложения</DialogTitle>
+        <DialogContent>
+          <Typography variant="body1" sx={{ mb: 2 }}>
+            Компания: {issuedPasswordModal.companyName}
+          </Typography>
+          <Typography variant="body2" sx={{ mb: 1 }}>
+            Сохраните и передайте пароль дилеру. После закрытия окна он больше не
+            будет отображаться в CRM.
+          </Typography>
+          <Typography variant="h6">{issuedPasswordModal.password}</Typography>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => handleCopyPassword(issuedPasswordModal.password)}>
+            Копировать
+          </Button>
+          <Button
+            onClick={() =>
+              setIssuedPasswordModal({
+                open: false,
+                companyName: '',
+                password: '',
+              })
+            }
+          >
+            Закрыть
+          </Button>
+        </DialogActions>
+      </Dialog>
       <ConfirmationDialog
         open={dialogOpen}
         onClose={() => setDialogOpen(false)}

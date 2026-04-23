@@ -1,6 +1,9 @@
 // companyRoutes.js
 const express = require('express')
 const router = express.Router()
+const bcrypt = require('bcrypt')
+
+const MOBILE_PASSWORD_LOCKED = 'NOTACCES'
 
 module.exports = (pool) => {
   // Получить все компании
@@ -852,6 +855,47 @@ GROUP BY
       res.json(result.rows[0])
     } catch (error) {
       console.error('Ошибка при обновлении пароля:', error)
+      res.status(500).send('Ошибка сервера')
+    }
+  })
+
+  // Обновить пароль компании для мобильного приложения
+  router.put('/companies/mobile-password/:id', async (req, res) => {
+    const companyId = req.params.id
+    const { mobile_password, userId } = req.body
+
+    try {
+      const preparedPassword =
+        mobile_password === MOBILE_PASSWORD_LOCKED
+          ? MOBILE_PASSWORD_LOCKED
+          : await bcrypt.hash(mobile_password, 10)
+
+      const result = await pool.query(
+        'UPDATE companies SET mobile_password = $1, updated_at = NOW() WHERE id = $2 RETURNING *',
+        [preparedPassword, companyId]
+      )
+
+      if (result.rows.length === 0) {
+        return res.status(404).send('Компания не найдена')
+      }
+
+      if (mobile_password !== MOBILE_PASSWORD_LOCKED && userId) {
+        const action = 'перевыпуск mobile пароля'
+        const entityInfo = JSON.stringify({
+          id: result.rows[0].id,
+          name: result.rows[0].name_companies,
+        })
+        const context = 'компонент пароли дилеров'
+
+        await pool.query(
+          'INSERT INTO user_actions (userId, action, entity_info, context) VALUES ($1, $2, $3, $4)',
+          [userId, action, entityInfo, context]
+        )
+      }
+
+      res.json(result.rows[0])
+    } catch (error) {
+      console.error('Ошибка при обновлении mobile пароля:', error)
       res.status(500).send('Ошибка сервера')
     }
   })

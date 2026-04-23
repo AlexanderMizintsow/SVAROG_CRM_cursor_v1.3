@@ -21,6 +21,7 @@
     "@mui/x-data-grid": "^7.9.0",
     "@mui/x-data-grid-pro": "^7.8.0",
     "@mui/x-date-pickers": "^7.12.1",
+    "@tiptap/extension-image": "^3.0.7",
     "@tiptap/extension-underline": "^3.0.7",
     "@tiptap/pm": "^3.0.7",
     "@tiptap/react": "^3.0.7",
