@@ -113,6 +113,13 @@ const TaskRenderer = ({
     }
   }
 
+  const formatDateOnly = (value) => {
+    if (!value) return 'Не указана'
+    const date = new Date(value)
+    if (isNaN(date.getTime())) return 'Не указана'
+    return date.toLocaleDateString()
+  }
+
   // Рендер карточки задачи
   const renderTaskCard = (task) => {
     const isArchive = completedArchiveMode
@@ -228,28 +235,39 @@ const TaskRenderer = ({
               </Typography>
             </Box>
 
-            {/* Дедлайн */}
-            <Box display="flex" alignItems="center" mb={2}>
-              <Schedule
-                sx={{
-                  fontSize: 18,
-                  mr: 1,
-                  color: isOverdue ? 'error.main' : 'text.secondary',
-                }}
-              />
-              <Typography
-                variant="body2"
-                color={isOverdue ? 'error.main' : 'text.secondary'}
-                sx={{ fontWeight: isOverdue ? 600 : 400 }}
-              >
-                {task.deadline && !isNaN(new Date(task.deadline).getTime()) ? (
-                  new Date(task.deadline).toLocaleDateString()
-                ) : (
-                  <span style={{ color: 'orange' }}> Не указан </span>
-                )}
-                {isOverdue && ' (Просрочено)'}
-              </Typography>
-            </Box>
+            {!isArchive ? (
+              /* Дедлайн */
+              <Box display="flex" alignItems="center" mb={2}>
+                <Schedule
+                  sx={{
+                    fontSize: 18,
+                    mr: 1,
+                    color: isOverdue ? 'error.main' : 'text.secondary',
+                  }}
+                />
+                <Typography
+                  variant="body2"
+                  color={isOverdue ? 'error.main' : 'text.secondary'}
+                  sx={{ fontWeight: isOverdue ? 600 : 400 }}
+                >
+                  {task.deadline && !isNaN(new Date(task.deadline).getTime()) ? (
+                    new Date(task.deadline).toLocaleDateString()
+                  ) : (
+                    <span style={{ color: 'orange' }}> Не указан </span>
+                  )}
+                  {isOverdue && ' (Просрочено)'}
+                </Typography>
+              </Box>
+            ) : (
+              <Box mb={2}>
+                <Typography variant="body2" color="text.secondary">
+                  Дата создания: {formatDateOnly(task.created_at)}
+                </Typography>
+                <Typography variant="body2" color="text.secondary">
+                  Дата финального завершения: {formatDateOnly(task.completed_at)}
+                </Typography>
+              </Box>
+            )}
 
             {/* Подзадачи */}
             {hasSubtasks[task.task_id] && !isCheckingSubtasks[task.task_id] && (
@@ -488,8 +506,8 @@ const TaskRenderer = ({
                   />
                 </Box>
 
-                <Box display="flex" alignItems="center" mb={1}>
-                  {!isArchive && (
+                {!isArchive ? (
+                  <Box display="flex" alignItems="center" mb={1}>
                     <IconButton
                       size="small"
                       onClick={() => handleOpenDeadlineDialog(task)}
@@ -497,17 +515,26 @@ const TaskRenderer = ({
                     >
                       <IoCalendarOutline size={14} />
                     </IconButton>
-                  )}
-                  <Typography
-                    variant="caption"
-                    color={isOverdue ? 'error.main' : 'text.secondary'}
-                    sx={{ fontWeight: isOverdue ? 600 : 400 }}
-                  >
-                    Дедлайн:{' '}
-                    {task.deadline ? new Date(task.deadline).toLocaleDateString() : 'Не указан'}
-                    {isOverdue && ' (Просрочено)'}
-                  </Typography>
-                </Box>
+                    <Typography
+                      variant="caption"
+                      color={isOverdue ? 'error.main' : 'text.secondary'}
+                      sx={{ fontWeight: isOverdue ? 600 : 400 }}
+                    >
+                      Дедлайн:{' '}
+                      {task.deadline ? new Date(task.deadline).toLocaleDateString() : 'Не указан'}
+                      {isOverdue && ' (Просрочено)'}
+                    </Typography>
+                  </Box>
+                ) : (
+                  <Box mb={1.5}>
+                    <Typography variant="caption" color="text.secondary" sx={{ display: 'block' }}>
+                      Дата создания: {formatDateOnly(task.created_at)}
+                    </Typography>
+                    <Typography variant="caption" color="text.secondary" sx={{ display: 'block' }}>
+                      Дата финального завершения: {formatDateOnly(task.completed_at)}
+                    </Typography>
+                  </Box>
+                )}
 
                 <Box display="flex" alignItems="center" mb={2}>
                   {!isArchive && (

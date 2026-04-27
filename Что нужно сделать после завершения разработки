@@ -1,0 +1,110 @@
+# Что нужно сделать после завершения разработки
+
+Документ фиксирует обязательные действия перед выпуском мобильного приложения `POZ` в рабочую эксплуатацию.
+
+## 1) Обязательные технические мероприятия перед релизом
+
+1. Проверить, что используются прод-адреса API:
+   - `EXPO_PUBLIC_MOBILE_API_URL` указывает на боевой сервер.
+   - Нет локальных адресов (`localhost`, `127.0.0.1`) в мобильной конфигурации.
+
+2. Проверить идентификаторы приложения:
+   - Android package: `com.poz.mobile`
+   - iOS bundleIdentifier: `com.poz.mobile`
+   - Не должно остаться упоминаний старого `com.schtandart.poz`.
+
+3. Проверить сборочные профили (`eas.json`):
+   - Для тестов: `preview` / `development`.
+   - Для выпуска: `production`.
+
+4. Проверить подписи и credentials:
+   - Android Keystore назначен и валиден.
+   - iOS сертификаты и provisioning profile корректно созданы.
+
+5. Выполнить регрессионное тестирование:
+   - Авторизация/выход.
+   - Лента новостей, карточки, экран деталей, переход назад.
+   - Событийное обновление ленты (публикация/снятие с публикации).
+   - Работа в светлой и темной теме (шапка, статус-бар, безопасные отступы).
+
+6. Проверить серверную часть mobile_app:
+   - Эндпоинты авторизации и ленты.
+   - Регистрация push-устройств.
+   - WebSocket `/ws/news` (подключение, reconnect, heartbeat).
+
+## 2) Push-уведомления через Firebase + Expo (обязательно)
+
+### 2.1 Настройка Firebase (Android)
+
+1. В Firebase Console создать/выбрать проект.
+2. Добавить Android-приложение с package `com.poz.mobile`.
+3. Скачать `google-services.json`.
+4. Разместить файл в `apk/POZ/google-services.json`.
+5. Проверить, что в `apk/POZ/app.json` прописано:
+   - `expo.android.googleServicesFile = "./google-services.json"`
+
+### 2.2 Настройка FCM V1 ключа в EAS
+
+1. В Firebase:
+   - `Project settings` -> `Service accounts` -> `Generate new private key`.
+   - Скачать JSON ключ service account (файл вида `...firebase-adminsdk....json`).
+2. В проекте выполнить:
+   - `npx eas credentials`
+3. Выбрать:
+   - Android -> нужный application identifier ->  
+     `Set up a Google Service Account Key for Push Notifications (FCM V1)`
+4. Указать путь к service account JSON (это **не** `google-services.json`).
+5. Убедиться в выводе CLI, что ключ привязан к `com.poz.mobile`.
+
+### 2.3 Проверка после сборки
+
+1. Собрать новый APK/AAB после привязки ключа:
+   - `npx eas build --platform android --profile preview`
+   - для релиза: `npx eas build --platform android --profile production`
+2. Установить новую сборку на физический телефон.
+3. Авторизоваться в приложении (чтобы устройство зарегистрировало push token).
+4. Проверить в БД:
+   - таблица `mobile_push_devices` содержит актуальный `expo_push_token`.
+5. Опубликовать новость и проверить:
+   - в `mobile_push_events` событие со статусом `done`;
+   - в `mobile_push_delivery_logs` нет ошибок FCM key/credentials;
+   - push приходит на устройство;
+   - по нажатию на push открывается нужный экран/новость.
+
+## 3) Что отличается между разработкой и финальным приложением
+
+1. `Expo Go` != финальное приложение:
+   - В `Expo Go` удаленная Android push-функциональность не используется как в production.
+   - Для полноценной проверки push нужен EAS build (preview/development build/production).
+
+2. Dev-сервера и локальные адреса:
+   - Во время разработки допустимы временные URL и отладка.
+   - В релизе должны быть только стабильные боевые endpoint'ы.
+
+3. Отладочные логи:
+   - В dev допустимы расширенные диагностические сообщения.
+   - В production оставлять только полезные эксплуатационные логи без чувствительных данных.
+
+4. Доступы и ключи:
+   - В релизной ветке не хранить приватные ключи в git.
+   - Файлы `*firebase-adminsdk*.json` должны быть в `.gitignore`.
+
+5. Стабильность UX:
+   - Проверить safe area на реальных устройствах с разными экранами.
+   - Проверить поведение приложения при фоне/возврате в foreground.
+
+6. Публикация в магазины:
+   - Android: подготовить `production` build и метаданные в Play Console.
+   - iOS: требуется Apple Developer и выпуск через TestFlight/App Store Connect.
+
+## 4) Минимальный релизный чек-лист (короткая версия)
+
+- [ ] Прод URL и переменные окружения проверены.
+- [ ] Идентификаторы `com.poz.mobile` везде корректны.
+- [ ] Firebase `google-services.json` подключен.
+- [ ] FCM V1 service account загружен в EAS credentials.
+- [ ] Push токен сохраняется в `mobile_push_devices`.
+- [ ] Push доставка успешна (без ошибок в `mobile_push_delivery_logs`).
+- [ ] Переход по push открывает нужный экран.
+- [ ] Регрессионные проверки пройдены.
+- [ ] Выполнена новая релизная сборка и проверка на физическом устройстве.

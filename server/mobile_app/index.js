@@ -1,4 +1,5 @@
 require('dotenv').config()
+const http = require('http')
 const express = require('express')
 const path = require('path')
 const pool = require('./db/pool')
@@ -7,9 +8,11 @@ const employeeAuthRoutes = require('./modules/employee/routes/authRoutes')
 const dealerNewsAdminRoutes = require('./modules/dealer_news/routes/adminRoutes')
 const dealerNewsFeedRoutes = require('./modules/dealer_news/routes/feedRoutes')
 const pushRoutes = require('./modules/shared/notifications/pushRoutes')
+const { initNewsEventsWs } = require('./modules/shared/events/newsEvents')
 const { configureSecurity } = require('./middleware/security')
 
 const app = express()
+const httpServer = http.createServer(app)
 const port = process.env.PORT || 5011
 const isProduction = process.env.NODE_ENV === 'production'
 
@@ -50,6 +53,8 @@ app.use('/api/mobile/dealer/news', dealerNewsFeedRoutes(pool))
 app.use('/api/mobile/dealer/news-admin', dealerNewsAdminRoutes(pool))
 app.use('/api/mobile/push', pushRoutes(pool))
 
-app.listen(port, '0.0.0.0', () => {
+initNewsEventsWs(httpServer)
+
+httpServer.listen(port, '0.0.0.0', () => {
   console.log(`mobile_app server started on ${port}`)
 })

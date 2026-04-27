@@ -8,6 +8,7 @@ const {
 } = require('../services/newsService')
 const { sanitizeNewsHtml } = require('../utils/sanitizeNewsHtml')
 const { enqueueAndSendNewsPublishedPush } = require('../../shared/notifications/pushService')
+const { broadcastNewsEvent } = require('../../shared/events/newsEvents')
 
 const parseEditorUserId = (req) => {
   const value = req.headers['x-user-id'] || req.body?.userId || req.query?.userId
@@ -60,7 +61,8 @@ const syncTimedStatuses = async (pool) => {
             updated_at = NOW()
       WHERE status IN ('published', 'scheduled')
         AND unpublish_at IS NOT NULL
-        AND unpublish_at <= NOW()`
+        AND unpublish_at <= NOW()
+      RETURNING id`
   )
 
   for (const row of becamePublishedRes.rows) {
@@ -70,6 +72,7 @@ const syncTimedStatuses = async (pool) => {
         title: row.title,
         createdBy: null,
       })
+      broadcastNewsEvent({ type: 'news_published', newsId: row.id })
     } catch (error) {
       console.error('[mobile_app][dealer_news][sync_publish_push] error', error)
     }
@@ -188,6 +191,7 @@ const createNews = (pool) => async (req, res) => {
           title,
           createdBy: access.userId,
         })
+        broadcastNewsEvent({ type: 'news_published', newsId })
       } catch (pushError) {
         console.error('[mobile_app][dealer_news][create_push] error', pushError)
       }
@@ -213,8 +217,9 @@ const updateNews = (pool) => async (req, res) => {
     const err = validatePayload(req.body)
     if (err) return res.status(400).json({ message: err })
 
-    const existing = await pool.query('SELECT id, cover_image_url FROM dealer_news WHERE id = $1', [newsId])
+    const existing = await pool.query('SELECT id, status, cover_image_url FROM dealer_news WHERE id = $1', [newsId])
     if (!existing.rows.length) return res.status(404).json({ message: 'Новость не найдена' })
+    const previousStatus = String(existing.rows[0].status || '')
 
     const title = String(req.body.title || '').trim()
     const summary = String(req.body.summary || '').trim()
@@ -261,9 +266,13 @@ const updateNews = (pool) => async (req, res) => {
           title,
           createdBy: access.userId,
         })
+        broadcastNewsEvent({ type: 'news_published', newsId })
       } catch (pushError) {
         console.error('[mobile_app][dealer_news][update_push] error', pushError)
       }
+    }
+    if (status === 'archived' && (previousStatus === 'published' || previousStatus === 'scheduled')) {
+      broadcastNewsEvent({ type: 'news_unpublished', newsId })
     }
 
     const full = await getNewsById(pool, newsId)

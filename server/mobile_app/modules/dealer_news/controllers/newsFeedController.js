@@ -1,5 +1,23 @@
 const { extractExcerpt, canNewsBeVisibleNow } = require('../services/newsService')
 
+const buildSegmentsByType = (segments = []) => ({
+  region: segments.filter((s) => s.segment_type === 'region').map((s) => s.segment_value),
+  city: segments.filter((s) => s.segment_type === 'city').map((s) => s.segment_value),
+  company: segments.filter((s) => s.segment_type === 'company').map((s) => s.segment_value),
+})
+
+const isVisibleForDealer = ({ segmentsByType, dealerRegion, dealerCity, companyName }) => {
+  const regionOk =
+    !segmentsByType.region.length ||
+    segmentsByType.region.some((x) => x.toLowerCase() === dealerRegion.toLowerCase())
+  const cityOk =
+    !segmentsByType.city.length || segmentsByType.city.some((x) => x.toLowerCase() === dealerCity.toLowerCase())
+  const companyOk =
+    !segmentsByType.company.length ||
+    segmentsByType.company.some((x) => x.toLowerCase() === companyName.toLowerCase())
+  return regionOk && cityOk && companyOk
+}
+
 const listFeed = (pool) => async (req, res) => {
   try {
     const limit = Math.min(20, Math.max(1, parseInt(req.query.limit || '10', 10)))
@@ -38,24 +56,12 @@ const listFeed = (pool) => async (req, res) => {
         [row.id]
       )
       const segments = segmentsRes.rows
-      if (!segments.length) {
+      const segmentsByType = buildSegmentsByType(segments)
+      if (
+        !segments.length ||
+        isVisibleForDealer({ segmentsByType, dealerRegion, dealerCity, companyName })
+      ) {
         filtered.push(row)
-      } else {
-        const byType = {
-          region: segments.filter((s) => s.segment_type === 'region').map((s) => s.segment_value),
-          city: segments.filter((s) => s.segment_type === 'city').map((s) => s.segment_value),
-          company: segments.filter((s) => s.segment_type === 'company').map((s) => s.segment_value),
-        }
-
-        const regionOk =
-          !byType.region.length ||
-          byType.region.some((x) => x.toLowerCase() === dealerRegion.toLowerCase())
-        const cityOk = !byType.city.length || byType.city.some((x) => x.toLowerCase() === dealerCity.toLowerCase())
-        const companyOk =
-          !byType.company.length ||
-          byType.company.some((x) => x.toLowerCase() === companyName.toLowerCase())
-
-        if (regionOk && cityOk && companyOk) filtered.push(row)
       }
 
       if (filtered.length >= limit) break
@@ -95,6 +101,32 @@ const getFeedItem = (pool) => async (req, res) => {
 
     const row = result.rows[0]
     if (!canNewsBeVisibleNow(row)) return res.status(404).json({ message: 'Новость не найдена' })
+
+    const companyName = String(req.user?.companyName || '').trim()
+    const profileRes = await pool.query(
+      `SELECT ca.region, ca.city
+         FROM companies c
+         LEFT JOIN company_addresses ca ON ca.company_id = c.id
+        WHERE LOWER(c.name_companies) = LOWER($1)
+        ORDER BY ca.is_primary DESC NULLS LAST, ca.id ASC
+        LIMIT 1`,
+      [companyName]
+    )
+    const dealerRegion = String(profileRes.rows[0]?.region || '').trim()
+    const dealerCity = String(profileRes.rows[0]?.city || '').trim()
+    const segmentsRes = await pool.query(
+      `SELECT segment_type, segment_value
+         FROM dealer_news_segments
+        WHERE news_id = $1`,
+      [newsId]
+    )
+    const segmentsByType = buildSegmentsByType(segmentsRes.rows)
+    const visibleForDealer =
+      !segmentsRes.rows.length ||
+      isVisibleForDealer({ segmentsByType, dealerRegion, dealerCity, companyName })
+    if (!visibleForDealer) {
+      return res.status(404).json({ message: 'Новость не найдена' })
+    }
 
     const mediaRes = await pool.query(
       `SELECT id, file_url, file_name, file_size_bytes, mime_type, width_px, height_px, display_order

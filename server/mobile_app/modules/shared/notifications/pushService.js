@@ -1,6 +1,7 @@
 const EXPO_PUSH_URL = 'https://exp.host/--/api/v2/push/send'
 
-const isExpoPushToken = (token) => /^ExponentPushToken\[[\w-]+\]$/.test(String(token || ''))
+const isExpoPushToken = (token) =>
+  /^(ExponentPushToken|ExpoPushToken)\[[\w-]+\]$/.test(String(token || ''))
 
 const buildNewsRecipientsQuery = async (pool, newsId) => {
   const segmentsRes = await pool.query(
@@ -101,6 +102,7 @@ const dispatchPushEvent = async (pool, eventId, recipients) => {
 
   let sentCount = 0
   let errorCount = 0
+  const sentTokens = new Set()
   for (const company of recipients) {
     const devicesRes = await pool.query(
       `SELECT id, expo_push_token, company_id, company_name
@@ -111,6 +113,9 @@ const dispatchPushEvent = async (pool, eventId, recipients) => {
 
     for (const device of devicesRes.rows) {
       const token = String(device.expo_push_token || '').trim()
+      if (sentTokens.has(token)) {
+        continue
+      }
       if (!isExpoPushToken(token)) {
         await pool.query(
           `INSERT INTO mobile_push_delivery_logs
@@ -136,6 +141,7 @@ const dispatchPushEvent = async (pool, eventId, recipients) => {
           [eventId, device.company_id, device.company_name, token, JSON.stringify(responseJson || {})]
         )
         sentCount += 1
+        sentTokens.add(token)
       } catch (error) {
         await pool.query(
           `INSERT INTO mobile_push_delivery_logs
@@ -162,10 +168,20 @@ const dispatchPushEvent = async (pool, eventId, recipients) => {
       WHERE id = $1`,
     [eventId, errorCount > 0 && sentCount === 0 ? 'failed' : 'done']
   )
+  console.log('[mobile_app][push] event dispatched', {
+    eventId,
+    sentCount,
+    errorCount,
+    recipientsCount: recipients.length,
+  })
 }
 
 const enqueueAndSendNewsPublishedPush = async (pool, { newsId, title, createdBy }) => {
   const recipients = await buildNewsRecipientsQuery(pool, newsId)
+  console.log('[mobile_app][push] publish recipients resolved', {
+    newsId,
+    recipientsCount: recipients.length,
+  })
   const eventId = await createPushEvent(pool, {
     eventType: 'news_published',
     entityType: 'dealer_news',
@@ -179,6 +195,21 @@ const enqueueAndSendNewsPublishedPush = async (pool, { newsId, title, createdBy 
 }
 
 const registerPushDevice = async (pool, { companyId, companyName, token, platform, appVersion }) => {
+  const normalizedPlatform = platform || 'android'
+
+  // Keep only one active token per company+platform to prevent duplicate pushes
+  // on app reinstall / token rotation scenarios.
+  await pool.query(
+    `UPDATE mobile_push_devices
+        SET is_active = FALSE,
+            updated_at = NOW()
+      WHERE company_id = $1
+        AND platform = $2
+        AND expo_push_token <> $3
+        AND is_active = TRUE`,
+    [companyId, normalizedPlatform, token]
+  )
+
   await pool.query(
     `INSERT INTO mobile_push_devices
       (company_id, company_name, expo_push_token, platform, app_version, is_active, last_seen_at, updated_at)
@@ -191,8 +222,15 @@ const registerPushDevice = async (pool, { companyId, companyName, token, platfor
        is_active = TRUE,
        last_seen_at = NOW(),
        updated_at = NOW()`,
-    [companyId, companyName, token, platform || 'android', appVersion || null]
+    [companyId, companyName, token, normalizedPlatform, appVersion || null]
   )
+  console.log('[mobile_app][push] device registered', {
+    companyId,
+    companyName,
+    platform: normalizedPlatform,
+    appVersion: appVersion || null,
+    tokenPrefix: String(token || '').slice(0, 24),
+  })
 }
 
 module.exports = {

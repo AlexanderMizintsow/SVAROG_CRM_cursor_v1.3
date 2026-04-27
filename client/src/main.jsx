@@ -58,6 +58,10 @@ cd business_process_engine
 pm2 start index.js --name "business_process_engine"
 cd ..
 
+cd mobile_app
+pm2 start index.js --name "mobile_app"
+cd ..
+
 cd ..
 cd client
 pm2 serve dist 5173 --spa --name SVAROG
@@ -145,3 +149,8 @@ pm2 save
   git merge bp_project_block
   git push origin main
 */
+
+
+
+//  cd C:\caddy
+//  .\caddy.exe reload --config Caddyfile

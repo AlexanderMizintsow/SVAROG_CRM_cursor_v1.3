@@ -27,3 +27,7 @@ Dextop_svarog/build/
 
 # Мобильное приложение ПОЗ — отдельный репозиторий (git init внутри apk/POZ, свой remote)
 apk/POZ/
+
+# Firebase service account keys (never commit)
+*firebase-adminsdk*.json
+apk/POZ/poz-mobile-push-firebase-adminsdk-fbsvc-c2c05db762.json

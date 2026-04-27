@@ -42,6 +42,18 @@ const ACTION_LABELS = {
   update: 'Изменение',
   delete: 'Удаление',
 }
+const EDITOR_STATUS_OPTIONS = {
+  default: [
+    { value: 'draft', label: 'Черновик' },
+    { value: 'scheduled', label: 'Запланировано' },
+    { value: 'published', label: 'Опубликовано' },
+    { value: 'archived', label: 'Снято с публикации' },
+  ],
+  published: [
+    { value: 'published', label: 'Опубликовано (текущий)', disabled: true },
+    { value: 'archived', label: 'Снято с публикации' },
+  ],
+}
 
 const toDateTimeLocalValue = (raw) => {
   if (!raw) return ''
@@ -463,6 +475,10 @@ const MobileAppNewsManagement = () => {
   }
 
   const availableUsersForPermission = users.filter((u) => !permissions.some((p) => p.user_id === u.id))
+  const statusOptions =
+    editing.status === 'published'
+      ? EDITOR_STATUS_OPTIONS.published
+      : EDITOR_STATUS_OPTIONS.default
 
   const grantPermission = async () => {
     if (!selectedPermissionUser) return
@@ -643,10 +659,11 @@ const MobileAppNewsManagement = () => {
                   }
                 }}
               >
-                <option value="draft">Черновик</option>
-                <option value="scheduled">Запланировано</option>
-                <option value="published">Опубликовано</option>
-                <option value="archived">Снято с публикации</option>
+                {statusOptions.map((option) => (
+                  <option key={option.value} value={option.value} disabled={option.disabled}>
+                    {option.label}
+                  </option>
+                ))}
               </select>
             </label>
             {editing.status === 'scheduled' && (
