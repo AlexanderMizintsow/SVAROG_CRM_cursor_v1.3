@@ -16,6 +16,9 @@ const toError = (res, error) => {
   } else if (/ECONNREFUSED|EHOSTUNREACH|ETIMEDOUT/i.test(rawMessage)) {
     status = 503
     message = 'Нет соединения с сервером 1С. Повторите попытку позже.'
+  } else if (/AW service unavailable|AW request failed|AW invalid response format/i.test(rawMessage)) {
+    status = 503
+    message = 'Сервис проверки заказов AW временно недоступен.'
   }
 
   return res.status(status).json({ message })
@@ -74,10 +77,34 @@ const addDraftNode = (pool) => async (req, res) => {
   }
 }
 
+const removeLastDraftNode = (pool) => async (req, res) => {
+  try {
+    const result = await complaintsService.removeLastDraftNode(pool, {
+      companyId: req.user.companyId,
+      draftId: Number(req.params.id),
+    })
+    return res.status(200).json(result)
+  } catch (error) {
+    return toError(res, error)
+  }
+}
+
+const clearDraftNodes = (pool) => async (req, res) => {
+  try {
+    const result = await complaintsService.clearDraftNodes(pool, {
+      companyId: req.user.companyId,
+      draftId: Number(req.params.id),
+    })
+    return res.status(200).json(result)
+  } catch (error) {
+    return toError(res, error)
+  }
+}
+
 const uploadDraftAttachment = (pool) => async (req, res) => {
   try {
     if (!req.file) {
-      return res.status(400).json({ message: 'file is required' })
+      return res.status(400).json({ message: 'Файл вложения не передан.' })
     }
     const attachment = await complaintsService.addDraftAttachment(pool, {
       companyId: req.user.companyId,
@@ -109,6 +136,7 @@ const submitDraft = (pool) => async (req, res) => {
 const createQuickComplaint = (pool) => async (req, res) => {
   try {
     const note = String(req.body.note || '').trim()
+    const orderName = String(req.body.orderName || '').trim()
     let captions = []
     if (req.body.captionsJson) {
       try {
@@ -118,11 +146,15 @@ const createQuickComplaint = (pool) => async (req, res) => {
         }
       } catch (error) {}
     }
-    if (!note && (!req.files || !req.files.length)) {
-      return res.status(400).json({ message: 'note or attachment is required' })
+    if (!orderName) {
+      return res.status(400).json({ message: 'Наименование заказа обязательно' })
+    }
+    if (!note) {
+      return res.status(400).json({ message: 'Описание проблемы обязательно' })
     }
     const result = await complaintsService.createQuickComplaint(pool, {
       companyId: req.user.companyId,
+      orderName,
       note,
       files: req.files || [],
       captions,
@@ -216,6 +248,8 @@ module.exports = {
   startDraft,
   getOrderItems,
   addDraftNode,
+  removeLastDraftNode,
+  clearDraftNodes,
   uploadDraftAttachment,
   submitDraft,
   createQuickComplaint,

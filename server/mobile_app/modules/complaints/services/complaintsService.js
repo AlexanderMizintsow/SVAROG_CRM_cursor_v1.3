@@ -20,6 +20,11 @@ const toPublicAttachment = (row) => ({
 const normalizeOrderItems = (payload) => {
   if (Array.isArray(payload)) return payload.map((item) => String(item).trim()).filter(Boolean)
   if (Array.isArray(payload?.items)) return payload.items.map((item) => String(item).trim()).filter(Boolean)
+  if (Array.isArray(payload?.result)) {
+    return payload.result
+      .map((row) => String(row?.NAME || row?.name || '').trim())
+      .filter(Boolean)
+  }
   return []
 }
 
@@ -39,6 +44,16 @@ const buildStructuredText = ({ orderNo, nodes }) => {
       lines.push(`  - ${partName}: ${reasons.join(', ')}`)
     }
   }
+  return lines.join('\n')
+}
+
+const buildAttachmentsText = (attachmentsRows = []) => {
+  if (!attachmentsRows.length) return ''
+  const lines = ['Вложения:']
+  attachmentsRows.forEach((row, index) => {
+    const caption = row.caption ? ` (описание: ${row.caption})` : ''
+    lines.push(`${index + 1}. ${row.original_name}${caption}`)
+  })
   return lines.join('\n')
 }
 
@@ -82,6 +97,51 @@ const addDraftNode = async (pool, { companyId, draftId, item, part, reason }) =>
     [draftId, item, part, reason]
   )
   return getDraftById(pool, { companyId, draftId })
+}
+
+const removeLastDraftNode = async (pool, { companyId, draftId }) => {
+  const draft = await getDraftById(pool, { companyId, draftId })
+  if (!draft) throw new Error('draft not found')
+
+  const lastNodeRes = await pool.query(
+    `SELECT id, item_name, part_name, reason_name
+       FROM mobile_complaint_draft_nodes
+      WHERE draft_id = $1
+      ORDER BY id DESC
+      LIMIT 1`,
+    [draftId]
+  )
+  const lastNode = lastNodeRes.rows[0]
+  if (!lastNode) {
+    return { removed: null, draft }
+  }
+
+  await pool.query(`DELETE FROM mobile_complaint_draft_nodes WHERE id = $1`, [lastNode.id])
+  return {
+    removed: {
+      item: lastNode.item_name,
+      part: lastNode.part_name,
+      reason: lastNode.reason_name,
+    },
+    draft: await getDraftById(pool, { companyId, draftId }),
+  }
+}
+
+const clearDraftNodes = async (pool, { companyId, draftId }) => {
+  const draft = await getDraftById(pool, { companyId, draftId })
+  if (!draft) throw new Error('draft not found')
+
+  const deletedRes = await pool.query(
+    `DELETE FROM mobile_complaint_draft_nodes
+      WHERE draft_id = $1
+  RETURNING id`,
+    [draftId]
+  )
+
+  return {
+    removedCount: deletedRes.rowCount || 0,
+    draft: await getDraftById(pool, { companyId, draftId }),
+  }
 }
 
 const addDraftAttachment = async (pool, { companyId, draftId, file, caption = '', kind = 'document' }) => {
@@ -139,9 +199,17 @@ const submitDraft = async (pool, { companyId, draftId, notes = [], allowEmptyStr
   } else {
     textBlocks.push(`Заказ № ${draft.order_no}\nБыстрая рекламация без структурированного конструктора.`)
   }
+  const attachmentsText = buildAttachmentsText(attachmentsRes.rows)
+  if (attachmentsText) {
+    textBlocks.push(attachmentsText)
+  }
   const textCalc = textBlocks.join('\n\n')
 
-  const links = attachmentsRes.rows.map((item) => `/uploads/${item.stored_rel_path.replace(/\\/g, '/')}`)
+  const publicBase = String(process.env.MOBILE_PUBLIC_BASE_URL || '').trim()
+  const links = attachmentsRes.rows.map((item) => {
+    const rel = `/uploads/${item.stored_rel_path.replace(/\\/g, '/')}`
+    return publicBase ? `${publicBase}${rel}` : rel
+  })
   const reminder = await createReminder(pool, {
     relatedId: -1,
     userId: managerId,
@@ -166,10 +234,10 @@ const submitDraft = async (pool, { companyId, draftId, notes = [], allowEmptyStr
   }
 }
 
-const createQuickComplaint = async (pool, { companyId, note = '', files = [], captions = [] }) => {
+const createQuickComplaint = async (pool, { companyId, orderName, note = '', files = [], captions = [] }) => {
   const draft = await createDraft(pool, {
     companyId,
-    orderNo: `quick-${Date.now()}`,
+    orderNo: orderName,
     year: 2026,
   })
   const saved = []
@@ -349,6 +417,8 @@ module.exports = {
   complaintsService: {
     createDraft,
     addDraftNode,
+    removeLastDraftNode,
+    clearDraftNodes,
     addDraftAttachment,
     submitDraft,
     createQuickComplaint,

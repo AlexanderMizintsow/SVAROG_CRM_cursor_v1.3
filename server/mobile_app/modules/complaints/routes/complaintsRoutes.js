@@ -7,6 +7,8 @@ const {
   startDraft,
   getOrderItems,
   addDraftNode,
+  removeLastDraftNode,
+  clearDraftNodes,
   uploadDraftAttachment,
   submitDraft,
   createQuickComplaint,
@@ -37,6 +39,22 @@ const upload = multer({
   },
 })
 
+const uploadDraftAttachmentSingle = (req, res, next) => {
+  upload.single('file')(req, res, (error) => {
+    if (!error) return next()
+    if (error instanceof multer.MulterError) {
+      if (error.code === 'LIMIT_FILE_SIZE') {
+        return res.status(400).json({ message: 'Файл слишком большой. Максимум 15 МБ на вложение.' })
+      }
+      if (error.code === 'LIMIT_FILE_COUNT') {
+        return res.status(400).json({ message: 'Превышен лимит вложений.' })
+      }
+      return res.status(400).json({ message: `Ошибка загрузки вложения: ${error.code}` })
+    }
+    return res.status(400).json({ message: 'Не удалось обработать вложение.' })
+  })
+}
+
 module.exports = (pool) => {
   const router = express.Router()
   router.use(authenticateAccessToken)
@@ -45,7 +63,9 @@ module.exports = (pool) => {
   router.get('/order-items', getOrderItems(pool))
   router.get('/draft/:id', getDraft(pool))
   router.post('/draft/:id/items', addDraftNode(pool))
-  router.post('/draft/:id/attachments', upload.single('file'), uploadDraftAttachment(pool))
+  router.post('/draft/:id/remove-last', removeLastDraftNode(pool))
+  router.post('/draft/:id/clear', clearDraftNodes(pool))
+  router.post('/draft/:id/attachments', uploadDraftAttachmentSingle, uploadDraftAttachment(pool))
   router.post('/draft/:id/submit', submitDraft(pool))
 
   router.post('/quick', upload.array('files', 10), createQuickComplaint(pool))
