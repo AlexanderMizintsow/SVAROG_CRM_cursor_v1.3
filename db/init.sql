@@ -960,12 +960,14 @@ CREATE INDEX idx_task_history_changed_by ON task_history(changed_by);
 
 -- Аналитика (фаза 1): поля и индексы для отчётов по проектам, задачам, отделам и сотрудникам
 ALTER TABLE tasks ADD COLUMN IF NOT EXISTS completed_at TIMESTAMP NULL;
+ALTER TABLE tasks ADD COLUMN IF NOT EXISTS done_moved_at TIMESTAMP NULL;
 ALTER TABLE task_approvals ADD COLUMN IF NOT EXISTS responded_at TIMESTAMP NULL;
 CREATE INDEX IF NOT EXISTS idx_global_task_history_created_at ON global_task_history(created_at);
 CREATE INDEX IF NOT EXISTS idx_global_task_history_created_by ON global_task_history(created_by);
 CREATE INDEX IF NOT EXISTS idx_global_task_history_event_type ON global_task_history(event_type);
 CREATE INDEX IF NOT EXISTS idx_task_history_change_timestamp ON task_history(change_timestamp);
 CREATE INDEX IF NOT EXISTS idx_tasks_completed_at ON tasks(completed_at) WHERE completed_at IS NOT NULL;
+CREATE INDEX IF NOT EXISTS idx_tasks_done_moved_at ON tasks(done_moved_at) WHERE done_moved_at IS NOT NULL;
 CREATE INDEX IF NOT EXISTS idx_task_approvals_responded_at ON task_approvals(responded_at) WHERE responded_at IS NOT NULL;
 
 -- отслеживания и отправки уведомлений пользователям о событиях, связанных с задачами

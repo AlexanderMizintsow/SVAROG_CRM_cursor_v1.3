@@ -17,6 +17,7 @@
     },
     "android": {
       "package": "com.poz.mobile",
+      "googleServicesFile": "${GOOGLE_SERVICES_JSON}",
       "adaptiveIcon": {
         "backgroundColor": "#ffffff"
       }

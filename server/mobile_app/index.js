@@ -8,6 +8,8 @@ const employeeAuthRoutes = require('./modules/employee/routes/authRoutes')
 const dealerNewsAdminRoutes = require('./modules/dealer_news/routes/adminRoutes')
 const dealerNewsFeedRoutes = require('./modules/dealer_news/routes/feedRoutes')
 const pushRoutes = require('./modules/shared/notifications/pushRoutes')
+const complaintsRoutes = require('./modules/complaints/routes/complaintsRoutes')
+const { startClosedClaimsSyncCron } = require('./modules/complaints/flows/closedClaimsCron')
 const { initNewsEventsWs } = require('./modules/shared/events/newsEvents')
 const { configureSecurity } = require('./middleware/security')
 
@@ -52,8 +54,10 @@ app.use('/api/mobile/employee/auth', employeeAuthRoutes(pool))
 app.use('/api/mobile/dealer/news', dealerNewsFeedRoutes(pool))
 app.use('/api/mobile/dealer/news-admin', dealerNewsAdminRoutes(pool))
 app.use('/api/mobile/push', pushRoutes(pool))
+app.use('/api/mobile/complaints', complaintsRoutes(pool))
 
 initNewsEventsWs(httpServer)
+startClosedClaimsSyncCron(pool)
 
 httpServer.listen(port, '0.0.0.0', () => {
   console.log(`mobile_app server started on ${port}`)

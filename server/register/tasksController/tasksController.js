@@ -6,6 +6,7 @@ const path = require('path')
 const { BPE_API_URL } = require('../config')
 
 let _warnedMissingBpeUrl = false
+
 function notifyBpeTaskUpdated(taskId) {
   if (!taskId) return
   if (!_warnedMissingBpeUrl && !(process.env.BPE_API_URL || process.env.BPE_WEBHOOK_URL)) {
@@ -715,6 +716,7 @@ unique_comments AS (
           t.id AS task_id,
           t.created_at,
           t.completed_at,
+          t.done_moved_at,
           t.title,
           t.description,
           t.created_by,
@@ -750,7 +752,7 @@ unique_comments AS (
         LEFT JOIN task_visibility tv ON t.id = tv.task_id
         LEFT JOIN unique_approvals ua ON t.id = ua.task_id
         WHERE ${whereClause}  
-        GROUP BY t.id, t.title, t.description, t.created_by, t.created_at, t.completed_at, t.deadline, t.priority, t.tags, t.status, t.global_task_id, t.parent_id, t.root_id${orderByClause}`,
+        GROUP BY t.id, t.title, t.description, t.created_by, t.created_at, t.completed_at, t.done_moved_at, t.deadline, t.priority, t.tags, t.status, t.global_task_id, t.parent_id, t.root_id${orderByClause}`,
         queryParams
       )
 
@@ -848,8 +850,17 @@ function updateTaskStatus(dbPool, io) {
     const { status } = req.body // Новый статус
 
     try {
-      const query = 'UPDATE tasks SET status = $1 WHERE id = $2 RETURNING *'
-      const values = [status, id]
+      const query = `
+        UPDATE tasks
+        SET status = $1,
+            done_moved_at = CASE
+              WHEN $3 THEN CURRENT_TIMESTAMP
+              ELSE done_moved_at
+            END
+        WHERE id = $2
+        RETURNING *
+      `
+      const values = [status, id, status === 'done']
       const result = await dbPool.query(query, values)
 
       if (result.rows.length === 0) {

@@ -264,6 +264,9 @@ const TaskRenderer = ({
                   Дата создания: {formatDateOnly(task.created_at)}
                 </Typography>
                 <Typography variant="body2" color="text.secondary">
+                  Дата переноса в &quot;Выполнено&quot;: {formatDateOnly(task.done_moved_at)}
+                </Typography>
+                <Typography variant="body2" color="text.secondary">
                   Дата финального завершения: {formatDateOnly(task.completed_at)}
                 </Typography>
               </Box>
@@ -529,6 +532,9 @@ const TaskRenderer = ({
                   <Box mb={1.5}>
                     <Typography variant="caption" color="text.secondary" sx={{ display: 'block' }}>
                       Дата создания: {formatDateOnly(task.created_at)}
+                    </Typography>
+                    <Typography variant="caption" color="text.secondary" sx={{ display: 'block' }}>
+                      Дата переноса в &quot;Выполнено&quot;: {formatDateOnly(task.done_moved_at)}
                     </Typography>
                     <Typography variant="caption" color="text.secondary" sx={{ display: 'block' }}>
                       Дата финального завершения: {formatDateOnly(task.completed_at)}

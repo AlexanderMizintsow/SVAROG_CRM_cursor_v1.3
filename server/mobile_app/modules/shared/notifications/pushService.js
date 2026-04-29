@@ -233,7 +233,21 @@ const registerPushDevice = async (pool, { companyId, companyName, token, platfor
   })
 }
 
+const enqueueAndSendCompanyPush = async (pool, { companyId, companyName, title, body, payload }) => {
+  const eventId = await createPushEvent(pool, {
+    eventType: 'complaint_status',
+    entityType: 'complaint',
+    entityId: null,
+    title,
+    body,
+    payload,
+    createdBy: null,
+  })
+  await dispatchPushEvent(pool, eventId, [{ company_id: companyId, company_name: companyName }])
+}
+
 module.exports = {
   enqueueAndSendNewsPublishedPush,
   registerPushDevice,
+  enqueueAndSendCompanyPush,
 }

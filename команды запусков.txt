@@ -1,0 +1,6 @@
+cd C:\caddy
+>> .\caddy.exe run --config Caddyfile
+
+npx expo start
+
+npx eas build --platform android --profile preview
