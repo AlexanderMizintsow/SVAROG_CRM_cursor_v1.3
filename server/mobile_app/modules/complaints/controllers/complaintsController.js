@@ -10,12 +10,14 @@ const toError = (res, error) => {
   let message = rawMessage
   let status = /required|allowed|not found|missing/i.test(rawMessage) ? 400 : 500
 
-  if (/onec response timeout|onec connect timeout|onec socket timeout/i.test(rawMessage)) {
+  if (
+    /onec\s+response\s+timeout|onec\s+connect\s+timeout|onec\s+socket\s+timeout|onec.*\btimeout\b/i.test(rawMessage)
+  ) {
     status = 503
-    message = 'Сервис 1С временно недоступен. Попробуйте обновить список позже.'
+    message = 'Сервис рекламаций временно недоступен. Попробуйте обновить список позже.'
   } else if (/ECONNREFUSED|EHOSTUNREACH|ETIMEDOUT/i.test(rawMessage)) {
     status = 503
-    message = 'Нет соединения с сервером 1С. Повторите попытку позже.'
+    message = 'Нет соединения с сервером учёта. Повторите попытку позже.'
   } else if (/AW service unavailable|AW request failed|AW invalid response format/i.test(rawMessage)) {
     status = 503
     message = 'Сервис проверки заказов AW временно недоступен.'
@@ -167,10 +169,10 @@ const createQuickComplaint = (pool) => async (req, res) => {
 
 const getList = (pool) => async (req, res) => {
   try {
-    const tickets = await complaintsService.getComplaintList(pool, {
+    const payload = await complaintsService.getComplaintList(pool, {
       companyId: req.user.companyId,
     })
-    return res.status(200).json({ tickets })
+    return res.status(200).json(payload)
   } catch (error) {
     return toError(res, error)
   }
@@ -183,7 +185,7 @@ const getTicketDetails = (pool) => async (req, res) => {
       requestNumber: String(req.params.requestNumber || '').trim(),
     })
     if (!ticket) {
-      return res.status(404).json({ message: 'ticket not found' })
+      return res.status(404).json({ message: 'Заявка не найдена.' })
     }
     return res.status(200).json({ ticket })
   } catch (error) {

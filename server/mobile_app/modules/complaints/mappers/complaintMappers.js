@@ -3,6 +3,8 @@ const mapDraftSummary = (draft, nodes = []) => ({
   orderNo: draft.order_no,
   year: String(draft.year),
   status: draft.status,
+  submittedAt: draft.submitted_at || null,
+  onecRequestNumber: draft.onec_request_number || null,
   createdAt: draft.created_at,
   updatedAt: draft.updated_at,
   items: nodes.reduce((acc, row) => {

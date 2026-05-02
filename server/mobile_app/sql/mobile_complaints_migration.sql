@@ -7,6 +7,7 @@ CREATE TABLE IF NOT EXISTS mobile_complaint_drafts (
   year INTEGER NOT NULL,
   status VARCHAR(24) NOT NULL DEFAULT 'active',
   submitted_at TIMESTAMPTZ NULL,
+  onec_request_number VARCHAR(120) NULL,
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   CHECK (status IN ('active', 'submitted', 'cancelled'))
@@ -14,6 +15,10 @@ CREATE TABLE IF NOT EXISTS mobile_complaint_drafts (
 
 CREATE INDEX IF NOT EXISTS idx_mobile_complaint_drafts_company_status
   ON mobile_complaint_drafts(company_id, status, updated_at DESC);
+
+CREATE INDEX IF NOT EXISTS idx_mobile_complaint_drafts_company_onec
+  ON mobile_complaint_drafts (company_id, onec_request_number)
+  WHERE onec_request_number IS NOT NULL;
 
 CREATE TABLE IF NOT EXISTS mobile_complaint_draft_nodes (
   id BIGSERIAL PRIMARY KEY,

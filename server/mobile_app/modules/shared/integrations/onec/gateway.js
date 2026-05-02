@@ -15,7 +15,11 @@ const execute = async (commandName, args = {}) => {
     date: args.date || null,
   })
 
-  const raw = await executeOneCTransport({ message })
+  const raw = await executeOneCTransport({
+    message,
+    timeoutMs: args.timeoutMs,
+    connectTimeoutMs: args.connectTimeoutMs,
+  })
   const parsed = command.parser(raw)
 
   return {

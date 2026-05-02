@@ -1,8 +1,13 @@
 const net = require('net')
 const iconv = require('iconv-lite')
 
-const DEFAULT_TIMEOUT_MS = 15000
-const DEFAULT_CONNECT_TIMEOUT_MS = 5000
+const readPositiveIntEnv = (name, fallback) => {
+  const n = Number(process.env[name])
+  return Number.isFinite(n) && n > 0 ? Math.floor(n) : fallback
+}
+
+const DEFAULT_TIMEOUT_MS = readPositiveIntEnv('ONEC_RESPONSE_TIMEOUT_MS', 30000)
+const DEFAULT_CONNECT_TIMEOUT_MS = readPositiveIntEnv('ONEC_CONNECT_TIMEOUT_MS', 8000)
 
 const executeOneCTransport = ({
   message,

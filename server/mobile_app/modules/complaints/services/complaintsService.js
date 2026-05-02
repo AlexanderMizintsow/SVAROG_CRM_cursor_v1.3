@@ -57,6 +57,225 @@ const buildAttachmentsText = (attachmentsRows = []) => {
   return lines.join('\n')
 }
 
+const PENDING_TICKET_PREFIX = 'pending-'
+const STATUS_MANAGER_PROCESSING = 'Обрабатывается менеджером'
+
+const normalizeOrderKey = (value) =>
+  String(value || '')
+    .trim()
+    .replace(/\s+/g, ' ')
+    .toLowerCase()
+
+const requestNumberSortValue = (n) => {
+  const digits = String(n || '').replace(/\D/g, '')
+  if (!digits) return 0
+  const num = Number(digits)
+  if (Number.isSafeInteger(num)) return num
+  const cut = digits.length > 15 ? digits.slice(-15) : digits
+  return Number.parseInt(cut, 10) || 0
+}
+
+const parsePendingDraftId = (requestNumber) => {
+  const s = String(requestNumber || '').trim()
+  if (!s.toLowerCase().startsWith(PENDING_TICKET_PREFIX)) return null
+  const id = Number(s.slice(PENDING_TICKET_PREFIX.length))
+  return Number.isFinite(id) && id > 0 ? id : null
+}
+
+const fetchOnecComplaintTickets = async (pool, companyId) => {
+  const company = await getCompanyById(pool, companyId)
+  if (!company?.inn) {
+    throw new Error('company INN is missing')
+  }
+  const onecResult = await oneCGateway.execute('complaint.list', { inn: company.inn })
+  return Array.isArray(onecResult.parsed) ? onecResult.parsed : []
+}
+
+const tryLinkWizardDraftsToTickets = async (pool, companyId, onecTickets) => {
+  const linkedRes = await pool.query(
+    `SELECT onec_request_number
+       FROM mobile_complaint_drafts
+      WHERE company_id = $1
+        AND onec_request_number IS NOT NULL`,
+    [companyId]
+  )
+  const consumed = new Set(linkedRes.rows.map((r) => String(r.onec_request_number)))
+
+  let poolTickets = onecTickets.filter((t) => {
+    const rn = String(t.requestNumber || '')
+    return rn && !consumed.has(rn)
+  })
+
+  const pendingRes = await pool.query(
+    `SELECT d.*
+       FROM mobile_complaint_drafts d
+      WHERE d.company_id = $1
+        AND d.status = 'submitted'
+        AND d.onec_request_number IS NULL
+        AND EXISTS (SELECT 1 FROM mobile_complaint_draft_nodes n WHERE n.draft_id = d.id)
+      ORDER BY d.submitted_at ASC NULLS LAST, d.id ASC`,
+    [companyId]
+  )
+
+  const byOrder = new Map()
+  for (const row of pendingRes.rows) {
+    const key = normalizeOrderKey(row.order_no)
+    if (!byOrder.has(key)) byOrder.set(key, [])
+    byOrder.get(key).push(row)
+  }
+
+  const consumeTicket = (rn) => {
+    const s = String(rn)
+    consumed.add(s)
+    poolTickets = poolTickets.filter((t) => String(t.requestNumber) !== s)
+  }
+
+  const linkPair = async (draftRow, ticketRow) => {
+    const upd = await pool.query(
+      `UPDATE mobile_complaint_drafts
+          SET onec_request_number = $1,
+              updated_at = NOW()
+        WHERE id = $2
+          AND company_id = $3
+          AND onec_request_number IS NULL`,
+      [String(ticketRow.requestNumber), draftRow.id, companyId]
+    )
+    if (upd.rowCount) consumeTicket(ticketRow.requestNumber)
+  }
+
+  for (const [, groupDrafts] of byOrder) {
+    const orderKey = normalizeOrderKey(groupDrafts[0].order_no)
+    const candidates = poolTickets.filter((t) => {
+      if (!t?.orderNumber || String(t.orderNumber).trim() === 'Не указан') return false
+      return normalizeOrderKey(t.orderNumber) === orderKey
+    })
+    if (!candidates.length) continue
+
+    const draftsSorted = [...groupDrafts].sort((a, b) => {
+      const ta = new Date(a.submitted_at || a.created_at || 0).getTime()
+      const tb = new Date(b.submitted_at || b.created_at || 0).getTime()
+      return ta - tb
+    })
+    const ticketsSorted = [...candidates].sort(
+      (a, b) => requestNumberSortValue(a.requestNumber) - requestNumberSortValue(b.requestNumber)
+    )
+
+    if (draftsSorted.length === ticketsSorted.length) {
+      for (let i = 0; i < draftsSorted.length; i += 1) {
+        // eslint-disable-next-line no-await-in-loop
+        await linkPair(draftsSorted[i], ticketsSorted[i])
+      }
+    } else if (draftsSorted.length === 1 && ticketsSorted.length === 1) {
+      // eslint-disable-next-line no-await-in-loop
+      await linkPair(draftsSorted[0], ticketsSorted[0])
+    }
+  }
+}
+
+const buildStubCommentFromRow = (row) => {
+  if (row.head_item) {
+    let s = `${row.head_item} · ${row.head_part || '—'}`
+    if (row.node_count > 1) s += ` (+${row.node_count - 1})`
+    return s
+  }
+  return 'Менеджер получил данные и зарегистрирует обращение.'
+}
+
+const fetchPendingWizardStubRows = async (pool, companyId) => {
+  const stubRes = await pool.query(
+    `SELECT d.id,
+            d.order_no,
+            d.submitted_at,
+            (SELECT COUNT(*)::int FROM mobile_complaint_draft_nodes n WHERE n.draft_id = d.id) AS node_count,
+            (SELECT item_name FROM mobile_complaint_draft_nodes n WHERE n.draft_id = d.id ORDER BY n.id ASC LIMIT 1) AS head_item,
+            (SELECT part_name FROM mobile_complaint_draft_nodes n WHERE n.draft_id = d.id ORDER BY n.id ASC LIMIT 1) AS head_part
+       FROM mobile_complaint_drafts d
+      WHERE d.company_id = $1
+        AND d.status = 'submitted'
+        AND d.onec_request_number IS NULL
+        AND EXISTS (SELECT 1 FROM mobile_complaint_draft_nodes n WHERE n.draft_id = d.id)
+      ORDER BY d.submitted_at DESC NULLS LAST, d.id DESC`,
+    [companyId]
+  )
+  return stubRes.rows
+}
+
+const getMergedComplaintTickets = async (pool, { companyId }) => {
+  let onecTickets = []
+  let registrySyncFailed = false
+
+  try {
+    onecTickets = await fetchOnecComplaintTickets(pool, companyId)
+  } catch (error) {
+    registrySyncFailed = true
+    console.error('[mobile_app][complaints] registry list unavailable:', error?.message || error)
+  }
+
+  try {
+    await tryLinkWizardDraftsToTickets(pool, companyId, onecTickets)
+  } catch (error) {
+    console.error('[mobile_app][complaints] draft link step failed:', error?.message || error)
+  }
+
+  const rows = await fetchPendingWizardStubRows(pool, companyId)
+  const stubs = rows.map((row) => ({
+    requestNumber: `${PENDING_TICKET_PREFIX}${row.id}`,
+    orderNumber: row.order_no,
+    status: STATUS_MANAGER_PROCESSING,
+    comment: buildStubCommentFromRow(row),
+    isPendingRegistration: true,
+    localDraftId: row.id,
+    submittedAt: row.submitted_at,
+  }))
+
+  return {
+    tickets: [...stubs, ...onecTickets],
+    registrySyncFailed,
+  }
+}
+
+const buildPendingComplaintDetail = async (pool, { draftRow }) => {
+  const draftId = draftRow.id
+  const nodesRes = await pool.query(
+    `SELECT item_name, part_name, reason_name
+       FROM mobile_complaint_draft_nodes
+      WHERE draft_id = $1
+      ORDER BY id ASC`,
+    [draftId]
+  )
+  if (!nodesRes.rows.length) return null
+  const attachmentsRes = await pool.query(
+    `SELECT *
+       FROM mobile_complaint_attachments
+      WHERE draft_id = $1
+      ORDER BY id ASC`,
+    [draftId]
+  )
+  const head = nodesRes.rows[0]
+  const comment = buildStubCommentFromRow({
+    head_item: head.item_name,
+    head_part: head.part_name,
+    node_count: nodesRes.rows.length,
+  })
+  const draft = mapDraftSummary(draftRow, nodesRes.rows)
+  const attachments = attachmentsRes.rows.map(toPublicAttachment)
+  return {
+    requestNumber: `${PENDING_TICKET_PREFIX}${draftId}`,
+    orderNumber: draftRow.order_no,
+    status: STATUS_MANAGER_PROCESSING,
+    comment,
+    isPendingRegistration: true,
+    localDraftId: draftId,
+    submittedAt: draftRow.submitted_at || null,
+    draft,
+    attachments,
+    defect: null,
+    location: null,
+    closedAt: null,
+    rating: null,
+  }
+}
+
 const getDraftById = async (pool, { companyId, draftId }) => {
   const draftRes = await pool.query(
     `SELECT *
@@ -197,7 +416,9 @@ const submitDraft = async (pool, { companyId, draftId, notes = [], allowEmptyStr
   if (nodesRes.rows.length) {
     textBlocks.push(buildStructuredText({ orderNo: draft.order_no, nodes: nodesRes.rows }))
   } else {
-    textBlocks.push(`Заказ № ${draft.order_no}\nБыстрая рекламация без структурированного конструктора.`)
+    textBlocks.push(
+      `Заказ № ${draft.order_no}\nКраткое обращение (mobile), без пошаговой рекламации: передача информации менеджеру; не означает автоматическую замену изделия/комплектующих или выезд специалиста.`
+    )
   }
   const attachmentsText = buildAttachmentsText(attachmentsRes.rows)
   if (attachmentsText) {
@@ -269,18 +490,34 @@ const fetchOrderItems = async (pool, { companyId, orderNo, year }) => {
   return normalizeOrderItems(payload)
 }
 
-const getComplaintList = async (pool, { companyId }) => {
-  const company = await getCompanyById(pool, companyId)
-  if (!company?.inn) {
-    throw new Error('company INN is missing')
-  }
-  const onecResult = await oneCGateway.execute('complaint.list', { inn: company.inn })
-  return onecResult.parsed
-}
+const getComplaintList = async (pool, { companyId }) => getMergedComplaintTickets(pool, { companyId })
 
 const getComplaintDetails = async (pool, { companyId, requestNumber }) => {
-  const tickets = await getComplaintList(pool, { companyId })
-  const ticket = tickets.find((item) => String(item.requestNumber) === String(requestNumber))
+  const pendingDraftId = parsePendingDraftId(requestNumber)
+  if (pendingDraftId) {
+    const draftRes = await pool.query(
+      `SELECT *
+         FROM mobile_complaint_drafts
+        WHERE id = $1
+          AND company_id = $2
+        LIMIT 1`,
+      [pendingDraftId, companyId]
+    )
+    const draftRow = draftRes.rows[0]
+    if (!draftRow) return null
+    if (draftRow.onec_request_number) {
+      return getComplaintDetails(pool, {
+        companyId,
+        requestNumber: String(draftRow.onec_request_number),
+      })
+    }
+    if (draftRow.status !== 'submitted') return null
+    return buildPendingComplaintDetail(pool, { draftRow })
+  }
+
+  const onecTickets = await fetchOnecComplaintTickets(pool, companyId)
+  await tryLinkWizardDraftsToTickets(pool, companyId, onecTickets)
+  const ticket = onecTickets.find((item) => String(item.requestNumber) === String(requestNumber))
   if (!ticket) return null
 
   const closedRes = await pool.query(
@@ -359,7 +596,9 @@ const upsertClosedClaims = async (pool, claims) => {
 }
 
 const syncClosedClaimsFromOneC = async (pool) => {
-  const result = await oneCGateway.execute('complaint.closed', {})
+  const slowMs = Number(process.env.ONEC_CLOSED_SYNC_TIMEOUT_MS)
+  const timeoutMs = Number.isFinite(slowMs) && slowMs > 0 ? Math.floor(slowMs) : 90000
+  const result = await oneCGateway.execute('complaint.closed', { timeoutMs })
   const inserted = await upsertClosedClaims(pool, result.parsed)
   return inserted
 }

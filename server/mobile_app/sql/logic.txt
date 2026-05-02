@@ -1,0 +1,79 @@
+Раздел Мои рекламации работает так:
+
+Клиент (ComplaintsListScreen) при открытии экрана вызывает complaintsApi.getList().
+Это запрос GET /api/mobile/complaints/list с Bearer токеном.
+Обработчик на сервере: complaintsController.getList.
+Сервис: complaintsService.getComplaintList.
+Дальше сервер делает:
+
+берет companyId из токена;
+находит компанию и ее inn;
+отправляет запрос в 1С через oneCGateway с командой complaint.list;
+для этой команды формируется скан: V6R${inn} (Q11 протокол);
+ответ 1С парсится parseV6R в массив заявок.
+Что приходит в ответе API:
+
+формат: { tickets: [...] }
+каждый элемент tickets:
+requestNumber — номер заявки;
+orderNumber — номер заказа;
+status — статус;
+comment — комментарий (если есть).
+Что должно отображаться в разделе:
+
+список карточек заявок;
+в карточке:
+№ requestNumber,
+статус,
+строка Заказ {orderNumber} · {comment};
+состояния:
+loading — “Загрузка рекламаций...”
+error — текст ошибки + кнопка Повторить
+empty — “У вас пока нет актуальных заявок для отображения.”
+Важно: источник данных именно 1С (V6R) через mobile_app, не локальная БД заявок.
+
+
+
+//----------------------------------------
+
+Да, раздел «Закрытые и оценка» работает так:
+
+1) Откуда берутся «закрытые»
+В mobile_app запущен cron closedClaimsCron.
+Он периодически запрашивает 1С командой complaint.closed (V6Z через Q11).
+Ответ парсится (parseClosedClaims) в поля:
+requestNumber
+contractor
+inn
+defect
+location
+date
+Затем это сохраняется в таблицу mobile_complaint_closed_claims.
+Для новых закрытых заявок отправляется push в мобильное приложение.
+2) Что видит пользователь в экране оценки
+Клиент ComplaintRatingsScreen при открытии делает:
+
+GET /api/mobile/complaints/ratings/pending
+Сервер возвращает items, где берутся закрытые заявки без оценки (join closed_claims + отсутствие записи в mobile_complaint_ratings).
+
+Элемент списка:
+
+request_number
+defect
+closed_at
+3) Как отправляется оценка
+При нажатии «Отправить оценку»:
+
+клиент отправляет POST /api/mobile/complaints/:requestNumber/rating с rating и comment
+сервер:
+отправляет оценку в 1С командой complaint.rating (V0N...Q{rating} через Q12)
+ждет ack q12\x01 (parseAckQ12)
+сохраняет оценку в mobile_complaint_ratings (upsert)
+После успешной отправки клиент снова запрашивает pending-список.
+
+4) Что должно отображаться в разделе
+Блок «Закрытые рекламации, ожидающие оценку» — список заявок для оценки.
+Если нет заявок:
+Новых закрытых рекламаций для оценки пока нет.
+Блок «Оценка качества» показывается только если есть pending-заявки.
+После отправки: заявка исчезает из pending, т.к. уже оценена.
