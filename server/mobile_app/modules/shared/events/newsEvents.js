@@ -14,12 +14,14 @@ const logWs = (message, extra = null) => {
   console.log(`[mobile_app][ws][news] ${message}`, extra)
 }
 
-const initNewsEventsWs = (httpServer) => {
+/** noServer: два WebSocket.Server с path на одном http.Server в ws 8.x дают 400 на «чужом» path — upgrade маршрутизируется в index.js */
+const initNewsEventsWs = () => {
   newsWss = new WebSocket.Server({
-    server: httpServer,
+    noServer: true,
     path: '/ws/news',
+    perMessageDeflate: false,
   })
-  logWs('server initialized')
+  logWs('server initialized (noServer)')
 
   newsWss.on('connection', (socket) => {
     socket.isAlive = true
@@ -58,6 +60,13 @@ const initNewsEventsWs = (httpServer) => {
   })
 }
 
+const handleNewsWebSocketUpgrade = (req, socket, head) => {
+  if (!newsWss) return
+  newsWss.handleUpgrade(req, socket, head, (ws) => {
+    newsWss.emit('connection', ws, req)
+  })
+}
+
 const broadcastNewsEvent = (payload) => {
   if (!newsWss) return
 
@@ -77,6 +86,6 @@ const broadcastNewsEvent = (payload) => {
 
 module.exports = {
   initNewsEventsWs,
+  handleNewsWebSocketUpgrade,
   broadcastNewsEvent,
 }
-

@@ -9,8 +9,13 @@ const dealerNewsAdminRoutes = require('./modules/dealer_news/routes/adminRoutes'
 const dealerNewsFeedRoutes = require('./modules/dealer_news/routes/feedRoutes')
 const pushRoutes = require('./modules/shared/notifications/pushRoutes')
 const complaintsRoutes = require('./modules/complaints/routes/complaintsRoutes')
+const managerComplaintChatRoutes = require('./modules/complaints/chat/managerComplaintChatRoutes')
 const { startClosedClaimsSyncCron } = require('./modules/complaints/flows/closedClaimsCron')
-const { initNewsEventsWs } = require('./modules/shared/events/newsEvents')
+const { initNewsEventsWs, handleNewsWebSocketUpgrade } = require('./modules/shared/events/newsEvents')
+const {
+  initComplaintChatWs,
+  handleComplaintChatWebSocketUpgrade,
+} = require('./modules/complaints/chat/complaintChatWs')
 const { configureSecurity } = require('./middleware/security')
 
 const app = express()
@@ -54,9 +59,32 @@ app.use('/api/mobile/employee/auth', employeeAuthRoutes(pool))
 app.use('/api/mobile/dealer/news', dealerNewsFeedRoutes(pool))
 app.use('/api/mobile/dealer/news-admin', dealerNewsAdminRoutes(pool))
 app.use('/api/mobile/push', pushRoutes(pool))
+// Узкий префикс раньше широкого: иначе /complaints перехватывает /complaints/manager-chat и требует JWT дилера.
+app.use('/api/mobile/complaints/manager-chat', managerComplaintChatRoutes(pool))
 app.use('/api/mobile/complaints', complaintsRoutes(pool))
 
-initNewsEventsWs(httpServer)
+initNewsEventsWs()
+initComplaintChatWs({ pool })
+
+const wsPathname = (url) => {
+  if (!url) return ''
+  const q = url.indexOf('?')
+  return q === -1 ? url : url.slice(0, q)
+}
+
+httpServer.on('upgrade', (request, socket, head) => {
+  const path = wsPathname(request.url || '')
+  if (path === '/ws/news') {
+    handleNewsWebSocketUpgrade(request, socket, head)
+    return
+  }
+  if (path === '/ws/complaint-chat') {
+    handleComplaintChatWebSocketUpgrade(request, socket, head)
+    return
+  }
+  socket.destroy()
+})
+
 startClosedClaimsSyncCron(pool)
 
 httpServer.listen(port, '0.0.0.0', () => {

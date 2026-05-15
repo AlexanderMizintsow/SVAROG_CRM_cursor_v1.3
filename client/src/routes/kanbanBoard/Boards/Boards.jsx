@@ -95,6 +95,8 @@ const Boards = () => {
     const userReminders = reminders.filter((reminder) => reminder.user_id === selectedEmployeeId)
     const reminderItems = userReminders.map((reminder) => ({
       id: reminder.id.toString(), // Используем id из напоминания
+      reminderNumericId: reminder.id,
+      typeReminders: reminder.type_reminders || null,
       title: reminder.title || 'Напоминание о звонке!',
       description: reminder.comment.replace(/\n/g, '<br />'),
       priority: reminder.priority_notifications,

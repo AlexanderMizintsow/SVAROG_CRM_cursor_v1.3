@@ -25,6 +25,57 @@ function parseLocalDayEndMs(yyyyMmDd) {
   return new Date(y, m - 1, d, 23, 59, 59, 999).getTime()
 }
 
+const TASK_LIST_TABS = [
+  { id: 'created', label: 'Созданные' },
+  { id: 'completed', label: 'Завершённые' },
+  { id: 'approver', label: 'На утверждение' },
+  { id: 'visible', label: 'Видимые' },
+]
+
+const COMPLETED_SUB_TABS = [
+  { id: 'mine', label: 'Мои выполненные' },
+  { id: 'delegated', label: 'Порученные' },
+  { id: 'participation', label: 'Участие' },
+]
+
+function isUserAssignee(task, userId) {
+  if (!userId || !Array.isArray(task.assigned_user_ids)) return false
+  const uid = String(userId)
+  return task.assigned_user_ids.some((id) => String(id) === uid)
+}
+
+function isUserAuthor(task, userId) {
+  if (!userId) return false
+  return String(task.created_by) === String(userId)
+}
+
+function getTaskKey(task) {
+  return task.task_id ?? task.id
+}
+
+/** Одна задача могла попасть и из completedTasks API, и из tasksManager */
+function dedupeTasksById(tasks) {
+  const seen = new Set()
+  return tasks.filter((task) => {
+    const key = getTaskKey(task)
+    if (key == null) return true
+    const keyStr = String(key)
+    if (seen.has(keyStr)) return false
+    seen.add(keyStr)
+    return true
+  })
+}
+
+function isUserApproverOrViewer(task, userId) {
+  if (!userId) return false
+  const uid = String(userId)
+  const isApprover = (task.approver_user_ids || []).some(
+    (a) => String(a.approver_id) === uid
+  )
+  const isViewer = (task.visibility_user_ids || []).some((id) => String(id) === uid)
+  return isApprover || isViewer
+}
+
 /** Сначала недавно завершённые (completed_at), при отсутствии — по дате создания */
 function completedTaskSortMs(task) {
   if (task.completed_at) {
@@ -39,7 +90,7 @@ function completedTaskSortMs(task) {
 }
 
 const TaskListManager = ({ onClose, onOpenProject, stripRefreshKey }) => {
-  const { user } = useUserStore()
+  const { user, users } = useUserStore()
   const [searchTerm, setSearchTerm] = useState('')
   const [completedDateFrom, setCompletedDateFrom] = useState(
     () => getLocalMonthDateRangeYyyyMmDd().from
@@ -51,16 +102,11 @@ const TaskListManager = ({ onClose, onOpenProject, stripRefreshKey }) => {
   const { fetchTasksManager, tasksManager, fetchCompletedTasks, completedTasks, isLoading } =
     useTasksManageStore()
   const [approvalStatus, setApprovalStatus] = useState({})
-  const [expandedGroups, setExpandedGroups] = useState({
-    approver: true,
-    visible: true,
-  })
-  /** Вкладки «Созданные» / «Завершённые» (когда есть хотя бы одна из групп) */
-  const [createdCompletedTab, setCreatedCompletedTab] = useState('created')
-  /** Как в CompletedTaskList: только задачи, где пользователь в исполнителях */
-  const [showMyCompletedTasks, setShowMyCompletedTasks] = useState(true)
+  const [activeTaskListTab, setActiveTaskListTab] = useState('created')
+  const [completedSubTab, setCompletedSubTab] = useState('mine')
+  const [selectedDelegateAssigneeId, setSelectedDelegateAssigneeId] = useState(null)
   const userId = user?.id
-  // Загрузка задач при изменении userId
+
   useEffect(() => {
     if (userId) {
       fetchTasksManager(userId)
@@ -72,23 +118,29 @@ const TaskListManager = ({ onClose, onOpenProject, stripRefreshKey }) => {
   }, [userId, fetchTasksManager, fetchCompletedTasks, completedDateFrom, completedDateTo])
 
   useEffect(() => {
-    const saved = localStorage.getItem('showMyTasks')
-    if (saved !== null) {
+    const savedSubTab = localStorage.getItem('completedSubTab')
+    if (savedSubTab === 'mine' || savedSubTab === 'delegated') {
+      setCompletedSubTab(savedSubTab)
+      return
+    }
+    const legacy = localStorage.getItem('showMyTasks')
+    if (legacy !== null) {
       try {
-        setShowMyCompletedTasks(JSON.parse(saved))
+        setCompletedSubTab(JSON.parse(legacy) ? 'mine' : 'delegated')
       } catch {
         /* ignore */
       }
     }
   }, [])
 
-  const handleShowMyCompletedChange = useCallback((e) => {
-    const checked = e.target.checked
-    setShowMyCompletedTasks(checked)
-    localStorage.setItem('showMyTasks', JSON.stringify(checked))
+  const handleCompletedSubTabChange = useCallback((subTabId) => {
+    setCompletedSubTab(subTabId)
+    localStorage.setItem('completedSubTab', subTabId)
+    if (subTabId === 'mine') {
+      setSelectedDelegateAssigneeId(null)
+    }
   }, [])
 
-  // Инициализация состояния утверждения при загрузке задач
   useEffect(() => {
     if (tasksManager && tasksManager.length > 0) {
       const initialApprovalStatus = {}
@@ -122,7 +174,7 @@ const TaskListManager = ({ onClose, onOpenProject, stripRefreshKey }) => {
         }
       })
     }
-    return completed
+    return dedupeTasksById(completed)
   }, [completedTasks, tasksManager])
 
   const completedTasksFiltered = useMemo(() => {
@@ -155,13 +207,101 @@ const TaskListManager = ({ onClose, onOpenProject, stripRefreshKey }) => {
     return [...list].sort((a, b) => completedTaskSortMs(b) - completedTaskSortMs(a))
   }, [completedBaseList, completedDateFrom, completedDateTo, completedSearch])
 
-  const completedTasksForCards = useMemo(() => {
-    if (!userId) return completedTasksFiltered
-    if (!showMyCompletedTasks) return completedTasksFiltered
-    return completedTasksFiltered.filter((task) =>
-      Array.isArray(task.assigned_user_ids) && task.assigned_user_ids.includes(userId)
+  const completedMineTasks = useMemo(() => {
+    if (!userId) return []
+    return completedTasksFiltered.filter((task) => isUserAssignee(task, userId))
+  }, [completedTasksFiltered, userId])
+
+  /** Порученные: автор, но не исполнитель (если оба — только в «Мои выполненные») */
+  const completedDelegatedBase = useMemo(() => {
+    if (!userId) return []
+    return completedTasksFiltered.filter(
+      (task) => isUserAuthor(task, userId) && !isUserAssignee(task, userId)
     )
-  }, [completedTasksFiltered, showMyCompletedTasks, userId])
+  }, [completedTasksFiltered, userId])
+
+  /** Завершённые, где вы утверждающий или зритель (не автор и не исполнитель) */
+  const completedParticipationTasks = useMemo(() => {
+    if (!userId) return []
+    return completedTasksFiltered.filter((task) => {
+      if (isUserAssignee(task, userId) || isUserAuthor(task, userId)) return false
+      return isUserApproverOrViewer(task, userId)
+    })
+  }, [completedTasksFiltered, userId])
+
+  const completedTabCount = useMemo(
+    () => completedTasksFiltered.length,
+    [completedTasksFiltered]
+  )
+
+  const visibleCompletedSubTabs = useMemo(
+    () =>
+      COMPLETED_SUB_TABS.filter((sub) => {
+        if (sub.id === 'participation') return completedParticipationTasks.length > 0
+        return true
+      }),
+    [completedParticipationTasks.length]
+  )
+
+  const delegateAssigneeOptions = useMemo(() => {
+    const idSet = new Set()
+    completedDelegatedBase.forEach((task) => {
+      (task.assigned_user_ids || []).forEach((assigneeId) => {
+        if (assigneeId != null && String(assigneeId) !== String(userId)) {
+          idSet.add(String(assigneeId))
+        }
+      })
+    })
+
+    return [...idSet]
+      .map((idStr) => {
+        const numericId = Number(idStr)
+        const u = users.find((item) => String(item.id) === idStr)
+        return {
+          id: Number.isNaN(numericId) ? idStr : numericId,
+          lastName: u?.last_name?.trim() || `Исполнитель #${idStr}`,
+        }
+      })
+      .sort((a, b) => a.lastName.localeCompare(b.lastName, 'ru'))
+  }, [completedDelegatedBase, users, userId])
+
+  useEffect(() => {
+    if (
+      selectedDelegateAssigneeId != null &&
+      !delegateAssigneeOptions.some((o) => String(o.id) === String(selectedDelegateAssigneeId))
+    ) {
+      setSelectedDelegateAssigneeId(null)
+    }
+  }, [delegateAssigneeOptions, selectedDelegateAssigneeId])
+
+  const completedDelegatedTasks = useMemo(() => {
+    if (selectedDelegateAssigneeId == null) return completedDelegatedBase
+    const selected = String(selectedDelegateAssigneeId)
+    return completedDelegatedBase.filter((task) =>
+      (task.assigned_user_ids || []).some((id) => String(id) === selected)
+    )
+  }, [completedDelegatedBase, selectedDelegateAssigneeId])
+
+  const completedTasksForCards = useMemo(() => {
+    if (completedSubTab === 'mine') return completedMineTasks
+    if (completedSubTab === 'delegated') return completedDelegatedTasks
+    if (completedSubTab === 'participation') return completedParticipationTasks
+    return completedMineTasks
+  }, [
+    completedSubTab,
+    completedMineTasks,
+    completedDelegatedTasks,
+    completedParticipationTasks,
+  ])
+
+  useEffect(() => {
+    if (
+      completedSubTab === 'participation' &&
+      completedParticipationTasks.length === 0
+    ) {
+      setCompletedSubTab('mine')
+    }
+  }, [completedSubTab, completedParticipationTasks.length])
 
   const completedMonthDefault = getLocalMonthDateRangeYyyyMmDd()
   const hasCompletedExtraFilters = Boolean(
@@ -177,11 +317,9 @@ const TaskListManager = ({ onClose, onOpenProject, stripRefreshKey }) => {
     setCompletedSearch('')
   }, [])
 
-  // Функция для обновления статуса утверждения
   const approval = async (taskId, userId, approv) => {
     const newApprovalStatus = !approv
 
-    // Обновляем состояние локально
     setApprovalStatus((prev) => ({
       ...prev,
       [taskId]: newApprovalStatus,
@@ -204,7 +342,7 @@ const TaskListManager = ({ onClose, onOpenProject, stripRefreshKey }) => {
   const handleTaskAccept = async (taskId, userId, isDone, comment = null) => {
     try {
       const data = {
-        comment: comment || null, // Если comment не передан, будет null
+        comment: comment || null,
       }
 
       await axios.patch(`${API_BASE_URL}5000/api/task/accept/${taskId}/${userId}/${isDone}`, data)
@@ -213,46 +351,50 @@ const TaskListManager = ({ onClose, onOpenProject, stripRefreshKey }) => {
     }
   }
 
-  // Группировка задач
-  const groupedTasks = {
-    approver: [],
-    visible: [],
-    created_by: [],
-    completed: completedTasks || [],
-  }
+  const groupedTasks = useMemo(() => {
+    const groups = {
+      approver: [],
+      visible: [],
+      created_by: [],
+      completed: completedBaseList,
+    }
 
-  if (Array.isArray(tasksManager)) {
-    tasksManager.forEach((task) => {
-      if (task.approver_user_ids?.some((approver) => approver.approver_id === user.id)) {
-        groupedTasks.approver.push(task)
-      } else if (task.created_by === user.id) {
-        groupedTasks.created_by.push(task)
-      } else if (task.visibility_user_ids?.includes(user.id)) {
-        groupedTasks.visible.push(task)
-      }
+    if (Array.isArray(tasksManager)) {
+      tasksManager.forEach((task) => {
+        if (task.approver_user_ids?.some((approver) => approver.approver_id === user?.id)) {
+          groups.approver.push(task)
+        } else if (task.created_by === user?.id) {
+          groups.created_by.push(task)
+        } else if (task.visibility_user_ids?.includes(user?.id)) {
+          groups.visible.push(task)
+        }
+      })
+    }
 
-      if (task.is_completed) {
-        groupedTasks.completed.push(task)
-      }
-    })
-  }
+    return groups
+  }, [tasksManager, completedBaseList, user?.id])
 
+  const hasApproverSection = groupedTasks.approver.length > 0
   const hasCreatedBySection = groupedTasks.created_by.length > 0
-  const hasCompletedSection = groupedTasks.completed.length > 0
-  const showCreatedCompletedTabs = hasCreatedBySection || hasCompletedSection
-  const activeCreatedCompletedTab =
-    hasCreatedBySection && !hasCompletedSection
-      ? 'created'
-      : !hasCreatedBySection && hasCompletedSection
-        ? 'completed'
-        : createdCompletedTab
+  const hasCompletedSection = completedTabCount > 0
+  const hasVisibleSection = groupedTasks.visible.length > 0
 
-  const toggleGroup = (group) => {
-    setExpandedGroups((prev) => ({
-      ...prev,
-      [group]: !prev[group],
-    }))
-  }
+  const tabCounts = useMemo(
+    () => ({
+      approver: groupedTasks.approver.length,
+      created: groupedTasks.created_by.length,
+      completed: completedTabCount,
+      visible: groupedTasks.visible.length,
+    }),
+    [groupedTasks, completedTabCount]
+  )
+
+  const resolvedActiveTab = useMemo(() => {
+    const countForTab = (id) => tabCounts[id] ?? 0
+    if (countForTab(activeTaskListTab) > 0) return activeTaskListTab
+    const firstWithTasks = TASK_LIST_TABS.find((t) => countForTab(t.id) > 0)
+    return firstWithTasks?.id ?? activeTaskListTab
+  }, [activeTaskListTab, tabCounts])
 
   const refreshTasks = async () => {
     if (userId) {
@@ -274,168 +416,215 @@ const TaskListManager = ({ onClose, onOpenProject, stripRefreshKey }) => {
         &times;
       </Box>
       <Box className={styles.scrollContent}>
-      {groupedTasks.approver.length > 0 && (
-        <Box>
-          <Box onClick={() => toggleGroup('approver')} style={{ cursor: 'pointer' }}>
-            <Typography variant="h6" className={styles.taskTitle}>
-              Задачи на утверждение {expandedGroups.approver ? '▼' : '▲'}
-            </Typography>
-          </Box>
-          {expandedGroups.approver && (
-            <ApproverTaskList
-              tasks={groupedTasks.approver}
-              approvalStatus={approvalStatus}
-              userId={userId}
-              onApproval={approval}
-            />
-          )}
-        </Box>
-      )}
-          {showCreatedCompletedTabs && (
-            <Box className={styles.createdCompletedTabs}>
-              <div className={styles.tabsBar} role="tablist" aria-label="Созданные и завершённые задачи">
-                <button
-                  type="button"
-                  role="tab"
-                  aria-selected={activeCreatedCompletedTab === 'created'}
-                  className={`${styles.tabButton} ${
-                    activeCreatedCompletedTab === 'created' ? styles.tabButtonActive : ''
-                  }`}
-                  onClick={() => setCreatedCompletedTab('created')}
-                >
-                  Созданные задачи
-                  {hasCreatedBySection ? ` (${groupedTasks.created_by.length})` : ''}
-                </button>
-                <button
-                  type="button"
-                  role="tab"
-                  aria-selected={activeCreatedCompletedTab === 'completed'}
-                  className={`${styles.tabButton} ${
-                    activeCreatedCompletedTab === 'completed' ? styles.tabButtonActive : ''
-                  }`}
-                  onClick={() => setCreatedCompletedTab('completed')}
-                >
-                  Завершённые задачи
-                  {hasCompletedSection ? ` (${groupedTasks.completed.length})` : ''}
-                </button>
-              </div>
+        <Box className={styles.taskListTabs}>
+          <div className={styles.tabsBar} role="tablist" aria-label="Разделы листа задач">
+            {TASK_LIST_TABS.map((tab) => (
+              <button
+                key={tab.id}
+                type="button"
+                role="tab"
+                aria-selected={resolvedActiveTab === tab.id}
+                className={`${styles.tabButton} ${
+                  resolvedActiveTab === tab.id ? styles.tabButtonActive : ''
+                }`}
+                onClick={() => setActiveTaskListTab(tab.id)}
+              >
+                {tab.label} ({tabCounts[tab.id]})
+              </button>
+            ))}
+          </div>
 
-              {activeCreatedCompletedTab === 'created' && (
-                <Box className={styles.tabPanel} role="tabpanel">
-                  <div className={styles.createdTabSearch}>
-                    <SearchBar
-                      searchTerm={searchTerm}
-                      setSearchTerm={setSearchTerm}
-                      placeholder="Поиск созданных задач..."
-                      transform="0"
-                    />
-                  </div>
-                  {hasCreatedBySection ? (
-                    <CreatedByTaskList
-                      tasks={filterTasks(groupedTasks.created_by)}
-                      approvalStatus={approvalStatus}
-                      userId={userId}
-                      handleTaskAccept={handleTaskAccept}
-                      refreshTasks={refreshTasks}
-                      onOpenProject={onOpenProject}
-                    />
-                  ) : (
-                    <Typography className={styles.tabEmpty}>Нет созданных задач</Typography>
-                  )}
-                </Box>
-              )}
-
-              {activeCreatedCompletedTab === 'completed' && (
-                <Box className={styles.tabPanel} role="tabpanel">
-                  <div className={styles.completedExtra}>
-                    <div className={styles.completedDateRange}>
-                      <span className={styles.completedFilterLabel}>Создано:</span>
-                      <label className={styles.completedDateField}>
-                        <span className={styles.completedDateFieldLabel}>с</span>
-                        <input
-                          type="date"
-                          value={completedDateFrom}
-                          onChange={(e) => setCompletedDateFrom(e.target.value)}
-                          className={styles.completedDateInput}
-                        />
-                      </label>
-                      <label className={styles.completedDateField}>
-                        <span className={styles.completedDateFieldLabel}>по</span>
-                        <input
-                          type="date"
-                          value={completedDateTo}
-                          onChange={(e) => setCompletedDateTo(e.target.value)}
-                          className={styles.completedDateInput}
-                        />
-                      </label>
-                    </div>
-                    <div className={styles.completedSearchWrap}>
-                      <label
-                        className={styles.completedSearchLabel}
-                        htmlFor="task-list-manager-completed-search"
-                      >
-                        Поиск:
-                      </label>
-                      <input
-                        id="task-list-manager-completed-search"
-                        type="search"
-                        value={completedSearch}
-                        onChange={(e) => setCompletedSearch(e.target.value)}
-                        placeholder="Название или описание…"
-                        className={styles.completedSearchInput}
-                        autoComplete="off"
-                      />
-                    </div>
-                    {hasCompletedExtraFilters && (
-                      <button
-                        type="button"
-                        className={styles.completedFilterReset}
-                        onClick={clearCompletedExtraFilters}
-                      >
-                        Сбросить период и поиск
-                      </button>
-                    )}
-                  </div>
-                  <label className={styles.completedMyTasksCheck}>
-                    <input
-                      type="checkbox"
-                      checked={showMyCompletedTasks}
-                      onChange={handleShowMyCompletedChange}
-                    />
-                    <span>Показывать только мои выполненные задачи</span>
-                  </label>
-                  {hasCompletedSection ? (
-                    <CreatedByTaskList
-                      tasks={completedTasksForCards}
-                      approvalStatus={approvalStatus}
-                      userId={userId}
-                      handleTaskAccept={handleTaskAccept}
-                      refreshTasks={refreshTasks}
-                      onOpenProject={onOpenProject}
-                      completedArchiveMode
-                    />
-                  ) : (
-                    <Typography className={styles.tabEmpty}>Нет завершённых задач</Typography>
-                  )}
-                </Box>
+          {resolvedActiveTab === 'approver' && (
+            <Box className={styles.tabPanel} role="tabpanel">
+              {hasApproverSection ? (
+                <ApproverTaskList
+                  tasks={groupedTasks.approver}
+                  approvalStatus={approvalStatus}
+                  userId={userId}
+                  onApproval={approval}
+                />
+              ) : (
+                <Typography className={styles.tabEmpty}>Нет задач на утверждение</Typography>
               )}
             </Box>
           )}
-      {groupedTasks.visible.length > 0 && (
-        <Box>
-          <Box onClick={() => toggleGroup('visible')} style={{ cursor: 'pointer' }}>
-            <Typography variant="h6" className={styles.taskTitle}>
-              Видимые задачи {expandedGroups.visible ? '▼' : '▲'}
-            </Typography>
-          </Box>
-          {expandedGroups.visible && (
-            <VisibleTaskList
-              tasks={groupedTasks.visible}
-              approvalStatus={approvalStatus}
-            />
+
+          {resolvedActiveTab === 'created' && (
+            <Box className={styles.tabPanel} role="tabpanel">
+              <div className={styles.createdTabSearch}>
+                <SearchBar
+                  searchTerm={searchTerm}
+                  setSearchTerm={setSearchTerm}
+                  placeholder="Поиск созданных задач..."
+                  transform="0"
+                />
+              </div>
+              {hasCreatedBySection ? (
+                <CreatedByTaskList
+                  tasks={filterTasks(groupedTasks.created_by)}
+                  approvalStatus={approvalStatus}
+                  userId={userId}
+                  handleTaskAccept={handleTaskAccept}
+                  refreshTasks={refreshTasks}
+                  onOpenProject={onOpenProject}
+                />
+              ) : (
+                <Typography className={styles.tabEmpty}>Нет созданных задач</Typography>
+              )}
+            </Box>
+          )}
+
+          {resolvedActiveTab === 'completed' && (
+            <Box className={styles.tabPanel} role="tabpanel">
+              <div className={styles.completedExtra}>
+                <div className={styles.completedDateRange}>
+                  <span className={styles.completedFilterLabel}>Создано:</span>
+                  <label className={styles.completedDateField}>
+                    <span className={styles.completedDateFieldLabel}>с</span>
+                    <input
+                      type="date"
+                      value={completedDateFrom}
+                      onChange={(e) => setCompletedDateFrom(e.target.value)}
+                      className={styles.completedDateInput}
+                    />
+                  </label>
+                  <label className={styles.completedDateField}>
+                    <span className={styles.completedDateFieldLabel}>по</span>
+                    <input
+                      type="date"
+                      value={completedDateTo}
+                      onChange={(e) => setCompletedDateTo(e.target.value)}
+                      className={styles.completedDateInput}
+                    />
+                  </label>
+                </div>
+                <div className={styles.completedSearchWrap}>
+                  <label
+                    className={styles.completedSearchLabel}
+                    htmlFor="task-list-manager-completed-search"
+                  >
+                    Поиск:
+                  </label>
+                  <input
+                    id="task-list-manager-completed-search"
+                    type="search"
+                    value={completedSearch}
+                    onChange={(e) => setCompletedSearch(e.target.value)}
+                    placeholder="Название или описание…"
+                    className={styles.completedSearchInput}
+                    autoComplete="off"
+                  />
+                </div>
+                {hasCompletedExtraFilters && (
+                  <button
+                    type="button"
+                    className={styles.completedFilterReset}
+                    onClick={clearCompletedExtraFilters}
+                  >
+                    Сбросить период и поиск
+                  </button>
+                )}
+              </div>
+              <div
+                className={styles.completedSubTabs}
+                role="tablist"
+                aria-label="Завершённые: мои и порученные"
+              >
+                {visibleCompletedSubTabs.map((sub) => {
+                  const count =
+                    sub.id === 'mine'
+                      ? completedMineTasks.length
+                      : sub.id === 'delegated'
+                        ? completedDelegatedBase.length
+                        : completedParticipationTasks.length
+                  return (
+                    <button
+                      key={sub.id}
+                      type="button"
+                      role="tab"
+                      aria-selected={completedSubTab === sub.id}
+                      className={`${styles.completedSubTabButton} ${
+                        completedSubTab === sub.id ? styles.completedSubTabButtonActive : ''
+                      }`}
+                      onClick={() => handleCompletedSubTabChange(sub.id)}
+                    >
+                      {sub.label} ({count})
+                    </button>
+                  )
+                })}
+              </div>
+
+              {completedSubTab === 'delegated' && delegateAssigneeOptions.length > 0 && (
+                <div className={styles.completedAssigneeFilters}>
+                  <span className={styles.completedAssigneeFiltersLabel}>Исполнитель:</span>
+                  <div className={styles.completedAssigneeFiltersButtons}>
+                    <button
+                      type="button"
+                      className={`${styles.completedAssigneeChip} ${
+                        selectedDelegateAssigneeId == null
+                          ? styles.completedAssigneeChipActive
+                          : ''
+                      }`}
+                      onClick={() => setSelectedDelegateAssigneeId(null)}
+                    >
+                      Все
+                    </button>
+                    {delegateAssigneeOptions.map((opt) => (
+                      <button
+                        key={opt.id}
+                        type="button"
+                        className={`${styles.completedAssigneeChip} ${
+                          String(selectedDelegateAssigneeId) === String(opt.id)
+                            ? styles.completedAssigneeChipActive
+                            : ''
+                        }`}
+                        onClick={() => setSelectedDelegateAssigneeId(opt.id)}
+                      >
+                        {opt.lastName}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {hasCompletedSection ? (
+                completedTasksForCards.length > 0 ? (
+                  <CreatedByTaskList
+                    tasks={completedTasksForCards}
+                    approvalStatus={approvalStatus}
+                    userId={userId}
+                    handleTaskAccept={handleTaskAccept}
+                    refreshTasks={refreshTasks}
+                    onOpenProject={onOpenProject}
+                    completedArchiveMode
+                  />
+                ) : (
+                  <Typography className={styles.tabEmpty}>
+                    {completedSubTab === 'mine'
+                      ? 'Нет ваших выполненных задач за выбранный период'
+                      : completedSubTab === 'participation'
+                        ? 'Нет завершённых задач, где вы утверждающий или зритель'
+                        : selectedDelegateAssigneeId != null
+                          ? 'Нет порученных задач для выбранного исполнителя'
+                          : 'Нет порученных задач за выбранный период'}
+                  </Typography>
+                )
+              ) : (
+                <Typography className={styles.tabEmpty}>Нет завершённых задач</Typography>
+              )}
+            </Box>
+          )}
+
+          {resolvedActiveTab === 'visible' && (
+            <Box className={styles.tabPanel} role="tabpanel">
+              {hasVisibleSection ? (
+                <VisibleTaskList tasks={groupedTasks.visible} approvalStatus={approvalStatus} />
+              ) : (
+                <Typography className={styles.tabEmpty}>Нет видимых задач</Typography>
+              )}
+            </Box>
           )}
         </Box>
-      )}
       </Box>
       <MiniProjectStrip onOpenProject={onOpenProject} refreshTrigger={stripRefreshKey} />
     </Box>

@@ -15,11 +15,13 @@ import { FaHashtag, FaFile } from 'react-icons/fa'
 import { CiTimer } from 'react-icons/ci'
 import { RiDeleteBinLine } from 'react-icons/ri'
 import { sanitizeFilename } from '../../../utils/fileUtils'
+import ComplaintManagerChat from './subcomponents/ComplaintManagerChat'
 import './Task.scss'
 
 const TaskNotification = forwardRef(
   ({ task, provided, onComplete, isNotificationColumn, actionIcon }, ref) => {
-    const { title, description, priority, createdAt, image, alt, tags, links } = task
+    const { title, description, priority, createdAt, image, alt, tags, links, typeReminders, reminderNumericId } =
+      task
     const selectedEmployeeId = useKanbanStore((state) => state.selectedEmployeeId) // id выбранной доски сотрудника
     const { user } = useUserStore()
     const [isModalOpen, setIsModalOpen] = useState(false)
@@ -29,6 +31,9 @@ const TaskNotification = forwardRef(
     const [isUploading, setIsUploading] = useState(false)
     const { hours, minutes } = useElapsedTime(createdAt)
     const [sentMessages, setSentMessages] = useState([])
+
+    const isComplaintMobileReminder = typeReminders === 'complaint_report_problem'
+    const complaintReminderId = reminderNumericId != null ? Number(reminderNumericId) : Number(task.id)
 
     const formatSentMessages = (messages) => {
       return (
@@ -238,6 +243,13 @@ const TaskNotification = forwardRef(
             </div>
           )}
 
+          {isComplaintMobileReminder && user?.id ? (
+            <ComplaintManagerChat
+              reminderId={complaintReminderId}
+              managerUserId={Number(user.id)}
+              isActiveManager={selectedEmployeeId === user.id}
+            />
+          ) : null}
           {tags.some((tag) => tag.title.toLowerCase() === 'telegram') &&
             selectedEmployeeId === user.id && (
               <FileUpload

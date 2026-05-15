@@ -23,6 +23,7 @@ const GlobalTaskChat = ({
   const [messages, setMessages] = useState([])
   const [inputText, setInputText] = useState('')
   const messagesEndRef = useRef(null)
+  const textareaRef = useRef(null)
   const { fetchMessages, messagesGlobalTask } = useTasksManageStore()
   const [showEmojiPicker, setShowEmojiPicker] = useState(false)
   const [replyingTo, setReplyingTo] = useState(null)
@@ -47,26 +48,11 @@ const GlobalTaskChat = ({
     }
   }
 
-  // Функция для обработки клика на сообщение
-  const handleMessageClick = (message, e) => {
-    // Проверяем, существует ли событие
-    if (!e) {
-      setReplyingTo(message)
-      return
-    }
-
-    // Если клик был на ссылке в сообщении, не устанавливаем его как отвечаемое
-    const replyPreview = e.target.closest('.reply-preview')
-    if (replyPreview) {
-      e.preventDefault()
-      e.stopPropagation()
-      if (message.replied_to_message_id) {
-        scrollToMessage(message.replied_to_message_id)
-      }
-      return
-    }
-
+  const handleReplyToMessage = (message) => {
     setReplyingTo(message)
+    setTimeout(() => {
+      textareaRef.current?.focus()
+    }, 100)
   }
 
   // Функция для отмены ответа
@@ -201,10 +187,23 @@ const GlobalTaskChat = ({
             {msg.first_name} {msg.last_name}
           </div>
         )}
-        <div className={`text-bubble ${isCurrentUser ? 'self' : 'other'}`}>
-          {msg.text}
+        <div className={`text-bubble ${isCurrentUser ? 'self' : 'other'}`}>{msg.text}</div>
+        <div className="message-footer">
+          <span className="timestamp">{formatTimestamp(msg.timestamp)}</span>
+          <button
+            type="button"
+            className="message-reply-btn"
+            title="Ответить"
+            aria-label="Ответить на сообщение"
+            onMouseDown={(e) => e.preventDefault()}
+            onClick={(e) => {
+              e.stopPropagation()
+              handleReplyToMessage(msg)
+            }}
+          >
+            <MdReply aria-hidden />
+          </button>
         </div>
-        <div className="timestamp">{formatTimestamp(msg.timestamp)}</div>
       </div>
     )
   }
@@ -251,7 +250,6 @@ const GlobalTaskChat = ({
                 className={`message ${isCurrentUser ? 'self' : 'other'} ${
                   replyingTo?.id === msg.id ? 'selected-message' : ''
                 }`}
-                onClick={(e) => handleMessageClick(msg, e)}
               >
                 <div
                   className={`message-inner ${
@@ -290,6 +288,7 @@ const GlobalTaskChat = ({
             </button>*/}
             <div className="input-wrapper">
               <textarea
+                ref={textareaRef}
                 placeholder="Напишите сообщение..."
                 value={inputText}
                 onChange={(e) => setInputText(e.target.value)}

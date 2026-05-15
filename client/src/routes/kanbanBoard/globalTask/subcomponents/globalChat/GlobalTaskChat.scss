@@ -165,6 +165,8 @@
   tab-size: 4;
   word-wrap: break-word;
   overflow-wrap: break-word;
+  user-select: text;
+  cursor: text;
 }
 
 .text-bubble.other {
@@ -185,11 +187,49 @@
   border-bottom-right-radius: 0;
 }
 
+.message-footer {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 0.35rem;
+  margin-top: 0.25rem;
+}
+
 .timestamp {
   font-size: 0.75rem; // text-xs
   color: #9ca3af;
-  margin-top: 0.25rem;
   text-align: right;
+}
+
+.message-reply-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.5rem;
+  height: 1.5rem;
+  padding: 0;
+  border: none;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.1);
+  color: #93c5fd;
+  cursor: pointer;
+  opacity: 0;
+  transition:
+    opacity 0.15s ease,
+    background 0.15s ease,
+    transform 0.15s ease;
+  font-size: 1rem;
+
+  &:hover {
+    background: rgba(255, 255, 255, 0.18);
+    transform: scale(1.05);
+  }
+
+  &:focus-visible {
+    opacity: 1;
+    outline: 2px solid #4a90e2;
+    outline-offset: 1px;
+  }
 }
 
 /* Ввод сообщения */
@@ -301,13 +341,28 @@ input[type='text']:focus {
 
 // Стили для выбранного сообщения
 .message {
+  position: relative;
+
   &.selected-message {
     background-color: rgba(0, 120, 215, 0.1);
   }
 
   &:hover {
     background-color: rgba(0, 0, 0, 0.05);
-    cursor: pointer;
+
+    .message-reply-btn {
+      opacity: 1;
+    }
+  }
+
+  &:focus-within .message-reply-btn {
+    opacity: 1;
+  }
+}
+
+@media (hover: none) {
+  .message .message-reply-btn {
+    opacity: 0.75;
   }
 }
 

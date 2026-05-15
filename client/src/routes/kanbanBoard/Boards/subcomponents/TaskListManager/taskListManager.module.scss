@@ -358,7 +358,8 @@
   }
 }
 
-.createdCompletedTabs {
+.createdCompletedTabs,
+.taskListTabs {
   margin-bottom: 1rem;
 }
 
@@ -375,9 +376,9 @@
 
 .tabButton {
   flex: 1 1 auto;
-  min-width: 140px;
-  padding: 0.55rem 0.85rem;
-  font-size: 0.9375rem;
+  min-width: 7.5rem;
+  padding: 0.5rem 0.65rem;
+  font-size: 0.8125rem;
   font-weight: 600;
   color: #4b5563;
   background: transparent;
@@ -414,6 +415,93 @@
   border: 1px dashed #d1d5db;
   border-radius: 10px;
   margin-bottom: 0.5rem;
+}
+
+.completedSubTabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+  margin: 0.75rem 0;
+  padding: 0.2rem;
+  background: #f8fafc;
+  border-radius: 8px;
+  border: 1px solid #e5e7eb;
+}
+
+.completedSubTabButton {
+  flex: 1 1 auto;
+  min-width: 8.5rem;
+  padding: 0.45rem 0.7rem;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  color: #4b5563;
+  background: transparent;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  transition:
+    background 0.2s ease,
+    color 0.2s ease;
+
+  &:hover {
+    color: #1f2937;
+    background: rgba(255, 255, 255, 0.8);
+  }
+}
+
+.completedSubTabButtonActive {
+  color: #0f172a;
+  background: #fff;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.06);
+}
+
+.completedAssigneeFilters {
+  margin-bottom: 0.75rem;
+}
+
+.completedAssigneeFiltersLabel {
+  display: block;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  color: #4b5563;
+  margin-bottom: 0.4rem;
+}
+
+.completedAssigneeFiltersButtons {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+}
+
+.completedAssigneeChip {
+  padding: 0.35rem 0.65rem;
+  font-size: 0.8125rem;
+  font-weight: 500;
+  color: #374151;
+  background: #f3f4f6;
+  border: 1px solid #d1d5db;
+  border-radius: 999px;
+  cursor: pointer;
+  transition:
+    background 0.15s ease,
+    border-color 0.15s ease,
+    color 0.15s ease;
+
+  &:hover {
+    background: #e5e7eb;
+    border-color: #9ca3af;
+  }
+}
+
+.completedAssigneeChipActive {
+  color: #fff;
+  background: #2563eb;
+  border-color: #2563eb;
+
+  &:hover {
+    background: #1d4ed8;
+    border-color: #1d4ed8;
+  }
 }
 
 .completedMyTasksCheck {
@@ -518,4 +606,69 @@
   :global(p:last-child) {
     margin-bottom: 0;
   }
+}
+
+.taskCardParticipants {
+  padding-top: 0.25rem;
+  border-top: 1px solid #f0f0f0;
+}
+
+.taskCardParticipantsRow {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.35rem;
+  margin-bottom: 0.35rem;
+}
+
+.taskCardParticipantsLabel {
+  font-weight: 600;
+}
+
+.taskCardParticipantsIcon {
+  flex-shrink: 0;
+  font-size: 1rem;
+  margin-top: 0.1rem;
+}
+
+.taskCardParticipantsApprovers {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.taskCardParticipantsApproverList {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem 0.75rem;
+  margin-top: 0.15rem;
+}
+
+.taskCardParticipantsApproverItem {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.2rem;
+}
+
+.taskCardParticipantsPending {
+  display: block;
+  color: #d32f2f;
+  font-weight: 500;
+}
+
+.taskCardParticipantsApproved {
+  display: block;
+  color: #2e7d32;
+}
+
+.taskCardParticipantsAllDone {
+  display: block;
+  color: #2e7d32;
+  font-weight: 500;
+}
+
+.taskCardArchiveActions {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0 1rem 1rem;
 }

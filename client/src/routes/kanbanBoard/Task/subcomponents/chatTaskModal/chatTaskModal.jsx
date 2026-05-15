@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback, useRef } from 'react'
 import axios from 'axios'
 import EmojiPicker from 'emoji-picker-react'
 import { FaFolder } from 'react-icons/fa'
+import { IoArrowUndoOutline } from 'react-icons/io5'
 import { API_BASE_URL } from '../../../../../../config'
 import useWebSocket from '../../../Boards/subcomponents/useWebSocket'
 import useUserStore from '../../../../../store/userStore'
@@ -762,7 +763,6 @@ const ChatTaskModal = ({
               className={`message ${message.sender_id === currentUser ? 'sent' : 'received'} ${
                 message.read_status ? 'read' : 'unread'
               }`}
-              onClick={() => handleReplyToMessage(message)}
             >
               {/* Блок ответа на сообщение */}
               {message.replied_message && (
@@ -792,12 +792,27 @@ const ChatTaskModal = ({
                 <span className="sender-name">
                   {message.sender_id === currentUser ? 'Вы' : message.sender_name || 'Отправитель'}
                 </span>
-                <span className="message-time">
-                  {new Date(message.timestamp).toLocaleTimeString('ru-RU', {
-                    hour: '2-digit',
-                    minute: '2-digit',
-                  })}
-                </span>
+                <div className="message-header-actions">
+                  <span className="message-time">
+                    {new Date(message.timestamp).toLocaleTimeString('ru-RU', {
+                      hour: '2-digit',
+                      minute: '2-digit',
+                    })}
+                  </span>
+                  <button
+                    type="button"
+                    className="message-reply-btn"
+                    title="Ответить"
+                    aria-label="Ответить на сообщение"
+                    onMouseDown={(e) => e.preventDefault()}
+                    onClick={(e) => {
+                      e.stopPropagation()
+                      handleReplyToMessage(message)
+                    }}
+                  >
+                    <IoArrowUndoOutline aria-hidden />
+                  </button>
+                </div>
               </div>
 
               {/* Текст сообщения */}

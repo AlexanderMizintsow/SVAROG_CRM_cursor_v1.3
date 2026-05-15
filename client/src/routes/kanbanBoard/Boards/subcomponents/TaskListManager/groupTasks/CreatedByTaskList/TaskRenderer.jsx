@@ -29,6 +29,7 @@ import styles from '../../taskListManager.module.scss'
 import { getUserNames } from '../../../../../Task/utils/taskUtils'
 import ChatTaskModal from '../../../../../Task/subcomponents/chatTaskModal/chatTaskModal'
 import Attachments from '../../../../../Task/subcomponents/Attachments'
+import TaskCardParticipants from './TaskCardParticipants'
 
 const TaskRenderer = ({
   filteredTasks,
@@ -119,6 +120,18 @@ const TaskRenderer = ({
     if (isNaN(date.getTime())) return 'Не указана'
     return date.toLocaleDateString()
   }
+
+  const renderChatButton = (taskId, size = 18) => (
+    <Tooltip title="Чат задачи — переписка и история">
+      <IconButton
+        size="small"
+        onClick={() => handleChatModal(taskId)}
+        color={unreadMessages.has(taskId) ? 'error' : 'default'}
+      >
+        <IoIosChatboxes size={size} />
+      </IconButton>
+    </Tooltip>
+  )
 
   // Рендер карточки задачи
   const renderTaskCard = (task) => {
@@ -299,6 +312,8 @@ const TaskRenderer = ({
               </Box>
             )}
 
+            <TaskCardParticipants task={task} users={users} />
+
             {/* Значок «Задача проекта» */}
             {task.global_task_id && (
               <Box display="flex" alignItems="center" mb={1}>
@@ -333,7 +348,7 @@ const TaskRenderer = ({
             )}
 
             {/* Уведомления */}
-            {!isArchive && unreadMessages.has(task.task_id) && (
+            {unreadMessages.has(task.task_id) && (
               <Box display="flex" alignItems="center">
                 <Badge color="error" variant="dot">
                   <Typography variant="caption" color="error.main" fontWeight={600}>
@@ -344,7 +359,14 @@ const TaskRenderer = ({
             )}
           </CardContent>
 
-          {!isArchive && (
+          {isArchive ? (
+            <Box className={styles.taskCardArchiveActions}>
+              {renderChatButton(task.task_id)}
+              <Typography variant="caption" color="text.secondary">
+                Переписка и история согласования
+              </Typography>
+            </Box>
+          ) : (
             <CardActions sx={{ pt: 0, px: 2, pb: 2 }}>
               <Box display="flex" justifyContent="space-between" width="100%" alignItems="center">
                 <Box display="flex" gap={1}>
@@ -366,15 +388,7 @@ const TaskRenderer = ({
                     </IconButton>
                   </Tooltip>
 
-                  <Tooltip title="Чат задачи">
-                    <IconButton
-                      size="small"
-                      onClick={() => handleChatModal(task.task_id)}
-                      color={unreadMessages.has(task.task_id) ? 'error' : 'default'}
-                    >
-                      <IoIosChatboxes size={18} />
-                    </IconButton>
-                  </Tooltip>
+                  {renderChatButton(task.task_id)}
                 </Box>
 
                 {task.status === 'done' && (
@@ -573,6 +587,8 @@ const TaskRenderer = ({
                   </Typography>
                 </Box>
 
+                <TaskCardParticipants task={task} users={users} />
+
                 {task.global_task_id && (
                   <Box display="flex" alignItems="center" mb={1}>
                     <Tooltip title={projectTitles[task.global_task_id] || `Проект #${task.global_task_id}`}>
@@ -628,19 +644,9 @@ const TaskRenderer = ({
                       </Tooltip>
                     )}
 
-                    {!isArchive && (
-                      <Tooltip title="Чат задачи">
-                        <IconButton
-                          size="small"
-                          onClick={() => handleChatModal(task.task_id)}
-                          color={unreadMessages.has(task.task_id) ? 'error' : 'default'}
-                        >
-                          <IoIosChatboxes size={18} />
-                        </IconButton>
-                      </Tooltip>
-                    )}
+                    {renderChatButton(task.task_id)}
 
-                    {!isArchive && unreadMessages.has(task.task_id) && (
+                    {unreadMessages.has(task.task_id) && (
                       <Typography variant="caption" color="error.main" fontWeight={600}>
                         (Новые сообщения)
                       </Typography>
@@ -680,7 +686,7 @@ const TaskRenderer = ({
         </ListItem>
         <Divider />
 
-        {!isArchive && openChatModals[task.task_id] && (
+        {openChatModals[task.task_id] && (
           <ChatTaskModal
             task={task}
             onClose={() => handleChatModal(task.task_id)}
@@ -747,20 +753,19 @@ const TaskRenderer = ({
       {viewMode === 'cards' ? (
         <Grid container spacing={3}>
           {filteredTasks.map(renderTaskCard)}
-          {!completedArchiveMode &&
-            filteredTasks.map(
-              (task) =>
-                openChatModals[task.task_id] && (
-                  <ChatTaskModal
-                    key={`chat-${task.task_id}`}
-                    task={task}
-                    onClose={() => handleChatModal(task.task_id)}
-                    isOpen={openChatModals[task.task_id]}
-                    currentUser={user.id}
-                    onMessageRead={() => resetUnreadMessages(task.task_id)}
-                  />
-                )
-            )}
+          {filteredTasks.map(
+            (task) =>
+              openChatModals[task.task_id] && (
+                <ChatTaskModal
+                  key={`chat-${task.task_id}`}
+                  task={task}
+                  onClose={() => handleChatModal(task.task_id)}
+                  isOpen={openChatModals[task.task_id]}
+                  currentUser={user.id}
+                  onMessageRead={() => resetUnreadMessages(task.task_id)}
+                />
+              )
+          )}
         </Grid>
       ) : (
         <Paper sx={{ borderRadius: 2 }}>

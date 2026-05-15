@@ -5,6 +5,7 @@ const { createReminder } = require('../../shared/reminders/reminderService')
 const { enqueueAndSendCompanyPush } = require('../../shared/notifications/pushService')
 const { mapDraftSummary } = require('../mappers/complaintMappers')
 const { getCompanyById } = require('./complaintsRepository')
+const { ensureThreadOnWizardSubmit } = require('../chat/complaintChatService')
 
 const resolveManagerId = (company) => company.mpp_id || company.mpr_id || company.regional_manager_id || null
 
@@ -188,8 +189,13 @@ const fetchPendingWizardStubRows = async (pool, companyId) => {
             d.submitted_at,
             (SELECT COUNT(*)::int FROM mobile_complaint_draft_nodes n WHERE n.draft_id = d.id) AS node_count,
             (SELECT item_name FROM mobile_complaint_draft_nodes n WHERE n.draft_id = d.id ORDER BY n.id ASC LIMIT 1) AS head_item,
-            (SELECT part_name FROM mobile_complaint_draft_nodes n WHERE n.draft_id = d.id ORDER BY n.id ASC LIMIT 1) AS head_part
+            (SELECT part_name FROM mobile_complaint_draft_nodes n WHERE n.draft_id = d.id ORDER BY n.id ASC LIMIT 1) AS head_part,
+            t.id AS chat_thread_id,
+            t.opened_at AS chat_opened_at,
+            t.rejected_at AS chat_rejected_at,
+            t.rejection_reason AS chat_rejection_reason
        FROM mobile_complaint_drafts d
+       LEFT JOIN mobile_complaint_chat_threads t ON t.draft_id = d.id AND t.company_id = d.company_id
       WHERE d.company_id = $1
         AND d.status = 'submitted'
         AND d.onec_request_number IS NULL
@@ -218,15 +224,28 @@ const getMergedComplaintTickets = async (pool, { companyId }) => {
   }
 
   const rows = await fetchPendingWizardStubRows(pool, companyId)
-  const stubs = rows.map((row) => ({
-    requestNumber: `${PENDING_TICKET_PREFIX}${row.id}`,
-    orderNumber: row.order_no,
-    status: STATUS_MANAGER_PROCESSING,
-    comment: buildStubCommentFromRow(row),
-    isPendingRegistration: true,
-    localDraftId: row.id,
-    submittedAt: row.submitted_at,
-  }))
+  const stubs = rows.map((row) => {
+    const rejected = Boolean(row.chat_rejected_at)
+    const baseComment = buildStubCommentFromRow(row)
+    const reasonSuffix =
+      rejected && row.chat_rejection_reason
+        ? ` Отклонено: ${row.chat_rejection_reason}`
+        : ''
+    return {
+      requestNumber: `${PENDING_TICKET_PREFIX}${row.id}`,
+      orderNumber: row.order_no,
+      status: rejected ? 'Отклонено' : STATUS_MANAGER_PROCESSING,
+      comment: `${baseComment}${reasonSuffix}`,
+      isPendingRegistration: true,
+      localDraftId: row.id,
+      submittedAt: row.submitted_at,
+      hasComplaintChat: Boolean(row.chat_thread_id),
+      complaintChatThreadId: row.chat_thread_id || null,
+      complaintChatOpenedAt: row.chat_opened_at || null,
+      complaintChatRejectedAt: row.chat_rejected_at || null,
+      complaintChatRejectionReason: row.chat_rejection_reason || null,
+    }
+  })
 
   return {
     tickets: [...stubs, ...onecTickets],
@@ -252,17 +271,40 @@ const buildPendingComplaintDetail = async (pool, { draftRow }) => {
     [draftId]
   )
   const head = nodesRes.rows[0]
-  const comment = buildStubCommentFromRow({
+  let comment = buildStubCommentFromRow({
     head_item: head.item_name,
     head_part: head.part_name,
     node_count: nodesRes.rows.length,
   })
   const draft = mapDraftSummary(draftRow, nodesRes.rows)
   const attachments = attachmentsRes.rows.map(toPublicAttachment)
+
+  const threadRes = await pool.query(
+    `SELECT id, opened_at, rejected_at, rejection_reason
+       FROM mobile_complaint_chat_threads
+      WHERE draft_id = $1 AND company_id = $2
+      LIMIT 1`,
+    [draftId, draftRow.company_id]
+  )
+  const chatRow = threadRes.rows[0] || null
+  const rejected = Boolean(chatRow?.rejected_at)
+  if (rejected && chatRow.rejection_reason) {
+    comment = `${comment} Отклонено: ${chatRow.rejection_reason}`
+  }
+  const complaintChat = chatRow
+    ? {
+        threadId: chatRow.id,
+        openedAt: chatRow.opened_at,
+        rejectedAt: chatRow.rejected_at,
+        rejectionReason: chatRow.rejection_reason,
+        canWrite: Boolean(chatRow.opened_at) && !chatRow.rejected_at,
+      }
+    : null
+
   return {
     requestNumber: `${PENDING_TICKET_PREFIX}${draftId}`,
     orderNumber: draftRow.order_no,
-    status: STATUS_MANAGER_PROCESSING,
+    status: rejected ? 'Отклонено' : STATUS_MANAGER_PROCESSING,
     comment,
     isPendingRegistration: true,
     localDraftId: draftId,
@@ -273,6 +315,8 @@ const buildPendingComplaintDetail = async (pool, { draftRow }) => {
     location: null,
     closedAt: null,
     rating: null,
+    hasComplaintChat: Boolean(chatRow),
+    complaintChat,
   }
 }
 
@@ -441,6 +485,15 @@ const submitDraft = async (pool, { companyId, draftId, notes = [], allowEmptyStr
     tags: [{ title: 'Mobile' }, { title: 'Рекламация' }],
     links,
   })
+
+  if (nodesRes.rows.length > 0) {
+    await ensureThreadOnWizardSubmit(pool, {
+      companyId,
+      draftId,
+      reminderId: reminder.id,
+      managerUserId: managerId,
+    })
+  }
 
   await pool.query(
     `UPDATE mobile_complaint_drafts

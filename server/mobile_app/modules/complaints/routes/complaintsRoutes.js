@@ -19,6 +19,12 @@ const {
   saveRatingComment,
   getDraft,
 } = require('../controllers/complaintsController')
+const {
+  getThreadByDraftDealer,
+  getMessagesDealer,
+  postMessageDealer,
+} = require('../chat/complaintChatController')
+const { uploadChatMiddleware } = require('../chat/chatMulter')
 
 const uploadsDir = path.resolve(__dirname, '..', '..', '..', '..', '..', 'uploads', 'mobile-complaints')
 fs.mkdirSync(uploadsDir, { recursive: true })
@@ -70,6 +76,9 @@ module.exports = (pool) => {
 
   router.post('/quick', upload.array('files', 10), createQuickComplaint(pool))
   router.get('/list', getList(pool))
+  router.get('/chat/thread/by-draft/:draftId', getThreadByDraftDealer(pool))
+  router.get('/chat/thread/:threadId/messages', getMessagesDealer(pool))
+  router.post('/chat/thread/:threadId/messages', uploadChatMiddleware, postMessageDealer(pool))
   router.get('/ticket/:requestNumber', getTicketDetails(pool))
 
   router.get('/ratings/pending', getPendingRatings(pool))

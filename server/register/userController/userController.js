@@ -157,6 +157,12 @@ const createUser = (dbPool) => async (req, res) => {
       phone_numbers,
     } = req.body
 
+    // Пустая строка из JSON для INTEGER даёт ошибку PostgreSQL (invalid input syntax for type integer)
+    const supervisorIdOrNull =
+      supervisor_id === '' || supervisor_id === null || supervisor_id === undefined
+        ? null
+        : supervisor_id
+
     const hashedPassword = await bcrypt.hash(password, 10)
 
     const userInsertQuery = `
@@ -173,7 +179,7 @@ const createUser = (dbPool) => async (req, res) => {
       hashedPassword,
       email,
       role_id,
-      supervisor_id,
+      supervisorIdOrNull,
     ])
 
     const userId = userResult.rows[0].id
