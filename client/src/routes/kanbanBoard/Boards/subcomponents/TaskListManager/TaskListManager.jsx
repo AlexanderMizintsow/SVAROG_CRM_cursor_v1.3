@@ -4,7 +4,6 @@ import axios from 'axios'
 import { API_BASE_URL } from '../../../../../../config'
 import useUserStore from '../../../../../store/userStore'
 import useTasksManageStore from '../../../../../store/useTasksManageStore'
-import ApproverTaskList from './groupTasks/ApproverTaskList'
 import VisibleTaskList from './groupTasks/VisibleTaskList'
 import CreatedByTaskList from './groupTasks/CreatedByTaskList/CreatedByTaskList'
 import SearchBar from '../../../../../components/searchBar/SearchBar'
@@ -89,7 +88,7 @@ function completedTaskSortMs(task) {
   return 0
 }
 
-const TaskListManager = ({ onClose, onOpenProject, stripRefreshKey }) => {
+const TaskListManager = ({ onClose, onOpenProject, stripRefreshKey, initialActiveTab }) => {
   const { user, users } = useUserStore()
   const [searchTerm, setSearchTerm] = useState('')
   const [completedDateFrom, setCompletedDateFrom] = useState(
@@ -102,10 +101,15 @@ const TaskListManager = ({ onClose, onOpenProject, stripRefreshKey }) => {
   const { fetchTasksManager, tasksManager, fetchCompletedTasks, completedTasks, isLoading } =
     useTasksManageStore()
   const [approvalStatus, setApprovalStatus] = useState({})
-  const [activeTaskListTab, setActiveTaskListTab] = useState('created')
+  const [activeTaskListTab, setActiveTaskListTab] = useState(initialActiveTab || 'created')
   const [completedSubTab, setCompletedSubTab] = useState('mine')
   const [selectedDelegateAssigneeId, setSelectedDelegateAssigneeId] = useState(null)
   const userId = user?.id
+
+  useEffect(() => {
+    // Внешние навигации (например, по клику в уведомлении) должны указывать нужную вкладку.
+    if (initialActiveTab) setActiveTaskListTab(initialActiveTab)
+  }, [initialActiveTab])
 
   useEffect(() => {
     if (userId) {
@@ -437,10 +441,14 @@ const TaskListManager = ({ onClose, onOpenProject, stripRefreshKey }) => {
           {resolvedActiveTab === 'approver' && (
             <Box className={styles.tabPanel} role="tabpanel">
               {hasApproverSection ? (
-                <ApproverTaskList
+                <CreatedByTaskList
                   tasks={groupedTasks.approver}
-                  approvalStatus={approvalStatus}
                   userId={userId}
+                  handleTaskAccept={handleTaskAccept}
+                  refreshTasks={refreshTasks}
+                  onOpenProject={onOpenProject}
+                  approverMode
+                  approvalStatus={approvalStatus}
                   onApproval={approval}
                 />
               ) : (

@@ -757,7 +757,8 @@ const AlertBanner = () => {
                   cursor:
                     key.startsWith('global-') ||
                     key.startsWith('project-msg-') ||
-                    key.startsWith('task-decision-')
+                    key.startsWith('task-decision-') ||
+                    key === 'approval'
                       ? 'pointer'
                       : undefined,
                 }}
@@ -795,6 +796,18 @@ const AlertBanner = () => {
                     handleTaskNotificationClick(taskId)
                   } else if (key.startsWith('task-decision-')) {
                     handleTaskDecisionNotificationClick(taskId)
+                  } else if (key === 'approval') {
+                    // Открываем вкладку "На утверждение" в менеджере задач
+                    const { setTaskDecisionNavigate, setTaskCardBlinkYellow } = useTaskStateTracker.getState()
+                    const pendingTaskId =
+                      Object.keys(approvals || {}).find(
+                        (taskId) =>
+                          approvals?.[taskId]?.[currentUserId] === false ||
+                          approvals?.[taskId]?.[String(currentUserId)] === false
+                      ) || null
+                    if (pendingTaskId) setTaskCardBlinkYellow(pendingTaskId)
+                    setTaskDecisionNavigate({ type: 'taskList', initialTab: 'approver' })
+                    window.dispatchEvent(new CustomEvent('task-decision-navigate'))
                   }
                 }}
               >

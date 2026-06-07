@@ -6,6 +6,15 @@ import { FaLightbulb, FaTimes } from 'react-icons/fa'
 import Toastify from 'toastify-js'
 import './IdeasModal.scss'
 
+/** URL вложения идеи (файлы лежат в uploads, отдаются через API задач). */
+const getAppIdeaFileUrl = (filePath) => {
+  if (!filePath) return null
+  const normalized = String(filePath).replace(/\\/g, '/')
+  const filename = normalized.split('/').filter(Boolean).pop()
+  if (!filename) return null
+  return `${API_BASE_URL}5000/api/task/uploads/${encodeURIComponent(filename)}`
+}
+
 const IdeasModal = ({ onClose }) => {
   const { user } = useUserStore()
   const [loading, setLoading] = useState(true)
@@ -149,12 +158,19 @@ function UserIdeasView({ userId, ideas, onRefresh, onClose }) {
           <p className="ideas-modal__empty">Пока нет отправленных предложений.</p>
         ) : (
           <ul className="ideas-modal__list">
-            {ideas.map((idea) => (
+            {ideas.map((idea) => {
+              const ideaFileUrl = getAppIdeaFileUrl(idea.file_path)
+              return (
               <li key={idea.id} className={`ideas-modal__list-item ${idea.is_applied ? 'ideas-modal__list-item--applied' : ''}`}>
                 <div className="ideas-modal__item-title">{idea.title}</div>
                 <div className="ideas-modal__item-message">{idea.message || '—'}</div>
-                {idea.file_path && (
-                  <a href={`${API_BASE_URL}5000${idea.file_path}`} target="_blank" rel="noopener noreferrer" className="ideas-modal__item-file">
+                {ideaFileUrl && (
+                  <a
+                    href={ideaFileUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="ideas-modal__item-file"
+                  >
                     {idea.file_name || 'Файл'}
                   </a>
                 )}
@@ -167,7 +183,7 @@ function UserIdeasView({ userId, ideas, onRefresh, onClose }) {
                   )}
                 </div>
               </li>
-            ))}
+            )})}
           </ul>
         )}
       </div>
@@ -200,6 +216,7 @@ function AdminIdeaItem({ idea, onRefresh }) {
   const [comment, setComment] = useState(idea.admin_comment || '')
   const [applied, setApplied] = useState(!!idea.is_applied)
   const [saving, setSaving] = useState(false)
+  const ideaFileUrl = getAppIdeaFileUrl(idea.file_path)
 
   const handleApply = async () => {
     setSaving(true)
@@ -231,8 +248,13 @@ function AdminIdeaItem({ idea, onRefresh }) {
       </div>
       <div className="ideas-admin__item-title">{idea.title}</div>
       <div className="ideas-admin__item-message">{idea.message || '—'}</div>
-      {idea.file_path && (
-        <a href={`${API_BASE_URL}5000${idea.file_path}`} target="_blank" rel="noopener noreferrer" className="ideas-admin__item-file">
+      {ideaFileUrl && (
+        <a
+          href={ideaFileUrl}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="ideas-admin__item-file"
+        >
           {idea.file_name || 'Файл'}
         </a>
       )}

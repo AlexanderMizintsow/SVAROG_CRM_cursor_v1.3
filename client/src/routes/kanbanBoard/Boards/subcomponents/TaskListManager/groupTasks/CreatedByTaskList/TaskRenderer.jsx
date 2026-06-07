@@ -19,7 +19,7 @@ import {
 } from '@mui/material'
 import { Person, Schedule, Assignment, CheckCircle, Error } from '@mui/icons-material'
 import { IoCalendarOutline } from 'react-icons/io5'
-import { FcInspection, FcRedo, FcMindMap } from 'react-icons/fc'
+import { FcInspection, FcRedo, FcMindMap, FcApproval, FcCancel } from 'react-icons/fc'
 import { IoIosChatboxes } from 'react-icons/io'
 import { FaEdit } from 'react-icons/fa'
 import { LiaUserCogSolid } from 'react-icons/lia'
@@ -57,6 +57,9 @@ const TaskRenderer = ({
   completedArchiveMode = false,
   /** Двойной клик по карточке/строке — полное описание (вкладка «Созданные» и при необходимости др.) */
   openFullDescriptionOnDoubleClick = true,
+  approverMode = false,
+  approvalStatus = {},
+  onApproval,
 }) => {
   const taskCardBlinkYellow = useTaskStateTracker((s) => s.taskCardBlinkYellow)
   const clearTaskCardBlinkYellow = useTaskStateTracker((s) => s.clearTaskCardBlinkYellow)
@@ -121,6 +124,56 @@ const TaskRenderer = ({
     return date.toLocaleDateString()
   }
 
+  const showAttachments = (task) =>
+    Array.isArray(task.attachments) &&
+    task.attachments.length > 0 &&
+    (approverMode || !task.global_task_id)
+
+  const renderApproverStatus = (task) => {
+    if (!approverMode) return null
+    const isApproved = !!approvalStatus[task.task_id]
+    return (
+      <Box mt={1} mb={1}>
+        <Typography variant="body2" component="span">
+          Утверждение:{' '}
+          {isApproved ? (
+            <span style={{ color: 'green' }}>
+              Утверждено <FcApproval style={{ fontSize: 20, verticalAlign: 'middle' }} />
+            </span>
+          ) : (
+            <span style={{ color: '#c62828' }}>
+              Не утверждено{' '}
+              <Tooltip title="Нажмите, чтобы утвердить задачу" arrow placement="top">
+                <span
+                  role="button"
+                  tabIndex={0}
+                  style={{ cursor: 'pointer', verticalAlign: 'middle' }}
+                  onClick={(e) => {
+                    e.stopPropagation()
+                    if (typeof onApproval !== 'function') return
+                    useTaskStateTracker.getState().setApproval(task.task_id, userId, true)
+                    onApproval(task.task_id, userId, approvalStatus[task.task_id])
+                  }}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' || e.key === ' ') {
+                      e.preventDefault()
+                      e.stopPropagation()
+                      if (typeof onApproval !== 'function') return
+                      useTaskStateTracker.getState().setApproval(task.task_id, userId, true)
+                      onApproval(task.task_id, userId, approvalStatus[task.task_id])
+                    }
+                  }}
+                >
+                  <FcCancel className={`${styles.icon} ${styles.neonPulse}`} style={{ fontSize: 22 }} />
+                </span>
+              </Tooltip>
+            </span>
+          )}
+        </Typography>
+      </Box>
+    )
+  }
+
   const renderChatButton = (taskId, size = 18) => (
     <Tooltip title="Чат задачи — переписка и история">
       <IconButton
@@ -139,7 +192,8 @@ const TaskRenderer = ({
     const allowDescDblClick = openFullDescriptionOnDoubleClick || isArchive
     const isOverdue = !isArchive && isTaskOverdue(task.deadline, task.status)
     const hasConfirmButtons = !isArchive && task.status === 'done'
-    const isHighlighted = hasConfirmButtons && taskCardBlinkYellow[String(task.task_id)]
+    const canBeHighlighted = approverMode || hasConfirmButtons
+    const isHighlighted = canBeHighlighted && taskCardBlinkYellow[String(task.task_id)]
 
     return (
       <Grid
@@ -314,6 +368,8 @@ const TaskRenderer = ({
 
             <TaskCardParticipants task={task} users={users} />
 
+            {renderApproverStatus(task)}
+
             {/* Значок «Задача проекта» */}
             {task.global_task_id && (
               <Box display="flex" alignItems="center" mb={1}>
@@ -337,8 +393,8 @@ const TaskRenderer = ({
               </Box>
             )}
 
-            {/* Вложения (только для задач без проекта) */}
-            {!task.global_task_id && Array.isArray(task.attachments) && task.attachments.length > 0 && (
+            {/* Вложения */}
+            {showAttachments(task) && (
               <Box mb={1} className={styles.taskCardAttachments}>
                 <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mb: 0.5 }}>
                   Вложения
@@ -366,6 +422,15 @@ const TaskRenderer = ({
                 Переписка и история согласования
               </Typography>
             </Box>
+          ) : approverMode ? (
+            <CardActions sx={{ pt: 0, px: 2, pb: 2 }}>
+              <Box display="flex" alignItems="center" gap={1}>
+                {renderChatButton(task.task_id)}
+                <Typography variant="caption" color="text.secondary">
+                  Чат задачи
+                </Typography>
+              </Box>
+            </CardActions>
           ) : (
             <CardActions sx={{ pt: 0, px: 2, pb: 2 }}>
               <Box display="flex" justifyContent="space-between" width="100%" alignItems="center">
@@ -435,7 +500,8 @@ const TaskRenderer = ({
     const allowDescDblClick = openFullDescriptionOnDoubleClick || isArchive
     const isOverdue = !isArchive && isTaskOverdue(task.deadline, task.status)
     const hasConfirmButtons = !isArchive && task.status === 'done'
-    const isHighlighted = hasConfirmButtons && taskCardBlinkYellow[String(task.task_id)]
+    const canBeHighlighted = approverMode || hasConfirmButtons
+    const isHighlighted = canBeHighlighted && taskCardBlinkYellow[String(task.task_id)]
 
     return (
       <React.Fragment key={task.task_id}>
@@ -497,7 +563,7 @@ const TaskRenderer = ({
             secondary={
               <>
                 <Box display="flex" alignItems="flex-start" mb={1}>
-                  {!isArchive && (
+                  {!isArchive && !approverMode && (
                     <IconButton
                       size="small"
                       onClick={() => handleEditDescription(task)}
@@ -525,13 +591,15 @@ const TaskRenderer = ({
 
                 {!isArchive ? (
                   <Box display="flex" alignItems="center" mb={1}>
-                    <IconButton
-                      size="small"
-                      onClick={() => handleOpenDeadlineDialog(task)}
-                      sx={{ mr: 1 }}
-                    >
-                      <IoCalendarOutline size={14} />
-                    </IconButton>
+                    {!approverMode && (
+                      <IconButton
+                        size="small"
+                        onClick={() => handleOpenDeadlineDialog(task)}
+                        sx={{ mr: 1 }}
+                      >
+                        <IoCalendarOutline size={14} />
+                      </IconButton>
+                    )}
                     <Typography
                       variant="caption"
                       color={isOverdue ? 'error.main' : 'text.secondary'}
@@ -557,7 +625,7 @@ const TaskRenderer = ({
                 )}
 
                 <Box display="flex" alignItems="center" mb={2}>
-                  {!isArchive && (
+                  {!isArchive && !approverMode && (
                     <IconButton
                       size="small"
                       onClick={() => handleOpenReplaceUserModal(task)}
@@ -569,7 +637,7 @@ const TaskRenderer = ({
                   <Typography
                     variant="caption"
                     sx={
-                      isArchive
+                      isArchive || approverMode
                         ? { color: 'text.secondary' }
                         : {
                             cursor: 'pointer',
@@ -577,7 +645,7 @@ const TaskRenderer = ({
                           }
                     }
                     onClick={
-                      isArchive
+                      isArchive || approverMode
                         ? undefined
                         : () =>
                             setSelectedAssignee(task.assigned_user_ids[0]?.toString() || 'all')
@@ -588,6 +656,8 @@ const TaskRenderer = ({
                 </Box>
 
                 <TaskCardParticipants task={task} users={users} />
+
+                {renderApproverStatus(task)}
 
                 {task.global_task_id && (
                   <Box display="flex" alignItems="center" mb={1}>
@@ -611,7 +681,7 @@ const TaskRenderer = ({
                   </Box>
                 )}
 
-                {!task.global_task_id && Array.isArray(task.attachments) && task.attachments.length > 0 && (
+                {showAttachments(task) && (
                   <Box mb={1} className={styles.taskCardAttachments}>
                     <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mb: 0.5 }}>
                       Вложения
@@ -653,7 +723,7 @@ const TaskRenderer = ({
                     )}
                   </Box>
 
-                  {!isArchive && task.status === 'done' && (
+                  {!isArchive && !approverMode && task.status === 'done' && (
                     <Box display="flex" gap={1}>
                       <Tooltip title="Подтвердить выполнение задачи">
                         <IconButton

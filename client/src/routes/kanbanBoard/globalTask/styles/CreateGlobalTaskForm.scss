@@ -116,27 +116,6 @@
     background-size: 0.8em auto;
   }
 
-  // Стили для react-datepicker input
-  .react-datepicker-wrapper {
-    display: block; // Чтобы инпут занимал всю ширину
-  }
-  .react-datepicker__input-container input {
-    display: block; // Чтобы инпут занимал всю ширину
-    width: 100%;
-    padding: 0.75rem 1rem;
-    border: 1px solid #d1d5db;
-    border-radius: 6px;
-    font-size: 1rem;
-    color: #374151;
-    transition: border-color 0.2s ease, box-shadow 0.2s ease;
-
-    &:focus {
-      outline: none;
-      border-color: #3b82f6;
-      box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.3);
-    }
-  }
-
   &__goal-field,
   &__additional-info-field {
     display: flex;

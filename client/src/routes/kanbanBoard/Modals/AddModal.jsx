@@ -19,6 +19,14 @@ const TagsManager = React.lazy(() =>
 );
 import "quill/dist/quill.snow.css";
 import styles from "./AddModal.module.scss";
+import {
+  getAddModalDraftKey,
+  loadAddModalDraft,
+  saveAddModalDraft,
+  clearAddModalDraft,
+  hasAddModalDraftContent,
+  buildEmptyTaskData,
+} from "./addModalDraft";
 
 const AddModal = ({
   isOpen,
@@ -31,32 +39,52 @@ const AddModal = ({
   initialTaskData: externalInitialTaskData,
   businessProcessInstanceId,
 }) => {
-  const defaultInitialTaskData = {
-    title: "",
-    description: "",
-    deadline: "",
-    priority: "низкий",
-    status: "",
-    notification_status: false,
-    tags: "",
-    created_by: userId,
-    implementers: [],
-    approvers: [],
-    viewers: [],
-    file_url: "",
-    file_type: "",
-    comment_file: "",
-    name_file: "",
-    global_task_id: globalTaskId,
-    parentTaskId,
-    rootTaskId,
-  };
+  const initialTaskData = useMemo(
+    () => ({
+      title: "",
+      description: "",
+      deadline: "",
+      priority: "низкий",
+      status: "",
+      notification_status: false,
+      tags: "",
+      created_by: userId,
+      implementers: [],
+      approvers: [],
+      viewers: [],
+      file_url: "",
+      file_type: "",
+      comment_file: "",
+      name_file: "",
+      global_task_id: globalTaskId,
+      parentTaskId,
+      rootTaskId,
+      ...(externalInitialTaskData || {}),
+    }),
+    [externalInitialTaskData, userId, globalTaskId, parentTaskId, rootTaskId]
+  );
 
-  const initialTaskData = externalInitialTaskData
-    ? { ...defaultInitialTaskData, ...externalInitialTaskData }
-    : defaultInitialTaskData;
+  const draftKey = useMemo(
+    () => getAddModalDraftKey(userId, globalTaskId, parentTaskId, rootTaskId),
+    [userId, globalTaskId, parentTaskId, rootTaskId]
+  );
 
-  const [taskData, setTaskData] = useState(initialTaskData);
+  const resolveInitialTaskData = useCallback(() => {
+    const saved = loadAddModalDraft(draftKey);
+    if (saved?.taskData && hasAddModalDraftContent(saved.taskData)) {
+      return {
+        ...buildEmptyTaskData(userId, globalTaskId, parentTaskId, rootTaskId),
+        ...saved.taskData,
+        global_task_id: globalTaskId,
+        parentTaskId,
+        rootTaskId,
+        created_by: userId,
+      };
+    }
+    return initialTaskData;
+  }, [draftKey, userId, globalTaskId, parentTaskId, rootTaskId, initialTaskData]);
+
+  const [taskData, setTaskData] = useState(() => resolveInitialTaskData());
   const [users, setUsers] = useState([]);
   const [selectedTag, setSelectedTag] = useState("");
   const [selectedImplementer, setSelectedImplementer] = useState("");
@@ -66,19 +94,33 @@ const AddModal = ({
   const [selectedTemplate, setSelectedTemplate] = useState(null);
   const [selectedFiles, setSelectedFiles] = useState([]);
   const [hasDangerousFiles, setHasDangerousFiles] = useState(false);
-  const [checkedComment, setCheckedComment] = useState(false);
+  const [checkedComment, setCheckedComment] = useState(() => {
+    const saved = loadAddModalDraft(
+      getAddModalDraftKey(userId, globalTaskId, parentTaskId, rootTaskId)
+    );
+    return !!saved?.checkedComment;
+  });
   const [isLoading, setIsLoading] = useState(false);
   const [isTagsManagerOpen, setIsTagsManagerOpen] = useState(false);
   const [dbTags, setDbTags] = useState([]);
   const [commentInput, setCommentInput] = useState("");
   const [showCommentModal, setShowCommentModal] = useState(false);
   const [currentFileIndex, setCurrentFileIndex] = useState(0);
-  const [fileComments, setFileComments] = useState({});
+  const [fileComments, setFileComments] = useState(() => {
+    const saved = loadAddModalDraft(
+      getAddModalDraftKey(userId, globalTaskId, parentTaskId, rootTaskId)
+    );
+    return saved?.fileComments && typeof saved.fileComments === 'object'
+      ? saved.fileComments
+      : {};
+  });
   const [projectDeadline, setProjectDeadline] = useState(null);
 
   const quillRef = useRef(null);
   const initialDataAppliedRef = useRef(false);
   const quillInitialSetRef = useRef(false);
+  const prevIsOpenRef = useRef(false);
+  const prevDraftKeyRef = useRef(draftKey);
 
   const {
     handleFileChange,
@@ -108,6 +150,15 @@ const AddModal = ({
     }
   );
 
+  /** Актуальное описание из Quill (источник истины для черновика). */
+  const getTaskDataForDraft = useCallback(() => {
+    const description =
+      (quillInstance?.root && quillInstance.root.innerHTML) ||
+      taskData.description ||
+      "";
+    return { ...taskData, description };
+  }, [quillInstance, taskData]);
+
   const tagOptions = useMemo(() => {
     return dbTags.map((tag) => tag.name); // получаем массив строк названий
   }, [dbTags]);
@@ -121,17 +172,55 @@ const AddModal = ({
     }
   }, [userId, users]);
 
-  // Применяем initialTaskData только при первом открытии модалки, чтобы опрос родителя (например, BPE) не сбрасывал ввод
+  // Подгрузка черновика при смене контекста (доска / проект / подзадача)
   useEffect(() => {
-    if (isOpen && externalInitialTaskData) {
-      if (!initialDataAppliedRef.current) {
-        setTaskData(initialTaskData);
-        initialDataAppliedRef.current = true;
+    if (prevDraftKeyRef.current === draftKey) return;
+    prevDraftKeyRef.current = draftKey;
+    const saved = loadAddModalDraft(draftKey);
+    if (saved?.taskData && hasAddModalDraftContent(saved.taskData)) {
+      const restored = {
+        ...buildEmptyTaskData(userId, globalTaskId, parentTaskId, rootTaskId),
+        ...saved.taskData,
+        global_task_id: globalTaskId,
+        parentTaskId,
+        rootTaskId,
+        created_by: userId,
+      };
+      setTaskData(restored);
+      if (quillInstance?.root && restored.description) {
+        quillInstance.root.innerHTML = restored.description;
       }
-    } else if (!isOpen) {
-      initialDataAppliedRef.current = false;
+      if (saved.checkedComment) setCheckedComment(!!saved.checkedComment);
+      if (saved.fileComments && typeof saved.fileComments === 'object') {
+        setFileComments(saved.fileComments);
+      }
+      initialDataAppliedRef.current = true;
+      return;
     }
-  }, [isOpen, externalInitialTaskData]);
+    setTaskData(initialTaskData);
+    initialDataAppliedRef.current = !!externalInitialTaskData;
+  }, [
+    draftKey,
+    userId,
+    globalTaskId,
+    parentTaskId,
+    rootTaskId,
+    initialTaskData,
+    externalInitialTaskData,
+    quillInstance,
+  ]);
+
+  // Шаблон из BPE — только если нет сохранённого черновика
+  useEffect(() => {
+    if (!isOpen || !externalInitialTaskData || initialDataAppliedRef.current) return;
+    const saved = loadAddModalDraft(draftKey);
+    if (saved?.taskData && hasAddModalDraftContent(saved.taskData)) {
+      initialDataAppliedRef.current = true;
+      return;
+    }
+    setTaskData(initialTaskData);
+    initialDataAppliedRef.current = true;
+  }, [isOpen, externalInitialTaskData, draftKey, initialTaskData]);
 
   // Принудительная активация Quill редактора при открытии модального окна
   useEffect(() => {
@@ -145,22 +234,55 @@ const AddModal = ({
     }
   }, [isOpen, quillInstance]);
 
-  // Подставляем описание в Quill только при первом открытии, чтобы не затирать ввод при ре-рендере родителя
+  // Синхронизация Quill при открытии модалки (после закрытия без сохранения задачи)
   useEffect(() => {
-    if (!isOpen) {
-      quillInitialSetRef.current = false;
-      return;
+    const justOpened = isOpen && !prevIsOpenRef.current;
+    prevIsOpenRef.current = isOpen;
+    if (!justOpened || !quillInstance) return;
+
+    const saved = loadAddModalDraft(draftKey);
+    const html =
+      taskData.description ||
+      saved?.taskData?.description ||
+      "";
+    const quillPlain = (quillInstance.root.innerHTML || "")
+      .replace(/<[^>]+>/g, "")
+      .trim();
+
+    if (html) {
+      if (quillInstance.root.innerHTML !== html) {
+        quillInstance.root.innerHTML = html;
+      }
+      if (!taskData.description) {
+        setTaskData((prev) => ({ ...prev, description: html }));
+      }
+    } else if (!quillPlain) {
+      quillInstance.root.innerHTML = "";
     }
-    if (
-      quillInstance &&
-      externalInitialTaskData &&
-      externalInitialTaskData.description &&
-      !quillInitialSetRef.current
-    ) {
-      quillInstance.root.innerHTML = externalInitialTaskData.description;
-      quillInitialSetRef.current = true;
-    }
-  }, [isOpen, quillInstance, externalInitialTaskData]);
+
+    quillInitialSetRef.current = true;
+  }, [isOpen, quillInstance, taskData.description, draftKey]);
+
+  // Автосохранение черновика в sessionStorage пока форма открыта
+  useEffect(() => {
+    if (!isOpen) return undefined;
+    const timer = setTimeout(() => {
+      saveAddModalDraft(draftKey, {
+        taskData: getTaskDataForDraft(),
+        checkedComment,
+        fileComments,
+      });
+    }, 400);
+    return () => clearTimeout(timer);
+  }, [
+    isOpen,
+    draftKey,
+    taskData,
+    checkedComment,
+    fileComments,
+    quillInstance,
+    getTaskDataForDraft,
+  ]);
 
   useEffect(() => {
     const fetchUsers = async () => {
@@ -214,34 +336,29 @@ const AddModal = ({
     setSelectedTemplate(null);
   }, []);
 
-  /** После успешного создания задачи — пустая форма (без подстановки externalInitialTaskData). */
-  const resetFormAfterSuccessfulCreate = useCallback(() => {
-    setTaskData({
-      title: "",
-      description: "",
-      deadline: "",
-      priority: "низкий",
-      status: "",
-      notification_status: false,
-      tags: "",
-      created_by: userId,
-      implementers: [],
-      approvers: [],
-      viewers: [],
-      file_url: "",
-      file_type: "",
-      comment_file: "",
-      name_file: "",
-      global_task_id: globalTaskId,
-      parentTaskId,
-      rootTaskId,
+  const persistDraft = useCallback(() => {
+    const dataForDraft = getTaskDataForDraft();
+    setTaskData(dataForDraft);
+    saveAddModalDraft(draftKey, {
+      taskData: dataForDraft,
+      checkedComment,
+      fileComments,
     });
+    return dataForDraft;
+  }, [draftKey, getTaskDataForDraft, checkedComment, fileComments]);
+
+  /** После успешного создания задачи — пустая форма и удаление черновика. */
+  const resetFormAfterSuccessfulCreate = useCallback(() => {
+    clearAddModalDraft(draftKey);
+    setTaskData(buildEmptyTaskData(userId, globalTaskId, parentTaskId, rootTaskId));
     resetAuxiliaryFormState();
     if (quillInstance?.root) {
       quillInstance.root.innerHTML = "";
     }
     quillInitialSetRef.current = false;
+    initialDataAppliedRef.current = false;
   }, [
+    draftKey,
     userId,
     globalTaskId,
     parentTaskId,
@@ -250,54 +367,14 @@ const AddModal = ({
     resetAuxiliaryFormState,
   ]);
 
+  /** Закрытие без создания — данные формы и черновик сохраняются. */
   const closeModal = useCallback(() => {
+    persistDraft();
     setOpen(false);
-    onClose();
-    const baseDefaults = {
-      title: "",
-      description: "",
-      deadline: "",
-      priority: "низкий",
-      status: "",
-      notification_status: false,
-      tags: "",
-      created_by: userId,
-      implementers: [],
-      approvers: [],
-      viewers: [],
-      file_url: "",
-      file_type: "",
-      comment_file: "",
-      name_file: "",
-      global_task_id: globalTaskId,
-      parentTaskId,
-      rootTaskId,
-    };
-    setTaskData(
-      externalInitialTaskData
-        ? { ...baseDefaults, ...externalInitialTaskData }
-        : baseDefaults
-    );
-    resetAuxiliaryFormState();
-    if (quillInstance?.root) {
-      if (externalInitialTaskData?.description) {
-        quillInstance.root.innerHTML = externalInitialTaskData.description;
-      } else {
-        quillInstance.root.innerHTML = "";
-      }
+    if (typeof onClose === "function") {
+      onClose();
     }
-    quillInitialSetRef.current = false;
-  }, [
-    setOpen,
-    onClose,
-    userId,
-    globalTaskId,
-    parentTaskId,
-    rootTaskId,
-    externalInitialTaskData,
-    resetAuxiliaryFormState,
-    quillInstance,
-  ]);
+  }, [persistDraft, setOpen, onClose]);
 
   const handleSubmitWithComments = useCallback(async () => {
     if (taskData.implementers.length === 0) {
@@ -450,12 +527,11 @@ const AddModal = ({
         }).showToast();
 
         resetFormAfterSuccessfulCreate();
+        setOpen(false);
 
         // Возвращаем ID первой созданной задачи через callback
         if (onClose && typeof onClose === "function") {
           onClose(taskIds[0]); // Возвращаем ID первой задачи
-        } else {
-          closeModal();
         }
       } catch (error) {
         console.error("Ошибка при создании задачи:", error);
@@ -482,7 +558,7 @@ const AddModal = ({
     businessProcessInstanceId,
     resetFormAfterSuccessfulCreate,
     onClose,
-    closeModal,
+    setOpen,
   ]);
 
   const handleCommentSubmit = () => {
@@ -520,11 +596,13 @@ const AddModal = ({
       });
       setQuillInstance(quill);
 
-      // Устанавливаем начальное содержимое из externalInitialTaskData
-      if (externalInitialTaskData && externalInitialTaskData.description) {
-        quill.root.innerHTML = externalInitialTaskData.description;
-      } else if (selectedTemplate) {
-        quill.root.innerHTML = selectedTemplate.description;
+      const initialDescription =
+        taskData.description ||
+        (externalInitialTaskData && externalInitialTaskData.description) ||
+        (selectedTemplate && selectedTemplate.description) ||
+        '';
+      if (initialDescription) {
+        quill.root.innerHTML = initialDescription;
       }
 
       quill.on("text-change", () => {
@@ -534,7 +612,7 @@ const AddModal = ({
         quill.off("text-change");
       };
     }
-  }, [quillInstance, selectedTemplate, externalInitialTaskData]);
+  }, [quillInstance, selectedTemplate, externalInitialTaskData, taskData.description]);
 
   const availableTags = useMemo(() => {
     let existingTags = [];

@@ -1,8 +1,6 @@
 import { useState, useEffect } from 'react'
 import axios from 'axios'
 import { API_BASE_URL } from '../../../../config'
-import DatePicker from 'react-datepicker'
-import { ru } from 'date-fns/locale'
 import { FaPlus, FaTrashAlt, FaUserPlus } from 'react-icons/fa'
 import {
   responsibleRolesList,
@@ -10,8 +8,16 @@ import {
   generateRandomAvatarColorClass,
   generateInitials,
 } from './utils/globalTaskUtils'
-import 'react-datepicker/dist/react-datepicker.css'
 import './styles/CreateGlobalTaskForm.scss'
+
+// Значение для input type="datetime-local": YYYY-MM-DDTHH:mm в локальной зоне
+const toDateTimeLocalValue = (deadline) => {
+  if (!deadline) return ''
+  const d = deadline instanceof Date ? deadline : new Date(deadline)
+  if (Number.isNaN(d.getTime())) return ''
+  const pad = (n) => String(n).padStart(2, '0')
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`
+}
 
 const CreateGlobalTaskForm = ({ onSave, onCancel, initialData }) => {
   const [users, setUsers] = useState([])
@@ -96,8 +102,17 @@ const CreateGlobalTaskForm = ({ onSave, onCancel, initialData }) => {
     setFormData({ ...formData, [name]: value })
   }
 
-  const handleDateChange = (date) => {
-    setFormData({ ...formData, deadline: date })
+  const handleDeadlineChange = (e) => {
+    const value = e.target.value
+    if (!value) {
+      setFormData({ ...formData, deadline: null })
+      return
+    }
+    const d = new Date(value)
+    setFormData({
+      ...formData,
+      deadline: Number.isNaN(d.getTime()) ? null : d,
+    })
   }
 
   const handleGoalChange = (index, value) => {
@@ -288,18 +303,13 @@ const CreateGlobalTaskForm = ({ onSave, onCancel, initialData }) => {
             >
               Срок выполнения (дата и время)
             </label>
-            <DatePicker
+            <input
+              type="datetime-local"
               id="deadline"
-              selected={formData.deadline}
-              onChange={handleDateChange}
-              showTimeSelect
-              timeFormat="HH:mm"
-              timeIntervals={15}
-              dateFormat="dd.MM.yyyy HH:mm"
+              name="deadline"
               className="create-global-task-form__input"
-              placeholderText="Выберите дату и время"
-              isClearable
-              locale={ru}
+              value={toDateTimeLocalValue(formData.deadline)}
+              onChange={handleDeadlineChange}
             />
           </div>
 

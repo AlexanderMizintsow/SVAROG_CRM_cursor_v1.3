@@ -1,5 +1,6 @@
 import { LuDelete } from 'react-icons/lu'
 import styles from '../AddModal.module.scss'
+import { useMemo, useState } from 'react'
 
 const UserRoleSectionTask = ({
   title,
@@ -12,11 +13,49 @@ const UserRoleSectionTask = ({
   handleAddUser,
   handleRemoveUser,
 }) => {
+  const [searchValue, setSearchValue] = useState('')
+
+  const getUserFullName = (user) =>
+    `${user.last_name || ''} ${user.first_name || ''} ${user.middle_name || ''}`
+      .replace(/\s+/g, ' ')
+      .trim()
+
+  const getDepartmentLabel = (user) =>
+    user?.department?.name || user?.department_name || user?.department || ''
+
+  const getPositionLabel = (user) =>
+    user?.position?.name || user?.position_name || user?.position || ''
+
+  const filteredUsers = useMemo(() => {
+    const query = searchValue.trim().toLowerCase()
+    const availableUsers = remainingUsersForRole(roleKey)
+    if (!query) return availableUsers
+
+    return availableUsers.filter((user) => {
+      // Визуально показываем только ФИО, но ищем и по должности/отделу
+      const haystack = [
+        getUserFullName(user),
+        getDepartmentLabel(user),
+        getPositionLabel(user),
+      ]
+        .join(' ')
+        .toLowerCase()
+      return haystack.includes(query)
+    })
+  }, [searchValue, remainingUsersForRole, roleKey])
+
   return (
     <div className={styles.border}>
       <p className={styles.titleInput}>{title}</p>
       <div className={styles.inputSection}>
         <div>
+          <input
+            type="text"
+            value={searchValue}
+            onChange={(e) => setSearchValue(e.target.value)}
+            placeholder="Поиск: фамилия, должность, отдел"
+            className={styles.userSearchInput}
+          />
           <select
             value={selectedUser}
             onChange={(e) => {
@@ -26,13 +65,12 @@ const UserRoleSectionTask = ({
                 handleAddUser(roleKey, value, setSelectedUser)
               }
             }}
+            className={styles.userSelectCompact}
           >
             <option value="">Выберите {title.toLowerCase()}</option>
-            {remainingUsersForRole(roleKey).map((user) => (
+            {filteredUsers.map((user) => (
               <option key={user.id} value={user.id}>
-                {`${user.last_name} ${user.first_name} ${
-                  user.middle_name || ''
-                }`}
+                {getUserFullName(user)}
               </option>
             ))}
           </select>
@@ -45,9 +83,7 @@ const UserRoleSectionTask = ({
                   style={{ display: 'flex', alignItems: 'center' }}
                   key={userId}
                 >
-                  {`${user.last_name} ${user.first_name} ${
-                    user.middle_name || ''
-                  }`}
+                  {getUserFullName(user)}
                   <LuDelete
                     style={{ marginLeft: 'auto' }}
                     title="Удалить"

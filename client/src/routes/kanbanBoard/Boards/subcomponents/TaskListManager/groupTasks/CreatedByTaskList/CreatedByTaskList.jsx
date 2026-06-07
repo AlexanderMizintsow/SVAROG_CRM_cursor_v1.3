@@ -20,6 +20,9 @@ const CreatedByTaskList = ({
   onOpenProject,
   completedArchiveMode = false,
   openFullDescriptionOnDoubleClick = true,
+  approverMode = false,
+  approvalStatus = {},
+  onApproval,
 }) => {
   const { user, users } = useUserStore()
   const [updatedTasks] = useState(tasks)
@@ -57,7 +60,7 @@ const CreatedByTaskList = ({
   const [selectedStatus, setSelectedStatus] = useState('all')
   const [selectedPriority, setSelectedPriority] = useState('all')
   const [selectedAssignee, setSelectedAssignee] = useState('all')
-  const [viewMode, setViewMode] = useState('cards') // cards, list
+  const [viewMode, setViewMode] = useState(approverMode ? 'cards' : 'cards') // cards, list
   const [sortBy, setSortBy] = useState('deadline')
   const [isFiltersOpen, setIsFiltersOpen] = useState(false)
   const [isHelpModalOpen, setIsHelpModalOpen] = useState(false)
@@ -429,7 +432,7 @@ const CreatedByTaskList = ({
   return (
     <Box sx={{ minHeight: '100vh', backgroundColor: '#f5f5f5' }}>
       {/* Header с фильтрами (во вкладке архива завершённых — фильтры сверху в TaskListManager) */}
-      {!completedArchiveMode && (
+      {!completedArchiveMode && !approverMode && (
         <TaskFiltersHeader
           stats={stats}
           isFiltersOpen={isFiltersOpen}
@@ -479,6 +482,9 @@ const CreatedByTaskList = ({
           onOpenProject={onOpenProject}
           completedArchiveMode={completedArchiveMode}
           openFullDescriptionOnDoubleClick={openFullDescriptionOnDoubleClick}
+          approverMode={approverMode}
+          approvalStatus={approvalStatus}
+          onApproval={onApproval}
         />
       </Box>
 

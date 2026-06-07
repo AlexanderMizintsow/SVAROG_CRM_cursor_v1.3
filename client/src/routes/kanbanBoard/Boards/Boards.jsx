@@ -65,6 +65,7 @@ const Boards = () => {
   const [stripRefreshKey, setStripRefreshKey] = useState(0)
   const [isCompletedHistoryOpen, setCompletedHistoryOpen] = useState(false)
   const [isHelpOpen, setHelpOpen] = useState(false)
+  const [taskListManagerInitialTab, setTaskListManagerInitialTab] = useState('created')
 
   const userId = user ? user.id : null
 
@@ -85,6 +86,7 @@ const Boards = () => {
         })
         .catch((err) => console.error('Ошибка загрузки проекта:', err))
     } else if (taskDecisionNavigate.type === 'taskList') {
+      setTaskListManagerInitialTab(taskDecisionNavigate.initialTab || 'created')
       setTaskListManagerOpen(true)
     }
     clearTaskDecisionNavigate()
@@ -241,6 +243,8 @@ const Boards = () => {
   }
 
   const toggleTaskListManager = () => {
+    // При ручном открытии менеджера возвращаем вкладку по умолчанию
+    setTaskListManagerInitialTab('created')
     setTaskListManagerOpen((prev) => {
       if (prev) clearTaskCardBlinkYellow()
       return !prev
@@ -468,6 +472,7 @@ const Boards = () => {
             onClose={toggleTaskListManager}
             onOpenProject={handleOpenProjectFromMini}
             stripRefreshKey={stripRefreshKey}
+            initialActiveTab={taskListManagerInitialTab}
           />
         </Box>
       </Modal>

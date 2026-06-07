@@ -17,12 +17,135 @@
   min-width: 0;
 }
 
+:global(body.mini-project-strip-resizing) {
+  cursor: col-resize !important;
+  user-select: none;
+}
+
+.stripTitleRow {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 0.75rem;
+  margin-bottom: 0.5rem;
+  padding: 0 4px;
+  flex-wrap: wrap;
+}
+
 .stripTitle {
   font-size: 0.875rem;
   font-weight: 600;
   color: #374151;
-  margin-bottom: 0.5rem;
-  padding-left: 4px;
+  margin: 0;
+}
+
+.stripHint {
+  font-size: 0.7rem;
+  color: #9ca3af;
+  font-weight: 400;
+}
+
+.splitContainer {
+  display: flex;
+  align-items: stretch;
+  max-width: 98%;
+  min-width: 0;
+  min-height: 120px;
+  border-radius: 8px;
+  overflow: hidden;
+  border: 1px solid rgba(0, 112, 255, 0.25);
+  background: rgba(255, 255, 255, 0.35);
+}
+
+.paneLeft {
+  flex: 0 0 auto;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  border-right: none;
+}
+
+.paneRight {
+  flex: 1 1 auto;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.pane {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  flex: 1;
+  padding: 0.4rem 0.35rem 0.5rem;
+}
+ 
+
+.paneHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.35rem;
+  margin-bottom: 0.15rem;
+}
+
+.paneTitle {
+  font-size: 0.72rem;
+  font-weight: 600;
+  color: #374151;
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
+}
+
+.paneCount {
+  font-size: 0.68rem;
+  font-weight: 600;
+  color: #6b7280;
+  background: rgba(255, 255, 255, 0.85);
+  padding: 1px 6px;
+  border-radius: 10px;
+}
+
+.paneEmpty {
+  font-size: 0.72rem;
+  color: #9ca3af;
+  padding: 0.5rem 0.25rem;
+  font-style: italic;
+}
+
+.resizer {
+  flex: 0 0 8px;
+  cursor: col-resize;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: linear-gradient(
+    90deg,
+    rgba(229, 231, 235, 0.9),
+    rgba(0, 112, 255, 0.35),
+    rgba(229, 231, 235, 0.9)
+  );
+  touch-action: none;
+  z-index: 2;
+
+  &:hover .resizerGrip,
+  &:active .resizerGrip {
+    background: #2563eb;
+    box-shadow: 0 0 0 2px rgba(37, 99, 235, 0.25);
+  }
+}
+
+.resizerGrip {
+  width: 3px;
+  height: 36px;
+  border-radius: 2px;
+  background: #6b7280;
+  pointer-events: none;
+  transition: background 0.15s ease, box-shadow 0.15s ease;
+}
+
+.actionsPlaceholder {
+  display: none;
 }
 
 .empty {
@@ -39,10 +162,12 @@
 
 .scroll {
   display: flex;
-  gap: 0.75rem; 
-  max-width: 98%;
+  gap: 0.75rem;
+  width: 100%;
   min-width: 0;
+  flex: 1;
   overflow-x: auto;
+  overflow-y: hidden;
   padding-bottom: 4px;
   -webkit-overflow-scrolling: touch;
   scroll-behavior: smooth;
