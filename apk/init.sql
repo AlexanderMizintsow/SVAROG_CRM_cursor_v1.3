@@ -228,6 +228,7 @@ CREATE TABLE user_statuses (
     status VARCHAR(50) NOT NULL, -- Например, 'отпуск', 'болезнь', 'выходные', 'командировка'
     start_date DATE, -- Дата начала статуса
     end_date DATE, -- Дата окончания статуса
+    substitute_user_id INTEGER REFERENCES users(id) ON DELETE SET NULL, -- Замещающий сотрудник
     created_at TIMESTAMP DEFAULT NOW(),
     updated_at TIMESTAMP DEFAULT NOW() 
 );

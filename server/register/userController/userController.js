@@ -402,24 +402,41 @@ const deletePhone = (dbPool) => async (req, res) => {
 }
 
 // Создание нового статуса пользователя
-const createUserStatus = (dbPool) => async (req, res) => {
-  const { user_id, status, start_date, end_date } = req.body
+const {
+  canManageEmployeeStatus,
+  getManagePermissions,
+} = require('../userStatusPermissions')
 
-  console.log('Создание статуса для пользователя:', user_id) // Отладочная строка
+const createUserStatus = (dbPool) => async (req, res) => {
+  const { user_id, status, start_date, end_date, substitute_user_id, actor_user_id } = req.body
+
+  if (!actor_user_id) {
+    return res.status(400).json({ error: 'Не указан инициатор действия (actor_user_id)' })
+  }
 
   try {
+    const allowed = await canManageEmployeeStatus(dbPool, actor_user_id, user_id)
+    if (!allowed) {
+      return res.status(403).json({
+        error: 'Недостаточно прав. Статус может назначать руководитель отдела, сотрудник отдела кадров или администратор.',
+      })
+    }
+
+    const substituteId =
+      substitute_user_id != null && substitute_user_id !== ''
+        ? Number(substitute_user_id)
+        : null
+
     const result = await dbPool.query(
-      `INSERT INTO user_statuses (user_id, status, start_date, end_date) 
-       VALUES ($1, $2, $3, $4) RETURNING id`,
-      [user_id, status, start_date, end_date]
+      `INSERT INTO user_statuses (user_id, status, start_date, end_date, substitute_user_id) 
+       VALUES ($1, $2, $3, $4, $5) RETURNING id`,
+      [user_id, status, start_date, end_date, Number.isFinite(substituteId) ? substituteId : null]
     )
 
     const userStatusId = result.rows[0].id
 
-    // Если это не период, добавляем конкретные даты
     if (end_date === null) {
-      const specificDates = req.body.specific_dates // Получаем список конкретных дат
-      console.log(specificDates)
+      const specificDates = req.body.specific_dates
       if (Array.isArray(specificDates)) {
         for (const date of specificDates) {
           await dbPool.query(
@@ -435,6 +452,171 @@ const createUserStatus = (dbPool) => async (req, res) => {
   } catch (error) {
     console.error('Ошибка при создании статуса пользователя:', error)
     res.status(500).send('Ошибка сервера')
+  }
+}
+
+const updateUserAbsenceStatus = (dbPool) => async (req, res) => {
+  const { id } = req.params
+  const {
+    actor_user_id,
+    status,
+    start_date,
+    end_date,
+    specific_dates,
+    substitute_user_id,
+  } = req.body
+
+  if (!actor_user_id) {
+    return res.status(400).json({ error: 'Не указан инициатор действия (actor_user_id)' })
+  }
+
+  const statusId = Number(id)
+  if (!Number.isFinite(statusId)) {
+    return res.status(400).json({ error: 'Некорректный id статуса' })
+  }
+
+  try {
+    const existing = await dbPool.query(
+      `SELECT id, user_id FROM user_statuses WHERE id = $1`,
+      [statusId]
+    )
+    if (existing.rows.length === 0) {
+      return res.status(404).json({ error: 'Запись статуса не найдена' })
+    }
+
+    const targetUserId = existing.rows[0].user_id
+    const allowed = await canManageEmployeeStatus(dbPool, actor_user_id, targetUserId)
+    if (!allowed) {
+      return res.status(403).json({
+        error: 'Недостаточно прав для изменения статуса этого сотрудника.',
+      })
+    }
+
+    const substituteId =
+      substitute_user_id != null && substitute_user_id !== ''
+        ? Number(substitute_user_id)
+        : null
+
+    const isPeriod = end_date != null && end_date !== ''
+
+    await dbPool.query('BEGIN')
+
+    await dbPool.query(
+      `UPDATE user_statuses
+       SET status = COALESCE($2, status),
+           start_date = $3,
+           end_date = $4,
+           substitute_user_id = $5,
+           updated_at = NOW()
+       WHERE id = $1`,
+      [
+        statusId,
+        status || null,
+        isPeriod ? start_date : null,
+        isPeriod ? end_date : null,
+        Number.isFinite(substituteId) ? substituteId : null,
+      ]
+    )
+
+    await dbPool.query(`DELETE FROM user_status_dates WHERE user_status_id = $1`, [statusId])
+
+    if (!isPeriod && Array.isArray(specific_dates) && specific_dates.length > 0) {
+      for (const date of specific_dates) {
+        await dbPool.query(
+          `INSERT INTO user_status_dates (user_status_id, specific_date) VALUES ($1, $2)`,
+          [statusId, date]
+        )
+      }
+    }
+
+    await dbPool.query('COMMIT')
+    res.json({ message: 'Статус обновлён', id: statusId })
+  } catch (error) {
+    await dbPool.query('ROLLBACK').catch(() => {})
+    console.error('Ошибка при обновлении статуса пользователя:', error)
+    res.status(500).json({ error: 'Ошибка сервера' })
+  }
+}
+
+const deleteUserAbsenceStatus = (dbPool) => async (req, res) => {
+  const { id } = req.params
+  const actorUserId = req.body?.actor_user_id ?? req.query?.actor_user_id
+
+  if (!actorUserId) {
+    return res.status(400).json({ error: 'Не указан инициатор действия (actor_user_id)' })
+  }
+
+  const statusId = Number(id)
+  if (!Number.isFinite(statusId)) {
+    return res.status(400).json({ error: 'Некорректный id статуса' })
+  }
+
+  try {
+    const existing = await dbPool.query(
+      `SELECT id, user_id FROM user_statuses WHERE id = $1`,
+      [statusId]
+    )
+    if (existing.rows.length === 0) {
+      return res.status(404).json({ error: 'Запись статуса не найдена' })
+    }
+
+    const allowed = await canManageEmployeeStatus(dbPool, actorUserId, existing.rows[0].user_id)
+    if (!allowed) {
+      return res.status(403).json({
+        error: 'Недостаточно прав для отмены статуса этого сотрудника.',
+      })
+    }
+
+    await dbPool.query(`DELETE FROM user_statuses WHERE id = $1`, [statusId])
+    res.json({ message: 'Статус отменён' })
+  } catch (error) {
+    console.error('Ошибка при удалении статуса пользователя:', error)
+    res.status(500).json({ error: 'Ошибка сервера' })
+  }
+}
+
+const getUserStatusPermissions = (dbPool) => async (req, res) => {
+  const actorUserId = req.query.actor_user_id
+  if (!actorUserId) {
+    return res.status(400).json({ error: 'Укажите actor_user_id' })
+  }
+
+  try {
+    const permissions = await getManagePermissions(dbPool, actorUserId)
+    res.json(permissions)
+  } catch (error) {
+    console.error('Ошибка при получении прав на статусы:', error)
+    res.status(500).json({ error: 'Ошибка сервера' })
+  }
+}
+
+const { getAllActiveAbsences } = require('../userAbsenceService')
+const { getWorkloadSummary } = require('../userAbsenceWorkloadService')
+
+// Активные отсутствия сотрудников на текущую дату
+const getActiveUserAbsences = (dbPool) => async (req, res) => {
+  try {
+    const absences = await getAllActiveAbsences(dbPool)
+    res.json(absences)
+  } catch (error) {
+    console.error('Ошибка при получении активных отсутствий:', error)
+    res.status(500).json({ error: 'Ошибка сервера' })
+  }
+}
+
+// Сводка открытых ролей сотрудника в задачах и проектах (только чтение)
+const getUserWorkloadSummary = (dbPool) => async (req, res) => {
+  const { userId } = req.params
+
+  try {
+    const data = await getWorkloadSummary(dbPool, userId)
+    if (!data) {
+      return res.status(400).json({ error: 'Некорректный id пользователя' })
+    }
+    res.json(data)
+  } catch (error) {
+    console.error('Ошибка при получении сводки нагрузки:', error)
+    res.status(500).json({ error: 'Ошибка сервера' })
   }
 }
 
@@ -829,6 +1011,11 @@ module.exports = {
   updatePhone,
   deletePhone,
   createUserStatus,
+  updateUserAbsenceStatus,
+  deleteUserAbsenceStatus,
+  getUserStatusPermissions,
+  getActiveUserAbsences,
+  getUserWorkloadSummary,
   getMppIdByCompanyId,
   getMprIdByCompanyId,
   updateReminderUserNotification,

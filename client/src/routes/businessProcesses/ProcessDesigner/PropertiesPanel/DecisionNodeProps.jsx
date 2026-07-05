@@ -13,7 +13,7 @@ import useBusinessProcessStore from '../../../../store/useBusinessProcessStore'
 import UserCheckboxList from './UserCheckboxList'
 import './PropertiesPanel.scss'
 
-const DecisionNodeProps = ({ node, onUpdate }) => {
+const DecisionNodeProps = ({ node, onUpdate, absencesMap = {} }) => {
   const settings = node.settings || {}
   const { scheme } = useBusinessProcessStore()
   const [users, setUsers] = useState([])
@@ -91,6 +91,7 @@ const DecisionNodeProps = ({ node, onUpdate }) => {
             users={users}
             selectedIds={settings.userIds || []}
             onChange={(ids) => handleChange('userIds', ids)}
+            absencesMap={absencesMap}
           />
         </div>
       )}

@@ -9,6 +9,12 @@ import {
   responsibleRolesList,
 } from '../utils/globalTaskUtils'
 import UserStore from '../../../../store/userStore'
+import { useActiveAbsences } from '../../../../utils/useActiveAbsences'
+import {
+  resolveUserSelection,
+  getAbsenceLabel,
+  showAbsenceMessage,
+} from '../../../../utils/userAbsenceUtils'
 import './ResponsibleSelector.scss'
 
 const ResponsibleSelector = ({
@@ -23,6 +29,7 @@ const ResponsibleSelector = ({
   const { user } = UserStore()
   const [loading, setLoading] = useState(true)
   const [responsibles, setResponsibles] = useState(existingResponsibles || [])
+  const { absencesMap } = useActiveAbsences(true)
 
   const userId = user ? user.id : null
 
@@ -57,45 +64,54 @@ const ResponsibleSelector = ({
       if (onClose) onClose()
       onRefresh(globalTaskId)
     } catch (error) {
+      const errMsg = error.response?.data?.error || 'Не удалось добавить ответственных. Попробуйте еще раз.'
       console.error('Ошибка при добавлении ответственных:', error)
-      alert('Не удалось добавить ответственных. Попробуйте еще раз.')
+      alert(errMsg)
     }
   }
 
-  // Обработчик добавления выбранного пользователя
-  const handleResponsibleSelect = (userId) => {
-    const selectedUser = users.find((user) => user.id === userId)
+  const handleResponsibleSelect = (selectedUserId) => {
+    const resolution = resolveUserSelection(selectedUserId, absencesMap, users)
+
+    if (resolution.message) {
+      showAbsenceMessage(resolution.message, resolution.blocked)
+    }
+
+    if (!resolution.added || resolution.effectiveId == null) return
+
+    const selectedUser = users.find((u) => Number(u.id) === Number(resolution.effectiveId))
     if (
-      selectedUser &&
-      !responsibles.some((resp) => resp.id === selectedUser.id)
+      !selectedUser ||
+      responsibles.some((resp) => Number(resp.id) === Number(selectedUser.id)) ||
+      responsiblesBefor.some((resp) => Number(resp.id) === Number(selectedUser.id))
     ) {
-      const newResponsible = {
-        id: selectedUser.id,
-        first_name: selectedUser.first_name,
-        last_name: selectedUser.last_name,
-        middle_name: selectedUser.middle_name,
-        initials: generateInitials(
-          selectedUser.first_name,
-          selectedUser.last_name
-        ),
-        avatarColorClass: generateRandomAvatarColorClass(),
-        backgroundColorClass: generateRandomBackgroundColorClass(),
-        role: (Array.isArray(responsibleRolesList) && responsibleRolesList.includes('Участник')) ? 'Участник' : ((Array.isArray(responsibleRolesList) && responsibleRolesList[0]) || 'Исполнитель'),
-        requires_approval: false,
-      }
-      setResponsibles([...responsibles, newResponsible])
-      if (onAddResponsible) {
-        onAddResponsible(newResponsible)
-      }
+      return
+    }
+
+    const newResponsible = {
+      id: selectedUser.id,
+      first_name: selectedUser.first_name,
+      last_name: selectedUser.last_name,
+      middle_name: selectedUser.middle_name,
+      initials: generateInitials(selectedUser.first_name, selectedUser.last_name),
+      avatarColorClass: generateRandomAvatarColorClass(),
+      backgroundColorClass: generateRandomBackgroundColorClass(),
+      role:
+        Array.isArray(responsibleRolesList) && responsibleRolesList.includes('Участник')
+          ? 'Участник'
+          : (Array.isArray(responsibleRolesList) && responsibleRolesList[0]) || 'Исполнитель',
+      requires_approval: false,
+    }
+    setResponsibles([...responsibles, newResponsible])
+    if (onAddResponsible) {
+      onAddResponsible(newResponsible)
     }
   }
 
-  // Обработчик удаления ответственного
   const removeResponsible = (id) => {
     setResponsibles(responsibles.filter((resp) => resp.id !== id))
   }
 
-  // Обработчик смены роли
   const handleResponsibleRoleChange = (userId, newRole) => {
     const updated = responsibles.map((resp) =>
       resp.id === userId ? { ...resp, role: newRole } : resp
@@ -103,7 +119,6 @@ const ResponsibleSelector = ({
     setResponsibles(updated)
   }
 
-  // Обработчик галочки «Требуется согласование»
   const handleRequiresApprovalChange = (respId, checked) => {
     const updated = responsibles.map((resp) =>
       resp.id === respId ? { ...resp, requires_approval: !!checked } : resp
@@ -114,7 +129,6 @@ const ResponsibleSelector = ({
   return (
     <div className="global-task-responsibles__modal-overlay">
       <div className="global-task-responsibles__modal-content">
-        {/* Отображение выбранных ответственных */}
         <div className="create-global-task-form__responsibles-list">
           {responsibles.map((resp) => (
             <div
@@ -123,9 +137,7 @@ const ResponsibleSelector = ({
             >
               <div
                 className={`create-global-task-form__responsible-avatar ${resp.avatarColorClass}`}
-                title={`${resp.last_name} ${resp.first_name} ${
-                  resp.middle_name || ''
-                }`}
+                title={`${resp.last_name} ${resp.first_name} ${resp.middle_name || ''}`}
               >
                 {resp.initials}
               </div>
@@ -135,13 +147,10 @@ const ResponsibleSelector = ({
                     (resp.middle_name || '')[0] ? (resp.middle_name || '')[0] + '.' : ''
                   }`}
                 </div>
-                {/* Роль */}
                 <select
                   className="create-global-task-form__responsible-role-select"
                   value={resp.role}
-                  onChange={(e) =>
-                    handleResponsibleRoleChange(resp.id, e.target.value)
-                  }
+                  onChange={(e) => handleResponsibleRoleChange(resp.id, e.target.value)}
                 >
                   {(Array.isArray(responsibleRolesList) ? responsibleRolesList : []).map((role) => (
                     <option key={role} value={role}>
@@ -149,20 +158,16 @@ const ResponsibleSelector = ({
                     </option>
                   ))}
                 </select>
-                {/* Требуется согласование */}
                 <label className="create-global-task-form__requires-approval-label">
                   <input
                     type="checkbox"
                     checked={!!resp.requires_approval}
-                    onChange={(e) =>
-                      handleRequiresApprovalChange(resp.id, e.target.checked)
-                    }
+                    onChange={(e) => handleRequiresApprovalChange(resp.id, e.target.checked)}
                     className="create-global-task-form__requires-approval-checkbox"
                   />
                   <span>Требуется согласование</span>
                 </label>
               </div>
-              {/* Кнопка удаления */}
               <button
                 type="button"
                 className="create-global-task-form__remove-responsible-button"
@@ -174,16 +179,15 @@ const ResponsibleSelector = ({
           ))}
         </div>
 
-        {/* Выбор ответственного */}
         <div className="create-global-task-form__add-responsible-section">
           <FaUserPlus className="create-global-task-form__add-responsible-icon" />
           <select
             className="create-global-task-form__select"
             style={{ width: '100%' }}
             onChange={(e) => {
-              const userId = parseInt(e.target.value, 10)
-              if (!isNaN(userId)) {
-                handleResponsibleSelect(userId)
+              const parsedId = parseInt(e.target.value, 10)
+              if (!isNaN(parsedId)) {
+                handleResponsibleSelect(parsedId)
               }
               e.target.value = ''
             }}
@@ -191,23 +195,25 @@ const ResponsibleSelector = ({
             disabled={loading}
           >
             <option value="" disabled>
-              {loading
-                ? 'Загрузка пользователей...'
-                : 'Выберите ответственного'}
+              {loading ? 'Загрузка пользователей...' : 'Выберите ответственного'}
             </option>
             {users
               .filter(
-                (user) =>
-                  !responsibles.some((resp) => resp.id === user.id) &&
-                  !responsiblesBefor.some((resp) => resp.id === user.id) // Фильтрация по responsiblesBefor
+                (u) =>
+                  !responsibles.some((resp) => resp.id === u.id) &&
+                  !responsiblesBefor.some((resp) => resp.id === u.id)
               )
-              .map((user) => (
-                <option key={user.id} value={user.id}>
-                  {`${user.last_name || ''} ${(user.first_name || '')[0] || ''}. ${
-                    (user.middle_name || '')[0] ? (user.middle_name || '')[0] + '.' : ''
-                  }`}
-                </option>
-              ))}
+              .map((u) => {
+                const absenceLabel = getAbsenceLabel(absencesMap[Number(u.id)])
+                return (
+                  <option key={u.id} value={u.id}>
+                    {`${u.last_name || ''} ${(u.first_name || '')[0] || ''}. ${
+                      (u.middle_name || '')[0] ? (u.middle_name || '')[0] + '.' : ''
+                    }`}
+                    {absenceLabel ? ` — ${absenceLabel}` : ''}
+                  </option>
+                )
+              })}
           </select>
         </div>
         <div className="global-task-responsibles__buttons">
@@ -219,9 +225,7 @@ const ResponsibleSelector = ({
           </button>
           <button
             className="global-task-responsibles__button global-task-responsibles__add-button"
-            onClick={() => {
-              handleAddResponsibles()
-            }}
+            onClick={handleAddResponsibles}
           >
             Добавить
           </button>

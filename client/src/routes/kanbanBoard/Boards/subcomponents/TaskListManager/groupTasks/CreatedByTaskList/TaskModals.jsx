@@ -6,6 +6,7 @@ import Link from '@tiptap/extension-link' // если понадобится г�
 import ConfirmationDialog from '../../../../../../../components/confirmationDialog/ConfirmationDialog'
 import SubTaskHierarchy from '../../../../../Task/subcomponents/subTaskHierarchy/SubTaskHierarchy'
 import { getUserNames } from '../../../../../Task/utils/taskUtils'
+import { getAbsenceLabel } from '../../../../../../../utils/userAbsenceUtils'
 import { ReactFlowProvider } from 'react-flow-renderer'
 import EditorToolbar from '../../../../../../../components/EditorToolbar/EditorToolbar'
 
@@ -39,6 +40,7 @@ const TaskModals = ({
   setSelectedNewUserId,
   handleConfirmReplaceUser,
   users,
+  absencesMap = {},
 }) => {
   const editor = useEditor({
     extensions: [StarterKit /*, Link, и др.*/],
@@ -231,11 +233,15 @@ const TaskModals = ({
               </MenuItem>
               {users
                 .filter((user) => !selectedTaskForReplacement?.assigned_user_ids?.includes(user.id))
-                .map((user) => (
-                  <MenuItem key={user.id} value={user.id}>
-                    {`${user.last_name} ${user.first_name} ${user.middle_name || ''}`}
-                  </MenuItem>
-                ))}
+                .map((user) => {
+                  const absenceLabel = getAbsenceLabel(absencesMap[Number(user.id)])
+                  return (
+                    <MenuItem key={user.id} value={user.id}>
+                      {`${user.last_name} ${user.first_name} ${user.middle_name || ''}`}
+                      {absenceLabel ? ` — ${absenceLabel}` : ''}
+                    </MenuItem>
+                  )
+                })}
             </TextField>
 
             <Box sx={{ mt: 3, display: 'flex', justifyContent: 'flex-end', gap: 2 }}>

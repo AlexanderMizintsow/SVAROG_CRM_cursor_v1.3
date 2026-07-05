@@ -5,9 +5,21 @@ import { getRandomColors } from '../../helpers/getRandomColors'
 import { dangerousFormats } from '../../Boards/subcomponents/taskUtils'
 import Toastify from 'toastify-js'
 import { useCallback } from 'react'
+import { resolveUserSelection } from '../../../../utils/userAbsenceUtils'
+
+const showToast = (text, isError = false) => {
+  Toastify({
+    text,
+    close: true,
+    duration: 6000,
+    backgroundColor: isError
+      ? 'linear-gradient(to right, #8B0000, #ff0000)'
+      : 'linear-gradient(to right, #f7971e, #ffd200)',
+  }).showToast()
+}
 
 export const useTaskHandlers = (state, setters) => {
-  const { taskData, selectedTag } = state
+  const { taskData, selectedTag, absencesMap, users } = state
   const {
     // Setters
     setTaskData,
@@ -118,29 +130,53 @@ export const useTaskHandlers = (state, setters) => {
 
   const handleAddUser = useCallback(
     (roleKey, selectedUser, setSelectedUser) => {
-      // Проверка, не выбран ли пользователь уже в другой роли
+      const userIdStr = String(selectedUser)
+
       if (
-        (roleKey !== 'implementers' && taskData.implementers.includes(selectedUser)) ||
-        (roleKey !== 'approvers' && taskData.approvers.includes(selectedUser)) ||
-        (roleKey !== 'viewers' && taskData.viewers.includes(selectedUser))
+        (roleKey !== 'implementers' && taskData.implementers.includes(userIdStr)) ||
+        (roleKey !== 'approvers' && taskData.approvers.includes(userIdStr)) ||
+        (roleKey !== 'viewers' && taskData.viewers.includes(userIdStr))
       ) {
-        Toastify({
-          text: 'Пользователь уже выбран в другой роли',
-          close: true,
-          backgroundColor: 'linear-gradient(to right, #8B0000, #ff0000)',
-        }).showToast()
+        showToast('Пользователь уже выбран в другой роли', true)
         return
       }
 
-      if (selectedUser && !taskData[roleKey].includes(selectedUser)) {
-        setTaskData((prev) => ({
-          ...prev,
-          [roleKey]: [...prev[roleKey], selectedUser],
-        }))
-        setSelectedUser('')
+      const resolution = resolveUserSelection(selectedUser, absencesMap || {}, users || [])
+
+      if (resolution.message) {
+        showToast(resolution.message, resolution.blocked)
       }
+
+      if (!resolution.added || resolution.effectiveId == null) {
+        setSelectedUser('')
+        return
+      }
+
+      const effectiveIdStr = String(resolution.effectiveId)
+
+      if (taskData[roleKey].includes(effectiveIdStr)) {
+        showToast('Замещающий уже добавлен в эту роль', true)
+        setSelectedUser('')
+        return
+      }
+
+      if (
+        (roleKey !== 'implementers' && taskData.implementers.includes(effectiveIdStr)) ||
+        (roleKey !== 'approvers' && taskData.approvers.includes(effectiveIdStr)) ||
+        (roleKey !== 'viewers' && taskData.viewers.includes(effectiveIdStr))
+      ) {
+        showToast('Замещающий уже выбран в другой роли', true)
+        setSelectedUser('')
+        return
+      }
+
+      setTaskData((prev) => ({
+        ...prev,
+        [roleKey]: [...prev[roleKey], effectiveIdStr],
+      }))
+      setSelectedUser('')
     },
-    [taskData, setTaskData]
+    [taskData, setTaskData, absencesMap, users]
   )
 
   const handleRemoveUser = useCallback(

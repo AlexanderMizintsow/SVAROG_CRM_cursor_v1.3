@@ -1,6 +1,7 @@
 import { LuDelete } from 'react-icons/lu'
 import styles from '../AddModal.module.scss'
 import { useMemo, useState } from 'react'
+import { getAbsenceLabel } from '../../../../utils/userAbsenceUtils'
 
 const UserRoleSectionTask = ({
   title,
@@ -12,6 +13,7 @@ const UserRoleSectionTask = ({
   remainingUsersForRole,
   handleAddUser,
   handleRemoveUser,
+  absencesMap = {},
 }) => {
   const [searchValue, setSearchValue] = useState('')
 
@@ -32,7 +34,6 @@ const UserRoleSectionTask = ({
     if (!query) return availableUsers
 
     return availableUsers.filter((user) => {
-      // Визуально показываем только ФИО, но ищем и по должности/отделу
       const haystack = [
         getUserFullName(user),
         getDepartmentLabel(user),
@@ -68,11 +69,16 @@ const UserRoleSectionTask = ({
             className={styles.userSelectCompact}
           >
             <option value="">Выберите {title.toLowerCase()}</option>
-            {filteredUsers.map((user) => (
-              <option key={user.id} value={user.id}>
-                {getUserFullName(user)}
-              </option>
-            ))}
+            {filteredUsers.map((user) => {
+              const absence = absencesMap[Number(user.id)]
+              const absenceLabel = getAbsenceLabel(absence)
+              return (
+                <option key={user.id} value={user.id}>
+                  {getUserFullName(user)}
+                  {absenceLabel ? ` — ${absenceLabel}` : ''}
+                </option>
+              )
+            })}
           </select>
           <div className={styles.addPerson}>
             Добавленные {title.toLowerCase()}:

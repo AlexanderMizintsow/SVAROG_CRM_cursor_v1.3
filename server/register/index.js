@@ -134,6 +134,11 @@ const {
   updatePhone,
   deletePhone,
   createUserStatus,
+  updateUserAbsenceStatus,
+  deleteUserAbsenceStatus,
+  getUserStatusPermissions,
+  getActiveUserAbsences,
+  getUserWorkloadSummary,
   getMppIdByCompanyId,
   getMprIdByCompanyId,
   updateReminderUserNotification,
@@ -390,6 +395,8 @@ app.get('/api/server-time', (req, res) => {
 
 /*************Маршруты для работы с СОТРУДНИКАМИ**************/
 app.get('/api/users', getUsers(dbPool))
+app.get('/api/users/absences/active', getActiveUserAbsences(dbPool))
+app.get('/api/users/:userId/workload-summary', getUserWorkloadSummary(dbPool))
 app.put('/api/users/:id', updateUser(dbPool))
 app.delete('/api/users/delete/:id', deleteUser(dbPool))
 app.post('/api/users/new', createUser(dbPool))
@@ -419,6 +426,9 @@ app.delete('/api/phones/delete/:phoneId', deletePhone(dbPool))
 /******/
 
 app.post('/api/user-statuses', createUserStatus(dbPool))
+app.get('/api/user-statuses/permissions', getUserStatusPermissions(dbPool))
+app.put('/api/user-statuses/:id', updateUserAbsenceStatus(dbPool))
+app.delete('/api/user-statuses/:id', deleteUserAbsenceStatus(dbPool))
 /******/
 
 server.listen(port, '0.0.0.0', () => {
@@ -506,8 +516,8 @@ app.post('/api/tasks/create', createTask(dbPool, io))
 app.get('/api/tasks/:taskId', getTaskById(dbPool))
 app.put('/api/tasks/:taskId/replace-assignee', replaceTaskAssignment(dbPool, io))
 app.post('/api/tasks/assignment/add', addTaskAssignment(dbPool, io))
-app.post('/api/tasks/approval/add', addTaskApproval(dbPool))
-app.post('/api/tasks/visibility/add', addTaskVisibility(dbPool))
+app.post('/api/tasks/approval/add', addTaskApproval(dbPool, io))
+app.post('/api/tasks/visibility/add', addTaskVisibility(dbPool, io))
 app.post('/api/tasks/attachment/add', addTaskAttachment(dbPool, io))
 app.get('/api/tasks/user/:userId', getUserTasks(dbPool))
 app.post('/api/tasks/socket', notifyTaskCreated(dbPool, io))

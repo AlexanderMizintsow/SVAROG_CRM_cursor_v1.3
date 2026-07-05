@@ -9,7 +9,7 @@ import useBusinessProcessStore from '../../../../store/useBusinessProcessStore'
 import UserCheckboxList from './UserCheckboxList'
 import './PropertiesPanel.scss'
 
-const NotificationNodeProps = ({ node, onUpdate }) => {
+const NotificationNodeProps = ({ node, onUpdate, absencesMap = {} }) => {
   const settings = node.settings || {}
   const { scheme } = useBusinessProcessStore()
   const [users, setUsers] = useState([])
@@ -118,6 +118,7 @@ const NotificationNodeProps = ({ node, onUpdate }) => {
             users={users}
             selectedIds={settings.userIds || []}
             onChange={(ids) => handleChange('userIds', ids)}
+            absencesMap={absencesMap}
           />
         </div>
       )}

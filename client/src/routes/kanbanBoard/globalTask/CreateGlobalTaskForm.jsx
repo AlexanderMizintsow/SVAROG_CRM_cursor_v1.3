@@ -8,6 +8,12 @@ import {
   generateRandomAvatarColorClass,
   generateInitials,
 } from './utils/globalTaskUtils'
+import { useActiveAbsences } from '../../../utils/useActiveAbsences'
+import {
+  resolveUserSelection,
+  getAbsenceLabel,
+  showAbsenceMessage,
+} from '../../../utils/userAbsenceUtils'
 import './styles/CreateGlobalTaskForm.scss'
 
 // Значение для input type="datetime-local": YYYY-MM-DDTHH:mm в локальной зоне
@@ -39,6 +45,7 @@ const CreateGlobalTaskForm = ({ onSave, onCancel, initialData }) => {
 
   const [loadingUsers, setLoadingUsers] = useState(true)
   const [initialDataApplied, setInitialDataApplied] = useState(false)
+  const { absencesMap } = useActiveAbsences(true)
 
   useEffect(() => {
     const fetchUsers = async () => {
@@ -161,32 +168,45 @@ const CreateGlobalTaskForm = ({ onSave, onCancel, initialData }) => {
     setFormData({ ...formData, additionalInfo: updatedAdditionalInfo })
   }
 
-  // Обновленная функция выбора ответственного
-  const handleResponsibleSelect = (userId) => {
-    const selectedUser = users.find((user) => user.id === userId)
+  const buildResponsibleEntry = (user) => ({
+    id: user.id,
+    first_name: user.first_name,
+    last_name: user.last_name,
+    middle_name: user.middle_name,
+    initials: generateInitials(user.first_name, user.last_name),
+    avatarColorClass: generateRandomAvatarColorClass(),
+    backgroundColorClass: generateRandomBackgroundColorClass(),
+    role:
+      Array.isArray(responsibleRolesList) && responsibleRolesList.includes('Участник')
+        ? 'Участник'
+        : (Array.isArray(responsibleRoles) && responsibleRoles[0]) ||
+          (responsibleRolesList && responsibleRolesList[0]) ||
+          'Исполнитель',
+    requires_approval: false,
+  })
 
-    if (selectedUser) {
-      if (!formData.responsibles.find((resp) => resp.id === selectedUser.id)) {
-        const newResponsible = {
-          id: selectedUser.id,
-          first_name: selectedUser.first_name,
-          last_name: selectedUser.last_name,
-          middle_name: selectedUser.middle_name,
-          initials: generateInitials(
-            selectedUser.first_name,
-            selectedUser.last_name
-          ),
-          avatarColorClass: generateRandomAvatarColorClass(),
-          backgroundColorClass: generateRandomBackgroundColorClass(),
-          role: (Array.isArray(responsibleRolesList) && responsibleRolesList.includes('Участник')) ? 'Участник' : ((Array.isArray(responsibleRoles) && responsibleRoles[0]) || (responsibleRolesList && responsibleRolesList[0]) || 'Исполнитель'),
-          requires_approval: false,
-        }
-        setFormData({
-          ...formData,
-          responsibles: [...formData.responsibles, newResponsible],
-        })
-      }
+  const handleResponsibleSelect = (userId) => {
+    const resolution = resolveUserSelection(userId, absencesMap, users)
+
+    if (resolution.message) {
+      showAbsenceMessage(resolution.message, resolution.blocked)
     }
+
+    if (!resolution.added || resolution.effectiveId == null) return
+
+    const selectedUser = users.find((user) => Number(user.id) === Number(resolution.effectiveId))
+    if (!selectedUser) return
+
+    if (formData.responsibles.find((resp) => Number(resp.id) === Number(selectedUser.id))) {
+      showAbsenceMessage('Участник уже добавлен в проект', true)
+      return
+    }
+
+    const newResponsible = buildResponsibleEntry(selectedUser)
+    setFormData({
+      ...formData,
+      responsibles: [...formData.responsibles, newResponsible],
+    })
   }
 
   const handleResponsibleRoleChange = (userId, newRole) => {
@@ -504,13 +524,17 @@ const CreateGlobalTaskForm = ({ onSave, onCancel, initialData }) => {
                     (user) =>
                       !formData.responsibles.find((resp) => resp.id === user.id)
                   )
-                  .map((user) => (
-                    <option key={user.id} value={user.id}>
-                      {`${user.last_name || ''} ${(user.first_name || '')[0] || ''}. ${
-                        (user.middle_name || '')[0] ? (user.middle_name || '')[0] + '.' : ''
-                      }`}
-                    </option>
-                  ))}
+                  .map((user) => {
+                    const absenceLabel = getAbsenceLabel(absencesMap[Number(user.id)])
+                    return (
+                      <option key={user.id} value={user.id}>
+                        {`${user.last_name || ''} ${(user.first_name || '')[0] || ''}. ${
+                          (user.middle_name || '')[0] ? (user.middle_name || '')[0] + '.' : ''
+                        }`}
+                        {absenceLabel ? ` — ${absenceLabel}` : ''}
+                      </option>
+                    )
+                  })}
               </select>
             </div>
           </div>

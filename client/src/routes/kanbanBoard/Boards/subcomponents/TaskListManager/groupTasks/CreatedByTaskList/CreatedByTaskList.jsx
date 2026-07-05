@@ -11,6 +11,8 @@ import TaskFiltersHeader from './TaskFiltersHeader'
 import TaskRenderer from './TaskRenderer'
 import TaskModals from './TaskModals'
 import HelpModalCreatedByTaskList from './HelpModalCreatedByTaskList'
+import { useActiveAbsences } from '../../../../../../../utils/useActiveAbsences'
+import { resolveUserSelection, showAbsenceMessage } from '../../../../../../../utils/userAbsenceUtils'
 
 const CreatedByTaskList = ({
   tasks,
@@ -53,6 +55,7 @@ const CreatedByTaskList = ({
   const [openReplaceUserModal, setOpenReplaceUserModal] = useState(false)
   const [selectedTaskForReplacement, setSelectedTaskForReplacement] = useState(null)
   const [selectedNewUserId, setSelectedNewUserId] = useState('')
+  const { absencesMap } = useActiveAbsences(true)
 
   // Новые состояния для современного интерфейса
   const [filteredTasks, setFilteredTasks] = useState([])
@@ -385,25 +388,29 @@ const CreatedByTaskList = ({
   // Функция для замены исполнителя
   const replaceTaskUser = async (taskId, oldUserId, newUserId) => {
     try {
-      await axios.put(`${API_BASE_URL}5000/api/tasks/${taskId}/replace-assignee`, {
+      const response = await axios.put(`${API_BASE_URL}5000/api/tasks/${taskId}/replace-assignee`, {
         task_id: taskId,
         old_user_id: oldUserId,
         new_user_id: newUserId,
       })
 
+      const substitutionMsg = response.data?.substitution?.message
       Toastify({
-        text: `Исполнитель задачи успешно изменен`,
-        duration: 3000,
+        text: substitutionMsg || 'Исполнитель задачи успешно изменен',
+        duration: 5000,
         close: true,
         style: {
-          background: 'linear-gradient(to right, #00b09b, #96c93d)',
+          background: substitutionMsg
+            ? 'linear-gradient(to right, #f7971e, #ffd200)'
+            : 'linear-gradient(to right, #00b09b, #96c93d)',
         },
       }).showToast()
       await refreshTasks() // Обновляем задачи после успешной замены
     } catch (error) {
       console.error('Ошибка при замене исполнителя:', error)
+      const errMsg = error.response?.data?.error || 'Ошибка при замене исполнителя'
       Toastify({
-        text: `Ошибка при замене исполнителя`,
+        text: errMsg,
         duration: 3000,
         close: true,
         style: {
@@ -424,8 +431,18 @@ const CreatedByTaskList = ({
   const handleConfirmReplaceUser = () => {
     if (!selectedTaskForReplacement || !selectedNewUserId) return
 
-    const oldUserId = selectedTaskForReplacement.assigned_user_ids[0] // предполагаем, что исполнитель один
-    replaceTaskUser(selectedTaskForReplacement.task_id, oldUserId, selectedNewUserId)
+    const resolution = resolveUserSelection(selectedNewUserId, absencesMap, users || [])
+    if (resolution.message) {
+      showAbsenceMessage(resolution.message, resolution.blocked)
+    }
+    if (!resolution.added || resolution.effectiveId == null) return
+
+    const oldUserId = selectedTaskForReplacement.assigned_user_ids[0]
+    replaceTaskUser(
+      selectedTaskForReplacement.task_id,
+      oldUserId,
+      resolution.effectiveId
+    )
     setOpenReplaceUserModal(false)
   }
 
@@ -518,6 +535,7 @@ const CreatedByTaskList = ({
         setSelectedNewUserId={setSelectedNewUserId}
         handleConfirmReplaceUser={handleConfirmReplaceUser}
         users={users}
+        absencesMap={absencesMap}
       />
 
       {/* Справка */}

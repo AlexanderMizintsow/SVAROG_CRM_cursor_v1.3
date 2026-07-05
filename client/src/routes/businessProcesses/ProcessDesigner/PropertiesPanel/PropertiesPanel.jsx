@@ -1,5 +1,6 @@
 import { useMemo } from 'react'
 import useBusinessProcessStore from '../../../../store/useBusinessProcessStore'
+import { useActiveAbsences } from '../../../../utils/useActiveAbsences'
 import { BLOCK_TYPES, BLOCK_LABELS } from '../../constants/blockTypes'
 import { IoCopyOutline, IoClipboardOutline } from 'react-icons/io5'
 import StartNodeProps from './StartNodeProps'
@@ -64,6 +65,8 @@ const PropertiesPanel = () => {
     copySelectedNode,
     pasteNode,
   } = useBusinessProcessStore()
+
+  const { absencesMap } = useActiveAbsences(true)
 
   const selectedNode = useMemo(() => {
     if (!selectedNodeId) return null
@@ -141,6 +144,7 @@ const PropertiesPanel = () => {
         <NodePropsComponent
           node={selectedNode}
           onUpdate={(updates) => updateNodeInScheme(selectedNode.id, updates)}
+          absencesMap={absencesMap}
         />
       ) : (
         <p className="properties-panel__hint">Настройки для этого типа блока пока не реализованы.</p>

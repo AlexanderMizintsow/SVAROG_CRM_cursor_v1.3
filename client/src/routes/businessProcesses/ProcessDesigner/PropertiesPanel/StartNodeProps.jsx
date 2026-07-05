@@ -4,7 +4,7 @@ import { INITIATOR_TYPES } from '../../constants/blockTypes'
 import UserCheckboxList from './UserCheckboxList'
 import './PropertiesPanel.scss'
 
-const StartNodeProps = ({ node, onUpdate }) => {
+const StartNodeProps = ({ node, onUpdate, absencesMap = {} }) => {
   const settings = node.settings || {}
   const [users, setUsers] = useState([])
   const [roles, setRoles] = useState([])
@@ -62,6 +62,7 @@ const StartNodeProps = ({ node, onUpdate }) => {
               users={users}
               selectedIds={settings.allowedLauncherUserIds || []}
               onChange={(ids) => handleChange('allowedLauncherUserIds', ids)}
+              absencesMap={absencesMap}
             />
           </>
         )}

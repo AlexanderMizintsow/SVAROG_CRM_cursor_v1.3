@@ -19,7 +19,7 @@ function toDateTimeLocalValue(deadline) {
   return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`
 }
 
-const CreateTaskNodeProps = ({ node, onUpdate }) => {
+const CreateTaskNodeProps = ({ node, onUpdate, absencesMap = {} }) => {
   const settings = node.settings || {}
   const [users, setUsers] = useState([])
   const [departments, setDepartments] = useState([])
@@ -300,6 +300,7 @@ const CreateTaskNodeProps = ({ node, onUpdate }) => {
             users={users}
             selectedIds={settings.assigneeUserIds || []}
             onChange={(ids) => handleChange('assigneeUserIds', ids)}
+            absencesMap={absencesMap}
           />
         </div>
       )}
@@ -340,6 +341,7 @@ const CreateTaskNodeProps = ({ node, onUpdate }) => {
           users={users}
           selectedIds={settings.approverUserIds || []}
           onChange={(ids) => handleChange('approverUserIds', ids)}
+          absencesMap={absencesMap}
         />
       </div>
 
@@ -349,6 +351,7 @@ const CreateTaskNodeProps = ({ node, onUpdate }) => {
           users={users}
           selectedIds={settings.viewerUserIds || []}
           onChange={(ids) => handleChange('viewerUserIds', ids)}
+          absencesMap={absencesMap}
         />
       </div>
 

@@ -27,6 +27,7 @@ import {
   hasAddModalDraftContent,
   buildEmptyTaskData,
 } from "./addModalDraft";
+import { useActiveAbsences } from "../../../utils/useActiveAbsences";
 
 const AddModal = ({
   isOpen,
@@ -115,6 +116,7 @@ const AddModal = ({
       : {};
   });
   const [projectDeadline, setProjectDeadline] = useState(null);
+  const { absencesMap } = useActiveAbsences(isOpen);
 
   const quillRef = useRef(null);
   const initialDataAppliedRef = useRef(false);
@@ -138,6 +140,8 @@ const AddModal = ({
     {
       taskData,
       selectedTag,
+      absencesMap,
+      users,
     },
     {
       setTaskData,
@@ -777,6 +781,7 @@ const AddModal = ({
             remainingUsersForRole={remainingUsersForRole}
             handleAddUser={handleAddUser}
             handleRemoveUser={handleRemoveUser}
+            absencesMap={absencesMap}
           />
           {/* Добавить зрителя*/}
           <UserRoleSectionTask
@@ -789,6 +794,7 @@ const AddModal = ({
             remainingUsersForRole={remainingUsersForRole}
             handleAddUser={handleAddUser}
             handleRemoveUser={handleRemoveUser}
+            absencesMap={absencesMap}
           />
           {/*Добавить утверждающих*/}
           <UserRoleSectionTask
@@ -801,6 +807,7 @@ const AddModal = ({
             remainingUsersForRole={remainingUsersForRole}
             handleAddUser={handleAddUser}
             handleRemoveUser={handleRemoveUser}
+            absencesMap={absencesMap}
           />
         </div>
       </div>

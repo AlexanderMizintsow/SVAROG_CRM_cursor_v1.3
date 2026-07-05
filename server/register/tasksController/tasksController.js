@@ -4,6 +4,7 @@ const axios = require('axios')
 const fs = require('fs')
 const path = require('path')
 const { BPE_API_URL } = require('../config')
+const userAbsence = require('../userAbsenceService')
 
 let _warnedMissingBpeUrl = false
 
@@ -302,10 +303,9 @@ function replaceTaskAssignment(dbPool, io) {
     try {
       // 1. Получаем информацию о задаче и пользователях
       const taskInfo = await dbPool.query(
-        `SELECT t.title, 
+        `SELECT t.title, t.created_by,
           CONCAT(u1.first_name, ' ', u1.last_name) as old_user_name, 
-          CONCAT(u2.first_name, ' ', u2.last_name) as new_user_name, 
-          t.created_by
+          CONCAT(u2.first_name, ' ', u2.last_name) as new_user_name
    FROM tasks t
    LEFT JOIN users u1 ON u1.id = \$2
    LEFT JOIN users u2 ON u2.id = \$3
@@ -317,7 +317,28 @@ function replaceTaskAssignment(dbPool, io) {
         return res.status(404).json({ error: 'Задача не найдена' })
       }
 
-      const { title, old_user_name, new_user_name, created_by } = taskInfo.rows[0]
+      const { title, old_user_name, new_user_name: initialNewUserName, created_by } = taskInfo.rows[0]
+
+      const resolvedNew = await userAbsence.resolveForAssignment(dbPool, io, new_user_id, {
+        notifyUserId: created_by,
+        roleLabel: 'исполнитель',
+        taskId: task_id,
+        taskTitle: title,
+      })
+
+      if (!resolvedNew.ok) {
+        return res.status(422).json({ error: resolvedNew.error })
+      }
+
+      const effectiveNewUserId = resolvedNew.effectiveId
+      let new_user_name = initialNewUserName
+      if (resolvedNew.resolved.substituted) {
+        const nameRes = await dbPool.query(
+          `SELECT CONCAT(first_name, ' ', last_name) AS full_name FROM users WHERE id = $1`,
+          [effectiveNewUserId]
+        )
+        new_user_name = nameRes.rows[0]?.full_name || new_user_name
+      }
 
       // 2. Обновляем исполнителя в одной операции
       const updateResult = await dbPool.query(
@@ -325,7 +346,7 @@ function replaceTaskAssignment(dbPool, io) {
          SET user_id = \$1 
          WHERE task_id = \$2   
          RETURNING *`,
-        [new_user_id, task_id]
+        [effectiveNewUserId, task_id]
       )
 
       if (updateResult.rowCount === 0) {
@@ -356,7 +377,7 @@ function replaceTaskAssignment(dbPool, io) {
           user_id, task_id, message, event_type, is_sent
         ) VALUES (\$1, \$2, \$3, \$4, \$5)`,
         [
-          new_user_id,
+          effectiveNewUserId,
           task_id,
           `Вы назначены исполнителем задачи "${title}". Предыдущий исполнитель: ${old_user_name}`,
           'taskAssigneeChanged',
@@ -371,15 +392,25 @@ function replaceTaskAssignment(dbPool, io) {
         title: title,
         oldUserId: old_user_id,
         oldUserName: old_user_name,
-        newUserId: new_user_id,
+        newUserId: effectiveNewUserId,
         newUserName: new_user_name,
         createdBy: created_by,
         message: `Исполнитель задачи "${title}" изменен`,
       })
 
-      res.status(200).json({
+      const responsePayload = {
         message: 'Исполнитель задачи успешно заменен',
-      })
+        effective_user_id: effectiveNewUserId,
+      }
+      if (resolvedNew.resolved.substituted && resolvedNew.resolved.absence) {
+        responsePayload.substitution = {
+          originalId: resolvedNew.resolved.originalId,
+          effectiveId: effectiveNewUserId,
+          message: userAbsence.buildSubstitutionMessage(resolvedNew.resolved.absence, 'исполнитель'),
+        }
+      }
+
+      res.status(200).json(responsePayload)
     } catch (error) {
       console.error('Ошибка при замене исполнителя:', error)
       res.status(500).json({
@@ -401,16 +432,46 @@ function addTaskAssignment(dbPool, io) {
 
     try {
       const userIds = Array.isArray(user_id) ? user_id : [user_id]
+      const taskRow = await dbPool.query('SELECT title, created_by FROM tasks WHERE id = $1', [task_id])
+      const taskInfo = taskRow.rows[0]
+      const substitutions = []
+      const warnings = []
 
-      for (const userId of userIds) {
+      for (const rawUserId of userIds) {
+        const resolved = await userAbsence.resolveForAssignment(dbPool, io, rawUserId, {
+          notifyUserId: taskInfo?.created_by,
+          roleLabel: 'исполнитель',
+          taskId: task_id,
+          taskTitle: taskInfo?.title,
+        })
+
+        if (!resolved.ok) {
+          warnings.push(resolved.error)
+          continue
+        }
+
+        if (resolved.resolved.substituted && resolved.resolved.absence) {
+          substitutions.push({
+            originalId: resolved.resolved.originalId,
+            effectiveId: resolved.effectiveId,
+            message: userAbsence.buildSubstitutionMessage(resolved.resolved.absence, 'исполнитель'),
+          })
+        }
+
         await dbPool.query(`INSERT INTO task_assignments (task_id, user_id) VALUES ( $1,  $2)`, [
           task_id,
-          userId,
+          resolved.effectiveId,
         ])
+      }
+
+      if (warnings.length > 0 && substitutions.length === 0 && warnings.length === userIds.length) {
+        return res.status(422).json({ error: warnings.join(' ') })
       }
 
       res.status(201).json({
         message: 'Исполнитель добавлен к задаче',
+        substitutions,
+        warnings: warnings.length > 0 ? warnings : undefined,
       })
     } catch (error) {
       console.error('Ошибка при добавлении исполнителя(ей):', error)
@@ -419,7 +480,7 @@ function addTaskAssignment(dbPool, io) {
   }
 }
 
-function addTaskApproval(dbPool) {
+function addTaskApproval(dbPool, io) {
   return async function (req, res) {
     const { task_id, approver_id } = req.body
 
@@ -429,16 +490,46 @@ function addTaskApproval(dbPool) {
 
     try {
       const approverIds = Array.isArray(approver_id) ? approver_id : [approver_id]
+      const taskRow = await dbPool.query('SELECT title, created_by FROM tasks WHERE id = $1', [task_id])
+      const taskInfo = taskRow.rows[0]
+      const substitutions = []
+      const warnings = []
 
-      for (const approverId of approverIds) {
+      for (const rawApproverId of approverIds) {
+        const resolved = await userAbsence.resolveForAssignment(dbPool, io, rawApproverId, {
+          notifyUserId: taskInfo?.created_by,
+          roleLabel: 'утверждающий',
+          taskId: task_id,
+          taskTitle: taskInfo?.title,
+        })
+
+        if (!resolved.ok) {
+          warnings.push(resolved.error)
+          continue
+        }
+
+        if (resolved.resolved.substituted && resolved.resolved.absence) {
+          substitutions.push({
+            originalId: resolved.resolved.originalId,
+            effectiveId: resolved.effectiveId,
+            message: userAbsence.buildSubstitutionMessage(resolved.resolved.absence, 'утверждающий'),
+          })
+        }
+
         await dbPool.query(`INSERT INTO task_approvals (task_id, approver_id) VALUES ($1, $2)`, [
           task_id,
-          approverId,
+          resolved.effectiveId,
         ])
+      }
+
+      if (warnings.length > 0 && substitutions.length === 0 && warnings.length === approverIds.length) {
+        return res.status(422).json({ error: warnings.join(' ') })
       }
 
       res.status(201).json({
         message: 'Утверждающий добавлен к задаче',
+        substitutions,
+        warnings: warnings.length > 0 ? warnings : undefined,
       })
     } catch (error) {
       console.error('Ошибка при добавлении утверждающего(их):', error)
@@ -447,7 +538,7 @@ function addTaskApproval(dbPool) {
   }
 }
 
-function addTaskVisibility(dbPool) {
+function addTaskVisibility(dbPool, io) {
   return async function (req, res) {
     const { task_id, user_id } = req.body
 
@@ -457,16 +548,46 @@ function addTaskVisibility(dbPool) {
 
     try {
       const userIds = Array.isArray(user_id) ? user_id : [user_id]
+      const taskRow = await dbPool.query('SELECT title, created_by FROM tasks WHERE id = $1', [task_id])
+      const taskInfo = taskRow.rows[0]
+      const substitutions = []
+      const warnings = []
 
-      for (const userId of userIds) {
+      for (const rawUserId of userIds) {
+        const resolved = await userAbsence.resolveForAssignment(dbPool, io, rawUserId, {
+          notifyUserId: taskInfo?.created_by,
+          roleLabel: 'наблюдатель',
+          taskId: task_id,
+          taskTitle: taskInfo?.title,
+        })
+
+        if (!resolved.ok) {
+          warnings.push(resolved.error)
+          continue
+        }
+
+        if (resolved.resolved.substituted && resolved.resolved.absence) {
+          substitutions.push({
+            originalId: resolved.resolved.originalId,
+            effectiveId: resolved.effectiveId,
+            message: userAbsence.buildSubstitutionMessage(resolved.resolved.absence, 'наблюдатель'),
+          })
+        }
+
         await dbPool.query(`INSERT INTO task_visibility (task_id, user_id) VALUES ($1, $2)`, [
           task_id,
-          userId,
+          resolved.effectiveId,
         ])
+      }
+
+      if (warnings.length > 0 && substitutions.length === 0 && warnings.length === userIds.length) {
+        return res.status(422).json({ error: warnings.join(' ') })
       }
 
       res.status(201).json({
         message: 'Наблюдатель добавлен',
+        substitutions,
+        warnings: warnings.length > 0 ? warnings : undefined,
       })
     } catch (error) {
       console.error('Ошибка при добавлении зрителя(ей):', error)
@@ -1390,12 +1511,48 @@ function createGlobalTask(dbPool, io) {
       // Если есть ответственные, вставляем их в связующую таблицу global_task_responsibles
       if (responsibles && responsibles.length > 0) {
         const requiresApproval = (r) => r.requires_approval === true || r.requires_approval === 'true'
+        const substitutions = []
+        const warnings = []
+
         for (const resp of responsibles) {
+          const resolved = await userAbsence.resolveForAssignment(dbPool, io, resp.id, {
+            notifyUserId: created_by,
+            roleLabel: resp.role || 'участник',
+            globalTaskId: newTaskId,
+            projectTitle: title,
+          })
+
+          if (!resolved.ok) {
+            warnings.push(resolved.error)
+            continue
+          }
+
+          if (resolved.resolved.substituted && resolved.resolved.absence) {
+            substitutions.push({
+              originalId: resolved.resolved.originalId,
+              effectiveId: resolved.effectiveId,
+              message: userAbsence.buildSubstitutionMessage(
+                resolved.resolved.absence,
+                resp.role || 'участник'
+              ),
+            })
+          }
+
           await dbPool.query(
             `INSERT INTO global_task_responsibles (global_task_id, user_id, role, requires_approval)
              VALUES ($1, $2, $3, $4)`,
-            [newTaskId, resp.id, resp.role || 'Исполнитель', requiresApproval(resp) || false]
+            [
+              newTaskId,
+              resolved.effectiveId,
+              resp.role || 'Исполнитель',
+              requiresApproval(resp) || false,
+            ]
           )
+        }
+
+        if (warnings.length > 0 && substitutions.length === 0 && warnings.length === responsibles.length) {
+          await dbPool.query('ROLLBACK')
+          return res.status(422).json({ error: warnings.join(' ') })
         }
       }
 
@@ -3036,30 +3193,70 @@ function addResponsiblesToGlobalTask(dbPool, io) {
     try {
       await dbPool.query('BEGIN')
 
-      // Получить имена и фамилии для каждого ответственного по id
-      const userIds = responsibles.map((resp) => resp.id)
+      const requiresApproval = (r) => r.requires_approval === true || r.requires_approval === 'true'
+      const resolvedResponsibles = []
+      const substitutions = []
+      const warnings = []
 
-      // Запрос для получения информации о пользователях
-      const usersQuery = `
-         SELECT id, first_name, last_name
-         FROM users
-         WHERE id = ANY($1)
-       `
-      const usersResult = await dbPool.query(usersQuery, [userIds])
+      const projectTitleRes = await dbPool.query('SELECT title, created_by FROM global_tasks WHERE id = $1', [taskId])
+      const projectInfo = projectTitleRes.rows[0]
 
-      // Создаем отображение id -> имя + фамилия
+      for (const resp of responsibles) {
+        const resolved = await userAbsence.resolveForAssignment(dbPool, io, resp.id, {
+          notifyUserId: userId || projectInfo?.created_by,
+          roleLabel: resp.role || 'участник',
+          globalTaskId: taskId,
+          projectTitle: projectInfo?.title,
+        })
+
+        if (!resolved.ok) {
+          warnings.push(resolved.error)
+          continue
+        }
+
+        if (resolved.resolved.substituted && resolved.resolved.absence) {
+          substitutions.push({
+            originalId: resolved.resolved.originalId,
+            effectiveId: resolved.effectiveId,
+            message: userAbsence.buildSubstitutionMessage(
+              resolved.resolved.absence,
+              resp.role || 'участник'
+            ),
+          })
+        }
+
+        resolvedResponsibles.push({
+          ...resp,
+          id: resolved.effectiveId,
+        })
+      }
+
+      if (warnings.length > 0 && resolvedResponsibles.length === 0) {
+        await dbPool.query('ROLLBACK')
+        return res.status(422).json({ error: warnings.join(' ') })
+      }
+
+      const userIds = resolvedResponsibles.map((resp) => resp.id)
+      const usersResult = await dbPool.query(
+        `SELECT id, first_name, last_name FROM users WHERE id = ANY($1)`,
+        [userIds]
+      )
+
       const userNamesMap = {}
       usersResult.rows.forEach((user) => {
         userNamesMap[user.id] = `${user.first_name} ${user.last_name}`
       })
 
-      // Формируем строку с именами и фамилиями добавляемых ответственных
-      const responsibleNamesStr = responsibles
+      const responsibleNamesStr = resolvedResponsibles
         .map((resp) => userNamesMap[resp.id] || 'Имя не найдено')
         .join(', ')
 
-      const requiresApproval = (r) => r.requires_approval === true || r.requires_approval === 'true'
-      const insertValues = responsibles.map((resp) => [taskId, resp.id, resp.role || 'Исполнитель', requiresApproval(resp) || false])
+      const insertValues = resolvedResponsibles.map((resp) => [
+        taskId,
+        resp.id,
+        resp.role || 'Исполнитель',
+        requiresApproval(resp) || false,
+      ])
 
       const insertQuery = `
         INSERT INTO global_task_responsibles (global_task_id, user_id, role, requires_approval)
@@ -3094,7 +3291,11 @@ function addResponsiblesToGlobalTask(dbPool, io) {
       }
       notifyBpeProjectUpdated(Number(taskId))
 
-      res.status(201).json(result.rows)
+      res.status(201).json({
+        rows: result.rows,
+        substitutions: substitutions.length > 0 ? substitutions : undefined,
+        warnings: warnings.length > 0 ? warnings : undefined,
+      })
     } catch (error) {
       await dbPool.query('ROLLBACK')
       console.error('Ошибка при добавлении ответственных:', error)
