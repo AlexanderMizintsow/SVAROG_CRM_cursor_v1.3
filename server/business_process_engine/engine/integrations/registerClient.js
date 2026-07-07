@@ -128,6 +128,13 @@ async function getRoles() {
   return response.data
 }
 
+async function resolveAssignees(userIds) {
+  const response = await client.post('/api/users/resolve-assignees', {
+    user_ids: Array.isArray(userIds) ? userIds : [userIds],
+  })
+  return response.data
+}
+
 module.exports = {
   createTask,
   notifyTaskCreated,
@@ -151,4 +158,5 @@ module.exports = {
   getUsers,
   getDepartments,
   getRoles,
+  resolveAssignees,
 }

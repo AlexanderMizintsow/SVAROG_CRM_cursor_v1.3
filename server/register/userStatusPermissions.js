@@ -5,16 +5,19 @@
 
 const HR_DEPARTMENT_NAME = 'Отдел кадров'
 const ADMIN_ROLE_NAME = 'Администратор'
+const DIRECTOR_POSITION_NAME = 'Директор'
+const DEPARTMENT_HEAD_ROLE_NAME = 'Руководитель отдела'
 
 async function getActorProfile(dbPool, actorUserId) {
   const uid = Number(actorUserId)
   if (!Number.isFinite(uid)) return null
 
   const result = await dbPool.query(
-    `SELECT u.id, u.department_id, r.name AS role_name, d.name AS department_name
+    `SELECT u.id, u.department_id, r.name AS role_name, d.name AS department_name, p.name AS position_name
      FROM users u
      LEFT JOIN roles r ON r.id = u.role_id
      LEFT JOIN departments d ON d.id = u.department_id
+     LEFT JOIN positions p ON p.id = u.position_id
      WHERE u.id = $1`,
     [uid]
   )
@@ -22,11 +25,25 @@ async function getActorProfile(dbPool, actorUserId) {
 }
 
 async function getHeadDepartmentIds(dbPool, actorUserId) {
-  const result = await dbPool.query(
-    `SELECT id FROM departments WHERE head_user_id = $1`,
-    [Number(actorUserId)]
-  )
-  return result.rows.map((r) => Number(r.id))
+  const actor = await getActorProfile(dbPool, actorUserId)
+  if (!actor) return []
+
+  const result = await dbPool.query(`SELECT id FROM departments WHERE head_user_id = $1`, [
+    Number(actorUserId),
+  ])
+
+  const ids = new Set(result.rows.map((r) => Number(r.id)))
+
+  // Fallback: если у руководителя не проставлен head_user_id в departments,
+  // но его роль "Руководитель отдела", разрешаем управление своим отделом.
+  if (ids.size === 0) {
+    const isDepartmentHeadByRole = actor.role_name === DEPARTMENT_HEAD_ROLE_NAME
+    if (isDepartmentHeadByRole && actor.department_id != null) {
+      ids.add(Number(actor.department_id))
+    }
+  }
+
+  return [...ids]
 }
 
 async function getTargetDepartmentId(dbPool, targetUserId) {
@@ -43,6 +60,7 @@ async function canManageEmployeeStatus(dbPool, actorUserId, targetUserId) {
   if (!actor) return false
 
   if (actor.role_name === ADMIN_ROLE_NAME) return true
+  if (actor.position_name === DIRECTOR_POSITION_NAME) return true
   if (actor.department_name === HR_DEPARTMENT_NAME) return true
 
   const targetDeptId = await getTargetDepartmentId(dbPool, targetUserId)
@@ -64,12 +82,14 @@ async function getManagePermissions(dbPool, actorUserId) {
   }
 
   const isAdmin = actor.role_name === ADMIN_ROLE_NAME
+  const isDirector = actor.position_name === DIRECTOR_POSITION_NAME
   const isHr = actor.department_name === HR_DEPARTMENT_NAME
   const headDepartmentIds = await getHeadDepartmentIds(dbPool, actorUserId)
 
   return {
-    canCreate: isAdmin || isHr || headDepartmentIds.length > 0,
+    canCreate: isAdmin || isDirector || isHr || headDepartmentIds.length > 0,
     isAdmin,
+    isDirector,
     isHr,
     headDepartmentIds,
   }
@@ -77,7 +97,7 @@ async function getManagePermissions(dbPool, actorUserId) {
 
 function canManageByDepartment(permissions, targetDepartmentId) {
   if (!permissions) return false
-  if (permissions.isAdmin || permissions.isHr) return true
+  if (permissions.isAdmin || permissions.isDirector || permissions.isHr) return true
   const depId = targetDepartmentId != null ? Number(targetDepartmentId) : null
   if (depId == null) return false
   return (permissions.headDepartmentIds || []).includes(depId)
@@ -86,6 +106,8 @@ function canManageByDepartment(permissions, targetDepartmentId) {
 module.exports = {
   HR_DEPARTMENT_NAME,
   ADMIN_ROLE_NAME,
+  DIRECTOR_POSITION_NAME,
+  DEPARTMENT_HEAD_ROLE_NAME,
   getActorProfile,
   canManageEmployeeStatus,
   getManagePermissions,

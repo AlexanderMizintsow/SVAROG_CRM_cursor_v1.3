@@ -1,7 +1,7 @@
 /**
  * Узел «Задача: добавить комментарий».
  */
-const { getOutgoingEdges, resolveTaskId } = require('./taskUtils')
+const { getOutgoingEdges, resolveTaskId, isTaskSourceSkipped } = require('./taskUtils')
 
 function substituteText(text, context) {
   if (!text || typeof text !== 'string') return text
@@ -25,6 +25,13 @@ async function handle(instance, node, scheme, integrations, dbPool) {
   const { registerClient: reg } = integrations
   const settings = node.settings || {}
   const context = typeof instance.context === 'object' ? instance.context : (instance.context ? JSON.parse(instance.context) : {})
+
+  if (isTaskSourceSkipped(context, settings)) {
+    const edges = getOutgoingEdges(scheme, node.id)
+    const nextEdge = edges[0]
+    if (!nextEdge) return { fail: 'У узла «Задача: комментарий» нет исходящего ребра' }
+    return { nextNodeId: nextEdge.target }
+  }
 
   const taskId = resolveTaskId(context, settings)
   if (!taskId) return { fail: 'Задача: не найден task_id (создайте задачу или выберите источник)' }

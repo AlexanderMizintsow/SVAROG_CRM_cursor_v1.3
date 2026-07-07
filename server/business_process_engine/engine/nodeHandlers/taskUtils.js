@@ -20,4 +20,16 @@ function resolveTaskId(context, settings) {
   return last != null ? (Number(last) || last) : null
 }
 
-module.exports = { getOutgoingEdges, resolveTaskId }
+function isTaskSourceSkipped(context, settings) {
+  const source = settings?.taskSource || 'last'
+  if (source !== 'by_node') return false
+  const nodeId = settings?.taskSourceNodeId
+  if (!nodeId) return false
+  const outs =
+    context?.block_outputs && typeof context.block_outputs === 'object'
+      ? context.block_outputs
+      : {}
+  return outs[nodeId]?.skipped === true
+}
+
+module.exports = { getOutgoingEdges, resolveTaskId, isTaskSourceSkipped }

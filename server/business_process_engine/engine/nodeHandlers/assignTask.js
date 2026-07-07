@@ -31,6 +31,14 @@ async function handle(instance, node, scheme, integrations, dbPool) {
   if (!sourceNodeId || !blockOutputs[sourceNodeId]) {
     return { fail: 'Не указан блок-источник задачи или задача ещё не создана' }
   }
+  if (blockOutputs[sourceNodeId].skipped === true) {
+    const edges = getOutgoingEdges(scheme, node.id)
+    const nextEdge = edges[0]
+    if (!nextEdge) {
+      return { fail: 'У узла Назначить задачу нет исходящего ребра' }
+    }
+    return { nextNodeId: nextEdge.target }
+  }
   const taskId = blockOutputs[sourceNodeId].task_id
   if (!taskId) {
     return { fail: 'Задача из блока-источника не найдена' }

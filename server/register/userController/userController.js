@@ -590,7 +590,7 @@ const getUserStatusPermissions = (dbPool) => async (req, res) => {
   }
 }
 
-const { getAllActiveAbsences } = require('../userAbsenceService')
+const { getAllActiveAbsences, resolveAssigneesBatch } = require('../userAbsenceService')
 const { getWorkloadSummary } = require('../userAbsenceWorkloadService')
 
 // Активные отсутствия сотрудников на текущую дату
@@ -616,6 +616,22 @@ const getUserWorkloadSummary = (dbPool) => async (req, res) => {
     res.json(data)
   } catch (error) {
     console.error('Ошибка при получении сводки нагрузки:', error)
+    res.status(500).json({ error: 'Ошибка сервера' })
+  }
+}
+
+// Пакетная проверка назначений (используется БП перед автосозданием задач)
+const postResolveAssignees = (dbPool) => async (req, res) => {
+  const userIds = req.body?.user_ids
+  if (!Array.isArray(userIds) || userIds.length === 0) {
+    return res.status(400).json({ error: 'Укажите непустой массив user_ids' })
+  }
+
+  try {
+    const result = await resolveAssigneesBatch(dbPool, userIds)
+    res.json(result)
+  } catch (error) {
+    console.error('Ошибка при проверке доступности исполнителей:', error)
     res.status(500).json({ error: 'Ошибка сервера' })
   }
 }
@@ -1016,6 +1032,7 @@ module.exports = {
   getUserStatusPermissions,
   getActiveUserAbsences,
   getUserWorkloadSummary,
+  postResolveAssignees,
   getMppIdByCompanyId,
   getMprIdByCompanyId,
   updateReminderUserNotification,

@@ -66,7 +66,13 @@ const LeaveCalendar = () => {
       const data = await fetchStatusPermissions(actorUserId)
       setPermissions(data)
     } catch {
-      setPermissions({ canCreate: false, isAdmin: false, isHr: false, headDepartmentIds: [] })
+      setPermissions({
+        canCreate: false,
+        isAdmin: false,
+        isDirector: false,
+        isHr: false,
+        headDepartmentIds: [],
+      })
     }
   }, [actorUserId])
 
@@ -245,7 +251,7 @@ const LeaveCalendar = () => {
       {activeTab === TABS.FORM && canCreate ? (
         <form onSubmit={handleSubmit} className="user-status-scheduler__form">
           <p className="user-status-scheduler__hint">
-            Назначать статус могут: руководитель отдела, сотрудники отдела кадров и администратор.
+            Назначать статус могут: руководитель отдела, сотрудники отдела кадров, директор и администратор.
           </p>
 
           <label htmlFor="user">Сотрудник</label>
@@ -370,7 +376,7 @@ const LeaveCalendar = () => {
         </form>
       ) : activeTab === TABS.FORM && !canCreate ? (
         <p className="user-status-scheduler__no-access">
-          У вас нет прав на добавление статусов. Обратитесь к руководителю отдела, отделу кадров или администратору.
+          У вас нет прав на добавление статусов. Обратитесь к руководителю отдела, отделу кадров, директору или администратору.
         </p>
       ) : (
         <ActiveAbsencesList

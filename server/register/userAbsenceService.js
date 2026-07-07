@@ -273,10 +273,45 @@ async function resolveForAssignment(dbPool, io, userId, options = {}) {
   return { ok: true, resolved, effectiveId: resolved.effectiveId }
 }
 
+/**
+ * Пакетная проверка доступности исполнителей с учетом отсутствий/замещающих.
+ */
+async function resolveAssigneesBatch(dbPool, userIds, checkDate = new Date()) {
+  const sourceIds = Array.isArray(userIds) ? userIds : [userIds]
+  const uniqueIds = [...new Set(sourceIds.map((id) => Number(id)).filter((id) => Number.isFinite(id)))]
+
+  const resolved = []
+  const blocked = []
+
+  for (const userId of uniqueIds) {
+    const result = await resolveAssignee(dbPool, userId, checkDate)
+    if (result.blocked) {
+      blocked.push({
+        userId,
+        reason: result.blockReason || 'Назначение недоступно',
+      })
+      continue
+    }
+    resolved.push({
+      originalId: result.originalId,
+      effectiveId: result.effectiveId,
+      substituted: result.substituted === true,
+    })
+  }
+
+  return {
+    resolved,
+    blocked,
+    canAssignAny: resolved.length > 0,
+    allBlocked: uniqueIds.length > 0 && blocked.length === uniqueIds.length,
+  }
+}
+
 module.exports = {
   getActiveAbsence,
   getAllActiveAbsences,
   resolveAssignee,
+  resolveAssigneesBatch,
   resolveForAssignment,
   notifySubstitution,
   buildBlockedMessage,

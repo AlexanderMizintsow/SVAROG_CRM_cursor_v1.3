@@ -163,7 +163,7 @@ export async function fetchStatusPermissions(actorUserId) {
 
 export function canManageEmployeeStatusClient(permissions, targetDepartmentId) {
   if (!permissions) return false
-  if (permissions.isAdmin || permissions.isHr) return true
+  if (permissions.isAdmin || permissions.isDirector || permissions.isHr) return true
   const depId = targetDepartmentId != null ? Number(targetDepartmentId) : null
   if (depId == null) return false
   return (permissions.headDepartmentIds || []).map(Number).includes(depId)
@@ -171,7 +171,7 @@ export function canManageEmployeeStatusClient(permissions, targetDepartmentId) {
 
 export function filterManageableUsers(users, permissions) {
   if (!permissions?.canCreate) return []
-  if (permissions.isAdmin || permissions.isHr) return users
+  if (permissions.isAdmin || permissions.isDirector || permissions.isHr) return users
   const headIds = new Set((permissions.headDepartmentIds || []).map(Number))
   return users.filter((u) => headIds.has(Number(u.department_id)))
 }

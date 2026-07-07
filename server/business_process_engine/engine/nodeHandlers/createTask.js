@@ -77,6 +77,27 @@ async function resolveUserIds(settings, context, registerClient) {
   return []
 }
 
+async function skipTaskCreation(dbPool, instance, node, scheme, context, reason, blocked = []) {
+  const blockOutputs = context.block_outputs || {}
+  blockOutputs[node.id] = {
+    task_id: null,
+    skipped: true,
+    skip_code: 'absence_no_substitute',
+    skip_reason: reason,
+    blocked_assignees: blocked,
+  }
+  const newContext = { ...context, block_outputs: blockOutputs }
+  await dbPool.query('UPDATE bp_process_instances SET context = $1 WHERE id = $2', [
+    JSON.stringify(newContext),
+    instance.id,
+  ])
+
+  const edges = getOutgoingEdges(scheme, node.id)
+  const nextEdge = edges[0]
+  if (!nextEdge) return { fail: 'У узла Создать задачу нет исходящего ребра' }
+  return { nextNodeId: nextEdge.target }
+}
+
 async function handle(instance, node, scheme, integrations, dbPool) {
   const { registerClient: reg } = integrations
   const settings = node.settings || {}
@@ -262,6 +283,34 @@ async function handle(instance, node, scheme, integrations, dbPool) {
     return { fail: 'Создать задачу: нельзя одновременно выбрать подзадачу проекта и подзадачу задачи из схемы' }
   }
 
+  // Pre-check для автоматического режима:
+  // если исполнители заданы, но все недоступны (отсутствие без замещающего),
+  // задачу не создаём и мягко продолжаем процесс.
+  const assigneeIds = await resolveUserIds(settings, context, reg)
+  let assignmentPlan = []
+  if (assigneeIds.length > 0) {
+    let assigneeCheck
+    try {
+      assigneeCheck = await reg.resolveAssignees(assigneeIds)
+    } catch (err) {
+      return {
+        fail: `Создать задачу: не удалось проверить исполнителей перед созданием: ${
+          err?.message || 'ошибка'
+        }`,
+      }
+    }
+
+    assignmentPlan = Array.isArray(assigneeCheck?.resolved) ? assigneeCheck.resolved : []
+
+    if (!assigneeCheck?.canAssignAny) {
+      const blocked = Array.isArray(assigneeCheck?.blocked) ? assigneeCheck.blocked : []
+      const reason =
+        blocked.map((b) => b.reason).filter(Boolean).join(' ') ||
+        'Все исполнители отсутствуют и не имеют доступного замещающего.'
+      return skipTaskCreation(dbPool, instance, node, scheme, context, reason, blocked)
+    }
+  }
+
   let task
   try {
     task = await reg.createTask(payload)
@@ -272,12 +321,11 @@ async function handle(instance, node, scheme, integrations, dbPool) {
 
   const taskId = task.id
 
-  const assigneeIds = await resolveUserIds(settings, context, reg)
-  for (const uid of assigneeIds) {
+  for (const item of assignmentPlan) {
     try {
-      await reg.addTaskAssignment(taskId, uid)
+      await reg.addTaskAssignment(taskId, item.effectiveId)
     } catch (e) {
-      console.warn('addTaskAssignment', taskId, uid, e.message)
+      console.warn('addTaskAssignment', taskId, item.effectiveId, e.message)
     }
   }
 
@@ -300,7 +348,8 @@ async function handle(instance, node, scheme, integrations, dbPool) {
   }
 
   try {
-    await reg.notifyTaskCreated(taskId, createdBy, assigneeIds, approverIds, viewerIds)
+    const notifyAssignees = assignmentPlan.map((item) => item.effectiveId)
+    await reg.notifyTaskCreated(taskId, createdBy, notifyAssignees, approverIds, viewerIds)
   } catch (e) {
     console.warn('notifyTaskCreated (канбан не обновится без перезагрузки):', e.message)
   }

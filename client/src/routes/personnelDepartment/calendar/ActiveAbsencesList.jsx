@@ -50,7 +50,10 @@ const ActiveAbsencesList = ({
 
   const showActionsColumn =
     permissions &&
-    (permissions.isAdmin || permissions.isHr || (permissions.headDepartmentIds || []).length > 0)
+    (permissions.isAdmin ||
+      permissions.isDirector ||
+      permissions.isHr ||
+      (permissions.headDepartmentIds || []).length > 0)
 
   if (loading) {
     return <p className="active-absences__empty">Загрузка списка…</p>

@@ -139,6 +139,7 @@ const {
   getUserStatusPermissions,
   getActiveUserAbsences,
   getUserWorkloadSummary,
+  postResolveAssignees,
   getMppIdByCompanyId,
   getMprIdByCompanyId,
   updateReminderUserNotification,
@@ -397,6 +398,7 @@ app.get('/api/server-time', (req, res) => {
 app.get('/api/users', getUsers(dbPool))
 app.get('/api/users/absences/active', getActiveUserAbsences(dbPool))
 app.get('/api/users/:userId/workload-summary', getUserWorkloadSummary(dbPool))
+app.post('/api/users/resolve-assignees', postResolveAssignees(dbPool))
 app.put('/api/users/:id', updateUser(dbPool))
 app.delete('/api/users/delete/:id', deleteUser(dbPool))
 app.post('/api/users/new', createUser(dbPool))

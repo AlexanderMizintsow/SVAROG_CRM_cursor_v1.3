@@ -26,6 +26,16 @@ async function handle(instance, node, scheme, integrations, dbPool) {
   const settings = node.settings || {}
   const context = typeof instance.context === 'object' ? instance.context : (instance.context ? JSON.parse(instance.context) : {})
 
+  if (settings?.taskSource === 'by_node' && settings?.taskNodeId) {
+    const outs = context?.block_outputs && typeof context.block_outputs === 'object' ? context.block_outputs : {}
+    if (outs[settings.taskNodeId]?.skipped === true) {
+      const edges = getOutgoingEdges(scheme, node.id)
+      const nextEdge = edges[0]
+      if (!nextEdge) return { fail: 'У узла «Подзадача: статус» нет исходящего ребра' }
+      return { nextNodeId: nextEdge.target }
+    }
+  }
+
   const taskId = resolveTaskId(context, settings)
   if (!taskId) return { fail: 'Подзадача: не найден task_id (создайте задачу выше или выберите источник)' }
 
