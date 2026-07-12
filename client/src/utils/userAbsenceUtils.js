@@ -7,6 +7,11 @@ export async function fetchActiveAbsences() {
   return Array.isArray(response.data) ? response.data : []
 }
 
+export async function fetchUpcomingAbsences() {
+  const response = await axios.get(`${API_BASE_URL}5000/api/users/absences/upcoming`)
+  return Array.isArray(response.data) ? response.data : []
+}
+
 export function buildAbsencesMap(absences) {
   const map = {}
   if (!Array.isArray(absences)) return map
@@ -25,10 +30,32 @@ export function formatUserFullName(user) {
     .trim()
 }
 
+/** Календарная дата YYYY-MM-DD без сдвига из-за UTC (node-pg DATE → ISO с T) */
+export function normalizeDateOnly(value) {
+  if (value == null || value === '') return ''
+  if (value instanceof Date) {
+    if (Number.isNaN(value.getTime())) return ''
+    const y = value.getFullYear()
+    const m = String(value.getMonth() + 1).padStart(2, '0')
+    const d = String(value.getDate()).padStart(2, '0')
+    return `${y}-${m}-${d}`
+  }
+  const str = String(value).trim()
+  if (!str) return ''
+  if (str.includes('T')) {
+    const d = new Date(str)
+    if (!Number.isNaN(d.getTime())) {
+      return normalizeDateOnly(d)
+    }
+  }
+  return str.length >= 10 ? str.slice(0, 10) : str
+}
+
 function formatDateRu(dateStr) {
-  if (!dateStr) return ''
-  const parts = String(dateStr).slice(0, 10).split('-')
-  if (parts.length !== 3) return String(dateStr)
+  const normalized = normalizeDateOnly(dateStr)
+  if (!normalized) return ''
+  const parts = normalized.split('-')
+  if (parts.length !== 3) return normalized
   return `${parts[2]}.${parts[1]}.${parts[0]}`
 }
 

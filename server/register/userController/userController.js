@@ -590,7 +590,7 @@ const getUserStatusPermissions = (dbPool) => async (req, res) => {
   }
 }
 
-const { getAllActiveAbsences, resolveAssigneesBatch } = require('../userAbsenceService')
+const { getAllActiveAbsences, getAllUpcomingAbsences, resolveAssigneesBatch } = require('../userAbsenceService')
 const { getWorkloadSummary } = require('../userAbsenceWorkloadService')
 
 // Активные отсутствия сотрудников на текущую дату
@@ -600,6 +600,17 @@ const getActiveUserAbsences = (dbPool) => async (req, res) => {
     res.json(absences)
   } catch (error) {
     console.error('Ошибка при получении активных отсутствий:', error)
+    res.status(500).json({ error: 'Ошибка сервера' })
+  }
+}
+
+// Запланированные отсутствия (ещё не начались на текущую дату)
+const getUpcomingUserAbsences = (dbPool) => async (req, res) => {
+  try {
+    const absences = await getAllUpcomingAbsences(dbPool)
+    res.json(absences)
+  } catch (error) {
+    console.error('Ошибка при получении запланированных отсутствий:', error)
     res.status(500).json({ error: 'Ошибка сервера' })
   }
 }
@@ -1031,6 +1042,7 @@ module.exports = {
   deleteUserAbsenceStatus,
   getUserStatusPermissions,
   getActiveUserAbsences,
+  getUpcomingUserAbsences,
   getUserWorkloadSummary,
   postResolveAssignees,
   getMppIdByCompanyId,

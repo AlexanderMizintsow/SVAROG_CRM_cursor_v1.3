@@ -2,11 +2,9 @@ import { useState, useEffect } from 'react'
 import axios from 'axios'
 import { API_BASE_URL } from '../../../../config'
 import { toast } from 'react-toastify'
+import { normalizeDateOnly } from '../../../utils/userAbsenceUtils'
 
-const toInputDate = (value) => {
-  if (!value) return ''
-  return String(value).slice(0, 10)
-}
+const toInputDate = (value) => normalizeDateOnly(value)
 
 const formatFio = (last, first, middle) =>
   [last, first, middle].filter(Boolean).join(' ').trim()

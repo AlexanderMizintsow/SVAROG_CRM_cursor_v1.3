@@ -1,8 +1,6 @@
-import React, { useState, useRef, useEffect } from 'react'
-import { GoPaperclip } from 'react-icons/go'
+import React, { useState, useRef, useEffect, useCallback } from 'react'
 import EmojiPicker from 'emoji-picker-react'
 import { FaRegPaperPlane } from 'react-icons/fa'
-import { FiMessageCircle } from 'react-icons/fi'
 import { FaRegComments } from 'react-icons/fa6'
 import UserStore from '../../../../../store/userStore'
 import './GlobalTaskChat.scss'
@@ -24,14 +22,52 @@ const GlobalTaskChat = ({
   const [inputText, setInputText] = useState('')
   const messagesEndRef = useRef(null)
   const textareaRef = useRef(null)
-  const { fetchMessages, messagesGlobalTask } = useTasksManageStore()
+  const globalTaskIdRef = useRef(globalTaskId)
+  const fetchMessages = useTasksManageStore((state) => state.fetchMessages)
+  const cachedMessages = useTasksManageStore(
+    (state) => state.messagesGlobalTaskById[String(globalTaskId ?? '')]
+  )
   const [showEmojiPicker, setShowEmojiPicker] = useState(false)
   const [replyingTo, setReplyingTo] = useState(null)
   const messageRefs = useRef({})
 
   const userId = user ? user.id : null
 
-  // Функция для прокрутки к сообщению
+  useEffect(() => {
+    globalTaskIdRef.current = globalTaskId
+  }, [globalTaskId])
+
+  const loadMessages = useCallback(async () => {
+    if (globalTaskId == null || globalTaskId === '') return
+    const data = await fetchMessages(globalTaskId)
+    if (String(globalTaskIdRef.current) !== String(globalTaskId)) return
+    setMessages(Array.isArray(data) ? data : [])
+  }, [fetchMessages, globalTaskId])
+
+  useEffect(() => {
+    setInputText('')
+    setReplyingTo(null)
+    setShowEmojiPicker(false)
+
+    const cacheKey = String(globalTaskId ?? '')
+    const cached = useTasksManageStore.getState().messagesGlobalTaskById[cacheKey]
+    setMessages(Array.isArray(cached) ? cached : [])
+
+    loadMessages()
+  }, [globalTaskId, loadMessages])
+
+  useEffect(() => {
+    if (cachedMessages == null) return
+    setMessages(cachedMessages)
+  }, [cachedMessages])
+
+  useEffect(() => {
+    if (globalTaskId) {
+      useTaskStateTracker.getState().clearProjectChatUnread(globalTaskId)
+      useTaskStateTracker.getState().removeGlobalTaskNotification(globalTaskId)
+    }
+  }, [globalTaskId])
+
   const scrollToMessage = (messageId) => {
     if (messageRefs.current[messageId]) {
       messageRefs.current[messageId].scrollIntoView({
@@ -39,7 +75,6 @@ const GlobalTaskChat = ({
         block: 'nearest',
       })
 
-      // Временное выделение сообщения
       const messageElement = messageRefs.current[messageId]
       messageElement.classList.add('highlighted-message')
       setTimeout(() => {
@@ -55,30 +90,9 @@ const GlobalTaskChat = ({
     }, 100)
   }
 
-  // Функция для отмены ответа
   const cancelReply = () => {
     setReplyingTo(null)
   }
-
-  const loadMessages = async () => {
-    const data = await fetchMessages(globalTaskId)
-    setMessages(data)
-  }
-
-  useEffect(() => {
-    setMessages(messagesGlobalTask)
-  }, [messagesGlobalTask])
-
-  useEffect(() => {
-    loadMessages()
-  }, [globalTaskId])
-
-  useEffect(() => {
-    if (globalTaskId) {
-      useTaskStateTracker.getState().clearProjectChatUnread(globalTaskId)
-      useTaskStateTracker.getState().removeGlobalTaskNotification(globalTaskId)
-    }
-  }, [globalTaskId])
 
   const scrollToBottom = () => {
     if (messagesEndRef.current) {
@@ -90,27 +104,28 @@ const GlobalTaskChat = ({
     scrollToBottom()
   }, [messages])
 
-  // Отправка сообщения
   const handleSendMessage = async () => {
     const trimmedText = inputText.trim()
-    if (trimmedText === '') return
+    const activeGlobalTaskId = globalTaskIdRef.current
+    if (trimmedText === '' || activeGlobalTaskId == null || activeGlobalTaskId === '') return
 
     const newMessage = {
-      globalTaskId: globalTaskId,
+      globalTaskId: activeGlobalTaskId,
       userId: userId,
       text: trimmedText,
       title,
-      repliedToMessageId: replyingTo ? replyingTo.id : null, // Добавляем ID сообщения, на которое отвечаем
+      repliedToMessageId: replyingTo ? replyingTo.id : null,
     }
 
     await axios.post(`${API_BASE_URL}5000/api/global-tasks/chat`, newMessage)
 
-    loadMessages()
-    setInputText('')
-    setReplyingTo(null) // Сбрасываем ответ после отправки
+    if (String(globalTaskIdRef.current) === String(activeGlobalTaskId)) {
+      await fetchMessages(activeGlobalTaskId)
+      setInputText('')
+      setReplyingTo(null)
+    }
   }
 
-  // Создаём функцию для форматирования даты
   const formatTimestamp = (timestamp) => {
     const date = new Date(timestamp)
     const options = {
@@ -139,24 +154,35 @@ const GlobalTaskChat = ({
   }
 
   const getColorClassById = (id) => {
-    const index = id % avatarColors.length // делим на длину массива цветов
+    const index = id % avatarColors.length
     return avatarColors[index]
   }
 
   const handleCloseChat = () => {
-    useTaskStateTracker.getState().removeGlobalTaskNotification(globalTaskId) // Удаление уведомления
-    onClick() // Вызов функции закрытия чата
+    useTaskStateTracker.getState().removeGlobalTaskNotification(globalTaskId)
+    onClick()
+  }
+
+  const handleOpenProject = (e) => {
+    e.preventDefault()
+    e.stopPropagation()
+    if (!globalTaskId) return
+
+    useTaskStateTracker.getState().setTaskDecisionNavigate({
+      type: 'project',
+      globalTaskId,
+    })
+    window.dispatchEvent(new CustomEvent('task-decision-navigate'))
+    handleCloseChat()
   }
 
   const toggleEmojiPicker = () => {
-    // Добавлено
     setShowEmojiPicker(!showEmojiPicker)
   }
 
   const onEmojiClick = (emoji) => {
-    // Добавлено
-    setInputText(inputText + emoji.emoji) // Добавляем эмодзи в текст
-    setShowEmojiPicker(false) // Закрываем выбор эмодзи после выбора
+    setInputText((prev) => prev + emoji.emoji)
+    setShowEmojiPicker(false)
   }
 
   const renderMessageContent = (msg, isCurrentUser) => {
@@ -219,7 +245,6 @@ const GlobalTaskChat = ({
         <button className="close-button" onClick={handleCloseChat}>
           <MdClose />
         </button>
-        {/* Заголовок */}
         <div className="header">
           <div className="title-section">
             <div className="avatar-box bg-indigo-500">
@@ -227,19 +252,24 @@ const GlobalTaskChat = ({
             </div>
             <div>
               <h2 className="title-chat">Проектный чат</h2>
-              <p className="subtitle">Обсуждение проекта: {title}</p>
+              <p className="subtitle">
+                Обсуждение проекта:{' '}
+                <button
+                  type="button"
+                  className="subtitle__project-link"
+                  onClick={handleOpenProject}
+                  title="Открыть проект"
+                >
+                  {title}
+                </button>
+              </p>
             </div>
           </div>
         </div>
 
-        {/* Область сообщений */}
         <div className="messages" ref={messagesEndRef}>
           {messages.map((msg) => {
-            const authorName = `${msg.first_name} ${msg.last_name}`
-
             const isCurrentUser = userId && msg.user_id === userId
-
-            // Инициализация
             const initials = getInitials(msg.first_name, msg.last_name)
             const colorClass = getColorClassById(msg.user_id)
 
@@ -268,9 +298,7 @@ const GlobalTaskChat = ({
           })}
         </div>
 
-        {/* Ввод сообщения */}
         <div className="input-area">
-          {/* Блок ответа (если есть сообщение, на которое отвечаем) */}
           {replyingTo && (
             <div className="reply-container">
               <div className="reply-info">
@@ -283,9 +311,6 @@ const GlobalTaskChat = ({
             </div>
           )}
           <div className="input-container">
-            {/*<button className="icon-button attach-btn">
-              <GoPaperclip style={{ fontSize: '24px' }} />
-            </button>*/}
             <div className="input-wrapper">
               <textarea
                 ref={textareaRef}
@@ -295,24 +320,21 @@ const GlobalTaskChat = ({
                 onKeyDown={(e) => {
                   if (e.key === 'Enter') {
                     if (e.ctrlKey) {
-                      // Ctrl + Shift + Enter — добавляем новую строку
                       e.preventDefault()
                       setInputText((prev) => prev + '\n')
                     } else if (!e.ctrlKey && !e.shiftKey) {
-                      // Просто Enter — отправляем сообщение
                       e.preventDefault()
                       handleSendMessage()
                     }
-                    // Shift + Enter — по умолчанию добавляется новая строка в textarea
                   }
                 }}
                 rows={2}
                 style={{ resize: 'none', whiteSpace: 'pre-wrap' }}
               />
 
-              {showEmojiPicker && ( // Изменено
+              {showEmojiPicker && (
                 <div className="emoji-picker-container">
-                  <EmojiPicker onEmojiClick={onEmojiClick} />{' '}
+                  <EmojiPicker onEmojiClick={onEmojiClick} />
                 </div>
               )}
             </div>

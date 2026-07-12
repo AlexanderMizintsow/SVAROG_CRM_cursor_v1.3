@@ -12,7 +12,8 @@ const useTasksManageStore = create((set, get) => ({
   /** Диапазон дат последней загрузки завершённых (для refetch по WebSocket и т.п.) */
   lastCompletedTasksRange: defaultCompletedTasksRange,
   unreadMessages: new Set(),
-  messagesGlobalTask: [],
+  /** Кэш сообщений проектного чата по globalTaskId */
+  messagesGlobalTaskById: {},
   isLoading: false,
 
   // Метод для загрузки активных задач
@@ -106,14 +107,24 @@ const useTasksManageStore = create((set, get) => ({
 
   setUnreadMessages: (messages) => set({ unreadMessages: new Set(messages) }),
 
-  // Новый метод для загрузки сообщений глобальной задачи
+  // Загрузка сообщений глобальной задачи (кэш по id проекта, без перезаписи других чатов)
   fetchMessages: async (globalTaskId) => {
+    if (globalTaskId == null || globalTaskId === '') return []
+
+    const cacheKey = String(globalTaskId)
     try {
       const response = await axios.get(`${API_BASE_URL}5000/api/global-tasks/chat/${globalTaskId}`)
-      set({ messagesGlobalTask: response.data })
-      return response.data // Верните данные, чтобы использовать их в компоненте
+      const data = response.data
+      set((state) => ({
+        messagesGlobalTaskById: {
+          ...state.messagesGlobalTaskById,
+          [cacheKey]: data,
+        },
+      }))
+      return data
     } catch (error) {
       console.error('Ошибка при загрузке сообщений:', error)
+      return []
     }
   },
 }))

@@ -56,6 +56,7 @@ const GlobalTaskHeader = ({ taskId, status, title, createdAt, author }) => {
       </div>
       {isChatOpen && (
         <GlobalTaskChat
+          key={taskId}
           onClick={toggleChat}
           globalTaskId={taskId}
           title={title}

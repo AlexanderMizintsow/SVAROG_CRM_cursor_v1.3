@@ -852,6 +852,7 @@ const AlertBanner = () => {
       {selectedGlobalTask &&
         ReactDOM.createPortal(
           <GlobalTaskChat
+            key={selectedGlobalTask.taskId}
             globalTaskId={selectedGlobalTask.taskId}
             title={selectedGlobalTask.title}
             onClick={() => setSelectedGlobalTask(null)}

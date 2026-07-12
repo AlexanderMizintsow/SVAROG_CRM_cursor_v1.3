@@ -1,5 +1,9 @@
 import { useMemo, useState } from 'react'
-import { formatAbsencePeriod, canManageEmployeeStatusClient } from '../../../utils/userAbsenceUtils'
+import {
+  formatAbsencePeriod,
+  canManageEmployeeStatusClient,
+  normalizeDateOnly,
+} from '../../../utils/userAbsenceUtils'
 import StatusEditModal from './StatusEditModal'
 import AbsenceTableRow from './AbsenceTableRow'
 
@@ -24,6 +28,15 @@ const STATUS_CLASS = {
   'на обучении': 'absence-status--training',
 }
 
+const getNearestAbsenceDate = (row) => {
+  if (row.start_date) return normalizeDateOnly(row.start_date)
+  const futureDates = (row.specific_dates || [])
+    .map(normalizeDateOnly)
+    .filter(Boolean)
+    .sort()
+  return futureDates[0] || '9999-12-31'
+}
+
 const ActiveAbsencesList = ({
   absences = [],
   loading = false,
@@ -31,11 +44,17 @@ const ActiveAbsencesList = ({
   permissions = null,
   users = [],
   actorUserId = null,
+  variant = 'active',
 }) => {
   const [editingAbsence, setEditingAbsence] = useState(null)
 
   const sortedRows = useMemo(() => {
     return [...absences].sort((a, b) => {
+      if (variant === 'upcoming') {
+        const dateA = getNearestAbsenceDate(a)
+        const dateB = getNearestAbsenceDate(b)
+        if (dateA !== dateB) return dateA.localeCompare(dateB)
+      }
       const deptA = (a.department_name || 'яяя').toLowerCase()
       const deptB = (b.department_name || 'яяя').toLowerCase()
       if (deptA !== deptB) return deptA.localeCompare(deptB, 'ru')
@@ -43,7 +62,13 @@ const ActiveAbsencesList = ({
       const nameB = formatFio(b.last_name, b.first_name, b.middle_name)
       return nameA.localeCompare(nameB, 'ru')
     })
-  }, [absences])
+  }, [absences, variant])
+
+  const isUpcoming = variant === 'upcoming'
+  const emptyMessage = isUpcoming
+    ? 'Нет запланированных отпусков и других статусов отсутствия.'
+    : 'Сейчас нет сотрудников в отпуске или другом статусе отсутствия.'
+  const countLabel = isUpcoming ? 'Запланировано' : 'Отсутствуют'
 
   const canEditRow = (row) =>
     canManageEmployeeStatusClient(permissions, row.user_department_id)
@@ -62,7 +87,7 @@ const ActiveAbsencesList = ({
   if (!sortedRows.length) {
     return (
       <div className="active-absences__empty-wrap">
-        <p className="active-absences__empty">Сейчас нет сотрудников в отпуске или другом статусе отсутствия.</p>
+        <p className="active-absences__empty">{emptyMessage}</p>
         {onRefresh && (
           <button type="button" className="active-absences__refresh" onClick={onRefresh}>
             Обновить
@@ -76,7 +101,7 @@ const ActiveAbsencesList = ({
     <div className="active-absences">
       <div className="active-absences__toolbar">
         <span className="active-absences__count">
-          Отсутствуют: <strong>{sortedRows.length}</strong>
+          {countLabel}: <strong>{sortedRows.length}</strong>
           <span className="active-absences__hover-hint"> · наведите на строку для сводки по задачам</span>
         </span>
         {onRefresh && (

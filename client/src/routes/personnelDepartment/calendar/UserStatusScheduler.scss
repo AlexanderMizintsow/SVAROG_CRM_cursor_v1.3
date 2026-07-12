@@ -69,6 +69,11 @@ $user-button-bg-hover: #0056b3;
     color: $user-button-bg;
     font-size: 12px;
     font-weight: 600;
+
+    &--upcoming {
+      background: #fff3e0;
+      color: #e65100;
+    }
   }
 
   &__form {
@@ -609,12 +614,12 @@ $user-button-bg-hover: #0056b3;
 }
 
 .workload-tooltip {
-  position: absolute;
-  left: 0;
-  top: calc(100% + 6px);
-  z-index: 100;
+  position: fixed;
+  z-index: 1100;
   min-width: 280px;
   max-width: 380px;
+  max-height: min(420px, calc(100vh - 24px));
+  overflow-y: auto;
   padding: 12px 14px;
   background: #fff;
   border: 1px solid #d4e4f7;

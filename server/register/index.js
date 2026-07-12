@@ -138,6 +138,7 @@ const {
   deleteUserAbsenceStatus,
   getUserStatusPermissions,
   getActiveUserAbsences,
+  getUpcomingUserAbsences,
   getUserWorkloadSummary,
   postResolveAssignees,
   getMppIdByCompanyId,
@@ -397,6 +398,7 @@ app.get('/api/server-time', (req, res) => {
 /*************Маршруты для работы с СОТРУДНИКАМИ**************/
 app.get('/api/users', getUsers(dbPool))
 app.get('/api/users/absences/active', getActiveUserAbsences(dbPool))
+app.get('/api/users/absences/upcoming', getUpcomingUserAbsences(dbPool))
 app.get('/api/users/:userId/workload-summary', getUserWorkloadSummary(dbPool))
 app.post('/api/users/resolve-assignees', postResolveAssignees(dbPool))
 app.put('/api/users/:id', updateUser(dbPool))

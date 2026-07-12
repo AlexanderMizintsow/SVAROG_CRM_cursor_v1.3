@@ -14,6 +14,40 @@ function buildAbsenceActiveSql(dateParamIndex) {
   )`
 }
 
+/** Статус ещё не начался сегодня, но есть будущие даты отсутствия */
+function buildAbsenceUpcomingSql(dateParamIndex) {
+  const p = `$${dateParamIndex}`
+  const activeSql = buildAbsenceActiveSql(dateParamIndex)
+  return `(
+    NOT (${activeSql})
+    AND (
+      (us.start_date IS NOT NULL AND us.end_date IS NOT NULL AND us.start_date > ${p}::date)
+      OR EXISTS (
+        SELECT 1 FROM user_status_dates usd
+        WHERE usd.user_status_id = us.id AND usd.specific_date > ${p}::date
+      )
+    )
+  )`
+}
+
+/** DATE из node-pg — полночь локального TZ; в JSON через toISOString() день смещается на −1 */
+function formatPgDateOnly(value) {
+  if (value == null || value === '') return null
+  if (value instanceof Date) {
+    if (Number.isNaN(value.getTime())) return null
+    return `${value.getFullYear()}-${String(value.getMonth() + 1).padStart(2, '0')}-${String(value.getDate()).padStart(2, '0')}`
+  }
+  const str = String(value).trim()
+  if (!str) return null
+  if (str.includes('T')) {
+    const d = new Date(str)
+    if (!Number.isNaN(d.getTime())) {
+      return formatPgDateOnly(d)
+    }
+  }
+  return str.length >= 10 ? str.slice(0, 10) : str
+}
+
 function toDateString(date) {
   const d = date instanceof Date ? date : new Date(date)
   if (Number.isNaN(d.getTime())) {
@@ -59,8 +93,8 @@ function mapAbsenceRow(row) {
     id: row.id,
     user_id: row.user_id,
     status: row.status,
-    start_date: row.start_date,
-    end_date: row.end_date,
+    start_date: formatPgDateOnly(row.start_date),
+    end_date: formatPgDateOnly(row.end_date),
     substitute_user_id: row.substitute_user_id,
     first_name: row.first_name,
     last_name: row.last_name,
@@ -73,7 +107,9 @@ function mapAbsenceRow(row) {
     supervisor_first_name: row.supervisor_first_name || null,
     supervisor_last_name: row.supervisor_last_name || null,
     supervisor_middle_name: row.supervisor_middle_name || null,
-    specific_dates: Array.isArray(specificDates) ? specificDates : [],
+    specific_dates: Array.isArray(specificDates)
+      ? specificDates.map(formatPgDateOnly).filter(Boolean)
+      : [],
   }
 }
 
@@ -130,6 +166,44 @@ async function getAllActiveAbsences(dbPool, checkDate = new Date()) {
      LEFT JOIN users su ON su.id = us.substitute_user_id
      WHERE ${buildAbsenceActiveSql(1)}
      ORDER BY d.name NULLS LAST, u.last_name, u.first_name`,
+    [dateStr]
+  )
+
+  return result.rows.map(mapAbsenceRow).filter(Boolean)
+}
+
+async function getAllUpcomingAbsences(dbPool, checkDate = new Date()) {
+  const dateStr = toDateString(checkDate)
+  const result = await dbPool.query(
+    `SELECT us.id, us.user_id, us.status, us.start_date, us.end_date, us.substitute_user_id,
+            u.first_name, u.last_name, u.middle_name,
+            u.department_id AS user_department_id,
+            d.name AS department_name,
+            sup.first_name AS supervisor_first_name,
+            sup.last_name AS supervisor_last_name,
+            sup.middle_name AS supervisor_middle_name,
+            su.first_name AS substitute_first_name,
+            su.last_name AS substitute_last_name,
+            su.middle_name AS substitute_middle_name,
+            COALESCE(
+              (SELECT json_agg(usd.specific_date ORDER BY usd.specific_date)
+               FROM user_status_dates usd WHERE usd.user_status_id = us.id),
+              '[]'::json
+            ) AS specific_dates
+     FROM user_statuses us
+     JOIN users u ON u.id = us.user_id
+     LEFT JOIN departments d ON d.id = u.department_id
+     LEFT JOIN users sup ON sup.id = u.supervisor_id
+     LEFT JOIN users su ON su.id = us.substitute_user_id
+     WHERE ${buildAbsenceUpcomingSql(1)}
+     ORDER BY
+       COALESCE(
+         us.start_date,
+         (SELECT MIN(usd.specific_date) FROM user_status_dates usd WHERE usd.user_status_id = us.id AND usd.specific_date > $1::date)
+       ) ASC NULLS LAST,
+       d.name NULLS LAST,
+       u.last_name,
+       u.first_name`,
     [dateStr]
   )
 
@@ -310,6 +384,7 @@ async function resolveAssigneesBatch(dbPool, userIds, checkDate = new Date()) {
 module.exports = {
   getActiveAbsence,
   getAllActiveAbsences,
+  getAllUpcomingAbsences,
   resolveAssignee,
   resolveAssigneesBatch,
   resolveForAssignment,

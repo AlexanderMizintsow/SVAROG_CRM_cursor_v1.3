@@ -6,6 +6,7 @@ import 'react-toastify/dist/ReactToastify.css'
 import useUserStore from '../../../store/userStore'
 import {
   fetchActiveAbsences,
+  fetchUpcomingAbsences,
   fetchStatusPermissions,
   fetchWorkloadSummary,
   filterManageableUsers,
@@ -19,6 +20,7 @@ import './UserStatusScheduler.scss'
 const TABS = {
   FORM: 'form',
   LIST: 'list',
+  UPCOMING: 'upcoming',
 }
 
 const LeaveCalendar = () => {
@@ -29,7 +31,9 @@ const LeaveCalendar = () => {
   const [users, setUsers] = useState([])
   const [permissions, setPermissions] = useState(null)
   const [absences, setAbsences] = useState([])
+  const [upcomingAbsences, setUpcomingAbsences] = useState([])
   const [absencesLoading, setAbsencesLoading] = useState(false)
+  const [upcomingLoading, setUpcomingLoading] = useState(false)
   const [selectedUser, setSelectedUser] = useState('')
   const [substituteUser, setSubstituteUser] = useState('')
   const [statusType, setStatusType] = useState('отпуск')
@@ -57,6 +61,23 @@ const LeaveCalendar = () => {
     }
   }, [])
 
+  const loadUpcomingAbsences = useCallback(async () => {
+    setUpcomingLoading(true)
+    try {
+      const data = await fetchUpcomingAbsences()
+      setUpcomingAbsences(data)
+    } catch {
+      toast.error('Не удалось загрузить список запланированных отсутствий')
+      setUpcomingAbsences([])
+    } finally {
+      setUpcomingLoading(false)
+    }
+  }, [])
+
+  const refreshAbsenceLists = useCallback(async () => {
+    await Promise.all([loadAbsences(), loadUpcomingAbsences()])
+  }, [loadAbsences, loadUpcomingAbsences])
+
   const loadPermissions = useCallback(async () => {
     if (!actorUserId) {
       setPermissions(null)
@@ -83,14 +104,18 @@ const LeaveCalendar = () => {
     }
     fetchUsers()
     loadAbsences()
+    loadUpcomingAbsences()
     loadPermissions()
-  }, [loadAbsences, loadPermissions])
+  }, [loadAbsences, loadUpcomingAbsences, loadPermissions])
 
   useEffect(() => {
     if (activeTab === TABS.LIST) {
       loadAbsences()
     }
-  }, [activeTab, loadAbsences])
+    if (activeTab === TABS.UPCOMING) {
+      loadUpcomingAbsences()
+    }
+  }, [activeTab, loadAbsences, loadUpcomingAbsences])
 
   useEffect(() => {
     if (permissions && !permissions.canCreate && activeTab === TABS.FORM) {
@@ -163,7 +188,7 @@ const LeaveCalendar = () => {
       toast.success('Статус успешно сохранён!')
       resetForm()
       closeSummaryModal()
-      loadAbsences()
+      refreshAbsenceLists()
     } catch (err) {
       const msg = err.response?.data?.error || 'Ошибка при сохранении статуса. Попробуйте снова.'
       toast.error(msg)
@@ -244,6 +269,20 @@ const LeaveCalendar = () => {
           Сейчас отсутствуют
           {absences.length > 0 && (
             <span className="user-status-scheduler__tab-badge">{absences.length}</span>
+          )}
+        </button>
+        <button
+          type="button"
+          className={`user-status-scheduler__tab ${
+            activeTab === TABS.UPCOMING ? 'user-status-scheduler__tab--active' : ''
+          }`}
+          onClick={() => setActiveTab(TABS.UPCOMING)}
+        >
+          Запланировано
+          {upcomingAbsences.length > 0 && (
+            <span className="user-status-scheduler__tab-badge user-status-scheduler__tab-badge--upcoming">
+              {upcomingAbsences.length}
+            </span>
           )}
         </button>
       </div>
@@ -378,11 +417,21 @@ const LeaveCalendar = () => {
         <p className="user-status-scheduler__no-access">
           У вас нет прав на добавление статусов. Обратитесь к руководителю отдела, отделу кадров, директору или администратору.
         </p>
+      ) : activeTab === TABS.UPCOMING ? (
+        <ActiveAbsencesList
+          absences={upcomingAbsences}
+          loading={upcomingLoading}
+          onRefresh={refreshAbsenceLists}
+          permissions={permissions}
+          users={users}
+          actorUserId={actorUserId}
+          variant="upcoming"
+        />
       ) : (
         <ActiveAbsencesList
           absences={absences}
           loading={absencesLoading}
-          onRefresh={loadAbsences}
+          onRefresh={refreshAbsenceLists}
           permissions={permissions}
           users={users}
           actorUserId={actorUserId}
