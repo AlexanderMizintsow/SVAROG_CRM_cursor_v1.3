@@ -36,24 +36,35 @@ const generateRandomPassword = (length = 12) => {
   return password
 }
 
+const buildEmployeeName = (employee) => {
+  const parts = [employee.last_name, employee.first_name, employee.middle_name].filter(Boolean)
+  return parts.length ? parts.join(' ') : employee.username
+}
+
 const CompanyPassword = () => {
   const { user } = useUserStore()
   const [companies, setCompanies] = useState([])
+  const [employees, setEmployees] = useState([])
   const [dialogOpen, setDialogOpen] = useState(false)
-  const [selectedCompanyId, setSelectedCompanyId] = useState(null)
-  const [selectedCompanyName, setSelectedCompanyName] = useState('') // Добавляем состояние для имени компании
+  const [selectedEntityId, setSelectedEntityId] = useState(null)
+  const [selectedEntityName, setSelectedEntityName] = useState('')
   const [searchTerm, setSearchTerm] = useState('')
   const [openHelpModal, setOpenHelpModal] = useState(false)
-  const [passwordMode, setPasswordMode] = useState('telegram')
+  const [passwordMode, setPasswordMode] = useState('staff')
   const [issuedPasswordModal, setIssuedPasswordModal] = useState({
     open: false,
-    companyName: '',
+    entityLabel: '',
     password: '',
+    isStaff: false,
   })
 
   useEffect(() => {
+    if (passwordMode === 'staff') {
+      fetchEmployees()
+      return
+    }
     fetchCompanies()
-  }, [])
+  }, [passwordMode])
 
   const fetchCompanies = async () => {
     try {
@@ -65,7 +76,17 @@ const CompanyPassword = () => {
     }
   }
 
-  const handlePasswordChange = async (companyId, newPassword) => {
+  const fetchEmployees = async () => {
+    try {
+      const response = await axios.get(`${API_BASE_URL}5000/api/users/mobile-staff-access`)
+      setEmployees(response.data)
+    } catch (error) {
+      console.error('Ошибка при получении сотрудников:', error)
+      toast.error('Ошибка при получении сотрудников')
+    }
+  }
+
+  const handleCompanyPasswordChange = async (companyId, newPassword) => {
     const isTelegramMode = passwordMode === 'telegram'
     const endpoint = isTelegramMode
       ? `${API_BASE_URL}5003/api/companies/password/${companyId}`
@@ -85,19 +106,42 @@ const CompanyPassword = () => {
     }
   }
 
-  const handlePasswordDelete = (companyId, companyName) => {
-    setSelectedCompanyId(companyId)
-    setSelectedCompanyName(companyName)
+  const handleStaffPasswordChange = async (employeeId, newPassword) => {
+    try {
+      await axios.put(`${API_BASE_URL}5000/api/users/mobile-staff-password/${employeeId}`, {
+        mobile_staff_password: newPassword,
+        userId: user?.id || null,
+      })
+      toast.success('Пароль успешно обновлён')
+      return true
+    } catch (error) {
+      console.error('Ошибка при обновлении пароля сотрудника:', error)
+      toast.error('Ошибка при обновлении пароля')
+      return false
+    }
+  }
+
+  const handlePasswordDelete = (entityId, entityName) => {
+    setSelectedEntityId(entityId)
+    setSelectedEntityName(entityName)
     setDialogOpen(true)
   }
 
   const confirmDelete = async () => {
-    const isUpdated = await handlePasswordChange(selectedCompanyId, 'NOTACCES')
+    const isUpdated =
+      passwordMode === 'staff'
+        ? await handleStaffPasswordChange(selectedEntityId, 'NOTACCES')
+        : await handleCompanyPasswordChange(selectedEntityId, 'NOTACCES')
+
     if (isUpdated) {
-      await fetchCompanies()
+      if (passwordMode === 'staff') {
+        await fetchEmployees()
+      } else {
+        await fetchCompanies()
+      }
     }
     setDialogOpen(false)
-    setSelectedCompanyName('')
+    setSelectedEntityName('')
   }
 
   const getPasswordByMode = (company) =>
@@ -113,13 +157,13 @@ const CompanyPassword = () => {
     }
   }
 
-  const handleGeneratePassword = async (company) => {
+  const handleGenerateCompanyPassword = async (company) => {
     const newPassword = generateRandomPassword()
     if (!newPassword) {
       return
     }
 
-    const isUpdated = await handlePasswordChange(company.id, newPassword)
+    const isUpdated = await handleCompanyPasswordChange(company.id, newPassword)
     if (!isUpdated) {
       return
     }
@@ -127,29 +171,64 @@ const CompanyPassword = () => {
     if (passwordMode === 'mobile') {
       setIssuedPasswordModal({
         open: true,
-        companyName: company.name_companies,
+        entityLabel: company.name_companies,
         password: newPassword,
+        isStaff: false,
       })
     }
 
     await fetchCompanies()
   }
 
-  const renderTableCellActions = (company) => (
+  const handleGenerateStaffPassword = async (employee) => {
+    const newPassword = generateRandomPassword()
+    if (!newPassword) {
+      return
+    }
+
+    const isUpdated = await handleStaffPasswordChange(employee.id, newPassword)
+    if (!isUpdated) {
+      return
+    }
+
+    setIssuedPasswordModal({
+      open: true,
+      entityLabel: buildEmployeeName(employee),
+      password: newPassword,
+      isStaff: true,
+    })
+
+    await fetchEmployees()
+  }
+
+  const renderCompanyActions = (company) => (
     <TableCell>
-      <Button
-        variant="contained"
-        onClick={() => handleGeneratePassword(company)}
-      >
+      <Button variant="contained" onClick={() => handleGenerateCompanyPassword(company)}>
         Установить пароль
       </Button>
       {getPasswordByMode(company) !== 'NOTACCES' && (
         <Button
           variant="contained"
           color="secondary"
-          onClick={() =>
-            handlePasswordDelete(company.id, company.name_companies)
-          }
+          onClick={() => handlePasswordDelete(company.id, company.name_companies)}
+          style={{ marginLeft: '10px' }}
+        >
+          Удалить пароль
+        </Button>
+      )}
+    </TableCell>
+  )
+
+  const renderStaffActions = (employee) => (
+    <TableCell>
+      <Button variant="contained" onClick={() => handleGenerateStaffPassword(employee)}>
+        Установить пароль
+      </Button>
+      {employee.mobile_staff_access !== 'NOTACCES' && (
+        <Button
+          variant="contained"
+          color="secondary"
+          onClick={() => handlePasswordDelete(employee.id, buildEmployeeName(employee))}
           style={{ marginLeft: '10px' }}
         >
           Удалить пароль
@@ -162,16 +241,32 @@ const CompanyPassword = () => {
     company.name_companies.toLowerCase().includes(searchTerm.toLowerCase())
   )
 
-  // Функция для открытия модального окна справки
-  const handleOpenHelpModal = () => {
-    setOpenHelpModal(true)
-  }
+  const filteredEmployees = employees.filter((employee) => {
+    const haystack = [
+      employee.username,
+      employee.first_name,
+      employee.last_name,
+      employee.middle_name,
+      employee.role_name,
+    ]
+      .filter(Boolean)
+      .join(' ')
+      .toLowerCase()
+    return haystack.includes(searchTerm.toLowerCase())
+  })
+
+  const modeDescription =
+    passwordMode === 'telegram'
+      ? 'Вкладка для выдачи пароля доступа в Telegram-бот.'
+      : passwordMode === 'mobile'
+        ? 'Вкладка для выдачи пароля доступа в мобильное приложение ПОЗ (дилеры).'
+        : 'Вкладка для выдачи пароля доступа в мобильное приложение ПОЗ-сотрудники.'
 
   return (
     <div className="container">
       <MdContactSupport
         className="help-icon"
-        onClick={handleOpenHelpModal}
+        onClick={() => setOpenHelpModal(true)}
         title="Справка"
       />
       <HelpModalCompanyPassword
@@ -179,68 +274,90 @@ const CompanyPassword = () => {
         open={openHelpModal}
         onClose={() => setOpenHelpModal(false)}
       />
-      <SearchBar
-        searchTerm={searchTerm}
-        setSearchTerm={setSearchTerm}
-        placeholder="Поиск..."
-      />
+      <SearchBar searchTerm={searchTerm} setSearchTerm={setSearchTerm} placeholder="Поиск..." />
       <Typography variant="h4" gutterBottom>
-        Управление паролями доступа дилеров
+        Управление паролями доступа
       </Typography>
       <Tabs
         value={passwordMode}
         onChange={(_, value) => setPasswordMode(value)}
         sx={{ marginBottom: 2 }}
       >
-        <Tab
-          value="telegram"
-          label="Пароли для Telegram-бота"
-        />
-        <Tab
-          value="mobile"
-          label="Пароли для мобильного приложения"
-        />
+        <Tab value="staff" label="Пароли для ПОЗ-сотрудники" />
+        <Tab value="telegram" label="Пароли для Telegram-бота" />
+        <Tab value="mobile" label="Пароли для ПОЗ (дилеры)" />
       </Tabs>
       <Typography variant="body2" sx={{ marginBottom: 2 }}>
-        {passwordMode === 'telegram'
-          ? 'Вкладка для выдачи пароля доступа в Telegram-бот.'
-          : 'Вкладка для выдачи пароля доступа в мобильное приложение ПОЗ.'}
+        {modeDescription}
       </Typography>
 
       <TableContainer>
         <Table>
-          <TableHead>
-            <TableRow>
-              <TableCell>Название компании</TableCell>
-              <TableCell>
-                {passwordMode === 'telegram'
-                  ? 'Пароль Telegram'
-                  : 'Пароль мобильного приложения'}
-              </TableCell>
-              <TableCell>Действия</TableCell>
-            </TableRow>
-          </TableHead>
-          <TableBody>
-            {filteredCompanies.map((company) => (
-              <TableRow key={company.id}>
-                <TableCell>{company.name_companies}</TableCell>
-                <TableCell>
-                  {getPasswordByMode(company) === 'NOTACCES' ? (
-                    'NOTACCES'
-                  ) : passwordMode === 'mobile' ? (
-                    <Typography variant="body2">
-                      Установлен. Для передачи дилеру перевыпустите пароль.
-                    </Typography>
-                  ) : (
-                    <Typography variant="body1">
-                      {getPasswordByMode(company)}
-                    </Typography>
-                  )}
-                </TableCell>
-                {renderTableCellActions(company)}
-              </TableRow>
-            ))}
-          </TableBody>
+          {passwordMode === 'staff' ? (
+            <>
+              <TableHead>
+                <TableRow>
+                  <TableCell>Сотрудник</TableCell>
+                  <TableCell>Логин</TableCell>
+                  <TableCell>Роль</TableCell>
+                  <TableCell>Доступ в приложение</TableCell>
+                  <TableCell>Действия</TableCell>
+                </TableRow>
+              </TableHead>
+              <TableBody>
+                {filteredEmployees.map((employee) => (
+                  <TableRow key={employee.id}>
+                    <TableCell>{buildEmployeeName(employee)}</TableCell>
+                    <TableCell>{employee.username}</TableCell>
+                    <TableCell>{employee.role_name || '—'}</TableCell>
+                    <TableCell>
+                      {employee.mobile_staff_access === 'NOTACCES' ? (
+                        'NOTACCES'
+                      ) : (
+                        <Typography variant="body2">
+                          Установлен. Для передачи сотруднику перевыпустите пароль.
+                        </Typography>
+                      )}
+                    </TableCell>
+                    {renderStaffActions(employee)}
+                  </TableRow>
+                ))}
+              </TableBody>
+            </>
+          ) : (
+            <>
+              <TableHead>
+                <TableRow>
+                  <TableCell>Название компании</TableCell>
+                  <TableCell>
+                    {passwordMode === 'telegram'
+                      ? 'Пароль Telegram'
+                      : 'Пароль мобильного приложения'}
+                  </TableCell>
+                  <TableCell>Действия</TableCell>
+                </TableRow>
+              </TableHead>
+              <TableBody>
+                {filteredCompanies.map((company) => (
+                  <TableRow key={company.id}>
+                    <TableCell>{company.name_companies}</TableCell>
+                    <TableCell>
+                      {getPasswordByMode(company) === 'NOTACCES' ? (
+                        'NOTACCES'
+                      ) : passwordMode === 'mobile' ? (
+                        <Typography variant="body2">
+                          Установлен. Для передачи дилеру перевыпустите пароль.
+                        </Typography>
+                      ) : (
+                        <Typography variant="body1">{getPasswordByMode(company)}</Typography>
+                      )}
+                    </TableCell>
+                    {renderCompanyActions(company)}
+                  </TableRow>
+                ))}
+              </TableBody>
+            </>
+          )}
         </Table>
       </TableContainer>
       <ToastContainer />
@@ -249,21 +366,27 @@ const CompanyPassword = () => {
         onClose={() =>
           setIssuedPasswordModal({
             open: false,
-            companyName: '',
+            entityLabel: '',
             password: '',
+            isStaff: false,
           })
         }
         maxWidth="sm"
         fullWidth
       >
-        <DialogTitle>Новый пароль для мобильного приложения</DialogTitle>
+        <DialogTitle>
+          {issuedPasswordModal.isStaff
+            ? 'Новый пароль для ПОЗ-сотрудники'
+            : 'Новый пароль для мобильного приложения'}
+        </DialogTitle>
         <DialogContent>
           <Typography variant="body1" sx={{ mb: 2 }}>
-            Компания: {issuedPasswordModal.companyName}
+            {issuedPasswordModal.isStaff ? 'Сотрудник' : 'Компания'}:{' '}
+            {issuedPasswordModal.entityLabel}
           </Typography>
           <Typography variant="body2" sx={{ mb: 1 }}>
-            Сохраните и передайте пароль дилеру. После закрытия окна он больше не
-            будет отображаться в CRM.
+            Сохраните и передайте пароль. После закрытия окна он больше не будет отображаться в
+            CRM.
           </Typography>
           <Typography variant="h6">{issuedPasswordModal.password}</Typography>
         </DialogContent>
@@ -275,8 +398,9 @@ const CompanyPassword = () => {
             onClick={() =>
               setIssuedPasswordModal({
                 open: false,
-                companyName: '',
+                entityLabel: '',
                 password: '',
+                isStaff: false,
               })
             }
           >
@@ -289,7 +413,7 @@ const CompanyPassword = () => {
         onClose={() => setDialogOpen(false)}
         onConfirm={confirmDelete}
         title="Подтверждение удаления пароля"
-        message={`Вы уверены, что хотите удалить пароль для компании "${selectedCompanyName}"?`} // Используем имя компании
+        message={`Вы уверены, что хотите удалить пароль для "${selectedEntityName}"?`}
         btn1="Отмена"
         btn2="Удалить"
       />

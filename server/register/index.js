@@ -150,6 +150,8 @@ const {
   deleteTag,
   createTag,
   getTags,
+  getUsersMobileStaffAccess,
+  updateMobileStaffPassword,
 } = require('./userController/userController')
 
 const {
@@ -397,6 +399,8 @@ app.get('/api/server-time', (req, res) => {
 
 /*************Маршруты для работы с СОТРУДНИКАМИ**************/
 app.get('/api/users', getUsers(dbPool))
+app.get('/api/users/mobile-staff-access', getUsersMobileStaffAccess(dbPool))
+app.put('/api/users/mobile-staff-password/:id', updateMobileStaffPassword(dbPool))
 app.get('/api/users/absences/active', getActiveUserAbsences(dbPool))
 app.get('/api/users/absences/upcoming', getUpcomingUserAbsences(dbPool))
 app.get('/api/users/:userId/workload-summary', getUserWorkloadSummary(dbPool))

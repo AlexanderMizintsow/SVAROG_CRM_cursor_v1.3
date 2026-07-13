@@ -30,6 +30,8 @@ const NavBar = () => {
   const { user } = useUserStore()
   const { isConnected, currentCall } = useCallNotifications()
   const roleAdministrator = user?.role_name === 'Администратор' ? true : false
+  const roleAdminOrDirector =
+    user && ['Администратор', 'Директор'].includes(user?.role_name)
   const roleConfirm =
     user && ['Администратор', 'Директор', 'Руководитель отдела'].includes(user?.role_name)
 
@@ -114,11 +116,15 @@ const NavBar = () => {
       icon: FaUserFriends,
       link: '/suppliers',
     },
-    {
-      name: 'Управление доступом дилеров',
-      icon: PiTelegramLogoLight,
-      link: '/password-company',
-    },
+    ...(roleAdminOrDirector
+      ? [
+          {
+            name: 'Управление доступом',
+            icon: PiTelegramLogoLight,
+            link: '/password-company',
+          },
+        ]
+      : []),
     {
       name: 'Автоматизация маркетинга',
       icon: MdCampaign,

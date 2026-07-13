@@ -47,12 +47,14 @@ function App() {
   const [isConnectBD, setIsConnectBD] = useState(null);
   const { fetchTasksManager } = useTasksManageStore();
   const roleAdministrator = user?.role_name === "Администратор" ? true : false;
+  const roleAdminOrDirector =
+    user && ["Администратор", "Директор"].includes(user?.role_name);
   const bgSeason = getSeasonBackground();
   const electronAPI = window.electronAPI || null;
 
   const router = useMemo(
-    () => createRouter(bgSeason, roleAdministrator, isConnectBD),
-    [bgSeason, roleAdministrator, isConnectBD]
+    () => createRouter(bgSeason, roleAdministrator, roleAdminOrDirector, isConnectBD),
+    [bgSeason, roleAdministrator, roleAdminOrDirector, isConnectBD]
   );
 
   const userData = JSON.parse(localStorage.getItem("userData"));

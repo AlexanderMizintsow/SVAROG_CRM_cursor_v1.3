@@ -31,7 +31,7 @@ import BusinessProcesses from '../routes/businessProcesses/BusinessProcesses.jsx
 import ProcessMonitoring from '../routes/statistics/ProcessMonitoring.jsx'
 import MobileAppNewsManagement from '../routes/adminMenu/mobileAppNews/MobileAppNewsManagement.jsx'
 
-const routes = (bgSeason, roleAdministrator, isConnectBD) => [
+const routes = (bgSeason, roleAdministrator, roleAdminOrDirector, isConnectBD) => [
   {
     path: '/',
     element: <Layout isConnectBD={isConnectBD} />,
@@ -49,7 +49,10 @@ const routes = (bgSeason, roleAdministrator, isConnectBD) => [
         path: 'permissions-manager',
         element: roleAdministrator ? <PermissionsManager /> : <NotFound />,
       },
-      { path: 'password-company', element: <CompanyPassword /> },
+      {
+        path: 'password-company',
+        element: roleAdminOrDirector ? <CompanyPassword /> : <NotFound />,
+      },
 
       {
         path: 'task-manager',
@@ -148,6 +151,6 @@ const routes = (bgSeason, roleAdministrator, isConnectBD) => [
   },
 ]
 
-export const createRouter = (bgSeason, roleAdministrator, isConnectBD) => {
-  return createBrowserRouter(routes(bgSeason, roleAdministrator, isConnectBD))
+export const createRouter = (bgSeason, roleAdministrator, roleAdminOrDirector, isConnectBD) => {
+  return createBrowserRouter(routes(bgSeason, roleAdministrator, roleAdminOrDirector, isConnectBD))
 }

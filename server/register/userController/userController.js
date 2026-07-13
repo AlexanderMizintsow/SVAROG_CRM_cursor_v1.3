@@ -1,4 +1,7 @@
 const bcrypt = require('bcrypt')
+
+const MOBILE_STAFF_PASSWORD_LOCKED = 'NOTACCES'
+
 const binaryToBase64 = (binaryData) => {
   return Buffer.from(binaryData).toString('base64')
 }
@@ -1023,6 +1026,82 @@ const updateEmailSignature = (dbPool) => async (req, res) => {
   }
 }
 
+const getUsersMobileStaffAccess = (dbPool) => async (req, res) => {
+  try {
+    const result = await dbPool.query(`
+      SELECT
+        u.id,
+        u.username,
+        u.first_name,
+        u.middle_name,
+        u.last_name,
+        u.role_assigned,
+        r.name AS role_name,
+        CASE
+          WHEN u.mobile_staff_password = 'NOTACCES' THEN 'NOTACCES'
+          ELSE 'SET'
+        END AS mobile_staff_access
+      FROM users u
+      LEFT JOIN roles r ON u.role_id = r.id
+      ORDER BY u.last_name NULLS LAST, u.first_name NULLS LAST, u.username
+    `)
+    res.json(result.rows)
+  } catch (err) {
+    console.error('Ошибка при получении списка mobile staff:', err)
+    res.status(500).json({ error: 'Ошибка при получении списка сотрудников' })
+  }
+}
+
+const updateMobileStaffPassword = (dbPool) => async (req, res) => {
+  const targetUserId = req.params.id
+  const { mobile_staff_password, userId } = req.body
+
+  try {
+    const preparedPassword =
+      mobile_staff_password === MOBILE_STAFF_PASSWORD_LOCKED
+        ? MOBILE_STAFF_PASSWORD_LOCKED
+        : await bcrypt.hash(mobile_staff_password, 10)
+
+    const result = await dbPool.query(
+      `UPDATE users
+       SET mobile_staff_password = $1, updated_at = NOW()
+       WHERE id = $2
+       RETURNING id, username, first_name, last_name, middle_name`,
+      [preparedPassword, targetUserId]
+    )
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({ message: 'Сотрудник не найден' })
+    }
+
+    if (mobile_staff_password !== MOBILE_STAFF_PASSWORD_LOCKED && userId) {
+      const action = 'перевыпуск mobile staff пароля'
+      const entityInfo = JSON.stringify({
+        id: result.rows[0].id,
+        username: result.rows[0].username,
+        name: [result.rows[0].last_name, result.rows[0].first_name, result.rows[0].middle_name]
+          .filter(Boolean)
+          .join(' '),
+      })
+      const context = 'компонент пароли сотрудников mobile'
+
+      await dbPool.query(
+        'INSERT INTO user_actions (userId, action, entity_info, context) VALUES ($1, $2, $3, $4)',
+        [userId, action, entityInfo, context]
+      )
+    }
+
+    res.json({
+      id: result.rows[0].id,
+      mobile_staff_access:
+        mobile_staff_password === MOBILE_STAFF_PASSWORD_LOCKED ? 'NOTACCES' : 'SET',
+    })
+  } catch (err) {
+    console.error('Ошибка при обновлении mobile staff пароля:', err)
+    res.status(500).json({ message: 'Ошибка сервера' })
+  }
+}
+
 module.exports = {
   getUsers,
   updateUser,
@@ -1054,4 +1133,6 @@ module.exports = {
   deleteTag,
   createTag,
   getTags,
+  getUsersMobileStaffAccess,
+  updateMobileStaffPassword,
 }
