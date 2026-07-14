@@ -781,9 +781,11 @@ function getUserTasks(dbPool) {
         whereClause = '(tv.user_id = $1 OR t.created_by = $1 OR ua.approver_id = $1)'
       } else if (filter === 'completed_tasks') {
         // Условие для завершенных задач ta.user_id - исполнитеь
+        // cancelled — отмена из-за провала/удаления проекта, не считаем обычным «завершением»
         whereClause = `
           (tv.user_id = $1 OR t.created_by = $1 OR ua.approver_id = $1 OR ta.user_id =  $1) 
-          AND t.is_completed = true`
+          AND t.is_completed = true
+          AND COALESCE(t.status, '') <> 'cancelled'`
       }
 
       // Добавляем условие по is_completed, если оно необходимо
@@ -2006,6 +2008,17 @@ function updateGlobalTaskProcess(dbPool, io) {
           const comment = commentResult.rows[0].comment
           statusHistory += `. Комментарий: ${comment}`
         }
+
+        try {
+          await cancelOpenSubtasksForProject(dbPool, io, {
+            globalTaskId: taskId,
+            projectTitle: result.rows[0]?.title || null,
+            reason: 'Провал',
+            actorUserId: userId,
+          })
+        } catch (cancelErr) {
+          console.error('Ошибка при отмене подзадач при провале проекта:', cancelErr)
+        }
       }
 
       //Если Пауза
@@ -2180,7 +2193,7 @@ function setProjectDeadline(dbPool, io) {
   }
 }
 
-// Мягкое удаление проекта (status = 'Удален'), подзадачи не удаляем
+// Мягкое удаление проекта (status = 'Удален'), незавершённые подзадачи отменяются
 function deleteGlobalTask(dbPool, io) {
   return async function (req, res) {
     const { taskId } = req.params
@@ -2198,9 +2211,21 @@ function deleteGlobalTask(dbPool, io) {
         return res.status(404).json({ error: 'Глобальная задача не найдена' })
       }
 
+      const projectTitle = updateResult.rows[0]?.title || null
+
+      try {
+        await cancelOpenSubtasksForProject(dbPool, io, {
+          globalTaskId: taskId,
+          projectTitle,
+          reason: 'Удален',
+          actorUserId: userId,
+        })
+      } catch (cancelErr) {
+        console.error('Ошибка при отмене подзадач при удалении проекта:', cancelErr)
+      }
+
       await insertTaskHistory(dbPool, taskId, 'удаление', 'Проект удалён', userId, null)
 
-      const projectTitle = updateResult.rows[0]?.title || null
       if (io && participantIds && participantIds.length > 0) {
         emitGlobalTaskChanged(io, participantIds, taskId, 'deleted', { title: projectTitle })
       }
@@ -3680,6 +3705,114 @@ async function insertTaskHistoryForTask(dbPool, taskId, changedBy, changeDescrip
     `INSERT INTO task_history (task_id, changed_by, change_description) VALUES ($1, $2, $3)`,
     [taskId, changedBy, changeDescription]
   )
+}
+
+/**
+ * Закрывает незавершённые подзадачи проекта как cancelled + is_completed
+ * и уведомляет исполнителей (требуется подтверждение «Ок» в баннере).
+ * @param {'Провал'|'Удален'} reason
+ */
+async function cancelOpenSubtasksForProject(dbPool, io, { globalTaskId, projectTitle, reason, actorUserId }) {
+  const reasonLabel =
+    reason === 'Удален' ? 'проект удалён' : 'проект помечен как неудача'
+
+  const openTasksResult = await dbPool.query(
+    `
+    SELECT t.id, t.title
+    FROM tasks t
+    WHERE t.global_task_id = $1
+      AND COALESCE(t.is_completed, false) = false
+      AND COALESCE(t.status, '') <> 'cancelled'
+    `,
+    [globalTaskId]
+  )
+
+  const openTasks = openTasksResult.rows
+  if (!openTasks.length) {
+    return { cancelledCount: 0, assigneeIds: [] }
+  }
+
+  const taskIds = openTasks.map((row) => row.id)
+  const titleById = Object.fromEntries(openTasks.map((row) => [String(row.id), row.title]))
+
+  await dbPool.query(
+    `
+    UPDATE tasks
+    SET status = 'cancelled',
+        is_completed = true,
+        completed_at = CASE WHEN completed_at IS NULL THEN CURRENT_TIMESTAMP ELSE completed_at END
+    WHERE id = ANY($1::int[])
+    `,
+    [taskIds]
+  )
+
+  const historyText = `Задача отменена: ${reasonLabel}`
+  for (const taskId of taskIds) {
+    await insertTaskHistoryForTask(dbPool, taskId, actorUserId || null, historyText)
+    notifyBpeTaskUpdated(Number(taskId))
+  }
+
+  const assigneesResult = await dbPool.query(
+    `
+    SELECT DISTINCT ta.user_id, ta.task_id
+    FROM task_assignments ta
+    WHERE ta.task_id = ANY($1::int[])
+      AND ta.user_id IS NOT NULL
+    `,
+    [taskIds]
+  )
+
+  const assigneeIds = []
+  const seenAssignees = new Set()
+
+  for (const row of assigneesResult.rows) {
+    const userId = row.user_id
+    const taskId = row.task_id
+    const taskTitle = titleById[String(taskId)] || 'Без названия'
+    const projectName = projectTitle || 'Без названия'
+    const message = `Задача «${taskTitle}» отменена: ${reasonLabel}${
+      projectTitle ? ` («${projectName}»)` : ''
+    }. Она больше не отображается среди активных задач.`
+
+    await dbPool.query(
+      `INSERT INTO notifications (user_id, task_id, message, event_type, is_sent)
+       VALUES ($1, $2, $3, 'task_cancelled_by_project', false)`,
+      [userId, taskId, message]
+    )
+
+    if (io) {
+      io.emit('notification', {
+        type: 'task_cancelled_by_project',
+        userId,
+        taskId,
+        title: taskTitle,
+        projectTitle: projectName,
+        reason,
+        message,
+      })
+    }
+
+    if (!seenAssignees.has(String(userId))) {
+      seenAssignees.add(String(userId))
+      assigneeIds.push(userId)
+    }
+  }
+
+  if (io && taskIds.length > 0) {
+    const byUser = await fetchTaskIdsByGlobalId(dbPool, globalTaskId)
+    const cancelledOnly = byUser
+      .map((entry) => ({
+        user_id: entry.user_id,
+        task_ids: (entry.task_ids || []).filter((id) => taskIds.includes(id)),
+      }))
+      .filter((entry) => entry.task_ids.length > 0)
+
+    if (cancelledOnly.length > 0) {
+      io.emit('updateStatusSubTasks', cancelledOnly, 'cancelled')
+    }
+  }
+
+  return { cancelledCount: taskIds.length, assigneeIds }
 }
 
 // Получение всех задач, связанных с конкретной глобальной задачей по global_task_id. Функция внутри сервера без вызова из клиента

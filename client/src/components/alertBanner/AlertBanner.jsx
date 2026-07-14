@@ -571,8 +571,14 @@ const AlertBanner = () => {
     }
 
     try {
-      // 2) Уведомления задач: помечаем прочитанными на сервере и чистим локальный стор
-      const ids = notificationsTask && typeof notificationsTask === 'object' ? Object.keys(notificationsTask) : []
+      // 2) Уведомления задач: помечаем прочитанными, кроме обязательных к подтверждению («Ок»)
+      const ids =
+        notificationsTask && typeof notificationsTask === 'object'
+          ? Object.keys(notificationsTask).filter((id) => {
+              const n = notificationsTask[id]
+              return n?.type !== 'task_cancelled_by_project'
+            })
+          : []
       await Promise.all(
         ids.map(async (id) => {
           try {

@@ -320,6 +320,14 @@ const useWebSocket = (userId, stableSetMessages, currentTaskId) => {
 
           fetchUnreadNotifications(userId)
         }
+
+        // Задача отменена из-за провала/удаления проекта **********************************************************
+        if (notification.type === 'task_cancelled_by_project' && notification.userId === userId) {
+          sendNotification('Задачи/Задача отменена', notification.message)
+          fetchTasks(userId)
+          fetchTasksManager(userId)
+          fetchUnreadNotifications(userId)
+        }
       })
     }
     // Очистка при размонтировании

@@ -68,6 +68,14 @@ const useTaskNotifications = ({ currentUserId }) => {
           statusText: 'Срок исполнения задачи был изменен!',
           showDetails: true,
         },
+        task_cancelled_by_project: {
+          icon: <FaEnvelope color="#ff7043" />,
+          className: 'extension-notification-cancelled-task',
+          statusText: 'Задача отменена — требуется подтверждение',
+          showDetails: true,
+          confirmLabel: 'Ок',
+          requiresAck: true,
+        },
         idea_applied: {
           icon: <FaLightbulb color="#27ae60" />,
           className: 'extension-notification-idea-applied',
@@ -111,7 +119,7 @@ const useTaskNotifications = ({ currentUserId }) => {
                     handleMarkAsRead(id)
                   }}
                 >
-                  Принять
+                  {config.confirmLabel || 'Принять'}
                 </button>
               )}
             </div>
@@ -126,6 +134,7 @@ const useTaskNotifications = ({ currentUserId }) => {
         userId: notification.userId,
         eventType: notification.eventType,
         isRead: notification.isRead,
+        requiresAck: Boolean(config.requiresAck),
       })
     })
   }
