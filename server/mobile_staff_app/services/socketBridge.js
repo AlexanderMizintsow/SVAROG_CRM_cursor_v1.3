@@ -16,6 +16,8 @@ const RELAY_EVENTS = [
   'notification',
   'globalTaskChanged',
   'newMessageGlobalTaskChat',
+  'groupCreated',
+  'participantVotesUpdated',
 ]
 
 /**

@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import axios from 'axios'
+import io from 'socket.io-client'
 import useUserStore from '../../store/userStore'
 import { MdContactSupport } from 'react-icons/md'
 import HelpModalWorkGroup from './HelpModalWorkGroup'
@@ -29,6 +30,14 @@ const AgreedGroup = () => {
     }
 
     fetchFixedGroups()
+
+    const socket = io(`${API_BASE_URL}5000`)
+    socket.on('groupCreated', () => {
+      fetchFixedGroups()
+    })
+    return () => {
+      socket.disconnect()
+    }
   }, [])
 
   if (loading) {
@@ -117,13 +126,14 @@ const AgreedGroup = () => {
     const group = groups.find((g) => g.id === currentGroupId)
     const selectedDateTime = group.selected_date // Сохраняем текущее значение selected_date
 
-    try {
+      try {
       if (actionType === 'complect') {
         await axios.patch(`${API_BASE_URL}5000/api/updateWorkGroup/${currentGroupId}`, {
           selected_date: selectedDateTime,
           start_date: null,
           end_date: null,
           create_type: 'complect',
+          exclude_user_id: user?.id || null,
         })
         console.log(`Группа ${currentGroupId} завершена!`)
       } else if (actionType === 'cancel') {
@@ -132,19 +142,10 @@ const AgreedGroup = () => {
           start_date: null,
           end_date: null,
           create_type: 'cancel',
+          exclude_user_id: user?.id || null,
         })
         console.log(`Собрание группы ${currentGroupId} отменено!`)
       }
-
-      // Отправка уведомлений участникам
-      await axios.post(`${API_BASE_URL}5777/api/create_group_notification`, {
-        participants: [...group.participant_ids, user.id], // Включаем создателя группы
-        groupData: {
-          ...group,
-          selected_date: selectedDateTime,
-          create_type: actionType, // Устанавливаем create_type
-        },
-      })
 
       // Обновляем группы после завершения/отмены
       const updatedResponse = await axios.get(`${API_BASE_URL}5000/api/fixed-groups`)

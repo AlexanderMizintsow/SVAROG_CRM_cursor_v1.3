@@ -165,6 +165,7 @@ const {
   deleteGroup,
   getParticipantVotes,
   getGroupCountsByUserId,
+  notifyWorkGroupStaffHandler,
 } = require('./workGroupsController/workGroupsController')
 
 const {
@@ -469,6 +470,10 @@ app.post('/api/participant_votes', (req, res) => saveParticipantVotes(dbPool, io
 app.get('/api/participant_votes', getParticipantVotes(dbPool))
 
 app.patch('/api/updateWorkGroup/:id', updateWorkGroup(dbPool, io))
+app.post(
+  '/api/work_groups/:id/notify-staff',
+  notifyWorkGroupStaffHandler(dbPool, io)
+)
 
 // Добавьте маршрут для удаления участников
 app.delete(

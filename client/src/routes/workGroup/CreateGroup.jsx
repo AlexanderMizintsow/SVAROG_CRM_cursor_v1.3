@@ -170,11 +170,14 @@ const CreateGroup = () => {
         })
       )
 
-      // Теперь вызываем новый API для отправки уведомлений
-      await axios.post(`${API_BASE_URL}5777/api/create_group_notification`, {
-        participants: [...participants, user.id], // Включаем создателя группы
-        groupData,
-      })
+      // Единый staff-notify (in-app + push), без Telegram
+      await axios.post(
+        `${API_BASE_URL}5000/api/work_groups/${workGroupId}/notify-staff`,
+        {
+          create_type: createType,
+          exclude_user_id: user?.id || null,
+        }
+      )
 
       setGroupName('')
       setParticipants([])

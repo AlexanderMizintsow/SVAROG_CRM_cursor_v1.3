@@ -10,24 +10,53 @@ const { registerStaffPushDevice, notifyStaffUsers } = require('../services/staff
 const listUnread = (pool) => async (req, res) => {
   try {
     const userId = req.user.userId
-    const result = await pool.query(
-      `SELECT
-         n.id,
-         n.user_id,
-         n.task_id,
-         n.message,
-         n.event_type,
-         n.created_at,
-         n.is_read,
-         t.title AS task_title,
-         t.global_task_id AS project_id
-       FROM notifications n
-       LEFT JOIN tasks t ON n.task_id = t.id
-       WHERE n.user_id = $1 AND COALESCE(n.is_read, false) = false
-       ORDER BY n.created_at DESC
-       LIMIT 200`,
-      [userId]
-    )
+    let result
+    try {
+      result = await pool.query(
+        `SELECT
+           n.id,
+           n.user_id,
+           n.task_id,
+           n.work_group_id,
+           n.message,
+           n.event_type,
+           n.created_at,
+           n.is_read,
+           t.title AS task_title,
+           t.global_task_id AS project_id,
+           wg.group_name AS work_group_name
+         FROM notifications n
+         LEFT JOIN tasks t ON n.task_id = t.id
+         LEFT JOIN work_groups wg ON n.work_group_id = wg.id
+         WHERE n.user_id = $1 AND COALESCE(n.is_read, false) = false
+         ORDER BY n.created_at DESC
+         LIMIT 200`,
+        [userId]
+      )
+    } catch (queryError) {
+      // колонка work_group_id ещё не применена — fallback без неё
+      if (!/work_group_id/i.test(queryError.message || '')) throw queryError
+      result = await pool.query(
+        `SELECT
+           n.id,
+           n.user_id,
+           n.task_id,
+           NULL::int AS work_group_id,
+           n.message,
+           n.event_type,
+           n.created_at,
+           n.is_read,
+           t.title AS task_title,
+           t.global_task_id AS project_id,
+           NULL::text AS work_group_name
+         FROM notifications n
+         LEFT JOIN tasks t ON n.task_id = t.id
+         WHERE n.user_id = $1 AND COALESCE(n.is_read, false) = false
+         ORDER BY n.created_at DESC
+         LIMIT 200`,
+        [userId]
+      )
+    }
     return res.json({ notifications: result.rows || [] })
   } catch (error) {
     console.error('[mobile_staff_app][notifications][list]', error)

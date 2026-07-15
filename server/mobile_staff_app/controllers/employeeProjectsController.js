@@ -1,5 +1,12 @@
 const FormData = require('form-data')
 const { registerFetch, REGISTER_URL } = require('../services/registerClient')
+const pool = require('../db/pool')
+const {
+  getProjectMeta,
+  notifyProjectParticipants,
+  safeNotify,
+  uniqueUserIds,
+} = require('../services/staffNotifyHelpers')
 
 const TERMINAL = ['Завершено', 'Провал', 'Удален']
 
@@ -167,8 +174,20 @@ const createProject = () => async (req, res) => {
       },
     })
 
+    const projectId = created?.taskId || created?.id
+    if (projectId) {
+      notifyProjectParticipants(pool, {
+        projectId,
+        excludeUserId: userId,
+        userIds: (responsibles || []).map((r) => Number(r.id)),
+        title: 'Новый проект',
+        body: String(title).trim(),
+        type: 'project_created',
+      })
+    }
+
     return res.status(201).json({
-      projectId: created?.taskId || created?.id,
+      projectId,
       result: created,
     })
   } catch (error) {
@@ -209,12 +228,26 @@ const updateStatus = () => async (req, res) => {
         method: 'DELETE',
         body: { userId },
       })
+      notifyProjectParticipants(pool, {
+        projectId,
+        excludeUserId: userId,
+        title: 'Проект удалён',
+        body: project.title || `Проект #${projectId}`,
+        type: 'project_deleted',
+      })
       return res.json({ result })
     }
 
     const result = await registerFetch(`/api/update/global-tasks/${projectId}/status`, {
       method: 'PUT',
       body: { status, userId },
+    })
+    notifyProjectParticipants(pool, {
+      projectId,
+      excludeUserId: userId,
+      title: 'Статус проекта',
+      body: `${project.title || 'Проект'}: ${status}`,
+      type: 'project_status',
     })
     return res.json({ result })
   } catch (error) {
@@ -234,6 +267,15 @@ const setApproval = () => async (req, res) => {
       method: 'POST',
       body: { status, comment, userId },
     })
+    const meta = await getProjectMeta(pool, projectId).catch(() => null)
+    if (meta?.createdBy) {
+      safeNotify(pool, {
+        userIds: uniqueUserIds([meta.createdBy], userId),
+        title: status === 'approved' || status === true ? 'Проект согласован' : 'Согласование проекта',
+        body: meta.title || `Проект #${projectId}`,
+        data: { type: 'project_approval', projectId: Number(projectId) },
+      })
+    }
     return res.json(result)
   } catch (error) {
     console.error('[mobile_staff_app][projects][approval]', error)
@@ -273,6 +315,14 @@ const sendMessage = () => async (req, res) => {
         title: title || 'Проект',
         repliedToMessageId: repliedToMessageId || null,
       },
+    })
+    const preview = String(text).trim().slice(0, 120)
+    notifyProjectParticipants(pool, {
+      projectId,
+      excludeUserId: userId,
+      title: 'Сообщение в проекте',
+      body: `${title || 'Проект'}: ${preview}`,
+      type: 'project_message',
     })
     return res.status(201).json({ message })
   } catch (error) {
@@ -408,6 +458,13 @@ const updateDescription = () => async (req, res) => {
       method: 'PUT',
       body: { description: description || '' },
     })
+    notifyProjectParticipants(pool, {
+      projectId,
+      excludeUserId: userId,
+      title: 'Обновлено описание проекта',
+      body: (await getProjectMeta(pool, projectId).catch(() => null))?.title || `Проект #${projectId}`,
+      type: 'project_description',
+    })
     return res.json({ result })
   } catch (error) {
     console.error('[mobile_staff_app][projects][description]', error)
@@ -429,6 +486,13 @@ const updateGoals = () => async (req, res) => {
     const result = await registerFetch(`/api/tasks/${projectId}/update-goals`, {
       method: 'PUT',
       body: { goals: cleaned, userId },
+    })
+    notifyProjectParticipants(pool, {
+      projectId,
+      excludeUserId: userId,
+      title: 'Обновлены цели проекта',
+      body: (await getProjectMeta(pool, projectId).catch(() => null))?.title || `Проект #${projectId}`,
+      type: 'project_goals',
     })
     return res.json({ result })
   } catch (error) {
@@ -485,6 +549,16 @@ const addResponsibles = () => async (req, res) => {
         },
       }
     )
+    const meta = await getProjectMeta(pool, projectId).catch(() => null)
+    safeNotify(pool, {
+      userIds: uniqueUserIds(
+        responsibles.map((r) => r.id),
+        userId
+      ),
+      title: 'Вас добавили в проект',
+      body: meta?.title || `Проект #${projectId}`,
+      data: { type: 'project_responsible_added', projectId: Number(projectId) },
+    })
     return res.status(201).json(result)
   } catch (error) {
     console.error('[mobile_staff_app][projects][addResponsibles]', error)
@@ -507,6 +581,13 @@ const removeResponsible = () => async (req, res) => {
         body: { requesterId: userId },
       }
     )
+    const meta = await getProjectMeta(pool, projectId).catch(() => null)
+    safeNotify(pool, {
+      userIds: uniqueUserIds([targetUserId], userId),
+      title: 'Вас исключили из проекта',
+      body: meta?.title || `Проект #${projectId}`,
+      data: { type: 'project_responsible_removed', projectId: Number(projectId) },
+    })
     return res.json(result)
   } catch (error) {
     console.error('[mobile_staff_app][projects][removeResponsible]', error)

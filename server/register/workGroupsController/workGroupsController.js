@@ -1,10 +1,12 @@
 // workGroupsController.js
 
 const { body, validationResult } = require('express-validator')
+const { notifyWorkGroupStaff } = require('./workGroupStaffNotify')
 
 // Функция для обновления информации о группе
 const updateWorkGroup = (dbPool, io) => async (req, res) => {
-  const { selected_date, start_date, end_date, create_type } = req.body
+  const { selected_date, start_date, end_date, create_type, exclude_user_id } =
+    req.body
   const groupId = req.params.id
 
   // Проверка наличия необходимых данных
@@ -19,12 +21,60 @@ const updateWorkGroup = (dbPool, io) => async (req, res) => {
       [selected_date, start_date, end_date, create_type, groupId]
     )
 
+    if (create_type === 'fixed') {
+      try {
+        await dbPool.query(
+          `UPDATE work_groups SET staff_notification_sent = FALSE WHERE id = $1`,
+          [groupId]
+        )
+      } catch (_) {}
+    }
+
     io.emit('groupCreated')
+
+    // Единый notify (веб + мобилка): без Telegram
+    if (['fixed', 'cancel', 'complect'].includes(create_type)) {
+      notifyWorkGroupStaff(dbPool, io, {
+        groupId,
+        createType: create_type,
+        excludeUserId: exclude_user_id || null,
+        groupOverride: { selected_date, create_type },
+      }).catch((err) =>
+        console.warn('[updateWorkGroup] staff notify', err.message)
+      )
+    }
 
     res.status(200).json({ message: 'Информация о группе успешно обновлена.' })
   } catch (err) {
     console.error('Ошибка при обновлении группы:', err)
     res.status(500).json({ error: 'Ошибка при обновлении группы.' })
+  }
+}
+
+/**
+ * Явный notify после создания группы (участники уже добавлены).
+ * Заменяет клиентский вызов Telegram.
+ */
+const notifyWorkGroupStaffHandler = (dbPool, io) => async (req, res) => {
+  const groupId = req.params.id
+  const createType = String(req.body?.create_type || req.body?.createType || '')
+  const excludeUserId =
+    req.body?.exclude_user_id ?? req.body?.excludeUserId ?? null
+
+  if (!createType) {
+    return res.status(400).json({ error: 'create_type обязателен' })
+  }
+
+  try {
+    const result = await notifyWorkGroupStaff(dbPool, io, {
+      groupId,
+      createType,
+      excludeUserId,
+    })
+    return res.status(200).json({ ok: true, ...result })
+  } catch (err) {
+    console.error('[notifyWorkGroupStaffHandler]', err)
+    return res.status(500).json({ error: 'Ошибка уведомлений' })
   }
 }
 
@@ -329,4 +379,5 @@ module.exports = {
   deleteGroup,
   getParticipantVotes,
   getGroupCountsByUserId,
+  notifyWorkGroupStaffHandler,
 }

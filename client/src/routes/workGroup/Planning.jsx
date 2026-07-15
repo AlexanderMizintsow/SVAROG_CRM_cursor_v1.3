@@ -50,8 +50,13 @@ const Planning = () => {
       }
     )
 
+    // Живое обновление списка (голоса / фикс даты с мобилки)
+    socket.on('groupCreated', () => {
+      setDateConfirmed((prev) => !prev)
+    })
+
     return () => {
-      socket.disconnect() // Очистка сокета при размонтировании компонента
+      socket.disconnect()
     }
   }, [])
 
@@ -178,22 +183,7 @@ const Planning = () => {
               start_date: null,
               end_date: null,
               create_type: 'fixed',
-            }
-          )
-
-          // вызываем API для отправки уведомлений
-          await axios.post(
-            `${API_BASE_URL}5777/api/create_group_notification`,
-            {
-              participants: [
-                ...group.participants.map((participant) => participant.id),
-                user.id,
-              ],
-              groupData: {
-                ...group,
-                selected_date: selectedDateTime,
-                create_type: 'fixed',
-              },
+              exclude_user_id: user?.id || null,
             }
           )
 

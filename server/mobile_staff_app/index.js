@@ -7,8 +7,14 @@ const employeeTasksRoutes = require('./routes/employeeTasksRoutes')
 const employeeProjectsRoutes = require('./routes/employeeProjectsRoutes')
 const employeeNotificationsRoutes = require('./routes/employeeNotificationsRoutes')
 const employeeAnalyticsRoutes = require('./routes/employeeAnalyticsRoutes')
+const employeeBadgesRoutes = require('./routes/employeeBadgesRoutes')
+const employeeAbsencesRoutes = require('./routes/employeeAbsencesRoutes')
+const employeeWorkGroupsRoutes = require('./routes/employeeWorkGroupsRoutes')
 const { configureSecurity } = require('./middleware/security')
 const { setupSocketBridge } = require('./services/socketBridge')
+const {
+  startWorkGroupReminderScheduler,
+} = require('./services/workGroupReminderScheduler')
 
 const app = express()
 const httpServer = http.createServer(app)
@@ -49,8 +55,12 @@ app.use('/api/mobile/employee/tasks', employeeTasksRoutes())
 app.use('/api/mobile/employee/projects', employeeProjectsRoutes())
 app.use('/api/mobile/employee/notifications', employeeNotificationsRoutes(pool))
 app.use('/api/mobile/employee/analytics', employeeAnalyticsRoutes())
+app.use('/api/mobile/employee/badges', employeeBadgesRoutes(pool))
+app.use('/api/mobile/employee/absences', employeeAbsencesRoutes())
+app.use('/api/mobile/employee/work-groups', employeeWorkGroupsRoutes(pool))
 
 setupSocketBridge(httpServer)
+startWorkGroupReminderScheduler(pool)
 
 httpServer.listen(port, '0.0.0.0', () => {
   console.log(`mobile_staff_app server started on ${port}`)

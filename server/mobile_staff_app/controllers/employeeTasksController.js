@@ -1,13 +1,17 @@
 const FormData = require('form-data')
 const { registerFetch, REGISTER_URL } = require('../services/registerClient')
 const pool = require('../db/pool')
-const { notifyStaffUsers } = require('../services/staffPushService')
+const {
+  STATUS_LABELS,
+  getTaskMeta,
+  notifyTaskParticipants,
+  safeNotify,
+  uniqueUserIds,
+} = require('../services/staffNotifyHelpers')
 
 /**
- * ПРИ СОЗДАНИИ НОВЫХ СОБЫТИЙ (статус, чат, согласование…):
- * после записи в БД / register вызывайте notifyStaffUsers(pool, { userIds, title, body, data })
- * и убедитесь, что в CRM `notifications` появятся строки для вкладки «Уведомления».
- * См. services/staffPushService.js
+ * ПРИ СОЗДАНИИ НОВЫХ СОБЫТИЙ: после успешной мутации вызывайте
+ * notifyTaskParticipants / notifyProjectParticipants (staffNotifyHelpers).
  */
 
 const formatUserName = (u) => {
@@ -332,20 +336,17 @@ const createTask = () => async (req, res) => {
       },
     }).catch(() => null)
 
-    // Push исполнителю (вкладка Уведомления + Expo). Не ломаем ответ при сбое push.
-    const recipients = [
-      Number(assigneeId),
-      ...(approverIds || []).map(Number),
-      ...(viewerIds || []).map(Number),
-    ].filter((id) => id && id !== Number(userId))
-
-    notifyStaffUsers(pool, {
-      userIds: recipients,
+    notifyTaskParticipants(pool, {
+      taskId,
+      excludeUserId: userId,
+      userIds: [
+        Number(assigneeId),
+        ...(approverIds || []).map(Number),
+        ...(viewerIds || []).map(Number),
+      ],
       title: 'Новая задача',
       body: String(title).trim(),
-      data: { type: 'task_created', taskId },
-    }).catch((err) => {
-      console.warn('[mobile_staff_app][tasks][create][push]', err.message)
+      type: 'task_created',
     })
 
     return res.status(201).json({ taskId, task: created })
@@ -377,6 +378,17 @@ const updateStatus = () => async (req, res) => {
       method: 'PUT',
       body: { status },
     })
+
+    const meta = await getTaskMeta(pool, taskId).catch(() => null)
+    const statusLabel = STATUS_LABELS[status] || status
+    notifyTaskParticipants(pool, {
+      taskId,
+      excludeUserId: userId,
+      title: 'Статус задачи',
+      body: `${meta?.title || 'Задача'}: ${statusLabel}`,
+      type: 'task_status',
+    })
+
     return res.json({ task: updated })
   } catch (error) {
     console.error('[mobile_staff_app][tasks][status]', error)
@@ -400,6 +412,17 @@ const decideTask = () => async (req, res) => {
         body: !isDone && comment ? { comment } : {},
       }
     )
+
+    const meta = await getTaskMeta(pool, taskId).catch(() => null)
+    notifyTaskParticipants(pool, {
+      taskId,
+      excludeUserId: userId,
+      userIds: meta?.assigneeIds || [],
+      title: isDone ? 'Задача принята' : 'Задача возвращена',
+      body: meta?.title || `Задача #${taskId}`,
+      type: isDone ? 'task_decision_accept' : 'task_decision_return',
+    })
+
     return res.json({ result: updated })
   } catch (error) {
     console.error('[mobile_staff_app][tasks][decide]', error)
@@ -446,6 +469,16 @@ const sendMessage = () => async (req, res) => {
         },
       }
     )
+
+    const preview = String(text).trim().slice(0, 120)
+    notifyTaskParticipants(pool, {
+      taskId,
+      excludeUserId: userId,
+      title: 'Сообщение в задаче',
+      body: `${title || 'Задача'}: ${preview}`,
+      type: 'task_message',
+    })
+
     return res.status(201).json({ message })
   } catch (error) {
     console.error('[mobile_staff_app][tasks][sendMessage]', error)
@@ -457,6 +490,7 @@ const sendMessage = () => async (req, res) => {
 
 const updateDescription = () => async (req, res) => {
   try {
+    const userId = req.user.userId
     const taskId = req.params.taskId
     const { description, assigned_user_ids } = req.body || {}
     const updated = await registerFetch(`/api/tasks/editing/description/${taskId}`, {
@@ -465,6 +499,17 @@ const updateDescription = () => async (req, res) => {
         newDescription: description,
         assignedUserIds: assigned_user_ids || [],
       },
+    })
+    const meta = await getTaskMeta(pool, taskId).catch(() => null)
+    notifyTaskParticipants(pool, {
+      taskId,
+      excludeUserId: userId,
+      userIds: assigned_user_ids?.length
+        ? assigned_user_ids
+        : meta?.assigneeIds,
+      title: 'Изменено описание',
+      body: meta?.title || `Задача #${taskId}`,
+      type: 'task_description',
     })
     return res.json({ result: updated })
   } catch (error) {
@@ -489,6 +534,17 @@ const updateDeadline = () => async (req, res) => {
         assigned_user_ids: assigned_user_ids || [],
       },
     })
+    const meta = await getTaskMeta(pool, taskId).catch(() => null)
+    notifyTaskParticipants(pool, {
+      taskId,
+      excludeUserId: userId,
+      userIds: assigned_user_ids?.length
+        ? assigned_user_ids
+        : meta?.assigneeIds,
+      title: 'Изменён срок задачи',
+      body: meta?.title || `Задача #${taskId}`,
+      type: 'task_deadline',
+    })
     return res.json({ result: updated })
   } catch (error) {
     console.error('[mobile_staff_app][tasks][deadline]', error)
@@ -512,6 +568,16 @@ const requestExtension = () => async (req, res) => {
         new_proposed_deadline,
       },
     })
+    const meta = await getTaskMeta(pool, task_id).catch(() => null)
+    const authorId = Number(created_by || meta?.createdBy)
+    if (authorId) {
+      safeNotify(pool, {
+        userIds: uniqueUserIds([authorId], userId),
+        title: 'Запрос продления срока',
+        body: meta?.title || `Задача #${task_id}`,
+        data: { type: 'task_extension_request', taskId: Number(task_id) },
+      })
+    }
     return res.status(201).json(result)
   } catch (error) {
     console.error('[mobile_staff_app][tasks][extension]', error)
@@ -523,11 +589,19 @@ const requestExtension = () => async (req, res) => {
 
 const replaceAssignee = () => async (req, res) => {
   try {
+    const userId = req.user.userId
     const taskId = req.params.taskId
     const { old_user_id, new_user_id } = req.body || {}
     const result = await registerFetch(`/api/tasks/${taskId}/replace-assignee`, {
       method: 'PUT',
       body: { task_id: Number(taskId), old_user_id, new_user_id },
+    })
+    const meta = await getTaskMeta(pool, taskId).catch(() => null)
+    safeNotify(pool, {
+      userIds: uniqueUserIds([new_user_id, old_user_id], userId),
+      title: 'Смена исполнителя',
+      body: meta?.title || `Задача #${taskId}`,
+      data: { type: 'task_assignee_changed', taskId: Number(taskId) },
     })
     return res.json(result)
   } catch (error) {
@@ -641,6 +715,15 @@ const addAttachment = () => async (req, res) => {
       },
     })
 
+    const meta = await getTaskMeta(pool, taskId).catch(() => null)
+    notifyTaskParticipants(pool, {
+      taskId,
+      excludeUserId: userId,
+      title: 'Вложение в задаче',
+      body: `${meta?.title || 'Задача'}: ${file.originalname || 'файл'}`,
+      type: 'task_attachment',
+    })
+
     return res.status(201).json({
       attachment: {
         ...attachment,
@@ -679,6 +762,14 @@ const approveExtension = () => async (req, res) => {
     const userId = req.user.userId
     const { requestId } = req.params
     const { response_comment, new_deadline } = req.body || {}
+
+    const reqRow = await pool
+      .query(
+        `SELECT requester_id, task_id FROM task_deadline_extension_requests WHERE id = $1`,
+        [requestId]
+      )
+      .catch(() => ({ rows: [] }))
+
     const result = await registerFetch(
       `/api/tasks/extension-requests/${requestId}/approve`,
       {
@@ -690,6 +781,17 @@ const approveExtension = () => async (req, res) => {
         },
       }
     )
+
+    const row = reqRow.rows[0]
+    if (row?.requester_id) {
+      const meta = await getTaskMeta(pool, row.task_id).catch(() => null)
+      safeNotify(pool, {
+        userIds: uniqueUserIds([row.requester_id], userId),
+        title: 'Срок продлён',
+        body: meta?.title || `Задача #${row.task_id}`,
+        data: { type: 'task_extension_approved', taskId: Number(row.task_id) },
+      })
+    }
     return res.json(result)
   } catch (error) {
     console.error('[mobile_staff_app][tasks][approveExtension]', error)
@@ -704,6 +806,14 @@ const rejectExtension = () => async (req, res) => {
     const userId = req.user.userId
     const { requestId } = req.params
     const { response_comment } = req.body || {}
+
+    const reqRow = await pool
+      .query(
+        `SELECT requester_id, task_id FROM task_deadline_extension_requests WHERE id = $1`,
+        [requestId]
+      )
+      .catch(() => ({ rows: [] }))
+
     const result = await registerFetch(
       `/api/tasks/extension-requests/${requestId}/reject`,
       {
@@ -714,6 +824,17 @@ const rejectExtension = () => async (req, res) => {
         },
       }
     )
+
+    const row = reqRow.rows[0]
+    if (row?.requester_id) {
+      const meta = await getTaskMeta(pool, row.task_id).catch(() => null)
+      safeNotify(pool, {
+        userIds: uniqueUserIds([row.requester_id], userId),
+        title: 'Продление отклонено',
+        body: meta?.title || `Задача #${row.task_id}`,
+        data: { type: 'task_extension_rejected', taskId: Number(row.task_id) },
+      })
+    }
     return res.json(result)
   } catch (error) {
     console.error('[mobile_staff_app][tasks][rejectExtension]', error)
