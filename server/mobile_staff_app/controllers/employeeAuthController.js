@@ -295,7 +295,16 @@ const refresh = (pool) => async (req, res) => {
       ...meta,
     })
 
-    return res.status(200).json(tokens)
+    return res.status(200).json({
+      accessToken: tokens.accessToken,
+      refreshToken: tokens.refreshToken,
+      user: {
+        id: userResult.rows[0].id,
+        login: userResult.rows[0].username,
+        name: tokens.displayName,
+        roleName: userResult.rows[0].role_name || null,
+      },
+    })
   } catch (error) {
     await writeAuditLog(pool, {
       eventType: 'refresh',

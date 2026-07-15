@@ -2,11 +2,14 @@ const jwt = require('jsonwebtoken')
 
 const authenticateAccessToken = (req, res, next) => {
   const authHeader = req.headers.authorization || ''
-  if (!authHeader.startsWith('Bearer ')) {
-    return res.status(401).json({ message: 'Требуется access token' })
-  }
+  const headerToken = authHeader.startsWith('Bearer ')
+    ? authHeader.slice(7).trim()
+    : ''
+  // Query-токен нужен для открытия вложений через Linking (без Authorization header)
+  const queryToken =
+    typeof req.query.access_token === 'string' ? req.query.access_token.trim() : ''
+  const token = headerToken || queryToken
 
-  const token = authHeader.slice(7).trim()
   if (!token) {
     return res.status(401).json({ message: 'Требуется access token' })
   }

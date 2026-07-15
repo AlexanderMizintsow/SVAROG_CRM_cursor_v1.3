@@ -3,7 +3,10 @@ const http = require('http')
 const express = require('express')
 const pool = require('./db/pool')
 const employeeAuthRoutes = require('./routes/employeeAuthRoutes')
+const employeeTasksRoutes = require('./routes/employeeTasksRoutes')
+const employeeProjectsRoutes = require('./routes/employeeProjectsRoutes')
 const { configureSecurity } = require('./middleware/security')
+const { setupSocketBridge } = require('./services/socketBridge')
 
 const app = express()
 const httpServer = http.createServer(app)
@@ -26,7 +29,7 @@ if (isProduction && process.env.CORS_ORIGIN === '*') {
 }
 
 configureSecurity(app)
-app.use(express.json({ limit: '1mb' }))
+app.use(express.json({ limit: '5mb' }))
 app.set('trust proxy', 1)
 
 app.get('/health', async (req, res) => {
@@ -40,6 +43,10 @@ app.get('/health', async (req, res) => {
 
 app.use('/api/mobile/employee/auth', employeeAuthRoutes(pool))
 app.use('/api/mobile/auth', employeeAuthRoutes(pool))
+app.use('/api/mobile/employee/tasks', employeeTasksRoutes())
+app.use('/api/mobile/employee/projects', employeeProjectsRoutes())
+
+setupSocketBridge(httpServer)
 
 httpServer.listen(port, '0.0.0.0', () => {
   console.log(`mobile_staff_app server started on ${port}`)
