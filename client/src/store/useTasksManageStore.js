@@ -35,6 +35,20 @@ const useTasksManageStore = create((set, get) => ({
             .setApproval(task.task_id, approval.approver_id, approval.is_approved)
         })
       })
+
+      // Баннер «примите решение» хранится в localStorage — если решение уже принято
+      // (в т.ч. с мобилки, пока десктоп был офлайн), снимаем устаревшие записи
+      const pendingDecisionIds = new Set(
+        (Array.isArray(data) ? data : [])
+          .filter((task) => task.status === 'done')
+          .map((task) => String(task.task_id ?? task.id))
+      )
+      const tracker = useTaskStateTracker.getState()
+      Object.keys(tracker.tasks || {}).forEach((taskId) => {
+        if (!pendingDecisionIds.has(String(taskId))) {
+          tracker.removeTask(taskId)
+        }
+      })
     } catch (error) {
       console.error('Ошибка при загрузке задач:', error)
     }

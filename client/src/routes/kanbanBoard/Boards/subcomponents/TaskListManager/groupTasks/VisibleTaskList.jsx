@@ -12,7 +12,11 @@ import {
 import { getChipStyles, getStatusLabel, stripHtmlTags } from '../../taskUtils'
 import { getUserNames } from '../../../../Task/utils/taskUtils'
 import useUserStore from '../../../../../../store/userStore'
+import Attachments from '../../../../Task/subcomponents/Attachments'
 import styles from '../taskListManager.module.scss'
+
+const hasAttachments = (task) =>
+  Array.isArray(task.attachments) && task.attachments.length > 0
 
 const VisibleTaskList = ({ tasks }) => {
   const { users } = useUserStore()
@@ -77,6 +81,18 @@ const VisibleTaskList = ({ tasks }) => {
                           sx={{ ml: 1 }}
                         />
                       </Box>
+                      {hasAttachments(task) && (
+                        <Box mt={1} className={styles.taskCardAttachments}>
+                          <Typography
+                            variant="caption"
+                            color="text.secondary"
+                            sx={{ display: 'block', mb: 0.5 }}
+                          >
+                            Вложения
+                          </Typography>
+                          <Attachments attachments={task.attachments} compact />
+                        </Box>
+                      )}
                     </>
                   }
                 />

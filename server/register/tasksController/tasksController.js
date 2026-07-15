@@ -1124,7 +1124,11 @@ function updateTaskAccept(dbPool, io) {
         )
       }
 
-      io.emit('taskAccept')
+      io.emit('taskAccept', {
+        taskId: Number(taskId),
+        userId: Number(userId),
+        isDone: isDone !== 'false',
+      })
 
       if (globalTaskIdForEmit) {
         const participantIds = await getGlobalTaskParticipantUserIds(dbPool, globalTaskIdForEmit)

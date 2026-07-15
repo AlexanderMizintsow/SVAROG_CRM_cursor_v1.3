@@ -54,6 +54,11 @@ cd email-service
 pm2 start index.js --name "email-service"
 cd ..
 
+cd mobile_staff_app
+pm2 start index.js --name "mobile_staff_app"
+cd ..
+
+
 cd business_process_engine
 pm2 start index.js --name "business_process_engine"
 cd ..

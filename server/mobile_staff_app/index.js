@@ -5,6 +5,8 @@ const pool = require('./db/pool')
 const employeeAuthRoutes = require('./routes/employeeAuthRoutes')
 const employeeTasksRoutes = require('./routes/employeeTasksRoutes')
 const employeeProjectsRoutes = require('./routes/employeeProjectsRoutes')
+const employeeNotificationsRoutes = require('./routes/employeeNotificationsRoutes')
+const employeeAnalyticsRoutes = require('./routes/employeeAnalyticsRoutes')
 const { configureSecurity } = require('./middleware/security')
 const { setupSocketBridge } = require('./services/socketBridge')
 
@@ -45,6 +47,8 @@ app.use('/api/mobile/employee/auth', employeeAuthRoutes(pool))
 app.use('/api/mobile/auth', employeeAuthRoutes(pool))
 app.use('/api/mobile/employee/tasks', employeeTasksRoutes())
 app.use('/api/mobile/employee/projects', employeeProjectsRoutes())
+app.use('/api/mobile/employee/notifications', employeeNotificationsRoutes(pool))
+app.use('/api/mobile/employee/analytics', employeeAnalyticsRoutes())
 
 setupSocketBridge(httpServer)
 

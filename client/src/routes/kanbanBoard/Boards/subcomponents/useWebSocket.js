@@ -137,11 +137,22 @@ const useWebSocket = (userId, stableSetMessages, currentTaskId) => {
         }
       })
 
-      // Слушаем событие 'taskAccept' для завершении задачи
-      socket.current.on('taskAccept', () => {
+      // Слушаем событие 'taskAccept' для завершении / возврате задачи
+      // (в т.ч. когда автор принял решение на мобилке — снимаем баннер на вебе)
+      socket.current.on('taskAccept', (payload) => {
         fetchCompletedTasks(userId)
+        // fetchTasksManager сам сверит tracker.tasks с сервером (на случай офлайна)
         fetchTasksManager(userId)
         fetchTasks(userId)
+
+        const acceptedTaskId = payload?.taskId ?? payload?.id ?? null
+        // Снимаем сразу по payload; сверка в fetchTasksManager — запасной путь
+        if (acceptedTaskId != null) {
+          const tracker = useTaskStateTracker.getState()
+          tracker.removeTask(acceptedTaskId)
+          tracker.removeTask(String(acceptedTaskId))
+          tracker.removeTask(Number(acceptedTaskId))
+        }
       })
 
       // Слушаем событие 'updateDescriptionTasks' обновление описания задачи

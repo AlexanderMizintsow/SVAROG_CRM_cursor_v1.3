@@ -1,5 +1,14 @@
 const FormData = require('form-data')
 const { registerFetch, REGISTER_URL } = require('../services/registerClient')
+const pool = require('../db/pool')
+const { notifyStaffUsers } = require('../services/staffPushService')
+
+/**
+ * ПРИ СОЗДАНИИ НОВЫХ СОБЫТИЙ (статус, чат, согласование…):
+ * после записи в БД / register вызывайте notifyStaffUsers(pool, { userIds, title, body, data })
+ * и убедитесь, что в CRM `notifications` появятся строки для вкладки «Уведомления».
+ * См. services/staffPushService.js
+ */
 
 const formatUserName = (u) => {
   if (!u) return '—'
@@ -322,6 +331,22 @@ const createTask = () => async (req, res) => {
         viewers: (viewerIds || []).map(Number),
       },
     }).catch(() => null)
+
+    // Push исполнителю (вкладка Уведомления + Expo). Не ломаем ответ при сбое push.
+    const recipients = [
+      Number(assigneeId),
+      ...(approverIds || []).map(Number),
+      ...(viewerIds || []).map(Number),
+    ].filter((id) => id && id !== Number(userId))
+
+    notifyStaffUsers(pool, {
+      userIds: recipients,
+      title: 'Новая задача',
+      body: String(title).trim(),
+      data: { type: 'task_created', taskId },
+    }).catch((err) => {
+      console.warn('[mobile_staff_app][tasks][create][push]', err.message)
+    })
 
     return res.status(201).json({ taskId, task: created })
   } catch (error) {
