@@ -139,6 +139,11 @@ const NavBar = () => {
           icon: FaRegMessage,
           link: '/mobile-news-management',
         },
+        {
+          name: 'Управление новостями (сотрудники)',
+          icon: FaRegMessage,
+          link: '/staff-news-management',
+        },
       ],
     },
     {

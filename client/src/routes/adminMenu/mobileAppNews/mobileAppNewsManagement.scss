@@ -519,4 +519,76 @@
     font-size: 16px;
     color: #42506b;
   }
+
+  &__ack-modal {
+    width: min(640px, 94vw);
+  }
+
+  &__ack-report {
+    h2 {
+      margin: 0 0 6px;
+      font-size: 22px;
+    }
+  }
+
+  &__ack-title {
+    margin: 0 0 12px;
+    color: #5e6472;
+    font-size: 14px;
+  }
+
+  &__ack-summary {
+    margin-bottom: 12px;
+    padding: 10px 12px;
+    border-radius: 8px;
+    background: #f4f7fb;
+    border: 1px solid #e1e7f0;
+    font-size: 14px;
+  }
+
+  &__ack-tabs {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 10px;
+    button {
+      border: 1px solid #d4dae6;
+      background: #fff;
+      border-radius: 8px;
+      padding: 7px 12px;
+      cursor: pointer;
+      font-size: 13px;
+      &.active {
+        border-color: #0b63c5;
+        background: #eef6ff;
+        color: #0b63c5;
+        font-weight: 600;
+      }
+    }
+  }
+
+  &__ack-list {
+    margin-top: 10px;
+    max-height: 48vh;
+    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+
+  &__ack-item {
+    display: flex;
+    justify-content: space-between;
+    gap: 12px;
+    align-items: flex-start;
+    padding: 10px 12px;
+    border: 1px solid #e5e9f1;
+    border-radius: 8px;
+    background: #fff;
+  }
+
+  &__ack-pending {
+    color: #b45309;
+    font-size: 12px;
+    white-space: nowrap;
+  }
 }

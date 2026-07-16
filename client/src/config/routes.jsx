@@ -30,6 +30,7 @@ import MarketingAutomation from '../routes/adminMenu/marketingAutomation/Marketi
 import BusinessProcesses from '../routes/businessProcesses/BusinessProcesses.jsx'
 import ProcessMonitoring from '../routes/statistics/ProcessMonitoring.jsx'
 import MobileAppNewsManagement from '../routes/adminMenu/mobileAppNews/MobileAppNewsManagement.jsx'
+import StaffNewsManagement from '../routes/adminMenu/staffNews/StaffNewsManagement.jsx'
 
 const routes = (bgSeason, roleAdministrator, roleAdminOrDirector, isConnectBD) => [
   {
@@ -122,6 +123,7 @@ const routes = (bgSeason, roleAdministrator, roleAdminOrDirector, isConnectBD) =
       { path: 'editor-handle', element: <EditorHandle /> },
       { path: 'marketing-automation', element: <MarketingAutomation /> },
       { path: 'mobile-news-management', element: <MobileAppNewsManagement /> },
+      { path: 'staff-news-management', element: <StaffNewsManagement /> },
       { path: 'process-monitoring', element: <ProcessMonitoring /> },
 
       // ***

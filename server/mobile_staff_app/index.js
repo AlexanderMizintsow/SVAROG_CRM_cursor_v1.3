@@ -10,6 +10,9 @@ const employeeAnalyticsRoutes = require('./routes/employeeAnalyticsRoutes')
 const employeeBadgesRoutes = require('./routes/employeeBadgesRoutes')
 const employeeAbsencesRoutes = require('./routes/employeeAbsencesRoutes')
 const employeeWorkGroupsRoutes = require('./routes/employeeWorkGroupsRoutes')
+const staffNewsAdminRoutes = require('./routes/staffNewsAdminRoutes')
+const staffNewsFeedRoutes = require('./routes/staffNewsFeedRoutes')
+const path = require('path')
 const { configureSecurity } = require('./middleware/security')
 const { setupSocketBridge } = require('./services/socketBridge')
 const {
@@ -40,6 +43,11 @@ configureSecurity(app)
 app.use(express.json({ limit: '5mb' }))
 app.set('trust proxy', 1)
 
+app.use(
+  '/uploads/staff_news',
+  express.static(path.join(__dirname, '..', '..', 'uploads', 'staff_news'))
+)
+
 app.get('/health', async (req, res) => {
   try {
     await pool.query('SELECT 1')
@@ -58,6 +66,8 @@ app.use('/api/mobile/employee/analytics', employeeAnalyticsRoutes())
 app.use('/api/mobile/employee/badges', employeeBadgesRoutes(pool))
 app.use('/api/mobile/employee/absences', employeeAbsencesRoutes())
 app.use('/api/mobile/employee/work-groups', employeeWorkGroupsRoutes(pool))
+app.use('/api/mobile/employee/news-admin', staffNewsAdminRoutes(pool))
+app.use('/api/mobile/employee/news', staffNewsFeedRoutes(pool))
 
 setupSocketBridge(httpServer)
 startWorkGroupReminderScheduler(pool)
