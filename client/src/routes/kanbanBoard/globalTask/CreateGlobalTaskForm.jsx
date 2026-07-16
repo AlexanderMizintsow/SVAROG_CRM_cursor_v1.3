@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef, useCallback } from 'react'
 import axios from 'axios'
 import { API_BASE_URL } from '../../../../config'
 import { FaPlus, FaTrashAlt, FaUserPlus } from 'react-icons/fa'
@@ -13,7 +13,14 @@ import {
   resolveUserSelection,
   getAbsenceLabel,
   showAbsenceMessage,
+  getAbsenceChoicesAtSave,
+  getAbsenceEndDate,
+  isDeadlineAfterAbsence,
+  normalizeDateOnly,
+  refreshAbsenceMetaNotes,
+  applyAbsenceDecisionsToResponsibles,
 } from '../../../utils/userAbsenceUtils'
+import AbsenceAssigneeChoiceModal from '../../../components/absenceAssigneeChoice/AbsenceAssigneeChoiceModal'
 import './styles/CreateGlobalTaskForm.scss'
 
 // Значение для input type="datetime-local": YYYY-MM-DDTHH:mm в локальной зоне
@@ -23,6 +30,14 @@ const toDateTimeLocalValue = (deadline) => {
   if (Number.isNaN(d.getTime())) return ''
   const pad = (n) => String(n).padStart(2, '0')
   return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`
+}
+
+const formatDateRuLocal = (dateStr) => {
+  const normalized = normalizeDateOnly(dateStr)
+  if (!normalized) return ''
+  const parts = normalized.split('-')
+  if (parts.length !== 3) return normalized
+  return `${parts[2]}.${parts[1]}.${parts[0]}`
 }
 
 const CreateGlobalTaskForm = ({ onSave, onCancel, initialData }) => {
@@ -36,7 +51,7 @@ const CreateGlobalTaskForm = ({ onSave, onCancel, initialData }) => {
     deadline: null,
     priority: 'medium',
     additionalInfo: {},
-    responsibles: [], // Массив для выбранных ответственных
+    responsibles: [],
   })
 
   const [additionalInfoFields, setAdditionalInfoFields] = useState([
@@ -45,6 +60,10 @@ const CreateGlobalTaskForm = ({ onSave, onCancel, initialData }) => {
 
   const [loadingUsers, setLoadingUsers] = useState(true)
   const [initialDataApplied, setInitialDataApplied] = useState(false)
+  const [absenceMeta, setAbsenceMeta] = useState([])
+  const [choiceQueue, setChoiceQueue] = useState([])
+  const [currentChoice, setCurrentChoice] = useState(null)
+  const choiceDecisionsRef = useRef({})
   const { absencesMap } = useActiveAbsences(true)
 
   useEffect(() => {
@@ -186,7 +205,9 @@ const CreateGlobalTaskForm = ({ onSave, onCancel, initialData }) => {
   })
 
   const handleResponsibleSelect = (userId) => {
-    const resolution = resolveUserSelection(userId, absencesMap, users)
+    const resolution = resolveUserSelection(userId, absencesMap, users, {
+      deadline: formData.deadline || null,
+    })
 
     if (resolution.message) {
       showAbsenceMessage(resolution.message, resolution.blocked)
@@ -198,7 +219,10 @@ const CreateGlobalTaskForm = ({ onSave, onCancel, initialData }) => {
     if (!selectedUser) return
 
     if (formData.responsibles.find((resp) => Number(resp.id) === Number(selectedUser.id))) {
-      showAbsenceMessage('Участник уже добавлен в проект', true)
+      showAbsenceMessage(
+        resolution.substituted ? 'Замещающий уже добавлен в проект' : 'Участник уже добавлен в проект',
+        true
+      )
       return
     }
 
@@ -206,6 +230,26 @@ const CreateGlobalTaskForm = ({ onSave, onCancel, initialData }) => {
     setFormData({
       ...formData,
       responsibles: [...formData.responsibles, newResponsible],
+    })
+
+    const absence = absencesMap[Number(resolution.originalId)]
+    setAbsenceMeta((prev) => {
+      const next = (prev || []).filter(
+        (entry) => String(entry.effectiveId) !== String(resolution.effectiveId)
+      )
+      if (resolution.substituted || resolution.needsSkipSubstitution || resolution.note) {
+        next.push({
+          roleKey: 'responsibles',
+          effectiveId: String(resolution.effectiveId),
+          originalId: String(resolution.originalId),
+          substituted: Boolean(resolution.substituted),
+          needsSkipSubstitution: Boolean(resolution.needsSkipSubstitution),
+          choiceAtSavePossible: Boolean(resolution.choiceAtSavePossible),
+          note: resolution.note || null,
+          absence: absence || null,
+        })
+      }
+      return next
     })
   }
 
@@ -228,12 +272,93 @@ const CreateGlobalTaskForm = ({ onSave, onCancel, initialData }) => {
       (resp) => resp.id !== userId
     )
     setFormData({ ...formData, responsibles: newResponsibles })
+    setAbsenceMeta((prev) =>
+      (prev || []).filter((entry) => String(entry.effectiveId) !== String(userId))
+    )
   }
+
+  useEffect(() => {
+    setAbsenceMeta((prev) => refreshAbsenceMetaNotes(prev, formData.deadline, users))
+  }, [formData.deadline, users])
+
+  const notesByEffectiveId = (() => {
+    const map = {}
+    ;(absenceMeta || []).forEach((entry) => {
+      map[String(entry.effectiveId)] = entry.note || null
+    })
+    return map
+  })()
+
+  const finalizeSave = useCallback(
+    (decisions = {}) => {
+      const responsibles = applyAbsenceDecisionsToResponsibles(
+        formData.responsibles,
+        absenceMeta,
+        decisions,
+        users
+      )
+      onSave({ ...formData, responsibles, attachmentsFiles })
+    },
+    [formData, absenceMeta, users, attachmentsFiles, onSave]
+  )
 
   const handleSubmit = (e) => {
     e.preventDefault()
-    console.log('Отправляемые данные:', formData)
-    onSave({ ...formData, attachmentsFiles })
+
+    if (!formData.responsibles.length) {
+      showAbsenceMessage('Необходимо указать хотя бы одного ответственного', true)
+      return
+    }
+
+    const invalidSkip = (absenceMeta || []).find(
+      (entry) =>
+        entry.needsSkipSubstitution &&
+        entry.absence &&
+        !isDeadlineAfterAbsence(formData.deadline, entry.absence)
+    )
+    if (invalidSkip) {
+      const endDay = getAbsenceEndDate(invalidSkip.absence)
+      showAbsenceMessage(
+        endDay
+          ? `Срок проекта должен быть после ${formatDateRuLocal(endDay)}, либо удалите отсутствующего сотрудника без замещающего.`
+          : 'Измените срок проекта или удалите отсутствующего сотрудника без замещающего.',
+        true
+      )
+      return
+    }
+
+    const choices = getAbsenceChoicesAtSave(absenceMeta, formData.deadline)
+    if (choices.length > 0) {
+      choiceDecisionsRef.current = {}
+      setChoiceQueue(choices)
+      setCurrentChoice(choices[0])
+      return
+    }
+
+    finalizeSave({})
+  }
+
+  const finishAbsenceChoice = (decision) => {
+    if (!currentChoice) return
+    choiceDecisionsRef.current = {
+      ...choiceDecisionsRef.current,
+      [String(currentChoice.effectiveId)]: decision,
+    }
+    const rest = choiceQueue.slice(1)
+    if (rest.length > 0) {
+      setChoiceQueue(rest)
+      setCurrentChoice(rest[0])
+      return
+    }
+    setChoiceQueue([])
+    setCurrentChoice(null)
+    finalizeSave(choiceDecisionsRef.current)
+  }
+
+  const cancelAbsenceChoice = () => {
+    setChoiceQueue([])
+    setCurrentChoice(null)
+    choiceDecisionsRef.current = {}
   }
 
   return (
@@ -241,7 +366,6 @@ const CreateGlobalTaskForm = ({ onSave, onCancel, initialData }) => {
       <div className="create-global-task-form">
         <div className="create-global-task-form__header">
           <h2 className="create-global-task-form__title">Создать проект</h2>
-          {/* Если есть кнопка закрытия в шапке, добавьте ее здесь */}
           {
             <button
               type="button"
@@ -462,6 +586,11 @@ const CreateGlobalTaskForm = ({ onSave, onCancel, initialData }) => {
                     <div className="create-global-task-form__responsible-name">
                       {nameDisplay}
                     </div>
+                    {notesByEffectiveId[String(resp.id)] ? (
+                      <div className="create-global-task-form__absence-note">
+                        {notesByEffectiveId[String(resp.id)]}
+                      </div>
+                    ) : null}
                     {/* Выбор роли для ответственного */}
                     <select
                       className="create-global-task-form__responsible-role-select"
@@ -557,6 +686,17 @@ const CreateGlobalTaskForm = ({ onSave, onCancel, initialData }) => {
           </div>
         </form>
       </div>
+      <AbsenceAssigneeChoiceModal
+        open={Boolean(currentChoice)}
+        entry={currentChoice}
+        users={users}
+        deadline={formData.deadline}
+        appointmentLabel="участника проекта"
+        deadlineCaption="Срок проекта"
+        onKeepSubstitute={() => finishAbsenceChoice('substitute')}
+        onAssignOriginal={() => finishAbsenceChoice('original')}
+        onCancel={cancelAbsenceChoice}
+      />
     </div>
   )
 }

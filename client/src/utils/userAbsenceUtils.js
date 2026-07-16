@@ -70,35 +70,107 @@ export function formatAbsencePeriod(absence) {
   return 'не указан'
 }
 
+/** Последний день отсутствия (YYYY-MM-DD) или null */
+export function getAbsenceEndDate(absence) {
+  if (!absence) return null
+  const end = normalizeDateOnly(absence.end_date)
+  if (end) return end
+  if (Array.isArray(absence.specific_dates) && absence.specific_dates.length > 0) {
+    const dates = absence.specific_dates.map(normalizeDateOnly).filter(Boolean).sort()
+    return dates.length ? dates[dates.length - 1] : null
+  }
+  return null
+}
+
+/** Дедлайн задачи позже последнего дня отсутствия */
+export function isDeadlineAfterAbsence(deadline, absence) {
+  const deadlineDay = normalizeDateOnly(deadline)
+  const endDay = getAbsenceEndDate(absence)
+  if (!deadlineDay || !endDay) return false
+  return deadlineDay > endDay
+}
+
+/**
+ * Календарные дни от дня после выхода до дедлайна включительно.
+ * Пример: выход 25-го, дедлайн 27-го → 2.
+ */
+export function daysAvailableAfterReturn(deadline, absence) {
+  const deadlineDay = normalizeDateOnly(deadline)
+  const endDay = getAbsenceEndDate(absence)
+  if (!deadlineDay || !endDay || deadlineDay <= endDay) return null
+  const start = new Date(`${endDay}T00:00:00`)
+  const end = new Date(`${deadlineDay}T00:00:00`)
+  const diffMs = end.getTime() - start.getTime()
+  return Math.round(diffMs / (24 * 60 * 60 * 1000))
+}
+
+function buildOkResult(partial) {
+  return {
+    effectiveId: null,
+    added: false,
+    blocked: false,
+    substituted: false,
+    message: null,
+    note: null,
+    originalId: null,
+    needsSkipSubstitution: false,
+    choiceAtSavePossible: false,
+    daysAfterReturn: null,
+    ...partial,
+  }
+}
+
 /**
  * Определяет, кого добавить вместо выбранного пользователя.
- * @returns {{ effectiveId, added, blocked, substituted, message }}
+ * @param {object} [options]
+ * @param {string|Date|null} [options.deadline] — срок задачи (для допуска отсутствующего после выхода)
+ * @returns {{ effectiveId, added, blocked, substituted, message, note, originalId, needsSkipSubstitution, choiceAtSavePossible, daysAfterReturn }}
  */
-export function resolveUserSelection(userId, absencesMap, users) {
+export function resolveUserSelection(userId, absencesMap, users, options = {}) {
   const id = Number(userId)
-  const absence = absencesMap[id]
+  const absence = absencesMap?.[id]
+  const deadline = options.deadline || null
 
   if (!absence) {
-    return { effectiveId: id, added: true, blocked: false, substituted: false, message: null }
+    return buildOkResult({
+      effectiveId: id,
+      added: true,
+      originalId: id,
+    })
   }
 
-  const user = users.find((u) => Number(u.id) === id)
+  const user = (users || []).find((u) => Number(u.id) === id)
   const userName = formatUserFullName(user) || `ID ${id}`
   const period = formatAbsencePeriod(absence)
   const statusLabel = absence.status || 'отсутствует'
+  const endDay = getAbsenceEndDate(absence)
+  const endLabel = endDay ? formatDateRu(endDay) : null
+  const afterLeave = isDeadlineAfterAbsence(deadline, absence)
+  const days = afterLeave ? daysAvailableAfterReturn(deadline, absence) : null
 
   if (!absence.substitute_user_id) {
-    return {
-      effectiveId: null,
-      added: false,
-      blocked: true,
-      substituted: false,
-      message: `${userName} — ${statusLabel} (${period}). Замещающий не назначен.`,
+    if (afterLeave) {
+      return buildOkResult({
+        effectiveId: id,
+        added: true,
+        originalId: id,
+        needsSkipSubstitution: true,
+        daysAfterReturn: days,
+        message: `${userName} — ${statusLabel} (${period}). Замещающий не назначен. Срок после выхода — сотрудник добавлен. На выполнение после отпуска остаётся ${days} дн.`,
+        note: `Отсутствует до ${endLabel}. После отпуска на выполнение: ${days} дн.`,
+      })
     }
+    return buildOkResult({
+      blocked: true,
+      originalId: id,
+      message: endLabel
+        ? `${userName} — ${statusLabel} (${period}). Замещающий не назначен. Укажите срок после ${endLabel}, чтобы назначить этого сотрудника.`
+        : `${userName} — ${statusLabel} (${period}). Замещающий не назначен.`,
+    })
   }
 
   const substituteId = Number(absence.substitute_user_id)
-  const substitute = users.find((u) => Number(u.id) === substituteId)
+  const substitute = (users || []).find((u) => Number(u.id) === substituteId)
   const subName =
     formatUserFullName(substitute) ||
     formatUserFullName({
@@ -109,28 +181,144 @@ export function resolveUserSelection(userId, absencesMap, users) {
     `ID ${substituteId}`
 
   if (absencesMap[substituteId]) {
-    return {
-      effectiveId: null,
-      added: false,
-      blocked: true,
-      substituted: false,
-      message: `${userName} — ${statusLabel} (${period}). Замещающий ${subName} тоже отсутствует.`,
+    if (afterLeave) {
+      return buildOkResult({
+        effectiveId: id,
+        added: true,
+        originalId: id,
+        needsSkipSubstitution: true,
+        daysAfterReturn: days,
+        message: `${userName} — ${statusLabel} (${period}). Замещающий ${subName} тоже отсутствует. Срок после выхода — добавлен ${userName}. На выполнение после отпуска: ${days} дн.`,
+        note: `Замещающий недоступен. После отпуска на выполнение: ${days} дн.`,
+      })
     }
+    return buildOkResult({
+      blocked: true,
+      originalId: id,
+      message: `${userName} — ${statusLabel} (${period}). Замещающий ${subName} тоже отсутствует.`,
+    })
   }
 
-  return {
+  const choiceHint = endLabel
+    ? afterLeave
+      ? ` При сохранении можно выбрать ${userName} (срок после выхода, на выполнение ~${days} дн.).`
+      : ` Если укажете срок после ${endLabel}, при сохранении можно будет назначить ${userName}.`
+    : ''
+
+  return buildOkResult({
     effectiveId: substituteId,
     added: true,
-    blocked: false,
     substituted: true,
-    message: `${userName} — ${statusLabel} (${period}). Замещает: ${subName} (добавлен автоматически).`,
-  }
+    originalId: id,
+    choiceAtSavePossible: Boolean(endLabel),
+    daysAfterReturn: days,
+    message: `${userName} — ${statusLabel} (${period}). Замещает: ${subName} (добавлен в поле).${choiceHint}`,
+    note: afterLeave
+      ? `Замещает ${userName} (до ${endLabel}). При сохранении возможен выбор ${userName} (~${days} дн. после отпуска).`
+      : endLabel
+        ? `Замещает ${userName} (до ${endLabel}). При сроке после ${endLabel} при сохранении возможен выбор ${userName}.`
+        : `Замещает ${userName}.`,
+  })
 }
 
 export function getAbsenceLabel(absence) {
   if (!absence) return ''
   const period = formatAbsencePeriod(absence)
   return `${absence.status} (${period})`
+}
+
+/**
+ * Записи замещения, по которым при сохранении нужен выбор «замещающий / исходный».
+ * @param {Array} absenceMeta
+ * @param {string|Date|null} deadline
+ */
+export function getAbsenceChoicesAtSave(absenceMeta, deadline) {
+  if (!Array.isArray(absenceMeta) || !absenceMeta.length) return []
+  return absenceMeta.filter((entry) => {
+    if (!entry?.substituted || !entry.originalId || !entry.effectiveId) return false
+    if (String(entry.originalId) === String(entry.effectiveId)) return false
+    return isDeadlineAfterAbsence(deadline, entry.absence)
+  })
+}
+
+/** Обновляет тексты пометок при смене дедлайна */
+export function refreshAbsenceMetaNotes(absenceMeta, deadline, users = []) {
+  return (absenceMeta || []).map((entry) => {
+    if (!entry?.absence) return entry
+    const after = isDeadlineAfterAbsence(deadline, entry.absence)
+    const days = after ? daysAvailableAfterReturn(deadline, entry.absence) : null
+    const endDay = getAbsenceEndDate(entry.absence)
+    const endLabel = endDay ? formatDateRu(endDay) : null
+    const originalUser = users.find((u) => String(u.id) === String(entry.originalId))
+    const originalName = formatUserFullName(originalUser) || `ID ${entry.originalId}`
+
+    if (entry.substituted) {
+      return {
+        ...entry,
+        note: after
+          ? `Замещает ${originalName} (до ${endLabel}). При сохранении возможен выбор ${originalName} (~${days} дн. после отпуска).`
+          : endLabel
+            ? `Замещает ${originalName} (до ${endLabel}). При сроке после ${endLabel} при сохранении возможен выбор ${originalName}.`
+            : entry.note,
+      }
+    }
+
+    if (entry.needsSkipSubstitution) {
+      if (!after) {
+        return {
+          ...entry,
+          note: endLabel
+            ? `Срок теперь в период отсутствия (до ${endLabel}). Измените срок или удалите сотрудника.`
+            : entry.note,
+        }
+      }
+      return {
+        ...entry,
+        note: `Отсутствует до ${endLabel}. После отпуска на выполнение: ${days} дн.`,
+      }
+    }
+
+    return entry
+  })
+}
+
+/**
+ * Применяет решения диалога к списку ответственных проекта.
+ * decisions: { [effectiveId]: 'substitute' | 'original' }
+ */
+export function applyAbsenceDecisionsToResponsibles(
+  responsibles,
+  absenceMeta,
+  decisions = {},
+  users = []
+) {
+  return (responsibles || []).map((resp) => {
+    const meta = (absenceMeta || []).find(
+      (entry) => String(entry.effectiveId) === String(resp.id)
+    )
+    if (!meta) {
+      return { ...resp, skip_absence_substitution: false }
+    }
+
+    const decision = decisions[String(resp.id)]
+    if (meta.substituted && decision === 'original') {
+      const originalUser = users.find((u) => String(u.id) === String(meta.originalId))
+      return {
+        ...resp,
+        id: Number(meta.originalId),
+        first_name: originalUser?.first_name ?? resp.first_name,
+        last_name: originalUser?.last_name ?? resp.last_name,
+        middle_name: originalUser?.middle_name ?? resp.middle_name,
+        skip_absence_substitution: true,
+      }
+    }
+
+    if (meta.needsSkipSubstitution) {
+      return { ...resp, skip_absence_substitution: true }
+    }
+
+    return { ...resp, skip_absence_substitution: false }
+  })
 }
 
 /**

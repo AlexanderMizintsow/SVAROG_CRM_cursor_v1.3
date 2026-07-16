@@ -14,6 +14,7 @@ const UserRoleSectionTask = ({
   handleAddUser,
   handleRemoveUser,
   absencesMap = {},
+  absenceMeta = [],
 }) => {
   const [searchValue, setSearchValue] = useState('')
 
@@ -27,6 +28,16 @@ const UserRoleSectionTask = ({
 
   const getPositionLabel = (user) =>
     user?.position?.name || user?.position_name || user?.position || ''
+
+  const notesByEffectiveId = useMemo(() => {
+    const map = {}
+    ;(absenceMeta || [])
+      .filter((entry) => entry.roleKey === roleKey)
+      .forEach((entry) => {
+        map[String(entry.effectiveId)] = entry.note || null
+      })
+    return map
+  }, [absenceMeta, roleKey])
 
   const filteredUsers = useMemo(() => {
     const query = searchValue.trim().toLowerCase()
@@ -84,18 +95,20 @@ const UserRoleSectionTask = ({
             Добавленные {title.toLowerCase()}:
             {taskData[roleKey].map((userId) => {
               const user = users.find((u) => String(u.id) === String(userId))
+              const note = notesByEffectiveId[String(userId)]
               return user ? (
                 <div
-                  style={{ display: 'flex', alignItems: 'center' }}
+                  style={{ display: 'flex', alignItems: 'flex-start', flexWrap: 'wrap' }}
                   key={userId}
                 >
-                  {getUserFullName(user)}
+                  <span>{getUserFullName(user)}</span>
                   <LuDelete
                     style={{ marginLeft: 'auto' }}
                     title="Удалить"
                     onClick={() => handleRemoveUser(roleKey, userId)}
                     className={styles.removeFile}
                   />
+                  {note ? <span className={styles.absenceNote}>{note}</span> : null}
                 </div>
               ) : null
             })}

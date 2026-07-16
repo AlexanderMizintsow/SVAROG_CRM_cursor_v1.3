@@ -21,7 +21,6 @@ const showToast = (text, isError = false) => {
 export const useTaskHandlers = (state, setters) => {
   const { taskData, selectedTag, absencesMap, users } = state
   const {
-    // Setters
     setTaskData,
     setSelectedTag,
     setSelectedFiles,
@@ -29,9 +28,9 @@ export const useTaskHandlers = (state, setters) => {
     setDbTags,
     setIsTagsManagerOpen,
     setCheckedComment,
+    setAbsenceMeta,
   } = setters
 
-  // Функция для загрузки тегов
   const fetchTags = () => {
     axios
       .get(`${API_BASE_URL}5000/api/tags`)
@@ -41,7 +40,6 @@ export const useTaskHandlers = (state, setters) => {
       .catch((err) => console.error('Ошибка загрузки тегов:', err))
   }
 
-  // Обновляем теги при открытии списка
   const handleOpenDropdown = () => {
     fetchTags()
   }
@@ -62,10 +60,9 @@ export const useTaskHandlers = (state, setters) => {
 
       setSelectedFiles((prevSelected) => [...prevSelected, ...newFiles])
     },
-    [dangerousFormats, setHasDangerousFiles, setSelectedFiles]
+    [setHasDangerousFiles, setSelectedFiles]
   )
 
-  // Функция для удаления файла из списка
   const removeFile = useCallback(
     (name) => {
       setSelectedFiles((prevSelected) => {
@@ -77,7 +74,7 @@ export const useTaskHandlers = (state, setters) => {
         return updatedFiles
       })
     },
-    [dangerousFormats, setHasDangerousFiles, setSelectedFiles]
+    [setHasDangerousFiles, setSelectedFiles]
   )
 
   const handleChange = useCallback(
@@ -141,7 +138,9 @@ export const useTaskHandlers = (state, setters) => {
         return
       }
 
-      const resolution = resolveUserSelection(selectedUser, absencesMap || {}, users || [])
+      const resolution = resolveUserSelection(selectedUser, absencesMap || {}, users || [], {
+        deadline: taskData.deadline || null,
+      })
 
       if (resolution.message) {
         showToast(resolution.message, resolution.blocked)
@@ -155,7 +154,10 @@ export const useTaskHandlers = (state, setters) => {
       const effectiveIdStr = String(resolution.effectiveId)
 
       if (taskData[roleKey].includes(effectiveIdStr)) {
-        showToast('Замещающий уже добавлен в эту роль', true)
+        showToast(
+          resolution.substituted ? 'Замещающий уже добавлен в эту роль' : 'Пользователь уже добавлен',
+          true
+        )
         setSelectedUser('')
         return
       }
@@ -165,7 +167,12 @@ export const useTaskHandlers = (state, setters) => {
         (roleKey !== 'approvers' && taskData.approvers.includes(effectiveIdStr)) ||
         (roleKey !== 'viewers' && taskData.viewers.includes(effectiveIdStr))
       ) {
-        showToast('Замещающий уже выбран в другой роли', true)
+        showToast(
+          resolution.substituted
+            ? 'Замещающий уже выбран в другой роли'
+            : 'Пользователь уже выбран в другой роли',
+          true
+        )
         setSelectedUser('')
         return
       }
@@ -174,9 +181,40 @@ export const useTaskHandlers = (state, setters) => {
         ...prev,
         [roleKey]: [...prev[roleKey], effectiveIdStr],
       }))
+
+      if (typeof setAbsenceMeta === 'function') {
+        const absence = (absencesMap || {})[Number(resolution.originalId)]
+        setAbsenceMeta((prev) => {
+          const next = (prev || []).filter(
+            (entry) =>
+              !(
+                entry.roleKey === roleKey &&
+                String(entry.effectiveId) === effectiveIdStr
+              )
+          )
+          if (
+            resolution.substituted ||
+            resolution.needsSkipSubstitution ||
+            resolution.note
+          ) {
+            next.push({
+              roleKey,
+              effectiveId: effectiveIdStr,
+              originalId: String(resolution.originalId),
+              substituted: Boolean(resolution.substituted),
+              needsSkipSubstitution: Boolean(resolution.needsSkipSubstitution),
+              choiceAtSavePossible: Boolean(resolution.choiceAtSavePossible),
+              note: resolution.note || null,
+              absence: absence || null,
+            })
+          }
+          return next
+        })
+      }
+
       setSelectedUser('')
     },
-    [taskData, setTaskData, absencesMap, users]
+    [taskData, setTaskData, absencesMap, users, setAbsenceMeta]
   )
 
   const handleRemoveUser = useCallback(
@@ -185,8 +223,16 @@ export const useTaskHandlers = (state, setters) => {
         ...prev,
         [roleKey]: prev[roleKey].filter((id) => id !== userId),
       }))
+      if (typeof setAbsenceMeta === 'function') {
+        setAbsenceMeta((prev) =>
+          (prev || []).filter(
+            (entry) =>
+              !(entry.roleKey === roleKey && String(entry.effectiveId) === String(userId))
+          )
+        )
+      }
     },
-    [setTaskData]
+    [setTaskData, setAbsenceMeta]
   )
 
   const handlecheckedComment = useCallback(() => {

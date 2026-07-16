@@ -252,6 +252,15 @@
     margin-right: 0.5rem;
   }
 
+  &__absence-note {
+    margin-top: 0.2rem;
+    margin-bottom: 0.25rem;
+    font-size: 0.75rem;
+    line-height: 1.35;
+    color: #9a6b00;
+    max-width: 280px;
+  }
+
   &__requires-approval-label {
     display: inline-flex;
     align-items: center;

@@ -635,6 +635,7 @@ const GlobalTaskCard = ({
             onClose={() => setIsModalOpenResponsibles(false)}
             globalTaskId={id}
             onRefresh={onRefresh}
+            projectDeadline={deadline}
           />
         </div>
       )}

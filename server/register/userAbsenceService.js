@@ -321,7 +321,40 @@ async function resolveForAssignment(dbPool, io, userId, options = {}) {
     taskTitle = null,
     projectTitle = null,
     checkDate = new Date(),
+    skipAbsenceSubstitution = false,
   } = options
+
+  const originalId = Number(userId)
+
+  // Явный opt-in: назначить выбранного пользователя без авто-замещения
+  // (срок задачи после выхода из отпуска — решение на клиенте при сохранении).
+  if (skipAbsenceSubstitution === true) {
+    if (!Number.isFinite(originalId)) {
+      return {
+        ok: false,
+        resolved: {
+          originalId: null,
+          effectiveId: null,
+          substituted: false,
+          absence: null,
+          blocked: true,
+          blockReason: 'Некорректный ID пользователя',
+        },
+        error: 'Некорректный ID пользователя',
+      }
+    }
+    return {
+      ok: true,
+      resolved: {
+        originalId,
+        effectiveId: originalId,
+        substituted: false,
+        absence: null,
+        blocked: false,
+      },
+      effectiveId: originalId,
+    }
+  }
 
   const resolved = await resolveAssignee(dbPool, userId, checkDate)
 

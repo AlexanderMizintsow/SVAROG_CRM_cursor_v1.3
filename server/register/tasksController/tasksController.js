@@ -424,7 +424,7 @@ function replaceTaskAssignment(dbPool, io) {
 // Запись исполнителя
 function addTaskAssignment(dbPool, io) {
   return async function (req, res) {
-    const { task_id, user_id } = req.body
+    const { task_id, user_id, skip_absence_substitution } = req.body
 
     if (!task_id || !user_id) {
       return res.status(400).json({ error: 'Необходимо указать task_id и user_id' })
@@ -436,6 +436,7 @@ function addTaskAssignment(dbPool, io) {
       const taskInfo = taskRow.rows[0]
       const substitutions = []
       const warnings = []
+      const skipAbsenceSubstitution = skip_absence_substitution === true
 
       for (const rawUserId of userIds) {
         const resolved = await userAbsence.resolveForAssignment(dbPool, io, rawUserId, {
@@ -443,6 +444,7 @@ function addTaskAssignment(dbPool, io) {
           roleLabel: 'исполнитель',
           taskId: task_id,
           taskTitle: taskInfo?.title,
+          skipAbsenceSubstitution,
         })
 
         if (!resolved.ok) {
@@ -482,7 +484,7 @@ function addTaskAssignment(dbPool, io) {
 
 function addTaskApproval(dbPool, io) {
   return async function (req, res) {
-    const { task_id, approver_id } = req.body
+    const { task_id, approver_id, skip_absence_substitution } = req.body
 
     if (!task_id || !approver_id) {
       return res.status(400).json({ error: 'Необходимо указать task_id и approver_id' })
@@ -494,6 +496,7 @@ function addTaskApproval(dbPool, io) {
       const taskInfo = taskRow.rows[0]
       const substitutions = []
       const warnings = []
+      const skipAbsenceSubstitution = skip_absence_substitution === true
 
       for (const rawApproverId of approverIds) {
         const resolved = await userAbsence.resolveForAssignment(dbPool, io, rawApproverId, {
@@ -501,6 +504,7 @@ function addTaskApproval(dbPool, io) {
           roleLabel: 'утверждающий',
           taskId: task_id,
           taskTitle: taskInfo?.title,
+          skipAbsenceSubstitution,
         })
 
         if (!resolved.ok) {
@@ -540,7 +544,7 @@ function addTaskApproval(dbPool, io) {
 
 function addTaskVisibility(dbPool, io) {
   return async function (req, res) {
-    const { task_id, user_id } = req.body
+    const { task_id, user_id, skip_absence_substitution } = req.body
 
     if (!task_id || !user_id) {
       return res.status(400).json({ error: 'Необходимо указать task_id и user_id' })
@@ -552,6 +556,7 @@ function addTaskVisibility(dbPool, io) {
       const taskInfo = taskRow.rows[0]
       const substitutions = []
       const warnings = []
+      const skipAbsenceSubstitution = skip_absence_substitution === true
 
       for (const rawUserId of userIds) {
         const resolved = await userAbsence.resolveForAssignment(dbPool, io, rawUserId, {
@@ -559,6 +564,7 @@ function addTaskVisibility(dbPool, io) {
           roleLabel: 'наблюдатель',
           taskId: task_id,
           taskTitle: taskInfo?.title,
+          skipAbsenceSubstitution,
         })
 
         if (!resolved.ok) {
@@ -1526,6 +1532,8 @@ function createGlobalTask(dbPool, io) {
             roleLabel: resp.role || 'участник',
             globalTaskId: newTaskId,
             projectTitle: title,
+            skipAbsenceSubstitution:
+              resp.skip_absence_substitution === true || resp.skipAbsenceSubstitution === true,
           })
 
           if (!resolved.ok) {
@@ -3236,6 +3244,8 @@ function addResponsiblesToGlobalTask(dbPool, io) {
           roleLabel: resp.role || 'участник',
           globalTaskId: taskId,
           projectTitle: projectInfo?.title,
+          skipAbsenceSubstitution:
+            resp.skip_absence_substitution === true || resp.skipAbsenceSubstitution === true,
         })
 
         if (!resolved.ok) {

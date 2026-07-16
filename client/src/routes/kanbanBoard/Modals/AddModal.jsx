@@ -28,6 +28,48 @@ import {
   buildEmptyTaskData,
 } from "./addModalDraft";
 import { useActiveAbsences } from "../../../utils/useActiveAbsences";
+import {
+  getAbsenceChoicesAtSave,
+  getAbsenceEndDate,
+  isDeadlineAfterAbsence,
+  normalizeDateOnly,
+  refreshAbsenceMetaNotes,
+} from "../../../utils/userAbsenceUtils";
+import AbsenceAssigneeChoiceModal from "../../../components/absenceAssigneeChoice/AbsenceAssigneeChoiceModal";
+
+const formatDateRuLocal = (dateStr) => {
+  const normalized = normalizeDateOnly(dateStr);
+  if (!normalized) return "";
+  const parts = normalized.split("-");
+  if (parts.length !== 3) return normalized;
+  return `${parts[2]}.${parts[1]}.${parts[0]}`;
+};
+
+const buildAssignmentPlan = (taskData, absenceMeta, decisions = {}) => {
+  const plan = { implementers: [], approvers: [], viewers: [] };
+  for (const roleKey of ["implementers", "approvers", "viewers"]) {
+    const ids = Array.isArray(taskData[roleKey]) ? taskData[roleKey] : [];
+    for (const id of ids) {
+      const meta = (absenceMeta || []).find(
+        (entry) =>
+          entry.roleKey === roleKey && String(entry.effectiveId) === String(id)
+      );
+      if (!meta) {
+        plan[roleKey].push({ userId: id, skip: false });
+        continue;
+      }
+      const decision = decisions[`${roleKey}:${id}`];
+      if (meta.substituted && decision === "original") {
+        plan[roleKey].push({ userId: meta.originalId, skip: true });
+      } else if (meta.needsSkipSubstitution) {
+        plan[roleKey].push({ userId: id, skip: true });
+      } else {
+        plan[roleKey].push({ userId: id, skip: false });
+      }
+    }
+  }
+  return plan;
+};
 
 const AddModal = ({
   isOpen,
@@ -116,6 +158,9 @@ const AddModal = ({
       : {};
   });
   const [projectDeadline, setProjectDeadline] = useState(null);
+  const [absenceMeta, setAbsenceMeta] = useState([]);
+  const [choiceQueue, setChoiceQueue] = useState([]);
+  const [currentChoice, setCurrentChoice] = useState(null);
   const { absencesMap } = useActiveAbsences(isOpen);
 
   const quillRef = useRef(null);
@@ -123,6 +168,7 @@ const AddModal = ({
   const quillInitialSetRef = useRef(false);
   const prevIsOpenRef = useRef(false);
   const prevDraftKeyRef = useRef(draftKey);
+  const choiceDecisionsRef = useRef({});
 
   const {
     handleFileChange,
@@ -151,6 +197,7 @@ const AddModal = ({
       setDbTags,
       setIsTagsManagerOpen,
       setCheckedComment,
+      setAbsenceMeta,
     }
   );
 
@@ -338,7 +385,16 @@ const AddModal = ({
     setCurrentFileIndex(0);
     setFileComments({});
     setSelectedTemplate(null);
+    setAbsenceMeta([]);
+    setChoiceQueue([]);
+    setCurrentChoice(null);
+    choiceDecisionsRef.current = {};
   }, []);
+
+  // Обновляем пометки по отсутствию при смене срока задачи
+  useEffect(() => {
+    setAbsenceMeta((prev) => refreshAbsenceMetaNotes(prev, taskData.deadline, users));
+  }, [taskData.deadline, users]);
 
   const persistDraft = useCallback(() => {
     const dataForDraft = getTaskDataForDraft();
@@ -380,6 +436,177 @@ const AddModal = ({
     }
   }, [persistDraft, setOpen, onClose]);
 
+  const createTasksWithPlan = useCallback(
+    async (assignmentPlan) => {
+      if (quillInstance) {
+        const description = quillInstance.root.innerHTML;
+        const textOnly = description.replace(/<[^>]+>/g, "");
+
+        if (!textOnly) {
+          Toastify({
+            text: "Необходимо указать ОПИСАНИЕ ЗАДАЧИ",
+            close: true,
+            backgroundColor: "linear-gradient(to right, #8B0000, #ff0000)",
+          }).showToast();
+          return;
+        }
+
+        if (globalTaskId && projectDeadline && taskData.deadline) {
+          const taskD = new Date(taskData.deadline);
+          const projD = new Date(projectDeadline);
+          if (
+            !Number.isNaN(taskD.getTime()) &&
+            !Number.isNaN(projD.getTime()) &&
+            taskD.getTime() > projD.getTime()
+          ) {
+            Toastify({
+              text: "Срок задачи не может быть позже срока проекта",
+              close: true,
+              backgroundColor: "linear-gradient(to right, #8B0000, #ff0000)",
+            }).showToast();
+            return;
+          }
+        }
+
+        try {
+          setIsLoading(true);
+          const taskIds = [];
+          const implementers = assignmentPlan.implementers || [];
+
+          for (const implementer of implementers) {
+            const taskToSubmit = {
+              ...taskData,
+              description,
+              created_at: new Date().toISOString(),
+              status: "backlog",
+              tags: taskData.tags ? taskData.tags : [],
+              created_by: userId,
+              parent_id: parentTaskId || null,
+              root_id: rootTaskId || parentTaskId || null,
+            };
+            if (businessProcessInstanceId) {
+              taskToSubmit.business_process_instance_id = businessProcessInstanceId;
+            }
+
+            const response = await axios.post(
+              `${API_BASE_URL}5000/api/tasks/create`,
+              taskToSubmit
+            );
+            const taskId = response.data.id;
+            taskIds.push(taskId);
+
+            await axios.post(`${API_BASE_URL}5000/api/tasks/assignment/add`, {
+              task_id: taskId,
+              user_id: implementer.userId,
+              ...(implementer.skip ? { skip_absence_substitution: true } : {}),
+            });
+          }
+
+          for (const approver of assignmentPlan.approvers || []) {
+            for (const taskId of taskIds) {
+              await axios.post(`${API_BASE_URL}5000/api/tasks/approval/add`, {
+                task_id: taskId,
+                approver_id: approver.userId,
+                ...(approver.skip ? { skip_absence_substitution: true } : {}),
+              });
+            }
+          }
+
+          for (const viewer of assignmentPlan.viewers || []) {
+            for (const taskId of taskIds) {
+              await axios.post(`${API_BASE_URL}5000/api/tasks/visibility/add`, {
+                task_id: taskId,
+                user_id: viewer.userId,
+                ...(viewer.skip ? { skip_absence_substitution: true } : {}),
+              });
+            }
+          }
+
+          if (selectedFiles.length > 0) {
+            const formData = new FormData();
+            selectedFiles.forEach(({ file }) => {
+              formData.append("files", file);
+            });
+
+            const uploadResponse = await axios.post(
+              `${API_BASE_URL}5000/api/upload`,
+              formData,
+              {
+                headers: {
+                  "Content-Type": "multipart/form-data",
+                },
+              }
+            );
+
+            const fileUrls = uploadResponse.data.fileUrls;
+
+            for (let i = 0; i < fileUrls.length; i++) {
+              const file = selectedFiles[i];
+              const comment = checkedComment ? fileComments[file.name] || "" : "";
+
+              for (const taskId of taskIds) {
+                await axios.post(`${API_BASE_URL}5000/api/tasks/attachment/add`, {
+                  task_id: taskId,
+                  file_url: fileUrls[i],
+                  file_type: file.type || "application/octet-stream",
+                  comment_file: comment,
+                  name_file: file.name,
+                  uploaded_by: userId,
+                });
+              }
+            }
+          }
+
+          await axios.post(`${API_BASE_URL}5000/api/tasks/socket`, {
+            id: taskIds,
+            createdBy: userId,
+            assignedUsers: implementers.map((item) => item.userId),
+            approvers: (assignmentPlan.approvers || []).map((item) => item.userId),
+            viewers: (assignmentPlan.viewers || []).map((item) => item.userId),
+          });
+
+          Toastify({
+            text: "Задачи успешно добавлены",
+            close: true,
+            backgroundColor: "linear-gradient(to right, #006400, #00FF00)",
+          }).showToast();
+
+          resetFormAfterSuccessfulCreate();
+          setOpen(false);
+
+          if (onClose && typeof onClose === "function") {
+            onClose(taskIds[0]);
+          }
+        } catch (error) {
+          console.error("Ошибка при создании задачи:", error);
+          Toastify({
+            text: error.response?.data?.error || "Ошибка при создании задачи",
+            close: true,
+            backgroundColor: "linear-gradient(to right, #8B0000, #ff0000)",
+          }).showToast();
+        } finally {
+          setIsLoading(false);
+        }
+      }
+    },
+    [
+      taskData,
+      quillInstance,
+      selectedFiles,
+      checkedComment,
+      userId,
+      parentTaskId,
+      rootTaskId,
+      fileComments,
+      globalTaskId,
+      projectDeadline,
+      businessProcessInstanceId,
+      resetFormAfterSuccessfulCreate,
+      onClose,
+      setOpen,
+    ]
+  );
+
   const handleSubmitWithComments = useCallback(async () => {
     if (taskData.implementers.length === 0) {
       Toastify({
@@ -399,171 +626,67 @@ const AddModal = ({
       return;
     }
 
-    if (quillInstance) {
-      const description = quillInstance.root.innerHTML;
-      const textOnly = description.replace(/<[^>]+>/g, "");
+    const invalidSkip = (absenceMeta || []).find(
+      (entry) =>
+        entry.needsSkipSubstitution &&
+        entry.absence &&
+        !isDeadlineAfterAbsence(taskData.deadline, entry.absence)
+    );
+    if (invalidSkip) {
+      const endDay = getAbsenceEndDate(invalidSkip.absence);
+      Toastify({
+        text: endDay
+          ? `Срок задачи должен быть после ${formatDateRuLocal(endDay)}, либо удалите отсутствующего сотрудника без замещающего.`
+          : "Измените срок задачи или удалите отсутствующего сотрудника без замещающего.",
+        close: true,
+        backgroundColor: "linear-gradient(to right, #8B0000, #ff0000)",
+      }).showToast();
+      return;
+    }
 
-      if (!textOnly) {
-        Toastify({
-          text: "Необходимо указать ОПИСАНИЕ ЗАДАЧИ",
-          close: true,
-          backgroundColor: "linear-gradient(to right, #8B0000, #ff0000)",
-        }).showToast();
+    const choices = getAbsenceChoicesAtSave(absenceMeta, taskData.deadline);
+    if (choices.length > 0) {
+      choiceDecisionsRef.current = {};
+      setChoiceQueue(choices);
+      setCurrentChoice(choices[0]);
+      return;
+    }
+
+    const plan = buildAssignmentPlan(taskData, absenceMeta, {});
+    await createTasksWithPlan(plan);
+  }, [taskData, absenceMeta, createTasksWithPlan]);
+
+  const finishAbsenceChoice = useCallback(
+    (decision) => {
+      if (!currentChoice) return;
+      const key = `${currentChoice.roleKey}:${currentChoice.effectiveId}`;
+      choiceDecisionsRef.current = {
+        ...choiceDecisionsRef.current,
+        [key]: decision,
+      };
+      const rest = choiceQueue.slice(1);
+      if (rest.length > 0) {
+        setChoiceQueue(rest);
+        setCurrentChoice(rest[0]);
         return;
       }
+      setChoiceQueue([]);
+      setCurrentChoice(null);
+      const plan = buildAssignmentPlan(
+        taskData,
+        absenceMeta,
+        choiceDecisionsRef.current
+      );
+      createTasksWithPlan(plan);
+    },
+    [currentChoice, choiceQueue, taskData, absenceMeta, createTasksWithPlan]
+  );
 
-      if (globalTaskId && projectDeadline && taskData.deadline) {
-        const taskD = new Date(taskData.deadline);
-        const projD = new Date(projectDeadline);
-        if (!Number.isNaN(taskD.getTime()) && !Number.isNaN(projD.getTime()) && taskD.getTime() > projD.getTime()) {
-          Toastify({
-            text: "Срок задачи не может быть позже срока проекта",
-            close: true,
-            backgroundColor: "linear-gradient(to right, #8B0000, #ff0000)",
-          }).showToast();
-          return;
-        }
-      }
-
-      try {
-        setIsLoading(true);
-        const taskIds = [];
-
-        // Создаем задачи для каждого исполнителя
-        for (const implementer of taskData.implementers) {
-          const taskToSubmit = {
-            ...taskData,
-            description,
-            created_at: new Date().toISOString(),
-            status: "backlog",
-            tags: taskData.tags ? taskData.tags : [],
-            created_by: userId,
-            parent_id: parentTaskId || null,
-            root_id: rootTaskId || parentTaskId || null,
-          };
-          if (businessProcessInstanceId) {
-            taskToSubmit.business_process_instance_id = businessProcessInstanceId;
-          }
-
-          const response = await axios.post(
-            `${API_BASE_URL}5000/api/tasks/create`,
-            taskToSubmit
-          );
-          const taskId = response.data.id;
-          taskIds.push(taskId);
-
-          await axios.post(`${API_BASE_URL}5000/api/tasks/assignment/add`, {
-            task_id: taskId,
-            user_id: implementer,
-          });
-        }
-
-        // Добавляем согласующих
-        for (const approver of taskData.approvers) {
-          for (const taskId of taskIds) {
-            await axios.post(`${API_BASE_URL}5000/api/tasks/approval/add`, {
-              task_id: taskId,
-              approver_id: approver,
-            });
-          }
-        }
-
-        // Добавляем наблюдателей
-        for (const viewer of taskData.viewers) {
-          for (const taskId of taskIds) {
-            await axios.post(`${API_BASE_URL}5000/api/tasks/visibility/add`, {
-              task_id: taskId,
-              user_id: viewer,
-            });
-          }
-        }
-
-        // Обработка вложений
-        if (selectedFiles.length > 0) {
-          const formData = new FormData();
-          selectedFiles.forEach(({ file }) => {
-            formData.append("files", file);
-          });
-
-          const uploadResponse = await axios.post(
-            `${API_BASE_URL}5000/api/upload`,
-            formData,
-            {
-              headers: {
-                "Content-Type": "multipart/form-data",
-              },
-            }
-          );
-
-          const fileUrls = uploadResponse.data.fileUrls;
-
-          // Для каждого файла создаем вложение для каждой задачи
-          for (let i = 0; i < fileUrls.length; i++) {
-            const file = selectedFiles[i];
-            const comment = checkedComment ? fileComments[file.name] || "" : "";
-
-            for (const taskId of taskIds) {
-              await axios.post(`${API_BASE_URL}5000/api/tasks/attachment/add`, {
-                task_id: taskId,
-                file_url: fileUrls[i],
-                file_type: file.type || "application/octet-stream",
-                comment_file: comment,
-                name_file: file.name,
-                uploaded_by: userId,
-              });
-            }
-          }
-        }
-
-        // Отправляем уведомление через сокет
-        await axios.post(`${API_BASE_URL}5000/api/tasks/socket`, {
-          id: taskIds,
-          createdBy: userId,
-          assignedUsers: taskData.implementers,
-          approvers: taskData.approvers,
-          viewers: taskData.viewers,
-        });
-
-        Toastify({
-          text: "Задачи успешно добавлены",
-          close: true,
-          backgroundColor: "linear-gradient(to right, #006400, #00FF00)",
-        }).showToast();
-
-        resetFormAfterSuccessfulCreate();
-        setOpen(false);
-
-        // Возвращаем ID первой созданной задачи через callback
-        if (onClose && typeof onClose === "function") {
-          onClose(taskIds[0]); // Возвращаем ID первой задачи
-        }
-      } catch (error) {
-        console.error("Ошибка при создании задачи:", error);
-        Toastify({
-          text: error.response?.data?.error || "Ошибка при создании задачи",
-          close: true,
-          backgroundColor: "linear-gradient(to right, #8B0000, #ff0000)",
-        }).showToast();
-      } finally {
-        setIsLoading(false);
-      }
-    }
-  }, [
-    taskData,
-    quillInstance,
-    selectedFiles,
-    checkedComment,
-    userId,
-    parentTaskId,
-    rootTaskId,
-    fileComments,
-    globalTaskId,
-    projectDeadline,
-    businessProcessInstanceId,
-    resetFormAfterSuccessfulCreate,
-    onClose,
-    setOpen,
-  ]);
+  const cancelAbsenceChoice = useCallback(() => {
+    setChoiceQueue([]);
+    setCurrentChoice(null);
+    choiceDecisionsRef.current = {};
+  }, []);
 
   const handleCommentSubmit = () => {
     const currentFile = selectedFiles[currentFileIndex];
@@ -782,6 +905,7 @@ const AddModal = ({
             handleAddUser={handleAddUser}
             handleRemoveUser={handleRemoveUser}
             absencesMap={absencesMap}
+            absenceMeta={absenceMeta}
           />
           {/* Добавить зрителя*/}
           <UserRoleSectionTask
@@ -795,6 +919,7 @@ const AddModal = ({
             handleAddUser={handleAddUser}
             handleRemoveUser={handleRemoveUser}
             absencesMap={absencesMap}
+            absenceMeta={absenceMeta}
           />
           {/*Добавить утверждающих*/}
           <UserRoleSectionTask
@@ -808,9 +933,19 @@ const AddModal = ({
             handleAddUser={handleAddUser}
             handleRemoveUser={handleRemoveUser}
             absencesMap={absencesMap}
+            absenceMeta={absenceMeta}
           />
         </div>
       </div>
+      <AbsenceAssigneeChoiceModal
+        open={Boolean(currentChoice)}
+        entry={currentChoice}
+        users={users}
+        deadline={taskData.deadline}
+        onKeepSubstitute={() => finishAbsenceChoice("substitute")}
+        onAssignOriginal={() => finishAbsenceChoice("original")}
+        onCancel={cancelAbsenceChoice}
+      />
       {isTagsManagerOpen && (
         <Suspense fallback={<div>Loading tags manager...</div>}>
           <TagsManager onClose={() => setIsTagsManagerOpen(false)} />

@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef, useCallback } from 'react'
 import axios from 'axios'
 import { API_BASE_URL } from '../../../../../config'
 import { FaTimes, FaUserPlus } from 'react-icons/fa'
@@ -14,8 +14,23 @@ import {
   resolveUserSelection,
   getAbsenceLabel,
   showAbsenceMessage,
+  getAbsenceChoicesAtSave,
+  getAbsenceEndDate,
+  isDeadlineAfterAbsence,
+  normalizeDateOnly,
+  refreshAbsenceMetaNotes,
+  applyAbsenceDecisionsToResponsibles,
 } from '../../../../utils/userAbsenceUtils'
+import AbsenceAssigneeChoiceModal from '../../../../components/absenceAssigneeChoice/AbsenceAssigneeChoiceModal'
 import './ResponsibleSelector.scss'
+
+const formatDateRuLocal = (dateStr) => {
+  const normalized = normalizeDateOnly(dateStr)
+  if (!normalized) return ''
+  const parts = normalized.split('-')
+  if (parts.length !== 3) return normalized
+  return `${parts[2]}.${parts[1]}.${parts[0]}`
+}
 
 const ResponsibleSelector = ({
   responsibles: responsiblesBefor,
@@ -24,11 +39,16 @@ const ResponsibleSelector = ({
   existingResponsibles,
   globalTaskId,
   onRefresh,
+  projectDeadline = null,
 }) => {
   const [users, setUsers] = useState([])
   const { user } = UserStore()
   const [loading, setLoading] = useState(true)
   const [responsibles, setResponsibles] = useState(existingResponsibles || [])
+  const [absenceMeta, setAbsenceMeta] = useState([])
+  const [choiceQueue, setChoiceQueue] = useState([])
+  const [currentChoice, setCurrentChoice] = useState(null)
+  const choiceDecisionsRef = useRef({})
   const { absencesMap } = useActiveAbsences(true)
 
   const userId = user ? user.id : null
@@ -47,31 +67,108 @@ const ResponsibleSelector = ({
     fetchUsers()
   }, [])
 
+  useEffect(() => {
+    setAbsenceMeta((prev) => refreshAbsenceMetaNotes(prev, projectDeadline, users))
+  }, [projectDeadline, users])
+
+  const notesByEffectiveId = (() => {
+    const map = {}
+    ;(absenceMeta || []).forEach((entry) => {
+      map[String(entry.effectiveId)] = entry.note || null
+    })
+    return map
+  })()
+
+  const submitResponsibles = useCallback(
+    async (list) => {
+      try {
+        await axios.post(
+          `${API_BASE_URL}5000/api/global-tasks/${globalTaskId}/responsibles-new`,
+          {
+            responsibles: list,
+            userId,
+          }
+        )
+        if (onClose) onClose()
+        onRefresh(globalTaskId)
+      } catch (error) {
+        const errMsg =
+          error.response?.data?.error || 'Не удалось добавить ответственных. Попробуйте еще раз.'
+        console.error('Ошибка при добавлении ответственных:', error)
+        alert(errMsg)
+      }
+    },
+    [globalTaskId, userId, onClose, onRefresh]
+  )
+
   const handleAddResponsibles = async () => {
     if (responsibles.length === 0) {
       alert('Пожалуйста, выберите хотя бы одного ответственного.')
       return
     }
 
-    try {
-      await axios.post(
-        `${API_BASE_URL}5000/api/global-tasks/${globalTaskId}/responsibles-new`,
-        {
-          responsibles,
-          userId,
-        }
+    const invalidSkip = (absenceMeta || []).find(
+      (entry) =>
+        entry.needsSkipSubstitution &&
+        entry.absence &&
+        !isDeadlineAfterAbsence(projectDeadline, entry.absence)
+    )
+    if (invalidSkip) {
+      const endDay = getAbsenceEndDate(invalidSkip.absence)
+      showAbsenceMessage(
+        endDay
+          ? `Срок проекта должен быть после ${formatDateRuLocal(endDay)}, либо удалите отсутствующего сотрудника без замещающего.`
+          : 'Измените срок проекта или удалите отсутствующего сотрудника без замещающего.',
+        true
       )
-      if (onClose) onClose()
-      onRefresh(globalTaskId)
-    } catch (error) {
-      const errMsg = error.response?.data?.error || 'Не удалось добавить ответственных. Попробуйте еще раз.'
-      console.error('Ошибка при добавлении ответственных:', error)
-      alert(errMsg)
+      return
     }
+
+    const choices = getAbsenceChoicesAtSave(absenceMeta, projectDeadline)
+    if (choices.length > 0) {
+      choiceDecisionsRef.current = {}
+      setChoiceQueue(choices)
+      setCurrentChoice(choices[0])
+      return
+    }
+
+    const list = applyAbsenceDecisionsToResponsibles(responsibles, absenceMeta, {}, users)
+    await submitResponsibles(list)
+  }
+
+  const finishAbsenceChoice = async (decision) => {
+    if (!currentChoice) return
+    choiceDecisionsRef.current = {
+      ...choiceDecisionsRef.current,
+      [String(currentChoice.effectiveId)]: decision,
+    }
+    const rest = choiceQueue.slice(1)
+    if (rest.length > 0) {
+      setChoiceQueue(rest)
+      setCurrentChoice(rest[0])
+      return
+    }
+    setChoiceQueue([])
+    setCurrentChoice(null)
+    const list = applyAbsenceDecisionsToResponsibles(
+      responsibles,
+      absenceMeta,
+      choiceDecisionsRef.current,
+      users
+    )
+    await submitResponsibles(list)
+  }
+
+  const cancelAbsenceChoice = () => {
+    setChoiceQueue([])
+    setCurrentChoice(null)
+    choiceDecisionsRef.current = {}
   }
 
   const handleResponsibleSelect = (selectedUserId) => {
-    const resolution = resolveUserSelection(selectedUserId, absencesMap, users)
+    const resolution = resolveUserSelection(selectedUserId, absencesMap, users, {
+      deadline: projectDeadline || null,
+    })
 
     if (resolution.message) {
       showAbsenceMessage(resolution.message, resolution.blocked)
@@ -85,6 +182,14 @@ const ResponsibleSelector = ({
       responsibles.some((resp) => Number(resp.id) === Number(selectedUser.id)) ||
       responsiblesBefor.some((resp) => Number(resp.id) === Number(selectedUser.id))
     ) {
+      if (selectedUser) {
+        showAbsenceMessage(
+          resolution.substituted
+            ? 'Замещающий уже добавлен в проект'
+            : 'Участник уже добавлен в проект',
+          true
+        )
+      }
       return
     }
 
@@ -106,15 +211,38 @@ const ResponsibleSelector = ({
     if (onAddResponsible) {
       onAddResponsible(newResponsible)
     }
+
+    const absence = absencesMap[Number(resolution.originalId)]
+    setAbsenceMeta((prev) => {
+      const next = (prev || []).filter(
+        (entry) => String(entry.effectiveId) !== String(resolution.effectiveId)
+      )
+      if (resolution.substituted || resolution.needsSkipSubstitution || resolution.note) {
+        next.push({
+          roleKey: 'responsibles',
+          effectiveId: String(resolution.effectiveId),
+          originalId: String(resolution.originalId),
+          substituted: Boolean(resolution.substituted),
+          needsSkipSubstitution: Boolean(resolution.needsSkipSubstitution),
+          choiceAtSavePossible: Boolean(resolution.choiceAtSavePossible),
+          note: resolution.note || null,
+          absence: absence || null,
+        })
+      }
+      return next
+    })
   }
 
   const removeResponsible = (id) => {
     setResponsibles(responsibles.filter((resp) => resp.id !== id))
+    setAbsenceMeta((prev) =>
+      (prev || []).filter((entry) => String(entry.effectiveId) !== String(id))
+    )
   }
 
-  const handleResponsibleRoleChange = (userId, newRole) => {
+  const handleResponsibleRoleChange = (respUserId, newRole) => {
     const updated = responsibles.map((resp) =>
-      resp.id === userId ? { ...resp, role: newRole } : resp
+      resp.id === respUserId ? { ...resp, role: newRole } : resp
     )
     setResponsibles(updated)
   }
@@ -147,6 +275,11 @@ const ResponsibleSelector = ({
                     (resp.middle_name || '')[0] ? (resp.middle_name || '')[0] + '.' : ''
                   }`}
                 </div>
+                {notesByEffectiveId[String(resp.id)] ? (
+                  <div className="create-global-task-form__absence-note">
+                    {notesByEffectiveId[String(resp.id)]}
+                  </div>
+                ) : null}
                 <select
                   className="create-global-task-form__responsible-role-select"
                   value={resp.role}
@@ -231,6 +364,17 @@ const ResponsibleSelector = ({
           </button>
         </div>
       </div>
+      <AbsenceAssigneeChoiceModal
+        open={Boolean(currentChoice)}
+        entry={currentChoice}
+        users={users}
+        deadline={projectDeadline}
+        appointmentLabel="участника проекта"
+        deadlineCaption="Срок проекта"
+        onKeepSubstitute={() => finishAbsenceChoice('substitute')}
+        onAssignOriginal={() => finishAbsenceChoice('original')}
+        onCancel={cancelAbsenceChoice}
+      />
     </div>
   )
 }
