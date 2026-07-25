@@ -27,6 +27,8 @@ const employeeTasksRoutes = () => {
   router.post('/:taskId/decision', ctrl.decideTask())
   router.get('/:taskId/messages', ctrl.getMessages())
   router.post('/:taskId/messages', ctrl.sendMessage())
+  router.patch('/:taskId/messages/:messageId', ctrl.updateMessage())
+  router.delete('/:taskId/messages/:messageId', ctrl.deleteMessage())
   router.put('/:taskId/description', ctrl.updateDescription())
   router.patch('/:taskId/deadline', ctrl.updateDeadline())
   router.put('/:taskId/assignee', ctrl.replaceAssignee())

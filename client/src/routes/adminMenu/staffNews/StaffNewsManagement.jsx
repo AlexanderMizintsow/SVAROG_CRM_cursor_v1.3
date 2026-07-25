@@ -71,24 +71,92 @@ const toastErr = (text) =>
     style: { background: 'linear-gradient(to right, #ff5f6d, #ffc371)' },
   }).showToast()
 
-const ChipSelect = ({ options, selected, onToggle, labelKey = 'name', valueKey = 'id' }) => (
-  <div className="mobile-news__chips">
-    {options.map((opt) => {
-      const value = String(opt[valueKey])
-      const active = (selected || []).map(String).includes(value)
-      return (
-        <button
-          key={value}
-          type="button"
-          className={`mobile-news__chip ${active ? 'active' : ''}`}
-          onClick={() => onToggle(value)}
-        >
-          {opt[labelKey]}
-        </button>
-      )
-    })}
-  </div>
-)
+const USER_CHIP_SEARCH_KEYS = ['roleName', 'departmentName', 'hint']
+
+const ChipSelect = ({
+  options,
+  selected,
+  onToggle,
+  labelKey = 'name',
+  valueKey = 'id',
+  searchable = false,
+  searchPlaceholder = 'Поиск…',
+  searchKeys = null,
+  scrollable = false,
+}) => {
+  const [query, setQuery] = useState('')
+  const selectedSet = useMemo(
+    () => new Set((selected || []).map(String)),
+    [selected]
+  )
+
+  const visible = useMemo(() => {
+    const list = options || []
+    const q = query.trim().toLowerCase()
+    if (!searchable || !q) return list
+    const matched = list.filter((opt) => {
+      const parts = [opt?.[labelKey]]
+      if (Array.isArray(searchKeys)) {
+        searchKeys.forEach((key) => parts.push(opt?.[key]))
+      }
+      return parts.filter(Boolean).join(' ').toLowerCase().includes(q)
+    })
+    const matchedIds = new Set(matched.map((opt) => String(opt[valueKey])))
+    const selectedExtra = list.filter(
+      (opt) =>
+        selectedSet.has(String(opt[valueKey])) &&
+        !matchedIds.has(String(opt[valueKey]))
+    )
+    return [...selectedExtra, ...matched]
+  }, [options, query, searchable, labelKey, searchKeys, valueKey, selectedSet])
+
+  return (
+    <div className="mobile-news__chip-select">
+      {searchable ? (
+        <div className="mobile-news__chip-search-row">
+          <input
+            type="search"
+            className="mobile-news__chip-search"
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            placeholder={searchPlaceholder}
+            autoComplete="off"
+          />
+          {selectedSet.size > 0 ? (
+            <span className="mobile-news__chip-selected-count">
+              Выбрано: {selectedSet.size}
+            </span>
+          ) : null}
+        </div>
+      ) : null}
+      <div
+        className={`mobile-news__chips${scrollable ? ' mobile-news__chips--scrollable' : ''}`}
+      >
+        {visible.length === 0 ? (
+          <span className="mobile-news__chip-empty">Ничего не найдено</span>
+        ) : (
+          visible.map((opt) => {
+            const value = String(opt[valueKey])
+            const active = selectedSet.has(value)
+            const hint = opt.hint || ''
+            return (
+              <button
+                key={value}
+                type="button"
+                className={`mobile-news__chip ${active ? 'active' : ''}`}
+                onClick={() => onToggle(value)}
+                title={hint || opt[labelKey]}
+              >
+                {opt[labelKey]}
+                {hint ? <span className="mobile-news__chip-hint">{hint}</span> : null}
+              </button>
+            )
+          })
+        )}
+      </div>
+    </div>
+  )
+}
 
 const StaffNewsManagement = () => {
   const { user } = useUserStore()
@@ -235,6 +303,23 @@ const StaffNewsManagement = () => {
         String(u.role || '').toLowerCase().includes(q)
     )
   }, [ackReport, ackReportTab, ackReportSearch])
+
+  const audienceUserOptions = useMemo(() => {
+    const depMap = Object.fromEntries(
+      (taxonomy.departments || []).map((d) => [String(d.id), d.name || ''])
+    )
+    return (taxonomy.users || []).map((u) => {
+      const departmentName = depMap[String(u.departmentId)] || ''
+      const roleName = u.roleName || ''
+      const hint = [departmentName, roleName].filter(Boolean).join(' · ')
+      return {
+        ...u,
+        departmentName,
+        roleName,
+        hint,
+      }
+    })
+  }, [taxonomy.departments, taxonomy.users])
 
   const openEditor = async (newsId = null) => {
     if (!newsId) {
@@ -832,6 +917,9 @@ const StaffNewsManagement = () => {
               options={taxonomy.departments}
               selected={form.segments.departments}
               onToggle={(v) => toggleSegment('department', v)}
+              searchable
+              searchPlaceholder="Найти отдел…"
+              scrollable={taxonomy.departments.length > 12}
             />
             <h4>Роли</h4>
             <ChipSelect
@@ -839,12 +927,19 @@ const StaffNewsManagement = () => {
               selected={form.segments.roles}
               onToggle={(v) => toggleSegment('role', v)}
               valueKey="name"
+              searchable
+              searchPlaceholder="Найти роль…"
+              scrollable={taxonomy.roles.length > 12}
             />
             <h4>Сотрудники (точечно)</h4>
             <ChipSelect
-              options={taxonomy.users}
+              options={audienceUserOptions}
               selected={form.segments.users}
               onToggle={(v) => toggleSegment('user', v)}
+              searchable
+              searchPlaceholder="ФИО, отдел или роль…"
+              searchKeys={USER_CHIP_SEARCH_KEYS}
+              scrollable
             />
           </div>
 

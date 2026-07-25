@@ -336,19 +336,6 @@ const createTask = () => async (req, res) => {
       },
     }).catch(() => null)
 
-    notifyTaskParticipants(pool, {
-      taskId,
-      excludeUserId: userId,
-      userIds: [
-        Number(assigneeId),
-        ...(approverIds || []).map(Number),
-        ...(viewerIds || []).map(Number),
-      ],
-      title: 'Новая задача',
-      body: String(title).trim(),
-      type: 'task_created',
-    })
-
     return res.status(201).json({ taskId, task: created })
   } catch (error) {
     console.error('[mobile_staff_app][tasks][create]', error)
@@ -488,6 +475,57 @@ const sendMessage = () => async (req, res) => {
   }
 }
 
+const updateMessage = () => async (req, res) => {
+  try {
+    const userId = req.user.userId
+    const { taskId, messageId } = req.params
+    const { text } = req.body || {}
+    if (!text || !String(text).trim()) {
+      return res.status(400).json({ message: 'Текст сообщения обязателен' })
+    }
+
+    const message = await registerFetch(
+      `/api/tasks/${taskId}/messages-chat-task/${messageId}`,
+      {
+        method: 'PATCH',
+        body: {
+          senderId: userId,
+          text: String(text).trim(),
+        },
+      }
+    )
+
+    return res.json({ message })
+  } catch (error) {
+    console.error('[mobile_staff_app][tasks][updateMessage]', error)
+    return res
+      .status(error.status || 500)
+      .json({ message: error.message || 'Ошибка редактирования сообщения' })
+  }
+}
+
+const deleteMessage = () => async (req, res) => {
+  try {
+    const userId = req.user.userId
+    const { taskId, messageId } = req.params
+
+    const message = await registerFetch(
+      `/api/tasks/${taskId}/messages-chat-task/${messageId}?senderId=${encodeURIComponent(userId)}`,
+      {
+        method: 'DELETE',
+        body: { senderId: userId },
+      }
+    )
+
+    return res.json({ message })
+  } catch (error) {
+    console.error('[mobile_staff_app][tasks][deleteMessage]', error)
+    return res
+      .status(error.status || 500)
+      .json({ message: error.message || 'Ошибка удаления сообщения' })
+  }
+}
+
 const updateDescription = () => async (req, res) => {
   try {
     const userId = req.user.userId
@@ -534,17 +572,7 @@ const updateDeadline = () => async (req, res) => {
         assigned_user_ids: assigned_user_ids || [],
       },
     })
-    const meta = await getTaskMeta(pool, taskId).catch(() => null)
-    notifyTaskParticipants(pool, {
-      taskId,
-      excludeUserId: userId,
-      userIds: assigned_user_ids?.length
-        ? assigned_user_ids
-        : meta?.assigneeIds,
-      title: 'Изменён срок задачи',
-      body: meta?.title || `Задача #${taskId}`,
-      type: 'task_deadline',
-    })
+    // push: register task_deadline_updated
     return res.json({ result: updated })
   } catch (error) {
     console.error('[mobile_staff_app][tasks][deadline]', error)
@@ -596,13 +624,7 @@ const replaceAssignee = () => async (req, res) => {
       method: 'PUT',
       body: { task_id: Number(taskId), old_user_id, new_user_id },
     })
-    const meta = await getTaskMeta(pool, taskId).catch(() => null)
-    safeNotify(pool, {
-      userIds: uniqueUserIds([new_user_id, old_user_id], userId),
-      title: 'Смена исполнителя',
-      body: meta?.title || `Задача #${taskId}`,
-      data: { type: 'task_assignee_changed', taskId: Number(taskId) },
-    })
+    // push: register taskAssigneeChanged
     return res.json(result)
   } catch (error) {
     console.error('[mobile_staff_app][tasks][replace]', error)
@@ -763,13 +785,6 @@ const approveExtension = () => async (req, res) => {
     const { requestId } = req.params
     const { response_comment, new_deadline } = req.body || {}
 
-    const reqRow = await pool
-      .query(
-        `SELECT requester_id, task_id FROM task_deadline_extension_requests WHERE id = $1`,
-        [requestId]
-      )
-      .catch(() => ({ rows: [] }))
-
     const result = await registerFetch(
       `/api/tasks/extension-requests/${requestId}/approve`,
       {
@@ -782,16 +797,7 @@ const approveExtension = () => async (req, res) => {
       }
     )
 
-    const row = reqRow.rows[0]
-    if (row?.requester_id) {
-      const meta = await getTaskMeta(pool, row.task_id).catch(() => null)
-      safeNotify(pool, {
-        userIds: uniqueUserIds([row.requester_id], userId),
-        title: 'Срок продлён',
-        body: meta?.title || `Задача #${row.task_id}`,
-        data: { type: 'task_extension_approved', taskId: Number(row.task_id) },
-      })
-    }
+    // push: register extension_request_approved
     return res.json(result)
   } catch (error) {
     console.error('[mobile_staff_app][tasks][approveExtension]', error)
@@ -807,13 +813,6 @@ const rejectExtension = () => async (req, res) => {
     const { requestId } = req.params
     const { response_comment } = req.body || {}
 
-    const reqRow = await pool
-      .query(
-        `SELECT requester_id, task_id FROM task_deadline_extension_requests WHERE id = $1`,
-        [requestId]
-      )
-      .catch(() => ({ rows: [] }))
-
     const result = await registerFetch(
       `/api/tasks/extension-requests/${requestId}/reject`,
       {
@@ -825,16 +824,7 @@ const rejectExtension = () => async (req, res) => {
       }
     )
 
-    const row = reqRow.rows[0]
-    if (row?.requester_id) {
-      const meta = await getTaskMeta(pool, row.task_id).catch(() => null)
-      safeNotify(pool, {
-        userIds: uniqueUserIds([row.requester_id], userId),
-        title: 'Продление отклонено',
-        body: meta?.title || `Задача #${row.task_id}`,
-        data: { type: 'task_extension_rejected', taskId: Number(row.task_id) },
-      })
-    }
+    // push: register extension_request_rejected
     return res.json(result)
   } catch (error) {
     console.error('[mobile_staff_app][tasks][rejectExtension]', error)
@@ -878,6 +868,8 @@ module.exports = {
   decideTask,
   getMessages,
   sendMessage,
+  updateMessage,
+  deleteMessage,
   updateDescription,
   updateDeadline,
   requestExtension,

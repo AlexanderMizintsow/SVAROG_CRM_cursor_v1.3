@@ -5,6 +5,10 @@ const fs = require('fs')
 const path = require('path')
 const { BPE_API_URL } = require('../config')
 const userAbsence = require('../userAbsenceService')
+const {
+  notifyStaffDevicesSafe,
+  notifyStaffProjectEvent,
+} = require('../staffMobilePush')
 
 let _warnedMissingBpeUrl = false
 
@@ -53,8 +57,8 @@ async function getGlobalTaskParticipantUserIds(db, globalTaskId) {
   return Array.from(ids)
 }
 
-function emitGlobalTaskChanged(io, userIds, globalTaskId, reason, payload = {}) {
-  if (!io || !userIds || userIds.length === 0 || !globalTaskId) return
+function emitGlobalTaskChanged(dbPool, io, userIds, globalTaskId, reason, payload = {}) {
+  if (!userIds || userIds.length === 0 || !globalTaskId) return
   const message = {
     globalTaskId: Number(globalTaskId),
     reason: reason || 'changed',
@@ -65,8 +69,14 @@ function emitGlobalTaskChanged(io, userIds, globalTaskId, reason, payload = {}) 
     ...(payload.isUnpublishedEmailChange === true && { isUnpublishedEmailChange: true }),
     ...(payload.performedByUserId != null && { performedByUserId: Number(payload.performedByUserId) }),
   }
-  for (const uid of userIds) {
-    io.to(String(uid)).emit('globalTaskChanged', message)
+  if (io) {
+    for (const uid of userIds) {
+      io.to(String(uid)).emit('globalTaskChanged', message)
+    }
+  }
+  // Expo push для POZ-Staff (веб + мобилка)
+  if (dbPool) {
+    notifyStaffProjectEvent(dbPool, userIds, globalTaskId, reason, payload)
   }
 }
 
@@ -100,7 +110,7 @@ async function checkAndEmitProgress100(dbPool, io, globalTaskId) {
     const authorId = r.rows[0].author_id != null ? Number(r.rows[0].author_id) : null
     const participantIds = await getGlobalTaskParticipantUserIds(dbPool, globalTaskId)
     if (participantIds && participantIds.length > 0) {
-      emitGlobalTaskChanged(io, participantIds, globalTaskId, 'progress_100', { title, authorId })
+      emitGlobalTaskChanged(dbPool, io, participantIds, globalTaskId, 'progress_100', { title, authorId })
     }
   } catch (err) {
     console.error('checkAndEmitProgress100:', err)
@@ -384,6 +394,17 @@ function replaceTaskAssignment(dbPool, io) {
           false,
         ]
       )
+
+      notifyStaffDevicesSafe(dbPool, {
+        userIds: [old_user_id, effectiveNewUserId],
+        title: 'Смена исполнителя',
+        body: `Исполнитель задачи «${title}» изменён`,
+        data: {
+          type: 'task',
+          taskId: Number(task_id),
+          event_type: 'taskAssigneeChanged',
+        },
+      })
 
       // 5. Отправляем события через сокет
       io.emit('notification', {
@@ -722,7 +743,7 @@ function addTaskAttachment(dbPool, io) {
             const titleRes = await dbPool.query('SELECT title FROM global_tasks WHERE id = $1', [
               globalTaskId,
             ])
-            emitGlobalTaskChanged(io, participantIds, globalTaskId, 'attachment', {
+            emitGlobalTaskChanged(dbPool, io, participantIds, globalTaskId, 'attachment', {
               title: titleRes.rows[0]?.title || null,
             })
           }
@@ -741,7 +762,7 @@ function addTaskAttachment(dbPool, io) {
         if (participantIds && participantIds.length > 0) {
           const titleRes = await dbPool.query('SELECT title FROM global_tasks WHERE id = $1', [task_id])
           const projectTitle = titleRes.rows[0]?.title || null
-          emitGlobalTaskChanged(io, participantIds, task_id, 'attachment', { title: projectTitle })
+          emitGlobalTaskChanged(dbPool, io, participantIds, task_id, 'attachment', { title: projectTitle })
         }
       }
       io.emit('taskAttachment')
@@ -943,6 +964,12 @@ function notifyTaskCreated(dbPool, io) {
               [uid, taskIdNum, message]
             )
           }
+          notifyStaffDevicesSafe(dbPool, {
+            userIds: recipientIds,
+            title: 'Новая задача',
+            body: message,
+            data: { type: 'task', taskId: taskIdNum, event_type: 'task_created' },
+          })
         }
       }
 
@@ -960,7 +987,7 @@ function notifyTaskCreated(dbPool, io) {
           const gtRow = await dbPool.query('SELECT title FROM global_tasks WHERE id = $1', [globalTaskId])
           const projectTitle = gtRow.rows[0]?.title || null
           const assigneeIdStrings = assigneeIds.map((u) => String(u))
-          emitGlobalTaskChanged(io, assigneeIdStrings, globalTaskId, 'subtask_added', { title: projectTitle })
+          emitGlobalTaskChanged(dbPool, io, assigneeIdStrings, globalTaskId, 'subtask_added', { title: projectTitle })
         }
       }
 
@@ -1012,7 +1039,7 @@ function updateTaskStatus(dbPool, io) {
             const titleRes = await dbPool.query('SELECT title FROM global_tasks WHERE id = $1', [
               updatedTask.global_task_id,
             ])
-            emitGlobalTaskChanged(io, participantIds, updatedTask.global_task_id, 'subtask_status_done', {
+            emitGlobalTaskChanged(dbPool, io, participantIds, updatedTask.global_task_id, 'subtask_status_done', {
               title: titleRes.rows[0]?.title || null,
             })
           }
@@ -1138,7 +1165,7 @@ function updateTaskAccept(dbPool, io) {
 
       if (globalTaskIdForEmit) {
         const participantIds = await getGlobalTaskParticipantUserIds(dbPool, globalTaskIdForEmit)
-        emitGlobalTaskChanged(io, participantIds, globalTaskIdForEmit, 'subtaskAccept')
+        emitGlobalTaskChanged(dbPool, io, participantIds, globalTaskIdForEmit, 'subtaskAccept')
         await checkAndEmitProgress100(dbPool, io, globalTaskIdForEmit)
         notifyBpeProjectUpdated(Number(globalTaskIdForEmit))
       }
@@ -1280,11 +1307,41 @@ function postMessagesNotificationDealer(dbPool) {
 }
 
 // ЧАТ***********
+const DELETED_MESSAGE_PLACEHOLDER = 'Сообщение удалено'
+
+function formatTaskChatMessage(row) {
+  if (!row) return null
+  const isDeleted = row.is_deleted === true
+  const repliedDeleted = row.replied_message_is_deleted === true
+  return {
+    id: row.id,
+    text: isDeleted ? DELETED_MESSAGE_PLACEHOLDER : row.text,
+    timestamp: row.timestamp,
+    task_author_id: row.task_author_id,
+    sender_id: row.sender_id,
+    read_status: row.read_status,
+    replied_to_message_id: row.replied_to_message_id,
+    sender_name: row.sender_name,
+    author_name: row.author_name,
+    edited_at: row.edited_at || null,
+    is_deleted: isDeleted,
+    deleted_at: row.deleted_at || null,
+    replied_message: row.replied_to_message_id
+      ? {
+          id: row.replied_to_message_id,
+          text: repliedDeleted ? DELETED_MESSAGE_PLACEHOLDER : row.replied_message_text,
+          sender_id: row.replied_message_sender_id,
+          sender_name: row.replied_message_sender_name,
+          is_deleted: repliedDeleted,
+        }
+      : null,
+  }
+}
+
 // Получение сообщений для задачи
 function getTaskMessages(dbPool) {
   return async function (req, res) {
     const taskId = req.params.taskId
-    const userId = req.user?.userId
 
     if (!taskId) {
       return res.status(400).json({ error: 'Необходимо указать taskId' })
@@ -1301,10 +1358,14 @@ function getTaskMessages(dbPool) {
           m.sender_id, 
           m.read_status,
           m.replied_to_message_id,
+          m.edited_at,
+          COALESCE(m.is_deleted, FALSE) AS is_deleted,
+          m.deleted_at,
           CONCAT(LEFT(u.first_name, 1), '. ', u.last_name) AS sender_name,
           CONCAT(LEFT(a.first_name, 1), '. ', a.last_name) AS author_name,
           rm.text AS replied_message_text,
           rm.sender_id AS replied_message_sender_id,
+          COALESCE(rm.is_deleted, FALSE) AS replied_message_is_deleted,
           CONCAT(LEFT(ru.first_name, 1), '. ', ru.last_name) AS replied_message_sender_name
         FROM messages_task m
         JOIN users u ON m.sender_id = u.id
@@ -1317,20 +1378,7 @@ function getTaskMessages(dbPool) {
         [taskId]
       )
 
-      // Форматируем ответ, чтобы включить информацию о replied_message
-      const formattedMessages = result.rows.map((message) => ({
-        ...message,
-        replied_message: message.replied_to_message_id
-          ? {
-              id: message.replied_to_message_id,
-              text: message.replied_message_text,
-              sender_id: message.replied_message_sender_id,
-              sender_name: message.replied_message_sender_name,
-            }
-          : null,
-      }))
-
-      res.status(200).json(formattedMessages)
+      res.status(200).json(result.rows.map(formatTaskChatMessage))
     } catch (error) {
       console.error('Ошибка при загрузке сообщений:', error)
       res.status(500).json({ error: 'Внутренняя ошибка сервера' })
@@ -1367,10 +1415,18 @@ function sendTaskMessage(dbPool, io) {
       let repliedMessage = null
       if (message.replied_to_message_id) {
         const repliedResult = await dbPool.query(
-          `SELECT id, text, sender_id FROM messages_task WHERE id = $1`,
+          `SELECT id, text, sender_id, COALESCE(is_deleted, FALSE) AS is_deleted FROM messages_task WHERE id = $1`,
           [message.replied_to_message_id]
         )
-        repliedMessage = repliedResult.rows[0]
+        const replied = repliedResult.rows[0]
+        if (replied) {
+          repliedMessage = {
+            id: replied.id,
+            text: replied.is_deleted ? DELETED_MESSAGE_PLACEHOLDER : replied.text,
+            sender_id: replied.sender_id,
+            is_deleted: replied.is_deleted === true,
+          }
+        }
       }
 
       // Получение user_id из таблицы task_assignments
@@ -1383,7 +1439,10 @@ function sendTaskMessage(dbPool, io) {
 
       const responseMessage = {
         ...message,
-        replied_message: repliedMessage, // Добавляем информацию о сообщении, на которое отвечаем
+        is_deleted: false,
+        edited_at: null,
+        deleted_at: null,
+        replied_message: repliedMessage,
         assigned_user: assignedUser,
         task_ids: taskId,
         title,
@@ -1394,6 +1453,142 @@ function sendTaskMessage(dbPool, io) {
     } catch (error) {
       console.error('Ошибка при отправке сообщения:', error)
       res.status(500).json({ error: 'Внутренняя ошибка сервера' })
+    }
+  }
+}
+
+// Редактирование своего сообщения в чате задачи
+function updateTaskMessage(dbPool, io) {
+  return async function (req, res) {
+    const { taskId, messageId } = req.params
+    const { text, senderId } = req.body || {}
+    const userId = senderId || req.user?.userId
+
+    if (!taskId || !messageId) {
+      return res.status(400).json({ error: 'Необходимо указать taskId и messageId' })
+    }
+    if (!userId) {
+      return res.status(400).json({ error: 'Необходимо указать senderId' })
+    }
+    const nextText = typeof text === 'string' ? text.trim() : ''
+    if (!nextText) {
+      return res.status(400).json({ error: 'Текст сообщения обязателен' })
+    }
+
+    try {
+      const existing = await dbPool.query(
+        `SELECT id, sender_id, task_id, COALESCE(is_deleted, FALSE) AS is_deleted
+         FROM messages_task WHERE id = $1 AND task_id = $2`,
+        [messageId, taskId]
+      )
+      if (!existing.rows.length) {
+        return res.status(404).json({ error: 'Сообщение не найдено' })
+      }
+      const row = existing.rows[0]
+      if (Number(row.sender_id) !== Number(userId)) {
+        return res.status(403).json({ error: 'Можно редактировать только свои сообщения' })
+      }
+      if (row.is_deleted) {
+        return res.status(400).json({ error: 'Удалённое сообщение нельзя редактировать' })
+      }
+
+      const updated = await dbPool.query(
+        `UPDATE messages_task
+         SET text = $1, edited_at = NOW()
+         WHERE id = $2 AND task_id = $3
+         RETURNING id, task_id, sender_id, task_author_id, text, timestamp,
+                   read_status, replied_to_message_id, edited_at,
+                   COALESCE(is_deleted, FALSE) AS is_deleted, deleted_at`,
+        [nextText, messageId, taskId]
+      )
+
+      const message = updated.rows[0]
+      const nameRes = await dbPool.query(
+        `SELECT CONCAT(LEFT(first_name, 1), '. ', last_name) AS sender_name FROM users WHERE id = $1`,
+        [message.sender_id]
+      )
+
+      const responseMessage = {
+        ...message,
+        sender_name: nameRes.rows[0]?.sender_name || null,
+        text: message.text,
+        is_deleted: false,
+      }
+
+      io.emit('taskChatMessageUpdated', responseMessage)
+      return res.status(200).json(responseMessage)
+    } catch (error) {
+      console.error('Ошибка при редактировании сообщения:', error)
+      return res.status(500).json({ error: 'Внутренняя ошибка сервера' })
+    }
+  }
+}
+
+// Мягкое удаление своего сообщения в чате задачи
+function deleteTaskMessage(dbPool, io) {
+  return async function (req, res) {
+    const { taskId, messageId } = req.params
+    const { senderId } = req.body || {}
+    const userId = senderId || req.query?.senderId || req.user?.userId
+
+    if (!taskId || !messageId) {
+      return res.status(400).json({ error: 'Необходимо указать taskId и messageId' })
+    }
+    if (!userId) {
+      return res.status(400).json({ error: 'Необходимо указать senderId' })
+    }
+
+    try {
+      const existing = await dbPool.query(
+        `SELECT id, sender_id, task_id, COALESCE(is_deleted, FALSE) AS is_deleted
+         FROM messages_task WHERE id = $1 AND task_id = $2`,
+        [messageId, taskId]
+      )
+      if (!existing.rows.length) {
+        return res.status(404).json({ error: 'Сообщение не найдено' })
+      }
+      const row = existing.rows[0]
+      if (Number(row.sender_id) !== Number(userId)) {
+        return res.status(403).json({ error: 'Можно удалять только свои сообщения' })
+      }
+      if (row.is_deleted) {
+        return res.status(200).json({
+          id: Number(messageId),
+          task_id: Number(taskId),
+          sender_id: Number(row.sender_id),
+          text: DELETED_MESSAGE_PLACEHOLDER,
+          is_deleted: true,
+        })
+      }
+
+      const updated = await dbPool.query(
+        `UPDATE messages_task
+         SET is_deleted = TRUE, deleted_at = NOW()
+         WHERE id = $1 AND task_id = $2
+         RETURNING id, task_id, sender_id, task_author_id, text, timestamp,
+                   read_status, replied_to_message_id, edited_at,
+                   COALESCE(is_deleted, FALSE) AS is_deleted, deleted_at`,
+        [messageId, taskId]
+      )
+
+      const message = updated.rows[0]
+      const nameRes = await dbPool.query(
+        `SELECT CONCAT(LEFT(first_name, 1), '. ', last_name) AS sender_name FROM users WHERE id = $1`,
+        [message.sender_id]
+      )
+
+      const responseMessage = {
+        ...message,
+        sender_name: nameRes.rows[0]?.sender_name || null,
+        text: DELETED_MESSAGE_PLACEHOLDER,
+        is_deleted: true,
+      }
+
+      io.emit('taskChatMessageUpdated', responseMessage)
+      return res.status(200).json(responseMessage)
+    } catch (error) {
+      console.error('Ошибка при удалении сообщения:', error)
+      return res.status(500).json({ error: 'Внутренняя ошибка сервера' })
     }
   }
 }
@@ -1574,7 +1769,7 @@ function createGlobalTask(dbPool, io) {
 
       // realtime: оповещаем всех участников проекта (уведомление о создании для всех)
       const participantIds = await getGlobalTaskParticipantUserIds(dbPool, newTaskId)
-      emitGlobalTaskChanged(io, participantIds, newTaskId, 'created', { title, authorId: created_by })
+      emitGlobalTaskChanged(dbPool, io, participantIds, newTaskId, 'created', { title, authorId: created_by })
 
       // BPE: уведомляем движок о появлении/изменении проекта (событийные развилки по проекту)
       notifyBpeProjectUpdated(Number(newTaskId))
@@ -1865,7 +2060,7 @@ function updateGlobalTask(dbPool, io) {
       if (result.rows.length > 0) {
         const newParticipantIds = await getGlobalTaskParticipantUserIds(client, taskId)
         const allIds = Array.from(new Set([...(oldParticipantIds || []), ...(newParticipantIds || [])]))
-        emitGlobalTaskChanged(io, allIds, taskId, 'updated')
+        emitGlobalTaskChanged(dbPool, io, allIds, taskId, 'updated')
         notifyBpeProjectUpdated(Number(taskId))
         res.status(200).json(result.rows[0]) // Возвращаем обновленную задачу
       } else {
@@ -2102,9 +2297,9 @@ function updateGlobalTaskProcess(dbPool, io) {
       const projectTitle = taskRow?.title || null
       const authorId = taskRow?.created_by || null
       if (io && participantIds && participantIds.length > 0) {
-        emitGlobalTaskChanged(io, participantIds, taskId, 'status', { title: projectTitle, authorId })
+        emitGlobalTaskChanged(dbPool, io, participantIds, taskId, 'status', { title: projectTitle, authorId })
         if (status === 'Завершено') {
-          emitGlobalTaskChanged(io, participantIds, taskId, 'progress_100', { title: projectTitle, authorId })
+          emitGlobalTaskChanged(dbPool, io, participantIds, taskId, 'progress_100', { title: projectTitle, authorId })
         }
       }
 
@@ -2186,7 +2381,7 @@ function setProjectDeadline(dbPool, io) {
       const title = row.title || 'Проект'
       const deadlineIso = deadlineDate.toISOString()
       if (io && exceptAuthor.length > 0) {
-        emitGlobalTaskChanged(io, exceptAuthor, taskId, 'deadline_set', {
+        emitGlobalTaskChanged(dbPool, io, exceptAuthor, taskId, 'deadline_set', {
           title,
           authorId,
           deadline: deadlineIso,
@@ -2239,7 +2434,7 @@ function deleteGlobalTask(dbPool, io) {
       await insertTaskHistory(dbPool, taskId, 'удаление', 'Проект удалён', userId, null)
 
       if (io && participantIds && participantIds.length > 0) {
-        emitGlobalTaskChanged(io, participantIds, taskId, 'deleted', { title: projectTitle })
+        emitGlobalTaskChanged(dbPool, io, participantIds, taskId, 'deleted', { title: projectTitle })
       }
       notifyBpeProjectUpdated(Number(taskId))
 
@@ -2396,7 +2591,7 @@ function createFinalSolution(dbPool) {
         const gt = await dbPool.query('SELECT title, created_by FROM global_tasks WHERE id = $1', [taskId])
         const projectTitle = gt.rows[0]?.title || null
         const authorId = gt.rows[0]?.created_by || null
-        emitGlobalTaskChanged(io, userIds, taskId, 'final_solution_added', { title: projectTitle, authorId, performedByUserId: uid })
+        emitGlobalTaskChanged(dbPool, io, userIds, taskId, 'final_solution_added', { title: projectTitle, authorId, performedByUserId: uid })
       }
       res.status(201).json({
         id: row.id,
@@ -2448,7 +2643,7 @@ function updateFinalSolution(dbPool) {
         const gt = await dbPool.query('SELECT title, created_by FROM global_tasks WHERE id = $1', [taskId])
         const projectTitle = gt.rows[0]?.title || null
         const authorId = gt.rows[0]?.created_by || null
-        emitGlobalTaskChanged(io, userIds, taskId, 'final_solution_updated', { title: projectTitle, authorId, performedByUserId: uid })
+        emitGlobalTaskChanged(dbPool, io, userIds, taskId, 'final_solution_updated', { title: projectTitle, authorId, performedByUserId: uid })
       }
       res.status(200).json({
         id: row.id,
@@ -2490,7 +2685,7 @@ function deleteFinalSolution(dbPool) {
         const gt = await dbPool.query('SELECT title, created_by FROM global_tasks WHERE id = $1', [taskId])
         const projectTitle = gt.rows[0]?.title || null
         const authorId = gt.rows[0]?.created_by || null
-        emitGlobalTaskChanged(io, userIds, taskId, 'final_solution_deleted', { title: projectTitle, authorId, performedByUserId: userId })
+        emitGlobalTaskChanged(dbPool, io, userIds, taskId, 'final_solution_deleted', { title: projectTitle, authorId, performedByUserId: userId })
       }
       res.status(200).json({ success: true })
     } catch (err) {
@@ -2545,7 +2740,7 @@ function createFirstSentEmailSolution(dbPool) {
       if (io) {
         const userIds = await getGlobalTaskParticipantUserIds(dbPool, gid)
         const gt = await dbPool.query('SELECT title, created_by FROM global_tasks WHERE id = $1', [gid])
-        emitGlobalTaskChanged(io, userIds, gid, 'final_solution_added', {
+        emitGlobalTaskChanged(dbPool, io, userIds, gid, 'final_solution_added', {
           title: gt.rows[0]?.title,
           authorId: gt.rows[0]?.created_by,
           isUnpublishedEmailChange: true,
@@ -2745,7 +2940,7 @@ function createFinalSolutionFromEmailReply(dbPool) {
           [solutionId]
         )
         const senderUserIds = (senderRows.rows || []).map((r) => Number(r.user_id)).filter(Boolean)
-        emitGlobalTaskChanged(io, userIds, global_task_id, existingSolutionId ? 'final_solution_updated' : 'final_solution_added', {
+        emitGlobalTaskChanged(dbPool, io, userIds, global_task_id, existingSolutionId ? 'final_solution_updated' : 'final_solution_added', {
           title: projectTitle,
           authorId: created_by,
           isEmailReply: true,
@@ -2807,7 +3002,7 @@ function appendThreadMessage(dbPool) {
       if (io) {
         const userIds = await getGlobalTaskParticipantUserIds(dbPool, taskId)
         const gt = await dbPool.query('SELECT title FROM global_tasks WHERE id = $1', [taskId])
-        emitGlobalTaskChanged(io, userIds, taskId, 'final_solution_updated', {
+        emitGlobalTaskChanged(dbPool, io, userIds, taskId, 'final_solution_updated', {
           title: gt.rows[0]?.title,
           isUnpublishedEmailChange: true,
         })
@@ -2875,7 +3070,7 @@ function updateThreadMessage(dbPool) {
         const userIds = await getGlobalTaskParticipantUserIds(dbPool, taskId)
         const gt = await dbPool.query('SELECT title FROM global_tasks WHERE id = $1', [taskId])
         const uid = userId ? parseInt(userId, 10) : null
-        emitGlobalTaskChanged(io, userIds, taskId, 'final_solution_updated', { title: gt.rows[0]?.title, performedByUserId: uid })
+        emitGlobalTaskChanged(dbPool, io, userIds, taskId, 'final_solution_updated', { title: gt.rows[0]?.title, performedByUserId: uid })
       }
       res.status(200).json({ success: true })
     } catch (err) {
@@ -2953,7 +3148,7 @@ function addEmailAttachmentToProject(dbPool) {
       const participantIds = await getGlobalTaskParticipantUserIds(dbPool, taskId)
       if (io && participantIds?.length) {
         const gt = await dbPool.query('SELECT title FROM global_tasks WHERE id = $1', [taskId])
-        emitGlobalTaskChanged(io, participantIds, taskId, 'attachment', { title: gt.rows[0]?.title })
+        emitGlobalTaskChanged(dbPool, io, participantIds, taskId, 'attachment', { title: gt.rows[0]?.title })
       }
       res.status(200).json({ success: true, file_url: fileUrl })
     } catch (err) {
@@ -2985,7 +3180,7 @@ function updateEmailThreadContent(dbPool) {
       if (io) {
         const userIds = await getGlobalTaskParticipantUserIds(dbPool, taskId)
         const gt = await dbPool.query('SELECT title FROM global_tasks WHERE id = $1', [taskId])
-        emitGlobalTaskChanged(io, userIds, taskId, 'final_solution_updated', { title: gt.rows[0]?.title, isUnpublishedEmailChange: true })
+        emitGlobalTaskChanged(dbPool, io, userIds, taskId, 'final_solution_updated', { title: gt.rows[0]?.title, isUnpublishedEmailChange: true })
       }
       res.status(200).json({ success: true })
     } catch (err) {
@@ -3021,7 +3216,7 @@ function publishFinalSolution(dbPool) {
         const gt = await dbPool.query('SELECT title, created_by FROM global_tasks WHERE id = $1', [taskId])
         const projectTitle = gt.rows[0]?.title || null
         const uid = userId ? parseInt(userId, 10) : null
-        emitGlobalTaskChanged(io, userIds, taskId, 'final_solution_updated', { title: projectTitle, performedByUserId: uid })
+        emitGlobalTaskChanged(dbPool, io, userIds, taskId, 'final_solution_updated', { title: projectTitle, performedByUserId: uid })
       }
       res.status(200).json({ success: true })
     } catch (err) {
@@ -3325,8 +3520,8 @@ function addResponsiblesToGlobalTask(dbPool, io) {
       const titleRes = await dbPool.query('SELECT title FROM global_tasks WHERE id = $1', [taskId])
       const projectTitle = titleRes.rows[0]?.title || null
       if (io && participantIds && participantIds.length > 0) {
-        emitGlobalTaskChanged(io, participantIds, taskId, 'responsiblesAdded', { title: projectTitle })
-        emitGlobalTaskChanged(io, userIds.map(String), taskId, 'participant_added', { title: projectTitle })
+        emitGlobalTaskChanged(dbPool, io, participantIds, taskId, 'responsiblesAdded', { title: projectTitle })
+        emitGlobalTaskChanged(dbPool, io, userIds.map(String), taskId, 'participant_added', { title: projectTitle })
       }
       notifyBpeProjectUpdated(Number(taskId))
 
@@ -3390,7 +3585,7 @@ function setProjectApproval(dbPool, io) {
       const participantIds = await getGlobalTaskParticipantUserIds(dbPool, taskId)
       const titleRes = await dbPool.query('SELECT title FROM global_tasks WHERE id = $1', [taskId])
       const projectTitle = titleRes.rows[0]?.title || null
-      emitGlobalTaskChanged(io, participantIds, taskId, 'approval', { title: projectTitle })
+      emitGlobalTaskChanged(dbPool, io, participantIds, taskId, 'approval', { title: projectTitle })
       if (status === 'approved') {
         await checkAndEmitProgress100(dbPool, io, taskId)
       }
@@ -3467,9 +3662,9 @@ function removeResponsibleFromGlobalTask(dbPool, io) {
       if (io) {
         const remainingIds = participantIds.filter((uid) => String(uid) !== String(targetUserId))
         if (remainingIds.length > 0) {
-          emitGlobalTaskChanged(io, remainingIds, taskId, 'responsibleRemoved', { title: projectTitle })
+          emitGlobalTaskChanged(dbPool, io, remainingIds, taskId, 'responsibleRemoved', { title: projectTitle })
         }
-        emitGlobalTaskChanged(io, [String(targetUserId)], taskId, 'participant_removed', { title: projectTitle })
+        emitGlobalTaskChanged(dbPool, io, [String(targetUserId)], taskId, 'participant_removed', { title: projectTitle })
       }
       notifyBpeProjectUpdated(Number(taskId))
 
@@ -3496,7 +3691,7 @@ function updateGoals(dbPool, io) {
       const titleRes = await dbPool.query('SELECT title FROM global_tasks WHERE id = $1', [id])
       const projectTitle = titleRes.rows[0]?.title || null
       if (io && participantIds && participantIds.length > 0) {
-        emitGlobalTaskChanged(io, participantIds, id, 'goals', { title: projectTitle })
+        emitGlobalTaskChanged(dbPool, io, participantIds, id, 'goals', { title: projectTitle })
       }
       res.json({ message: 'Цели обновлены' })
     } catch (err) {
@@ -3521,7 +3716,7 @@ function updateAdditionalInfo(dbPool, io) {
       const titleRes = await dbPool.query('SELECT title FROM global_tasks WHERE id = $1', [id])
       const projectTitle = titleRes.rows[0]?.title || null
       if (io && participantIds && participantIds.length > 0) {
-        emitGlobalTaskChanged(io, participantIds, id, 'additionalInfo', { title: projectTitle })
+        emitGlobalTaskChanged(dbPool, io, participantIds, id, 'additionalInfo', { title: projectTitle })
       }
       res.json({ message: 'Дополнительная информация обновлена' })
     } catch (err) {
@@ -3533,6 +3728,25 @@ function updateAdditionalInfo(dbPool, io) {
 
 // Чат глобальных задач ***
 
+function formatProjectChatMessage(row) {
+  if (!row) return null
+  const isDeleted = row.is_deleted === true
+  const repliedDeleted = row.replied_is_deleted === true
+  return {
+    ...row,
+    text: isDeleted ? DELETED_MESSAGE_PLACEHOLDER : row.text,
+    edited_at: row.edited_at || null,
+    is_deleted: isDeleted,
+    deleted_at: row.deleted_at || null,
+    replied_text: row.replied_id
+      ? repliedDeleted
+        ? DELETED_MESSAGE_PLACEHOLDER
+        : row.replied_text
+      : row.replied_text,
+    replied_is_deleted: row.replied_id ? repliedDeleted : undefined,
+  }
+}
+
 // Получить сообщения для глобальной задачи
 function getChatMessages(dbPool) {
   return async function (req, res) {
@@ -3542,13 +3756,22 @@ function getChatMessages(dbPool) {
       const result = await dbPool.query(
         `
         SELECT 
-          m.*,
+          m.id,
+          m.global_task_id,
+          m.user_id,
+          m.text,
+          m.timestamp,
+          m.replied_to_message_id,
+          m.edited_at,
+          COALESCE(m.is_deleted, FALSE) AS is_deleted,
+          m.deleted_at,
           u.first_name,
           u.last_name,
           u.avatar_url,
           replied_msg.id as replied_id,
           replied_msg.text as replied_text,
           replied_msg.timestamp as replied_timestamp,
+          COALESCE(replied_msg.is_deleted, FALSE) AS replied_is_deleted,
           replied_user.first_name as replied_first_name,
           replied_user.last_name as replied_last_name,
           replied_user.avatar_url as replied_avatar_url
@@ -3564,7 +3787,7 @@ function getChatMessages(dbPool) {
         [globalTaskId]
       )
 
-      res.json(result.rows)
+      res.json(result.rows.map(formatProjectChatMessage))
     } catch (err) {
       console.error('Ошибка при получении сообщений:', err)
       res.status(500).json({ error: 'Ошибка получения сообщений' })
@@ -3618,12 +3841,160 @@ function sendChatMessage(dbPool, io) {
         userIds.push(creatorId)
       }
 
-      res.json(result.rows[0])
+      const message = {
+        ...result.rows[0],
+        edited_at: null,
+        is_deleted: false,
+        deleted_at: null,
+      }
+
+      res.json(message)
 
       io.emit('newMessageGlobalTaskChat', globalTaskId, userIds, title, userId) // еще айди пользователей к этой задаче
     } catch (err) {
       console.error('Ошибка при отправке сообщения:', err)
       res.status(500).json({ error: 'Ошибка отправки сообщения' })
+    }
+  }
+}
+
+// Редактирование своего сообщения в чате проекта
+function updateChatMessage(dbPool, io) {
+  return async function (req, res) {
+    const { globalTaskId, messageId } = req.params
+    const { text, userId: bodyUserId } = req.body || {}
+    const userId = bodyUserId || req.user?.userId
+
+    if (!globalTaskId || !messageId) {
+      return res.status(400).json({ error: 'Необходимо указать globalTaskId и messageId' })
+    }
+    if (!userId) {
+      return res.status(400).json({ error: 'Необходимо указать userId' })
+    }
+    const nextText = typeof text === 'string' ? text.trim() : ''
+    if (!nextText) {
+      return res.status(400).json({ error: 'Текст сообщения обязателен' })
+    }
+
+    try {
+      const existing = await dbPool.query(
+        `SELECT id, user_id, global_task_id, COALESCE(is_deleted, FALSE) AS is_deleted
+         FROM global_task_chat_messages WHERE id = $1 AND global_task_id = $2`,
+        [messageId, globalTaskId]
+      )
+      if (!existing.rows.length) {
+        return res.status(404).json({ error: 'Сообщение не найдено' })
+      }
+      const row = existing.rows[0]
+      if (Number(row.user_id) !== Number(userId)) {
+        return res.status(403).json({ error: 'Можно редактировать только свои сообщения' })
+      }
+      if (row.is_deleted) {
+        return res.status(400).json({ error: 'Удалённое сообщение нельзя редактировать' })
+      }
+
+      const updated = await dbPool.query(
+        `UPDATE global_task_chat_messages
+         SET text = $1, edited_at = NOW()
+         WHERE id = $2 AND global_task_id = $3
+         RETURNING id, global_task_id, user_id, text, timestamp,
+                   replied_to_message_id, edited_at,
+                   COALESCE(is_deleted, FALSE) AS is_deleted, deleted_at`,
+        [nextText, messageId, globalTaskId]
+      )
+
+      const message = updated.rows[0]
+      const nameRes = await dbPool.query(
+        `SELECT first_name, last_name, avatar_url FROM users WHERE id = $1`,
+        [message.user_id]
+      )
+      const userRow = nameRes.rows[0] || {}
+
+      const responseMessage = {
+        ...message,
+        first_name: userRow.first_name || null,
+        last_name: userRow.last_name || null,
+        avatar_url: userRow.avatar_url || null,
+        is_deleted: false,
+      }
+
+      io.emit('projectChatMessageUpdated', responseMessage)
+      return res.status(200).json(responseMessage)
+    } catch (error) {
+      console.error('Ошибка при редактировании сообщения проекта:', error)
+      return res.status(500).json({ error: 'Внутренняя ошибка сервера' })
+    }
+  }
+}
+
+// Мягкое удаление своего сообщения в чате проекта
+function deleteChatMessage(dbPool, io) {
+  return async function (req, res) {
+    const { globalTaskId, messageId } = req.params
+    const { userId: bodyUserId } = req.body || {}
+    const userId = bodyUserId || req.query?.userId || req.user?.userId
+
+    if (!globalTaskId || !messageId) {
+      return res.status(400).json({ error: 'Необходимо указать globalTaskId и messageId' })
+    }
+    if (!userId) {
+      return res.status(400).json({ error: 'Необходимо указать userId' })
+    }
+
+    try {
+      const existing = await dbPool.query(
+        `SELECT id, user_id, global_task_id, COALESCE(is_deleted, FALSE) AS is_deleted
+         FROM global_task_chat_messages WHERE id = $1 AND global_task_id = $2`,
+        [messageId, globalTaskId]
+      )
+      if (!existing.rows.length) {
+        return res.status(404).json({ error: 'Сообщение не найдено' })
+      }
+      const row = existing.rows[0]
+      if (Number(row.user_id) !== Number(userId)) {
+        return res.status(403).json({ error: 'Можно удалять только свои сообщения' })
+      }
+      if (row.is_deleted) {
+        return res.status(200).json({
+          id: Number(messageId),
+          global_task_id: Number(globalTaskId),
+          user_id: Number(row.user_id),
+          text: DELETED_MESSAGE_PLACEHOLDER,
+          is_deleted: true,
+        })
+      }
+
+      const updated = await dbPool.query(
+        `UPDATE global_task_chat_messages
+         SET is_deleted = TRUE, deleted_at = NOW()
+         WHERE id = $1 AND global_task_id = $2
+         RETURNING id, global_task_id, user_id, text, timestamp,
+                   replied_to_message_id, edited_at,
+                   COALESCE(is_deleted, FALSE) AS is_deleted, deleted_at`,
+        [messageId, globalTaskId]
+      )
+
+      const message = updated.rows[0]
+      const nameRes = await dbPool.query(
+        `SELECT first_name, last_name, avatar_url FROM users WHERE id = $1`,
+        [message.user_id]
+      )
+      const userRow = nameRes.rows[0] || {}
+
+      const responseMessage = {
+        ...message,
+        first_name: userRow.first_name || null,
+        last_name: userRow.last_name || null,
+        avatar_url: userRow.avatar_url || null,
+        text: DELETED_MESSAGE_PLACEHOLDER,
+        is_deleted: true,
+      }
+
+      io.emit('projectChatMessageUpdated', responseMessage)
+      return res.status(200).json(responseMessage)
+    } catch (error) {
+      console.error('Ошибка при удалении сообщения проекта:', error)
+      return res.status(500).json({ error: 'Внутренняя ошибка сервера' })
     }
   }
 }
@@ -3793,6 +4164,17 @@ async function cancelOpenSubtasksForProject(dbPool, io, { globalTaskId, projectT
        VALUES ($1, $2, $3, 'task_cancelled_by_project', false)`,
       [userId, taskId, message]
     )
+
+    notifyStaffDevicesSafe(dbPool, {
+      userIds: [userId],
+      title: 'Задача отменена',
+      body: message,
+      data: {
+        type: 'task',
+        taskId: Number(taskId),
+        event_type: 'task_cancelled_by_project',
+      },
+    })
 
     if (io) {
       io.emit('notification', {
@@ -4124,6 +4506,17 @@ const rejectExtensionRequest = (dbPool, io) => async (req, res) => {
       [request.requester_id, request.task_id, notificationMessage, 'extension_request_rejected']
     )
 
+    notifyStaffDevicesSafe(dbPool, {
+      userIds: [request.requester_id],
+      title: 'Продление отклонено',
+      body: notificationMessage,
+      data: {
+        type: 'task',
+        taskId: Number(request.task_id),
+        event_type: 'extension_request_rejected',
+      },
+    })
+
     // 4. Отправка WebSocket уведомления
     io.emit('notification', {
       id: notification.rows[0].id,
@@ -4237,6 +4630,17 @@ const approveExtensionRequest = (dbPool, io) => async (req, res) => {
        RETURNING *`,
       [request.requester_id, request.task_id, notificationMessage, 'extension_request_approved']
     )
+
+    notifyStaffDevicesSafe(dbPool, {
+      userIds: [request.requester_id],
+      title: 'Срок продлён',
+      body: notificationMessage,
+      data: {
+        type: 'task',
+        taskId: Number(request.task_id),
+        event_type: 'extension_request_approved',
+      },
+    })
 
     // 7. Отправка WebSocket уведомления
     io.emit('notification', {
@@ -4369,6 +4773,17 @@ const updateTaskDeadline = (dbPool, io) => async (req, res) => {
         newDeadline: formattedDeadline,
       })
     }
+
+    notifyStaffDevicesSafe(dbPool, {
+      userIds: recipients,
+      title: 'Изменён срок задачи',
+      body: notificationMessage,
+      data: {
+        type: 'task',
+        taskId: Number(taskId),
+        event_type: 'task_deadline_updated',
+      },
+    })
 
     // Также отправляем уведомление автору (если он не исполнитель)
     /* if (!recipients.includes(task.author_id)) {
@@ -4805,6 +5220,13 @@ async function sendOverdueNotification(task, dbPool, io) {
       ]
     )
 
+    notifyStaffDevicesSafe(dbPool, {
+      userIds: [user_id],
+      title: 'Просрочена задача',
+      body: `Задача «${title}» просрочена`,
+      data: { type: 'task', taskId: Number(id), event_type: 'taskDeadlineOverdue' },
+    })
+
     // Отправляем событие через сокет
     io.emit('notification', {
       type: 'taskDeadlineOverdue',
@@ -4839,6 +5261,13 @@ async function sendOverdueNotification(task, dbPool, io) {
           false,
         ]
       )
+
+      notifyStaffDevicesSafe(dbPool, {
+        userIds: [created_by],
+        title: 'Просрочена задача',
+        body: `Ваша задача «${title}» просрочена`,
+        data: { type: 'task', taskId: Number(id), event_type: 'taskDeadlineOverdue' },
+      })
 
       // Отправляем событие через сокет
       io.emit('notification', {
@@ -4936,6 +5365,8 @@ module.exports = {
   postMessagesNotificationDealer,
   getTaskMessages,
   sendTaskMessage,
+  updateTaskMessage,
+  deleteTaskMessage,
   markMessagesAsRead,
   createGlobalTask,
   getGlobalTasks,
@@ -4953,6 +5384,8 @@ module.exports = {
   updateAdditionalInfo,
   getChatMessages,
   sendChatMessage,
+  updateChatMessage,
+  deleteChatMessage,
   getGlobalTaskHistory,
   updateGlobalTaskHistory,
   getGlobalTaskTitle,

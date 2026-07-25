@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
 import axios from 'axios'
 import EmojiPicker from 'emoji-picker-react'
-import { FaFolder } from 'react-icons/fa'
+import { FaFolder, FaPen, FaTrash } from 'react-icons/fa'
 import { IoArrowUndoOutline } from 'react-icons/io5'
 import { API_BASE_URL } from '../../../../../../config'
 import useWebSocket from '../../../Boards/subcomponents/useWebSocket'
@@ -51,8 +51,47 @@ const ChatTaskModal = ({
   const [showFileManager, setShowFileManager] = useState(false)
   const [isUploading, setIsUploading] = useState(false)
   const [isProcessingPaste, setIsProcessingPaste] = useState(false)
+  const [editingMessageId, setEditingMessageId] = useState(null)
+  const [editDraft, setEditDraft] = useState('')
+  const [savingEdit, setSavingEdit] = useState(false)
+  const [messagePendingDelete, setMessagePendingDelete] = useState(null)
+  const [deletingMessage, setDeletingMessage] = useState(false)
 
   const userId = user ? user.id : null
+  const taskId = task.id || task.task_id
+
+  const applyChatMessageUpdate = useCallback((updated) => {
+    if (!updated?.id) return
+    setMessages((prev) =>
+      prev.map((msg) => {
+        if (Number(msg.id) === Number(updated.id)) {
+          return {
+            ...msg,
+            ...updated,
+            files: updated.is_deleted ? [] : msg.files,
+          }
+        }
+        if (
+          msg.replied_message &&
+          Number(msg.replied_message.id) === Number(updated.id) &&
+          updated.is_deleted
+        ) {
+          return {
+            ...msg,
+            replied_message: {
+              ...msg.replied_message,
+              text: 'Сообщение удалено',
+              is_deleted: true,
+            },
+          }
+        }
+        return msg
+      })
+    )
+    setEditingMessageId((prev) =>
+      Number(prev) === Number(updated.id) ? null : prev
+    )
+  }, [])
 
   // Функция для прокрутки к сообщению
   const scrollToMessage = useCallback((messageId) => {
@@ -229,7 +268,7 @@ const ChatTaskModal = ({
     [userId, task.id, task.task_id]
   )
 
-  useWebSocket(userId, stableSetMessages, task.id || task.task_id)
+  useWebSocket(userId, stableSetMessages, task.id || task.task_id, applyChatMessageUpdate)
 
   useEffect(() => {
     if (messagesContainerRef.current) {
@@ -341,6 +380,7 @@ const ChatTaskModal = ({
   }, [messages])
 
   const handleClose = () => {
+    setMessagePendingDelete(null)
     setIsClosing(true)
     setTimeout(() => {
       onClose()
@@ -688,6 +728,7 @@ const ChatTaskModal = ({
   }
 
   const handleReplyToMessage = (message) => {
+    if (message?.is_deleted) return
     setReplyingTo(message)
     setTimeout(() => {
       const input = document.querySelector('.chat-input textarea')
@@ -699,6 +740,75 @@ const ChatTaskModal = ({
 
   const cancelReply = () => {
     setReplyingTo(null)
+  }
+
+  const startEditMessage = (message) => {
+    if (!message || message.is_deleted || message.isTemp) return
+    if (Number(message.sender_id) !== Number(currentUser)) return
+    setEditingMessageId(message.id)
+    setEditDraft(message.text || '')
+  }
+
+  const cancelEditMessage = () => {
+    setEditingMessageId(null)
+    setEditDraft('')
+  }
+
+  const saveEditMessage = async () => {
+    if (!editingMessageId) return
+    const nextText = String(editDraft || '').trim()
+    if (!nextText) return
+    setSavingEdit(true)
+    try {
+      const response = await axios.patch(
+        `${API_BASE_URL}5000/api/tasks/${taskId}/messages-chat-task/${editingMessageId}`,
+        {
+          text: nextText,
+          senderId: currentUser,
+        }
+      )
+      applyChatMessageUpdate(response.data)
+      cancelEditMessage()
+    } catch (error) {
+      console.error('Ошибка при редактировании сообщения:', error)
+      alert(error.response?.data?.error || 'Не удалось сохранить изменения')
+    } finally {
+      setSavingEdit(false)
+    }
+  }
+
+  const requestDeleteMessage = (message) => {
+    if (!message || message.is_deleted || message.isTemp) return
+    if (Number(message.sender_id) !== Number(currentUser)) return
+    setMessagePendingDelete(message)
+  }
+
+  const cancelDeleteMessage = () => {
+    if (deletingMessage) return
+    setMessagePendingDelete(null)
+  }
+
+  const confirmDeleteMessage = async () => {
+    const message = messagePendingDelete
+    if (!message || message.is_deleted || message.isTemp) return
+    if (Number(message.sender_id) !== Number(currentUser)) return
+
+    setDeletingMessage(true)
+    try {
+      const response = await axios.delete(
+        `${API_BASE_URL}5000/api/tasks/${taskId}/messages-chat-task/${message.id}`,
+        {
+          data: { senderId: currentUser },
+        }
+      )
+      applyChatMessageUpdate(response.data)
+      setMessagePendingDelete(null)
+    } catch (error) {
+      console.error('Ошибка при удалении сообщения:', error)
+      alert(error.response?.data?.error || 'Не удалось удалить сообщение')
+    } finally {
+      setDeletingMessage(false)
+    }
   }
 
   if (!isOpen && !isClosing) return null
@@ -756,13 +866,17 @@ const ChatTaskModal = ({
 
         {/* Список сообщений */}
         <div className="chat-messages" ref={messagesContainerRef}>
-          {messages.map((message) => (
+          {messages.map((message) => {
+            const isMine = Number(message.sender_id) === Number(currentUser)
+            const isDeleted = message.is_deleted === true
+            const isEditing = Number(editingMessageId) === Number(message.id)
+            return (
             <div
               key={message.id}
               id={`msg-${message.id}`}
-              className={`message ${message.sender_id === currentUser ? 'sent' : 'received'} ${
+              className={`message ${isMine ? 'sent' : 'received'} ${
                 message.read_status ? 'read' : 'unread'
-              }`}
+              } ${isDeleted ? 'deleted' : ''}`}
             >
               {/* Блок ответа на сообщение */}
               {message.replied_message && (
@@ -782,7 +896,9 @@ const ChatTaskModal = ({
                         {message.replied_message.sender_name || 'Отправитель'}:
                       </span>
                     )}
-                    {message.replied_message.text}
+                    {message.replied_message.is_deleted
+                      ? 'Сообщение удалено'
+                      : message.replied_message.text}
                   </div>
                 </div>
               )}
@@ -790,7 +906,7 @@ const ChatTaskModal = ({
               {/* Отправитель и время */}
               <div className="message-header">
                 <span className="sender-name">
-                  {message.sender_id === currentUser ? 'Вы' : message.sender_name || 'Отправитель'}
+                  {isMine ? 'Вы' : message.sender_name || 'Отправитель'}
                 </span>
                 <div className="message-header-actions">
                   <span className="message-time">
@@ -799,27 +915,95 @@ const ChatTaskModal = ({
                       minute: '2-digit',
                     })}
                   </span>
-                  <button
-                    type="button"
-                    className="message-reply-btn"
-                    title="Ответить"
-                    aria-label="Ответить на сообщение"
-                    onMouseDown={(e) => e.preventDefault()}
-                    onClick={(e) => {
-                      e.stopPropagation()
-                      handleReplyToMessage(message)
-                    }}
-                  >
-                    <IoArrowUndoOutline aria-hidden />
-                  </button>
+                  {!isDeleted && !message.isTemp && (
+                    <button
+                      type="button"
+                      className="message-reply-btn"
+                      title="Ответить"
+                      aria-label="Ответить на сообщение"
+                      onMouseDown={(e) => e.preventDefault()}
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        handleReplyToMessage(message)
+                      }}
+                    >
+                      <IoArrowUndoOutline aria-hidden />
+                    </button>
+                  )}
+                  {isMine && !isDeleted && !message.isTemp && (
+                    <>
+                      <button
+                        type="button"
+                        className="message-edit-btn"
+                        title="Редактировать"
+                        aria-label="Редактировать сообщение"
+                        onMouseDown={(e) => e.preventDefault()}
+                        onClick={(e) => {
+                          e.stopPropagation()
+                          startEditMessage(message)
+                        }}
+                      >
+                        <FaPen aria-hidden />
+                      </button>
+                      <button
+                        type="button"
+                        className="message-delete-btn"
+                        title="Удалить"
+                        aria-label="Удалить сообщение"
+                        onMouseDown={(e) => e.preventDefault()}
+                        onClick={(e) => {
+                          e.stopPropagation()
+                          requestDeleteMessage(message)
+                        }}
+                      >
+                        <FaTrash aria-hidden />
+                      </button>
+                    </>
+                  )}
                 </div>
               </div>
 
               {/* Текст сообщения */}
-              <div className="message-text">{message.text}</div>
+              {isEditing ? (
+                <div className="message-edit-box">
+                  <textarea
+                    className="message-edit-input"
+                    value={editDraft}
+                    onChange={(e) => setEditDraft(e.target.value)}
+                    rows={3}
+                  />
+                  <div className="message-edit-actions">
+                    <button
+                      type="button"
+                      className="message-edit-cancel"
+                      onClick={cancelEditMessage}
+                      disabled={savingEdit}
+                    >
+                      Отмена
+                    </button>
+                    <button
+                      type="button"
+                      className="message-edit-save"
+                      onClick={saveEditMessage}
+                      disabled={savingEdit || !String(editDraft || '').trim()}
+                    >
+                      {savingEdit ? 'Сохранение…' : 'Сохранить'}
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                <>
+                  <div className={`message-text ${isDeleted ? 'message-text--deleted' : ''}`}>
+                    {isDeleted ? 'Сообщение удалено' : message.text}
+                  </div>
+                  {!isDeleted && message.edited_at ? (
+                    <div className="message-edited-label">редактировано</div>
+                  ) : null}
+                </>
+              )}
 
               {/* Файлы в сообщении */}
-              {message.files && message.files.length > 0 && (
+              {!isDeleted && message.files && message.files.length > 0 && (
                 <div className="message-files">
                   <ChatFileViewer
                     files={message.files}
@@ -838,7 +1022,8 @@ const ChatTaskModal = ({
                 )}
               </div>
             </div>
-          ))}
+            )
+          })}
         </div>
 
         {/* Поле ввода сообщения */}
@@ -905,6 +1090,43 @@ const ChatTaskModal = ({
             )}
           </div>
         </div>
+
+        {messagePendingDelete ? (
+          <div className="chat-confirm-overlay" role="presentation" onClick={cancelDeleteMessage}>
+            <div
+              className="chat-confirm-dialog"
+              role="dialog"
+              aria-modal="true"
+              aria-labelledby="chat-delete-confirm-title"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <p id="chat-delete-confirm-title" className="chat-confirm-title">
+                Удалить это сообщение?
+              </p>
+              <p className="chat-confirm-text">
+                Сообщение останется в чате как удалённое.
+              </p>
+              <div className="chat-confirm-actions">
+                <button
+                  type="button"
+                  className="chat-confirm-cancel"
+                  onClick={cancelDeleteMessage}
+                  disabled={deletingMessage}
+                >
+                  Отмена
+                </button>
+                <button
+                  type="button"
+                  className="chat-confirm-delete"
+                  onClick={confirmDeleteMessage}
+                  disabled={deletingMessage}
+                >
+                  {deletingMessage ? 'Удаление…' : 'Удалить'}
+                </button>
+              </div>
+            </div>
+          </div>
+        ) : null}
       </div>
 
       {/* Менеджер файлов */}

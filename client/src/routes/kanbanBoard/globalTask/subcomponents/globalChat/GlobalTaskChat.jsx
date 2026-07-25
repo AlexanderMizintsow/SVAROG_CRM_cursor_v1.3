@@ -1,6 +1,6 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react'
 import EmojiPicker from 'emoji-picker-react'
-import { FaRegPaperPlane } from 'react-icons/fa'
+import { FaRegPaperPlane, FaPen, FaTrash } from 'react-icons/fa'
 import { FaRegComments } from 'react-icons/fa6'
 import UserStore from '../../../../../store/userStore'
 import './GlobalTaskChat.scss'
@@ -29,6 +29,11 @@ const GlobalTaskChat = ({
   )
   const [showEmojiPicker, setShowEmojiPicker] = useState(false)
   const [replyingTo, setReplyingTo] = useState(null)
+  const [editingMessageId, setEditingMessageId] = useState(null)
+  const [editDraft, setEditDraft] = useState('')
+  const [savingEdit, setSavingEdit] = useState(false)
+  const [messagePendingDelete, setMessagePendingDelete] = useState(null)
+  const [deletingMessage, setDeletingMessage] = useState(false)
   const messageRefs = useRef({})
 
   const userId = user ? user.id : null
@@ -36,6 +41,35 @@ const GlobalTaskChat = ({
   useEffect(() => {
     globalTaskIdRef.current = globalTaskId
   }, [globalTaskId])
+
+  const applyChatMessageUpdate = useCallback((updated) => {
+    if (!updated?.id) return
+    setMessages((prev) =>
+      prev.map((msg) => {
+        if (Number(msg.id) === Number(updated.id)) {
+          return { ...msg, ...updated }
+        }
+        return msg
+      })
+    )
+    setEditingMessageId((prev) =>
+      Number(prev) === Number(updated.id) ? null : prev
+    )
+
+    const cacheKey = String(globalTaskIdRef.current ?? '')
+    if (!cacheKey) return
+    const store = useTasksManageStore.getState()
+    const cached = store.messagesGlobalTaskById[cacheKey]
+    if (!Array.isArray(cached)) return
+    useTasksManageStore.setState({
+      messagesGlobalTaskById: {
+        ...store.messagesGlobalTaskById,
+        [cacheKey]: cached.map((msg) =>
+          Number(msg.id) === Number(updated.id) ? { ...msg, ...updated } : msg
+        ),
+      },
+    })
+  }, [])
 
   const loadMessages = useCallback(async () => {
     if (globalTaskId == null || globalTaskId === '') return
@@ -48,6 +82,9 @@ const GlobalTaskChat = ({
     setInputText('')
     setReplyingTo(null)
     setShowEmojiPicker(false)
+    setEditingMessageId(null)
+    setEditDraft('')
+    setMessagePendingDelete(null)
 
     const cacheKey = String(globalTaskId ?? '')
     const cached = useTasksManageStore.getState().messagesGlobalTaskById[cacheKey]
@@ -84,6 +121,7 @@ const GlobalTaskChat = ({
   }
 
   const handleReplyToMessage = (message) => {
+    if (message?.is_deleted) return
     setReplyingTo(message)
     setTimeout(() => {
       textareaRef.current?.focus()
@@ -92,6 +130,81 @@ const GlobalTaskChat = ({
 
   const cancelReply = () => {
     setReplyingTo(null)
+  }
+
+  const startEditMessage = (message) => {
+    if (!message || message.is_deleted) return
+    if (Number(message.user_id) !== Number(userId)) return
+    setEditingMessageId(message.id)
+    setEditDraft(message.text || '')
+  }
+
+  const cancelEditMessage = () => {
+    setEditingMessageId(null)
+    setEditDraft('')
+  }
+
+  const saveEditMessage = async () => {
+    if (!editingMessageId) return
+    const nextText = String(editDraft || '').trim()
+    if (!nextText) return
+    const activeGlobalTaskId = globalTaskIdRef.current
+    if (activeGlobalTaskId == null || activeGlobalTaskId === '') return
+
+    setSavingEdit(true)
+    try {
+      const response = await axios.patch(
+        `${API_BASE_URL}5000/api/global-tasks/chat/${activeGlobalTaskId}/${editingMessageId}`,
+        {
+          text: nextText,
+          userId,
+        }
+      )
+      applyChatMessageUpdate(response.data)
+      cancelEditMessage()
+    } catch (error) {
+      console.error('Ошибка при редактировании сообщения проекта:', error)
+      alert(error.response?.data?.error || 'Не удалось сохранить изменения')
+    } finally {
+      setSavingEdit(false)
+    }
+  }
+
+  const requestDeleteMessage = (message) => {
+    if (!message || message.is_deleted) return
+    if (Number(message.user_id) !== Number(userId)) return
+    setMessagePendingDelete(message)
+  }
+
+  const cancelDeleteMessage = () => {
+    if (deletingMessage) return
+    setMessagePendingDelete(null)
+  }
+
+  const confirmDeleteMessage = async () => {
+    const message = messagePendingDelete
+    if (!message || message.is_deleted) return
+    if (Number(message.user_id) !== Number(userId)) return
+
+    const activeGlobalTaskId = globalTaskIdRef.current
+    if (activeGlobalTaskId == null || activeGlobalTaskId === '') return
+
+    setDeletingMessage(true)
+    try {
+      const response = await axios.delete(
+        `${API_BASE_URL}5000/api/global-tasks/chat/${activeGlobalTaskId}/${message.id}`,
+        {
+          data: { userId },
+        }
+      )
+      applyChatMessageUpdate(response.data)
+      setMessagePendingDelete(null)
+    } catch (error) {
+      console.error('Ошибка при удалении сообщения проекта:', error)
+      alert(error.response?.data?.error || 'Не удалось удалить сообщение')
+    } finally {
+      setDeletingMessage(false)
+    }
   }
 
   const scrollToBottom = () => {
@@ -186,9 +299,9 @@ const GlobalTaskChat = ({
   }
 
   const renderMessageContent = (msg, isCurrentUser) => {
-    const repliedToMessage = messages.find(
-      (m) => m.id === msg.replied_to_message_id
-    )
+    const isDeleted = msg.is_deleted === true
+    const isEditing = Number(editingMessageId) === Number(msg.id)
+    const repliedToMessage = messages.find((m) => m.id === msg.replied_to_message_id)
 
     return (
       <div className="message-content">
@@ -205,7 +318,11 @@ const GlobalTaskChat = ({
               <MdReply className="reply-icon" />
               {repliedToMessage.first_name} {repliedToMessage.last_name}
             </div>
-            <div className="reply-text">{repliedToMessage.text}</div>
+            <div className="reply-text">
+              {repliedToMessage.is_deleted
+                ? 'Сообщение удалено'
+                : repliedToMessage.text}
+            </div>
           </div>
         )}
         {!isCurrentUser && (
@@ -213,22 +330,94 @@ const GlobalTaskChat = ({
             {msg.first_name} {msg.last_name}
           </div>
         )}
-        <div className={`text-bubble ${isCurrentUser ? 'self' : 'other'}`}>{msg.text}</div>
+        {isEditing ? (
+          <div className="message-edit-box">
+            <textarea
+              className="message-edit-input"
+              value={editDraft}
+              onChange={(e) => setEditDraft(e.target.value)}
+              rows={3}
+            />
+            <div className="message-edit-actions">
+              <button
+                type="button"
+                className="message-edit-cancel"
+                onClick={cancelEditMessage}
+                disabled={savingEdit}
+              >
+                Отмена
+              </button>
+              <button
+                type="button"
+                className="message-edit-save"
+                onClick={saveEditMessage}
+                disabled={savingEdit || !String(editDraft || '').trim()}
+              >
+                {savingEdit ? 'Сохранение…' : 'Сохранить'}
+              </button>
+            </div>
+          </div>
+        ) : (
+          <>
+            <div
+              className={`text-bubble ${isCurrentUser ? 'self' : 'other'} ${
+                isDeleted ? 'text-bubble--deleted' : ''
+              }`}
+            >
+              {isDeleted ? 'Сообщение удалено' : msg.text}
+            </div>
+            {!isDeleted && msg.edited_at ? (
+              <div className="message-edited-label">редактировано</div>
+            ) : null}
+          </>
+        )}
         <div className="message-footer">
           <span className="timestamp">{formatTimestamp(msg.timestamp)}</span>
-          <button
-            type="button"
-            className="message-reply-btn"
-            title="Ответить"
-            aria-label="Ответить на сообщение"
-            onMouseDown={(e) => e.preventDefault()}
-            onClick={(e) => {
-              e.stopPropagation()
-              handleReplyToMessage(msg)
-            }}
-          >
-            <MdReply aria-hidden />
-          </button>
+          {!isDeleted && (
+            <button
+              type="button"
+              className="message-reply-btn"
+              title="Ответить"
+              aria-label="Ответить на сообщение"
+              onMouseDown={(e) => e.preventDefault()}
+              onClick={(e) => {
+                e.stopPropagation()
+                handleReplyToMessage(msg)
+              }}
+            >
+              <MdReply aria-hidden />
+            </button>
+          )}
+          {isCurrentUser && !isDeleted && (
+            <>
+              <button
+                type="button"
+                className="message-edit-btn"
+                title="Редактировать"
+                aria-label="Редактировать сообщение"
+                onMouseDown={(e) => e.preventDefault()}
+                onClick={(e) => {
+                  e.stopPropagation()
+                  startEditMessage(msg)
+                }}
+              >
+                <FaPen aria-hidden />
+              </button>
+              <button
+                type="button"
+                className="message-delete-btn"
+                title="Удалить"
+                aria-label="Удалить сообщение"
+                onMouseDown={(e) => e.preventDefault()}
+                onClick={(e) => {
+                  e.stopPropagation()
+                  requestDeleteMessage(msg)
+                }}
+              >
+                <FaTrash aria-hidden />
+              </button>
+            </>
+          )}
         </div>
       </div>
     )
@@ -269,7 +458,7 @@ const GlobalTaskChat = ({
 
         <div className="messages" ref={messagesEndRef}>
           {messages.map((msg) => {
-            const isCurrentUser = userId && msg.user_id === userId
+            const isCurrentUser = userId && Number(msg.user_id) === Number(userId)
             const initials = getInitials(msg.first_name, msg.last_name)
             const colorClass = getColorClassById(msg.user_id)
 
@@ -279,7 +468,7 @@ const GlobalTaskChat = ({
                 ref={(el) => (messageRefs.current[msg.id] = el)}
                 className={`message ${isCurrentUser ? 'self' : 'other'} ${
                   replyingTo?.id === msg.id ? 'selected-message' : ''
-                }`}
+                } ${msg.is_deleted ? 'deleted' : ''}`}
               >
                 <div
                   className={`message-inner ${
@@ -303,7 +492,9 @@ const GlobalTaskChat = ({
             <div className="reply-container">
               <div className="reply-info">
                 <span>Ответ на сообщение {replyingTo.first_name}:</span>
-                <span className="reply-text">{replyingTo.text}</span>
+                <span className="reply-text">
+                  {replyingTo.is_deleted ? 'Сообщение удалено' : replyingTo.text}
+                </span>
               </div>
               <button className="cancel-reply" onClick={cancelReply}>
                 <MdClose />
@@ -349,6 +540,43 @@ const GlobalTaskChat = ({
             </button>
           </div>
         </div>
+
+        {messagePendingDelete ? (
+          <div className="chat-confirm-overlay" role="presentation" onClick={cancelDeleteMessage}>
+            <div
+              className="chat-confirm-dialog"
+              role="dialog"
+              aria-modal="true"
+              aria-labelledby="project-chat-delete-confirm-title"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <p id="project-chat-delete-confirm-title" className="chat-confirm-title">
+                Удалить это сообщение?
+              </p>
+              <p className="chat-confirm-text">
+                Сообщение останется в чате как удалённое.
+              </p>
+              <div className="chat-confirm-actions">
+                <button
+                  type="button"
+                  className="chat-confirm-cancel"
+                  onClick={cancelDeleteMessage}
+                  disabled={deletingMessage}
+                >
+                  Отмена
+                </button>
+                <button
+                  type="button"
+                  className="chat-confirm-delete"
+                  onClick={confirmDeleteMessage}
+                  disabled={deletingMessage}
+                >
+                  {deletingMessage ? 'Удаление…' : 'Удалить'}
+                </button>
+              </div>
+            </div>
+          </div>
+        ) : null}
       </div>
     </div>
   )

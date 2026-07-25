@@ -30,6 +30,7 @@ import {
 import { useActiveAbsences } from "../../../utils/useActiveAbsences";
 import {
   getAbsenceChoicesAtSave,
+  findAbsenceChoicesFromAssignees,
   getAbsenceEndDate,
   isDeadlineAfterAbsence,
   normalizeDateOnly,
@@ -169,6 +170,7 @@ const AddModal = ({
   const prevIsOpenRef = useRef(false);
   const prevDraftKeyRef = useRef(draftKey);
   const choiceDecisionsRef = useRef({});
+  const choiceEntriesRef = useRef([]);
 
   const {
     handleFileChange,
@@ -389,12 +391,15 @@ const AddModal = ({
     setChoiceQueue([]);
     setCurrentChoice(null);
     choiceDecisionsRef.current = {};
+    choiceEntriesRef.current = [];
   }, []);
 
   // Обновляем пометки по отсутствию при смене срока задачи
   useEffect(() => {
-    setAbsenceMeta((prev) => refreshAbsenceMetaNotes(prev, taskData.deadline, users));
-  }, [taskData.deadline, users]);
+    setAbsenceMeta((prev) =>
+      refreshAbsenceMetaNotes(prev, taskData.deadline, users, absencesMap)
+    );
+  }, [taskData.deadline, users, absencesMap]);
 
   const persistDraft = useCallback(() => {
     const dataForDraft = getTaskDataForDraft();
@@ -644,17 +649,54 @@ const AddModal = ({
       return;
     }
 
-    const choices = getAbsenceChoicesAtSave(absenceMeta, taskData.deadline);
+    const choicesFromMeta = getAbsenceChoicesAtSave(
+      absenceMeta,
+      taskData.deadline,
+      absencesMap
+    );
+    const choiceKeys = new Set(
+      choicesFromMeta.map((c) => `${c.roleKey}:${c.effectiveId}`)
+    );
+    const choices = [...choicesFromMeta];
+    for (const roleKey of ["implementers", "approvers", "viewers"]) {
+      const fallback = findAbsenceChoicesFromAssignees(
+        taskData[roleKey],
+        taskData.deadline,
+        absencesMap,
+        roleKey
+      );
+      fallback.forEach((entry) => {
+        const key = `${entry.roleKey}:${entry.effectiveId}`;
+        if (!choiceKeys.has(key)) {
+          choiceKeys.add(key);
+          choices.push(entry);
+        }
+      });
+    }
     if (choices.length > 0) {
+      choiceEntriesRef.current = choices;
       choiceDecisionsRef.current = {};
+      setAbsenceMeta((prev) => {
+        const next = [...(prev || [])];
+        choices.forEach((entry) => {
+          const exists = next.some(
+            (e) =>
+              e.roleKey === entry.roleKey &&
+              String(e.effectiveId) === String(entry.effectiveId)
+          );
+          if (!exists) next.push(entry);
+        });
+        return refreshAbsenceMetaNotes(next, taskData.deadline, users, absencesMap);
+      });
       setChoiceQueue(choices);
       setCurrentChoice(choices[0]);
       return;
     }
 
+    choiceEntriesRef.current = [];
     const plan = buildAssignmentPlan(taskData, absenceMeta, {});
     await createTasksWithPlan(plan);
-  }, [taskData, absenceMeta, createTasksWithPlan]);
+  }, [taskData, absenceMeta, createTasksWithPlan, absencesMap, users]);
 
   const finishAbsenceChoice = useCallback(
     (decision) => {
@@ -672,11 +714,23 @@ const AddModal = ({
       }
       setChoiceQueue([]);
       setCurrentChoice(null);
+
+      const mergedMeta = [...(absenceMeta || [])];
+      ;(choiceEntriesRef.current || []).forEach((entry) => {
+        const exists = mergedMeta.some(
+          (e) =>
+            e.roleKey === entry.roleKey &&
+            String(e.effectiveId) === String(entry.effectiveId)
+        );
+        if (!exists) mergedMeta.push(entry);
+      });
+
       const plan = buildAssignmentPlan(
         taskData,
-        absenceMeta,
+        mergedMeta,
         choiceDecisionsRef.current
       );
+      choiceEntriesRef.current = [];
       createTasksWithPlan(plan);
     },
     [currentChoice, choiceQueue, taskData, absenceMeta, createTasksWithPlan]
@@ -686,6 +740,7 @@ const AddModal = ({
     setChoiceQueue([]);
     setCurrentChoice(null);
     choiceDecisionsRef.current = {};
+    choiceEntriesRef.current = [];
   }, []);
 
   const handleCommentSubmit = () => {

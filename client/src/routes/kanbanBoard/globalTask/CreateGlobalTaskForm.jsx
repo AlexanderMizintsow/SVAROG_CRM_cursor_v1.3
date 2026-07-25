@@ -14,6 +14,7 @@ import {
   getAbsenceLabel,
   showAbsenceMessage,
   getAbsenceChoicesAtSave,
+  findAbsenceChoicesFromAssignees,
   getAbsenceEndDate,
   isDeadlineAfterAbsence,
   normalizeDateOnly,
@@ -64,6 +65,7 @@ const CreateGlobalTaskForm = ({ onSave, onCancel, initialData }) => {
   const [choiceQueue, setChoiceQueue] = useState([])
   const [currentChoice, setCurrentChoice] = useState(null)
   const choiceDecisionsRef = useRef({})
+  const choiceEntriesRef = useRef([])
   const { absencesMap } = useActiveAbsences(true)
 
   useEffect(() => {
@@ -278,8 +280,10 @@ const CreateGlobalTaskForm = ({ onSave, onCancel, initialData }) => {
   }
 
   useEffect(() => {
-    setAbsenceMeta((prev) => refreshAbsenceMetaNotes(prev, formData.deadline, users))
-  }, [formData.deadline, users])
+    setAbsenceMeta((prev) =>
+      refreshAbsenceMetaNotes(prev, formData.deadline, users, absencesMap)
+    )
+  }, [formData.deadline, users, absencesMap])
 
   const notesByEffectiveId = (() => {
     const map = {}
@@ -290,10 +294,11 @@ const CreateGlobalTaskForm = ({ onSave, onCancel, initialData }) => {
   })()
 
   const finalizeSave = useCallback(
-    (decisions = {}) => {
+    (decisions = {}, metaOverride = null) => {
+      const meta = metaOverride || absenceMeta
       const responsibles = applyAbsenceDecisionsToResponsibles(
         formData.responsibles,
-        absenceMeta,
+        meta,
         decisions,
         users
       )
@@ -327,14 +332,46 @@ const CreateGlobalTaskForm = ({ onSave, onCancel, initialData }) => {
       return
     }
 
-    const choices = getAbsenceChoicesAtSave(absenceMeta, formData.deadline)
+    const choicesFromMeta = getAbsenceChoicesAtSave(
+      absenceMeta,
+      formData.deadline,
+      absencesMap
+    )
+    const choiceKeys = new Set(
+      choicesFromMeta.map((c) => String(c.effectiveId))
+    )
+    const choices = [...choicesFromMeta]
+    findAbsenceChoicesFromAssignees(
+      formData.responsibles.map((r) => r.id),
+      formData.deadline,
+      absencesMap,
+      'responsibles'
+    ).forEach((entry) => {
+      if (!choiceKeys.has(String(entry.effectiveId))) {
+        choiceKeys.add(String(entry.effectiveId))
+        choices.push(entry)
+      }
+    })
+
     if (choices.length > 0) {
       choiceDecisionsRef.current = {}
+      choiceEntriesRef.current = choices
+      setAbsenceMeta((prev) => {
+        const next = [...(prev || [])]
+        choices.forEach((entry) => {
+          const exists = next.some(
+            (e) => String(e.effectiveId) === String(entry.effectiveId)
+          )
+          if (!exists) next.push(entry)
+        })
+        return refreshAbsenceMetaNotes(next, formData.deadline, users, absencesMap)
+      })
       setChoiceQueue(choices)
       setCurrentChoice(choices[0])
       return
     }
 
+    choiceEntriesRef.current = []
     finalizeSave({})
   }
 
@@ -352,13 +389,22 @@ const CreateGlobalTaskForm = ({ onSave, onCancel, initialData }) => {
     }
     setChoiceQueue([])
     setCurrentChoice(null)
-    finalizeSave(choiceDecisionsRef.current)
+    const mergedMeta = [...(absenceMeta || [])]
+    ;(choiceEntriesRef.current || []).forEach((entry) => {
+      const exists = mergedMeta.some(
+        (e) => String(e.effectiveId) === String(entry.effectiveId)
+      )
+      if (!exists) mergedMeta.push(entry)
+    })
+    choiceEntriesRef.current = []
+    finalizeSave(choiceDecisionsRef.current, mergedMeta)
   }
 
   const cancelAbsenceChoice = () => {
     setChoiceQueue([])
     setCurrentChoice(null)
     choiceDecisionsRef.current = {}
+    choiceEntriesRef.current = []
   }
 
   return (

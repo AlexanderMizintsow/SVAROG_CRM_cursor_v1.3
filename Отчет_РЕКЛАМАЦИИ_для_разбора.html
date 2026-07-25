@@ -1,0 +1,1310 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1"/>
+<title>Рекламации для разбора — июль 2026</title>
+<style>
+:root{--bg:#f4f6f8;--card:#fff;--line:#d7dee7;--text:#1c2430;--muted:#667788;--ok:#0f7a45;--warn:#9a5b00;--accent:#1f4e79}
+*{box-sizing:border-box}
+body{margin:0;font:15px/1.45 system-ui,Segoe UI,Roboto,Arial,sans-serif;background:var(--bg);color:var(--text)}
+.wrap{max-width:1100px;margin:0 auto;padding:20px}
+h1{margin:0 0 8px;font-size:24px}
+.meta,.hint{color:var(--muted);margin-bottom:12px}
+.hint{background:#fff;border:1px solid var(--line);border-radius:10px;padding:10px 12px;color:var(--text)}
+.stats{display:flex;gap:10px;flex-wrap:wrap;margin-bottom:14px}
+.stat{background:#fff;border:1px solid var(--line);border-radius:10px;padding:10px 12px;min-width:110px}
+.stat b{display:block;font-size:20px}
+.toolbar{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:14px;position:sticky;top:0;background:var(--bg);padding:8px 0;z-index:5}
+input,select,button{padding:8px 10px;border:1px solid var(--line);border-radius:8px;background:#fff;font:inherit}
+input[type=search]{flex:1;min-width:220px}
+button{cursor:pointer}
+.card{background:var(--card);border:1px solid var(--line);border-radius:12px;margin-bottom:10px;overflow:hidden}
+.card-h{display:flex;justify-content:space-between;gap:12px;padding:12px 14px;cursor:pointer;align-items:center}
+.card-h:hover{background:#f8fafc}
+.card-h h3{margin:0;font-size:15px}
+.left{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+.pill{font-size:12px;padding:2px 8px;border-radius:999px;border:1px solid var(--line);background:#f3f6fa}
+.pill.ok{color:var(--ok);border-color:#b7e0c7;background:#eaf8f0}
+.pill.warn{color:var(--warn);border-color:#f0d6a6;background:#fff6e8}
+.card-b{display:none;padding:0 14px 14px;border-top:1px solid var(--line)}
+.card.open .card-b{display:block}
+.recl{background:#fff4f0;border:1px solid #f0cfc4;border-radius:8px;padding:8px 10px;margin:8px 0}
+.task{border:1px solid var(--line);border-radius:8px;margin:8px 0}
+.task-head{padding:8px 10px;background:#f9fbfd;display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+.task-body{padding:8px 10px}
+.badge{font-size:12px;background:#e8eef6;color:var(--accent);padding:2px 6px;border-radius:6px}
+pre{white-space:pre-wrap;background:#f7fafc;border-radius:8px;padding:10px;font-size:13px;margin:6px 0;border:1px solid #e7eef5}
+.notes{background:#fff8e8;border:1px solid #f0d6a6;border-radius:8px;padding:8px;margin:8px 0}
+.note{margin:8px 0;font-size:13px}
+.msg{padding:4px 0;border-bottom:1px dashed #e6ebf0;font-size:13px}
+.muted{color:var(--muted)}
+h4{margin:14px 0 6px;font-size:14px;color:var(--accent)}
+.allchat{margin-top:8px;font-size:13px}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>Рекламации для самостоятельного разбора</h1>
+  <div class="meta">Июль 2026 · задачи Мизинцова из CRM · сформировано 17.07.2026, 16:58:11</div>
+  <div class="hint">
+    Здесь все перечисленные рекламации. У каждой — найденные задачи/проекты, полное описание и выдержки из чата,
+    где есть уточнения или возможное расхождение с описанием. Оценку причин делаете вы.
+  </div>
+  <div class="stats">
+    <div class="stat"><b>48</b>рекламаций</div>
+    <div class="stat"><b>26</b>с задачей</div>
+    <div class="stat"><b>22</b>без задачи</div>
+    <div class="stat"><b>17</b>с пометками чата</div>
+  </div>
+  <div class="stats"><div class="stat"><b>18</b>плёнка/ламинация</div><div class="stat"><b>13</b>привод</div><div class="stat"><b>6</b>планки</div><div class="stat"><b>4</b>фурнитура</div><div class="stat"><b>3</b>порошковая</div><div class="stat"><b>2</b>ручки/наж.гар</div><div class="stat"><b>1</b>цилиндр</div><div class="stat"><b>1</b>сэндвич</div></div>
+  <div class="toolbar">
+    <input id="q" type="search" placeholder="Заказ, рекл, текст..." oninput="f()"/>
+    <select id="topic" onchange="f()"><option value="">Все темы</option><option value="планки">планки</option><option value="плёнка/ламинация">плёнка/ламинация</option><option value="порошковая">порошковая</option><option value="привод">привод</option><option value="ручки/наж.гар">ручки/наж.гар</option><option value="сэндвич">сэндвич</option><option value="фурнитура">фурнитура</option><option value="цилиндр">цилиндр</option></select>
+    <select id="has" onchange="f()">
+      <option value="">Все</option>
+      <option value="1">Только с задачей</option>
+      <option value="0">Только без задачи</option>
+    </select>
+    <button type="button" onclick="document.querySelectorAll('.card').forEach(c=>c.classList.add('open'))">Раскрыть</button>
+    <button type="button" onclick="document.querySelectorAll('.card').forEach(c=>c.classList.remove('open'))">Свернуть</button>
+  </div>
+  <div id="list">
+      <article class="card" data-topic="планки" data-has="1" data-q="рекл 608 заказ 13659 не рассчитаны ответные планки 13659 планки">
+        <header class="card-h" onclick="this.parentElement.classList.toggle('open')">
+          <div class="left">
+            <span class="pill">01 июля</span>
+            <span class="pill topic">планки</span>
+            <span class="pill ok">2 задач</span>
+            <h3>рекл 608 · заказ 13659</h3>
+          </div>
+        </header>
+        <div class="card-b">
+          <div class="recl">📢 01 июля · рекл 608 · заказ <b>13659</b> — не рассчитаны ответные планки</div>
+          <h4>Задачи / проекты в CRM</h4>
+          
+            <div class="task">
+              <div class="task-head">
+                <span class="badge">Задача №1388</span>
+                <strong>Ошибка расчета фурнитуры Рото</strong>
+                <span class="muted">01.07.2026, 10:46 · Рагулин Юрий Иванович · номер в задаче · done</span>
+              </div>
+              <div class="task-body">
+                <div><b>Описание:</b></div>
+                <pre>Добрый день. На заказ 13659 не рассчитались ответные планки. На створке 6 цапф. Должно быть рассчитано арт. 332439 Отв. планка REHAU S730 - 6 шт. Прошу исправить.</pre>
+                <div class="notes"><b>Из чата (для оценки — уточнения / возможные расхождения с описанием):</b><div class="note"><span class="pill">детали, которых может не быть в описании</span> <span class="muted">15.07.2026, 10:54 · Мизинцов Александр</span><div>«добрый день. я не понимаю, артикулы нижк написал с кол ответок. 255281 - 1 255280 - 1 259721 - 2»</div></div></div>
+                <details class="allchat"><summary>Весь чат (6 сообщ.)</summary><div class="msg"><b>02.07.2026, 09:30</b> Мизинцов Александр: Есть каталог? А то у меня нет информации по этим ответкам, сколько их и на что нужно ставить</div><div class="msg"><b>02.07.2026, 10:57</b> Рагулин Юрий: Отправлено 1 файл(ов): Roto_NX_katalog_PVC.pdf</div><div class="msg"><b>15.07.2026, 10:54</b> Мизинцов Александр: добрый день. я не понимаю, артикулы нижк написал с кол ответок. 255281 - 1 255280 - 1 259721 - 2</div><div class="msg"><b>15.07.2026, 10:54</b> Мизинцов Александр: а где еще 2?</div><div class="msg"><b>15.07.2026, 11:15</b> Рагулин Юрий: 260277, который сверху - 1, 260286 - 1</div><div class="msg"><b>15.07.2026, 13:06</b> Мизинцов Александр: Доступно после обновления</div></details>
+              </div>
+            </div>
+            <div class="task">
+              <div class="task-head">
+                <span class="badge">Проект №399</span>
+                <strong>Закрыть возможность расчета проветривания на фурнитуре РОТО + ответные планки</strong>
+                <span class="muted">01.07.2026, 16:32 · Прошкина Наталья Владимировна · номер в задаче · Завершено</span>
+              </div>
+              <div class="task-body">
+                <div><b>Описание:</b></div>
+                <pre>Добрый день! Прошу закрыть возможность расчета в построителе на фурнитуре ROTO NX в пользовательских параметрах проветривание - Щелевое проветривание и Многоступенчатое. Закрытие связано с тем, что у поставщика нет такой фурнитуры. Также в заказах на фурнитуре ROTO NX не считаются ответные планки ( пример заказа 13659 ). Должен считаться арт 332439 - 5 шт Также прошу исправить. После того как будут готовы исправления сообщите, определимся по времени когда делать проверку ( так как фурнитура для массового расчета закрыта ).</pre>
+                <div class="muted">В чате явных уточнений/дополнений к описанию не отмечено.</div>
+                <details class="allchat"><summary>Весь чат (2 сообщ.)</summary><div class="msg"><b>01.07.2026, 16:50</b> Мизинцов Александр: еще бы информация к каким элементам вообще считаются данные ответные планки или хотя бы каталог на эту фурнитуру</div><div class="msg"><b>02.07.2026, 10:00</b> Прошкина Наталья: Каталог приложила По вопросам можешь к Рагулину обращаться - он сказал что через него быстрее будет</div></details>
+              </div>
+            </div>
+        </div>
+      </article>
+
+      <article class="card" data-topic="привод" data-has="0" data-q="рекл 609 заказ 13481 выбился привод 661-1160, нужен 500-660 13481 привод">
+        <header class="card-h" onclick="this.parentElement.classList.toggle('open')">
+          <div class="left">
+            <span class="pill">01 июля</span>
+            <span class="pill topic">привод</span>
+            <span class="pill warn">нет задачи</span>
+            <h3>рекл 609 · заказ 13481</h3>
+          </div>
+        </header>
+        <div class="card-b">
+          <div class="recl">📢 01 июля · рекл 609 · заказ <b>13481</b> — выбился привод 661-1160, нужен 500-660</div>
+          <h4>Задачи / проекты в CRM</h4>
+          <div class="muted">В CRM у Мизинцова задача/проект с этим номером заказа не найдены.</div>
+        </div>
+      </article>
+
+      <article class="card" data-topic="плёнка/ламинация" data-has="1" data-q="рекл 640 заказ 14530 неверный расчет ламинации (часть окна посчитана белой а часть в ломинации) 14530 плёнка/ламинация">
+        <header class="card-h" onclick="this.parentElement.classList.toggle('open')">
+          <div class="left">
+            <span class="pill">03 июля</span>
+            <span class="pill topic">плёнка/ламинация</span>
+            <span class="pill ok">1 задач</span>
+            <h3>рекл 640 · заказ 14530</h3>
+          </div>
+        </header>
+        <div class="card-b">
+          <div class="recl">📢 03 июля · рекл 640 · заказ <b>14530</b> — неверный расчет ламинации (часть окна посчитана белой а часть в ломинации)</div>
+          <h4>Задачи / проекты в CRM</h4>
+          
+            <div class="task">
+              <div class="task-head">
+                <span class="badge">Задача №1479</span>
+                <strong>Ошибка расчета основы для ламинации.</strong>
+                <span class="muted">06.07.2026, 07:50 · Рагулин Юрий Иванович · номер в задаче · done</span>
+              </div>
+              <div class="task-body">
+                <div><b>Описание:</b></div>
+                <pre>Добрый день. В зак. 14530 в заявке на ламинацию арт. 1550777 Ложный импост 70 PULS рассчитан на серой основе, а все остальные профили на белой основе. Прошу исправить, для данного импоста так же нужна белая основа.</pre>
+                <div class="notes"><b>Из чата (для оценки — уточнения / возможные расхождения с описанием):</b><div class="note"><span class="pill">детали, которых может не быть в описании</span> <span class="muted">06.07.2026, 15:21 · Мизинцов Александр</span><div>«на белой основе будет различаться ценой? Я так понимаю артикул должен быть другой?»</div></div><div class="note"><span class="pill">повтор / ошибка осталась</span> <span class="muted">07.07.2026, 13:37 · Рагулин Юрий</span><div>«Артикул тот же самый 1550777, но в оптимизацию он попал как серая основа.»</div></div><div class="note"><span class="pill">детали, которых может не быть в описании</span> <span class="muted">08.07.2026, 10:30 · Мизинцов Александр</span><div>«у нас в АВ не заведен белый, мне нужен артикул и цена»</div></div><div class="note"><span class="pill">повтор / ошибка осталась</span> <span class="muted">08.07.2026, 10:34 · Рагулин Юрий</span><div>«Мы новый арт. заводить не будем. У нас есть 1550777 Ложный импост 70 PULS это белый цвет. Как он может попасть в оптимизацию как серая основа? Я не могу это смоделировать, но ошибка такая была.»</div></div><div class="note"><span class="pill">повтор / ошибка осталась</span> <span class="muted">08.07.2026, 11:00 · Рагулин Юрий</span><div>«Видимо существует и белая и серая основа и не ламинированная сторона видна. Я не знаю. Как и откуда формируется заявка на ламинацию? В ней надо смотреть.»</div></div></div>
+                <details class="allchat"><summary>Весь чат (12 сообщ.)</summary><div class="msg"><b>06.07.2026, 15:21</b> Мизинцов Александр: на белой основе будет различаться ценой? Я так понимаю артикул должен быть другой?</div><div class="msg"><b>06.07.2026, 15:22</b> Рагулин Юрий: Конечно артикул другой.</div><div class="msg"><b>07.07.2026, 12:59</b> Мизинцов Александр: Какой?</div><div class="msg"><b>07.07.2026, 13:37</b> Рагулин Юрий: Артикул тот же самый 1550777, но в оптимизацию он попал как серая основа.</div><div class="msg"><b>08.07.2026, 10:30</b> Мизинцов Александр: у нас в АВ не заведен белый, мне нужен артикул и цена</div><div class="msg"><b>08.07.2026, 10:34</b> Рагулин Юрий: Мы новый арт. заводить не будем. У нас есть 1550777 Ложный импост 70 PULS это белый цвет. Как он может попасть в оптимизацию как серая основа? Я не могу это смоделировать, но ошибка такая была.</div><div class="msg"><b>08.07.2026, 10:49</b> Мизинцов Александр: а, смысл в том что он не серый а белый</div><div class="msg"><b>08.07.2026, 10:58</b> Мизинцов Александр: доступно с 09.07.2026г.</div><div class="msg"><b>08.07.2026, 11:00</b> Рагулин Юрий: Видимо существует и белая и серая основа и не ламинированная сторона видна. Я не знаю. Как и откуда формируется заявка на ламинацию? В ней надо смотреть.</div><div class="msg"><b>08.07.2026, 11:04</b> Мизинцов Александр: как мне задачу делать? Что нужно сделать?</div><div class="msg"><b>08.07.2026, 11:17</b> Рагулин Юрий: Откуда формируется документ ЗАЯВКА НА ЛАМИНАЦИЮ?</div><div class="msg"><b>08.07.2026, 15:31</b> Мизинцов Александр: Из компонента Сменные задачи, в отчете - Ламинация, это у диспетчера</div></details>
+              </div>
+            </div>
+        </div>
+      </article>
+
+      <article class="card" data-topic="плёнка/ламинация" data-has="1" data-q="рекл 643 заказ 13975 неверно рассчитана пленка для ламинации 13975 плёнка/ламинация">
+        <header class="card-h" onclick="this.parentElement.classList.toggle('open')">
+          <div class="left">
+            <span class="pill">03 июля</span>
+            <span class="pill topic">плёнка/ламинация</span>
+            <span class="pill ok">2 задач</span>
+            <h3>рекл 643 · заказ 13975</h3>
+          </div>
+        </header>
+        <div class="card-b">
+          <div class="recl">📢 03 июля · рекл 643 · заказ <b>13975</b> — неверно рассчитана пленка для ламинации</div>
+          <h4>Задачи / проекты в CRM</h4>
+          
+            <div class="task">
+              <div class="task-head">
+                <span class="badge">Проект №417</span>
+                <strong>ошибка 13975</strong>
+                <span class="muted">03.07.2026, 09:07 · Прошкина Наталья Владимировна · номер в задаче · Завершено</span>
+              </div>
+              <div class="task-body">
+                <div><b>Описание:</b></div>
+                <pre>Добрый день! Заказ 13975 рассчитан не верно: необходимо сделать так, чтобы арт FPR.13 Петля поворотно-фрамужная регулируемая 13 считался по 1 шт на каждом изделии Прошу исправить!</pre>
+                <div class="notes"><b>Из чата (для оценки — уточнения / возможные расхождения с описанием):</b><div class="note"><span class="pill">уточнение в чате</span> <span class="muted">03.07.2026, 12:57 · Мизинцов Александр</span><div>«Добавил участника, в понедельник уточню»</div></div><div class="note"><span class="pill">уточнение в чате</span> <span class="muted">13.07.2026, 09:29 · Мизинцов Александр</span><div>«тут по задаче уже были исправления.»</div></div></div>
+                <details class="allchat"><summary>Весь чат (7 сообщ.)</summary><div class="msg"><b>03.07.2026, 12:49</b> Мизинцов Александр: тут нет прйфов, в каком случае FPR.13 устанавливается вообще?</div><div class="msg"><b>03.07.2026, 12:50</b> Прошкина Наталья: Задай пожалуйста этот вопрос Рагулину в пн</div><div class="msg"><b>03.07.2026, 12:52</b> Мизинцов Александр: там в заказе есть параметр Прижим = 'Средняя петля'. Если его ставить то считается если другое, то другие элементы</div><div class="msg"><b>03.07.2026, 12:56</b> Прошкина Наталья: Как мне сказали с линии нестандарт, из за того что створка трапециевидная не верно считается петля, чтобы собрать заказ затянули арт FPR.13</div><div class="msg"><b>03.07.2026, 12:57</b> Мизинцов Александр: Добавил участника, в понедельник уточню</div><div class="msg"><b>13.07.2026, 09:29</b> Мизинцов Александр: тут по задаче уже были исправления.</div><div class="msg"><b>13.07.2026, 09:30</b> Мизинцов Александр: Юрий Иванович, там есть кнопка, где вы участник в проекте, на согласовании, ее нажмите, что бы закончить проект.</div></details>
+              </div>
+            </div>
+            <div class="task">
+              <div class="task-head">
+                <span class="badge">Задача №1478</span>
+                <strong>Ошибка расчета косых поворотных створок</strong>
+                <span class="muted">06.07.2026, 07:43 · Рагулин Юрий Иванович · номер в задаче · done</span>
+              </div>
+              <div class="task-body">
+                <div><b>Описание:</b></div>
+                <pre>Добрый день. В зак. 13975 рассчитаны косые поворотные створки. Расчеты в АВ подходят для прямоугольных створок. Надо исключить арт. PK Поворотная петля-кронштейн регулируемая - 1 шт и арт. SV.13 Петля створки верхняя 13 - 1 шт. Добавить в расчеты арт. FPR.13 Петля поворотно-фрамужная регулируемая для паза 13 мм - 1 шт на створку.</pre>
+                <div class="muted">В чате явных уточнений/дополнений к описанию не отмечено.</div>
+                <details class="allchat"><summary>Весь чат (4 сообщ.)</summary><div class="msg"><b>06.07.2026, 16:23</b> Мизинцов Александр: Если створка косая поворотная, и скос идет снизу, то убираются нижние петли?</div><div class="msg"><b>08.07.2026, 11:12</b> Мизинцов Александр: тут видеди чат?</div><div class="msg"><b>08.07.2026, 11:18</b> Рагулин Юрий: Створок со скосом снизу не бывает. Но теоритически - да</div><div class="msg"><b>08.07.2026, 20:01</b> Мизинцов Александр: Доступно с 10.07.2026г.</div></details>
+              </div>
+            </div>
+        </div>
+      </article>
+
+      <article class="card" data-topic="плёнка/ламинация" data-has="1" data-q="рекл 645 заказ 13599 неверно рассчитана пленка для ламинации 13599 плёнка/ламинация">
+        <header class="card-h" onclick="this.parentElement.classList.toggle('open')">
+          <div class="left">
+            <span class="pill">04 июля</span>
+            <span class="pill topic">плёнка/ламинация</span>
+            <span class="pill ok">1 задач</span>
+            <h3>рекл 645 · заказ 13599</h3>
+          </div>
+        </header>
+        <div class="card-b">
+          <div class="recl">📢 04 июля · рекл 645 · заказ <b>13599</b> — неверно рассчитана пленка для ламинации</div>
+          <h4>Задачи / проекты в CRM</h4>
+          
+            <div class="task">
+              <div class="task-head">
+                <span class="badge">Задача №1500</span>
+                <strong>Ошибка расчета пленки для ламинации.</strong>
+                <span class="muted">06.07.2026, 08:07 · Рагулин Юрий Иванович · номер в задаче · done</span>
+              </div>
+              <div class="task-body">
+                <div><b>Описание:</b></div>
+                <pre>Добрый день. В расчетах ламинированных заказов попадает пленка белого цвета: зак. 14406, 13599 в цвете Коричневый дуб UQ901(стандарт), пленка Пленка LG160 белого цвета. Зак. 12653 в цвете Мореный дуб UR401(стандарт), пленка Пленка LG90 идет в белом цвете. Прошу исправить.</pre>
+                <div class="notes"><b>Из чата (для оценки — уточнения / возможные расхождения с описанием):</b><div class="note"><span class="pill">уточнение в чате</span> <span class="muted">06.07.2026, 15:31 · Мизинцов Александр</span><div>«в первых двух заказов так же уже исправлено ранее, после перерасчета ошибки нет. В случае Пленки 90 исправлено сегодня и доступно завтра по другой задаче.»</div></div></div>
+                <details class="allchat"><summary>Весь чат (1 сообщ.)</summary><div class="msg"><b>06.07.2026, 15:31</b> Мизинцов Александр: в первых двух заказов так же уже исправлено ранее, после перерасчета ошибки нет. В случае Пленки 90 исправлено сегодня и доступно завтра по другой задаче.</div></details>
+              </div>
+            </div>
+        </div>
+      </article>
+
+      <article class="card" data-topic="плёнка/ламинация" data-has="1" data-q="рекл 646 заказ 12653 неверно рассчитана пленка для ламинации 12653 плёнка/ламинация">
+        <header class="card-h" onclick="this.parentElement.classList.toggle('open')">
+          <div class="left">
+            <span class="pill">04 июля</span>
+            <span class="pill topic">плёнка/ламинация</span>
+            <span class="pill ok">2 задач</span>
+            <h3>рекл 646 · заказ 12653</h3>
+          </div>
+        </header>
+        <div class="card-b">
+          <div class="recl">📢 04 июля · рекл 646 · заказ <b>12653</b> — неверно рассчитана пленка для ламинации</div>
+          <h4>Задачи / проекты в CRM</h4>
+          
+            <div class="task">
+              <div class="task-head">
+                <span class="badge">Проект №416</span>
+                <strong>ошибка 12 653</strong>
+                <span class="muted">03.07.2026, 08:26 · Прошкина Наталья Владимировна · номер в задаче · Завершено</span>
+              </div>
+              <div class="task-body">
+                <div><b>Описание:</b></div>
+                <pre>Добрый день! На заказ 12 653 Пленка LG стандарт 90 мм считается с белой характеристикой, прошу срочно исправить Заранее благодарна!</pre>
+                <div class="notes"><b>Из чата (для оценки — уточнения / возможные расхождения с описанием):</b><div class="note"><span class="pill">уточнение в чате</span> <span class="muted">07.07.2026, 09:03 · Прошкина Наталья</span><div>«90 исправлена 160 так и осталась белая»</div></div></div>
+                <details class="allchat"><summary>Весь чат (4 сообщ.)</summary><div class="msg"><b>03.07.2026, 12:31</b> Мизинцов Александр: там и 160 в белой считается</div><div class="msg"><b>03.07.2026, 12:47</b> Прошкина Наталья: Она вся должна быть с цветом...</div><div class="msg"><b>07.07.2026, 09:03</b> Прошкина Наталья: 90 исправлена 160 так и осталась белая</div><div class="msg"><b>07.07.2026, 09:19</b> Мизинцов Александр: я не понимаю если честно. Там же створка Т, она перевернута, и как раз получается на белый цвет</div></details>
+              </div>
+            </div>
+            <div class="task">
+              <div class="task-head">
+                <span class="badge">Задача №1500</span>
+                <strong>Ошибка расчета пленки для ламинации.</strong>
+                <span class="muted">06.07.2026, 08:07 · Рагулин Юрий Иванович · номер в задаче · done</span>
+              </div>
+              <div class="task-body">
+                <div><b>Описание:</b></div>
+                <pre>Добрый день. В расчетах ламинированных заказов попадает пленка белого цвета: зак. 14406, 13599 в цвете Коричневый дуб UQ901(стандарт), пленка Пленка LG160 белого цвета. Зак. 12653 в цвете Мореный дуб UR401(стандарт), пленка Пленка LG90 идет в белом цвете. Прошу исправить.</pre>
+                <div class="notes"><b>Из чата (для оценки — уточнения / возможные расхождения с описанием):</b><div class="note"><span class="pill">уточнение в чате</span> <span class="muted">06.07.2026, 15:31 · Мизинцов Александр</span><div>«в первых двух заказов так же уже исправлено ранее, после перерасчета ошибки нет. В случае Пленки 90 исправлено сегодня и доступно завтра по другой задаче.»</div></div></div>
+                <details class="allchat"><summary>Весь чат (1 сообщ.)</summary><div class="msg"><b>06.07.2026, 15:31</b> Мизинцов Александр: в первых двух заказов так же уже исправлено ранее, после перерасчета ошибки нет. В случае Пленки 90 исправлено сегодня и доступно завтра по другой задаче.</div></details>
+              </div>
+            </div>
+        </div>
+      </article>
+
+      <article class="card" data-topic="порошковая" data-has="1" data-q="рекл 647 заказ 14594 считается порошковая покраска, а ее не должно быть 14594 порошковая">
+        <header class="card-h" onclick="this.parentElement.classList.toggle('open')">
+          <div class="left">
+            <span class="pill">04 июля</span>
+            <span class="pill topic">порошковая</span>
+            <span class="pill ok">2 задач</span>
+            <h3>рекл 647 · заказ 14594</h3>
+          </div>
+        </header>
+        <div class="card-b">
+          <div class="recl">📢 04 июля · рекл 647 · заказ <b>14594</b> — считается порошковая покраска, а ее не должно быть</div>
+          <h4>Задачи / проекты в CRM</h4>
+          
+            <div class="task">
+              <div class="task-head">
+                <span class="badge">Проект №420</span>
+                <strong>ошибка 14594,14595, 14718</strong>
+                <span class="muted">03.07.2026, 11:25 · Прошкина Наталья Владимировна · номер в задаче · Завершено</span>
+              </div>
+              <div class="task-body">
+                <div><b>Описание:</b></div>
+                <pre>Добрый день! На заказы 14594,14595 опять считается Порошковая краска 9016 — исправляли же месяц назад ,все было хорошо, что пошло опять не так? На заказ 14718 опять считается Порошковая краска 9016 — ее быть не должно прошу исправить ПРОВЕДАЛЬ ЗАКУПАЕМ В БЕЛОМ ЦВЕТЕ С ЗАВОДА! Заранее благодарна!</pre>
+                <div class="muted">В чате явных уточнений/дополнений к описанию не отмечено.</div>
+                
+              </div>
+            </div>
+            <div class="task">
+              <div class="task-head">
+                <span class="badge">Задача №1501</span>
+                <strong>Ошибка расчета краски на Проведаль</strong>
+                <span class="muted">06.07.2026, 08:13 · Рагулин Юрий Иванович · номер в задаче · done</span>
+              </div>
+              <div class="task-body">
+                <div><b>Описание:</b></div>
+                <pre>Добрый день. Поскольку Проведаль всегда закупается в белом цвете, краска белого цвета не должна считаться в заказе. Пример зак. 14594, 14595, 14718 Прошу исправить.</pre>
+                <div class="notes"><b>Из чата (для оценки — уточнения / возможные расхождения с описанием):</b><div class="note"><span class="pill">уточнение в чате</span> <span class="muted">06.07.2026, 14:51 · Мизинцов Александр</span><div>«Исправлено ранее. Данные заказы уже находятся на производстве»</div></div><div class="note"><span class="pill">повтор / ошибка осталась</span> <span class="muted">06.07.2026, 15:00 · Рагулин Юрий</span><div>«Пришло только что: На заказы 14809,14810 опять считается Порошковая краска. Это исправлено и просто не пересчитаны заказы?»</div></div></div>
+                <details class="allchat"><summary>Весь чат (4 сообщ.)</summary><div class="msg"><b>06.07.2026, 14:51</b> Мизинцов Александр: Исправлено ранее. Данные заказы уже находятся на производстве</div><div class="msg"><b>06.07.2026, 15:00</b> Рагулин Юрий: Пришло только что: На заказы 14809,14810 опять считается Порошковая краска. Это исправлено и просто не пересчитаны заказы?</div><div class="msg"><b>06.07.2026, 15:15</b> Мизинцов Александр: неперсчитанные заказы. Я присылал кому то на перерасчет, которые еще не были в производстве. Те которые на производстве уже не пересчитать, пока их не отменить на производстве и заного не загрузить</div><div class="msg"><b>06.07.2026, 15:16</b> Рагулин Юрий: ок</div></details>
+              </div>
+            </div>
+        </div>
+      </article>
+
+      <article class="card" data-topic="порошковая" data-has="1" data-q="рекл 649 заказ 14718 считается порошковая покраска, а ее не должно быть 14718 порошковая">
+        <header class="card-h" onclick="this.parentElement.classList.toggle('open')">
+          <div class="left">
+            <span class="pill">04 июля</span>
+            <span class="pill topic">порошковая</span>
+            <span class="pill ok">2 задач</span>
+            <h3>рекл 649 · заказ 14718</h3>
+          </div>
+        </header>
+        <div class="card-b">
+          <div class="recl">📢 04 июля · рекл 649 · заказ <b>14718</b> — считается порошковая покраска, а ее не должно быть</div>
+          <h4>Задачи / проекты в CRM</h4>
+          
+            <div class="task">
+              <div class="task-head">
+                <span class="badge">Проект №420</span>
+                <strong>ошибка 14594,14595, 14718</strong>
+                <span class="muted">03.07.2026, 11:25 · Прошкина Наталья Владимировна · номер в задаче · Завершено</span>
+              </div>
+              <div class="task-body">
+                <div><b>Описание:</b></div>
+                <pre>Добрый день! На заказы 14594,14595 опять считается Порошковая краска 9016 — исправляли же месяц назад ,все было хорошо, что пошло опять не так? На заказ 14718 опять считается Порошковая краска 9016 — ее быть не должно прошу исправить ПРОВЕДАЛЬ ЗАКУПАЕМ В БЕЛОМ ЦВЕТЕ С ЗАВОДА! Заранее благодарна!</pre>
+                <div class="muted">В чате явных уточнений/дополнений к описанию не отмечено.</div>
+                
+              </div>
+            </div>
+            <div class="task">
+              <div class="task-head">
+                <span class="badge">Задача №1501</span>
+                <strong>Ошибка расчета краски на Проведаль</strong>
+                <span class="muted">06.07.2026, 08:13 · Рагулин Юрий Иванович · номер в задаче · done</span>
+              </div>
+              <div class="task-body">
+                <div><b>Описание:</b></div>
+                <pre>Добрый день. Поскольку Проведаль всегда закупается в белом цвете, краска белого цвета не должна считаться в заказе. Пример зак. 14594, 14595, 14718 Прошу исправить.</pre>
+                <div class="notes"><b>Из чата (для оценки — уточнения / возможные расхождения с описанием):</b><div class="note"><span class="pill">уточнение в чате</span> <span class="muted">06.07.2026, 14:51 · Мизинцов Александр</span><div>«Исправлено ранее. Данные заказы уже находятся на производстве»</div></div><div class="note"><span class="pill">повтор / ошибка осталась</span> <span class="muted">06.07.2026, 15:00 · Рагулин Юрий</span><div>«Пришло только что: На заказы 14809,14810 опять считается Порошковая краска. Это исправлено и просто не пересчитаны заказы?»</div></div></div>
+                <details class="allchat"><summary>Весь чат (4 сообщ.)</summary><div class="msg"><b>06.07.2026, 14:51</b> Мизинцов Александр: Исправлено ранее. Данные заказы уже находятся на производстве</div><div class="msg"><b>06.07.2026, 15:00</b> Рагулин Юрий: Пришло только что: На заказы 14809,14810 опять считается Порошковая краска. Это исправлено и просто не пересчитаны заказы?</div><div class="msg"><b>06.07.2026, 15:15</b> Мизинцов Александр: неперсчитанные заказы. Я присылал кому то на перерасчет, которые еще не были в производстве. Те которые на производстве уже не пересчитать, пока их не отменить на производстве и заного не загрузить</div><div class="msg"><b>06.07.2026, 15:16</b> Рагулин Юрий: ок</div></details>
+              </div>
+            </div>
+        </div>
+      </article>
+
+      <article class="card" data-topic="планки" data-has="1" data-q="рекл 653 заказ 14382 не рассчитаны ответные планки 14382 планки">
+        <header class="card-h" onclick="this.parentElement.classList.toggle('open')">
+          <div class="left">
+            <span class="pill">07 июля</span>
+            <span class="pill topic">планки</span>
+            <span class="pill ok">1 задач</span>
+            <h3>рекл 653 · заказ 14382</h3>
+          </div>
+        </header>
+        <div class="card-b">
+          <div class="recl">📢 07 июля · рекл 653 · заказ <b>14382</b> — не рассчитаны ответные планки</div>
+          <h4>Задачи / проекты в CRM</h4>
+          
+            <div class="task">
+              <div class="task-head">
+                <span class="badge">Задача №1511</span>
+                <strong>Ошибка расчета количества ответных планок Резе</strong>
+                <span class="muted">06.07.2026, 11:15 · Рагулин Юрий Иванович · номер в задаче · done</span>
+              </div>
+              <div class="task-body">
+                <div><b>Описание:</b></div>
+                <pre>Добрый день. Зак. 14382 на створке две цапфы (угловая передача + удлинитель) в наборе всего одна ответная планка R212101. Надо добавить простую ответку R 211103 - 1 шт</pre>
+                <div class="muted">В чате явных уточнений/дополнений к описанию не отмечено.</div>
+                <details class="allchat"><summary>Весь чат (3 сообщ.)</summary><div class="msg"><b>07.07.2026, 12:58</b> Мизинцов Александр: в заказе две угловые передачи и 1 удлинитель. К чему именно добавить 211103 ?</div><div class="msg"><b>07.07.2026, 14:06</b> Рагулин Юрий: В зак. угловые передачи R 203104 - 2 шт. Та угловая передача, которая внизу всегда выполняет роль элемента для откидывания створки и работает в паре с R210101, вторая угловая передача с ответкой 211103</div><div class="msg"><b>07.07.2026, 15:48</b> Мизинцов Александр: Доступно с 08.07.2026г.</div></details>
+              </div>
+            </div>
+        </div>
+      </article>
+
+      <article class="card" data-topic="порошковая" data-has="1" data-q="рекл 656 заказ 14809,14810 считается порошковая покраска, а ее не должно быть 14809 14810 порошковая">
+        <header class="card-h" onclick="this.parentElement.classList.toggle('open')">
+          <div class="left">
+            <span class="pill">07 июля</span>
+            <span class="pill topic">порошковая</span>
+            <span class="pill ok">1 задач</span>
+            <h3>рекл 656 · заказ 14809, 14810</h3>
+          </div>
+        </header>
+        <div class="card-b">
+          <div class="recl">📢 07 июля · рекл 656 · заказ <b>14809, 14810</b> — считается порошковая покраска, а ее не должно быть</div>
+          <h4>Задачи / проекты в CRM</h4>
+          
+            <div class="task">
+              <div class="task-head">
+                <span class="badge">Задача №1501</span>
+                <strong>Ошибка расчета краски на Проведаль</strong>
+                <span class="muted">06.07.2026, 08:13 · Рагулин Юрий Иванович · номер в чате · done</span>
+              </div>
+              <div class="task-body">
+                <div><b>Описание:</b></div>
+                <pre>Добрый день. Поскольку Проведаль всегда закупается в белом цвете, краска белого цвета не должна считаться в заказе. Пример зак. 14594, 14595, 14718 Прошу исправить.</pre>
+                <div class="notes"><b>Из чата (для оценки — уточнения / возможные расхождения с описанием):</b><div class="note"><span class="pill">уточнение в чате</span> <span class="muted">06.07.2026, 14:51 · Мизинцов Александр</span><div>«Исправлено ранее. Данные заказы уже находятся на производстве»</div></div><div class="note"><span class="pill">повтор / ошибка осталась</span> <span class="muted">06.07.2026, 15:00 · Рагулин Юрий</span><div>«Пришло только что: На заказы 14809,14810 опять считается Порошковая краска. Это исправлено и просто не пересчитаны заказы?»</div></div></div>
+                <details class="allchat"><summary>Весь чат (4 сообщ.)</summary><div class="msg"><b>06.07.2026, 14:51</b> Мизинцов Александр: Исправлено ранее. Данные заказы уже находятся на производстве</div><div class="msg"><b>06.07.2026, 15:00</b> Рагулин Юрий: Пришло только что: На заказы 14809,14810 опять считается Порошковая краска. Это исправлено и просто не пересчитаны заказы?</div><div class="msg"><b>06.07.2026, 15:15</b> Мизинцов Александр: неперсчитанные заказы. Я присылал кому то на перерасчет, которые еще не были в производстве. Те которые на производстве уже не пересчитать, пока их не отменить на производстве и заного не загрузить</div><div class="msg"><b>06.07.2026, 15:16</b> Рагулин Юрий: ок</div></details>
+              </div>
+            </div>
+        </div>
+      </article>
+
+      <article class="card" data-topic="фурнитура" data-has="1" data-q="рекл 657 заказ 14594 рассчитана фурнитура ge которой давно нет (не стоит запрет) 14594 фурнитура">
+        <header class="card-h" onclick="this.parentElement.classList.toggle('open')">
+          <div class="left">
+            <span class="pill">07 июля</span>
+            <span class="pill topic">фурнитура</span>
+            <span class="pill ok">2 задач</span>
+            <h3>рекл 657 · заказ 14594</h3>
+          </div>
+        </header>
+        <div class="card-b">
+          <div class="recl">📢 07 июля · рекл 657 · заказ <b>14594</b> — рассчитана фурнитура GE которой давно нет (не стоит запрет)</div>
+          <h4>Задачи / проекты в CRM</h4>
+          
+            <div class="task">
+              <div class="task-head">
+                <span class="badge">Проект №420</span>
+                <strong>ошибка 14594,14595, 14718</strong>
+                <span class="muted">03.07.2026, 11:25 · Прошкина Наталья Владимировна · номер в задаче · Завершено</span>
+              </div>
+              <div class="task-body">
+                <div><b>Описание:</b></div>
+                <pre>Добрый день! На заказы 14594,14595 опять считается Порошковая краска 9016 — исправляли же месяц назад ,все было хорошо, что пошло опять не так? На заказ 14718 опять считается Порошковая краска 9016 — ее быть не должно прошу исправить ПРОВЕДАЛЬ ЗАКУПАЕМ В БЕЛОМ ЦВЕТЕ С ЗАВОДА! Заранее благодарна!</pre>
+                <div class="muted">В чате явных уточнений/дополнений к описанию не отмечено.</div>
+                
+              </div>
+            </div>
+            <div class="task">
+              <div class="task-head">
+                <span class="badge">Задача №1501</span>
+                <strong>Ошибка расчета краски на Проведаль</strong>
+                <span class="muted">06.07.2026, 08:13 · Рагулин Юрий Иванович · номер в задаче · done</span>
+              </div>
+              <div class="task-body">
+                <div><b>Описание:</b></div>
+                <pre>Добрый день. Поскольку Проведаль всегда закупается в белом цвете, краска белого цвета не должна считаться в заказе. Пример зак. 14594, 14595, 14718 Прошу исправить.</pre>
+                <div class="notes"><b>Из чата (для оценки — уточнения / возможные расхождения с описанием):</b><div class="note"><span class="pill">уточнение в чате</span> <span class="muted">06.07.2026, 14:51 · Мизинцов Александр</span><div>«Исправлено ранее. Данные заказы уже находятся на производстве»</div></div><div class="note"><span class="pill">повтор / ошибка осталась</span> <span class="muted">06.07.2026, 15:00 · Рагулин Юрий</span><div>«Пришло только что: На заказы 14809,14810 опять считается Порошковая краска. Это исправлено и просто не пересчитаны заказы?»</div></div></div>
+                <details class="allchat"><summary>Весь чат (4 сообщ.)</summary><div class="msg"><b>06.07.2026, 14:51</b> Мизинцов Александр: Исправлено ранее. Данные заказы уже находятся на производстве</div><div class="msg"><b>06.07.2026, 15:00</b> Рагулин Юрий: Пришло только что: На заказы 14809,14810 опять считается Порошковая краска. Это исправлено и просто не пересчитаны заказы?</div><div class="msg"><b>06.07.2026, 15:15</b> Мизинцов Александр: неперсчитанные заказы. Я присылал кому то на перерасчет, которые еще не были в производстве. Те которые на производстве уже не пересчитать, пока их не отменить на производстве и заного не загрузить</div><div class="msg"><b>06.07.2026, 15:16</b> Рагулин Юрий: ок</div></details>
+              </div>
+            </div>
+        </div>
+      </article>
+
+      <article class="card" data-topic="фурнитура" data-has="0" data-q="рекл 658 заказ 14496 ошибка в таблице для расчетов фиксированной фурнитуры 14496 фурнитура">
+        <header class="card-h" onclick="this.parentElement.classList.toggle('open')">
+          <div class="left">
+            <span class="pill">07 июля</span>
+            <span class="pill topic">фурнитура</span>
+            <span class="pill warn">нет задачи</span>
+            <h3>рекл 658 · заказ 14496</h3>
+          </div>
+        </header>
+        <div class="card-b">
+          <div class="recl">📢 07 июля · рекл 658 · заказ <b>14496</b> — ошибка в таблице для расчетов фиксированной фурнитуры</div>
+          <h4>Задачи / проекты в CRM</h4>
+          <div class="muted">В CRM у Мизинцова задача/проект с этим номером заказа не найдены.</div>
+        </div>
+      </article>
+
+      <article class="card" data-topic="ручки/наж.гар" data-has="0" data-q="рекл 660 заказ 11732 неверно рассчитаны ручки (наж гар) 11732 ручки/наж.гар">
+        <header class="card-h" onclick="this.parentElement.classList.toggle('open')">
+          <div class="left">
+            <span class="pill">07 июля</span>
+            <span class="pill topic">ручки/наж.гар</span>
+            <span class="pill warn">нет задачи</span>
+            <h3>рекл 660 · заказ 11732</h3>
+          </div>
+        </header>
+        <div class="card-b">
+          <div class="recl">📢 07 июля · рекл 660 · заказ <b>11732</b> — неверно рассчитаны ручки (наж гар)</div>
+          <h4>Задачи / проекты в CRM</h4>
+          <div class="muted">В CRM у Мизинцова задача/проект с этим номером заказа не найдены.</div>
+        </div>
+      </article>
+
+      <article class="card" data-topic="цилиндр" data-has="1" data-q="рекл 662 заказ 14453 считается цилиндр который давно должен быть закрыт 14453 цилиндр">
+        <header class="card-h" onclick="this.parentElement.classList.toggle('open')">
+          <div class="left">
+            <span class="pill">08 июля</span>
+            <span class="pill topic">цилиндр</span>
+            <span class="pill ok">1 задач</span>
+            <h3>рекл 662 · заказ 14453</h3>
+          </div>
+        </header>
+        <div class="card-b">
+          <div class="recl">📢 08 июля · рекл 662 · заказ <b>14453</b> — считается цилиндр который давно должен быть закрыт</div>
+          <h4>Задачи / проекты в CRM</h4>
+          
+            <div class="task">
+              <div class="task-head">
+                <span class="badge">Проект №438</span>
+                <strong>ошибка 14 453</strong>
+                <span class="muted">07.07.2026, 15:15 · Прошкина Наталья Владимировна · номер в задаче · Завершено</span>
+              </div>
+              <div class="task-body">
+                <div><b>Описание:</b></div>
+                <pre>Добрый день! Прошу проверить расчет заказа 14 453 — там считается Цилиндр 40/45 для замка — мы его недавно закрыли вообще , он считаться не должен и его нет в наличии . Вместо него должен быть арт арт у него ELM1013.67 Наименование Цилиндр профильный ELEMENTIS 45(ключ)/45(ключ) ЦАМ, 5 перфорированных ключей, никелированный С Рагулиным Ю.И. переписывалась, он сказал что задачу на замену ставил, но возможно не привязалось конкретно к профилю посчитанному в заказе. Прошу исправить!</pre>
+                <div class="notes"><b>Из чата (для оценки — уточнения / возможные расхождения с описанием):</b><div class="note"><span class="pill">сомнение / просьба уточнить</span> <span class="muted">07.07.2026, 15:51 · Мизинцов Александр</span><div>«что то не помню такой задачи»</div></div></div>
+                <details class="allchat"><summary>Весь чат (1 сообщ.)</summary><div class="msg"><b>07.07.2026, 15:51</b> Мизинцов Александр: что то не помню такой задачи</div></details>
+              </div>
+            </div>
+        </div>
+      </article>
+
+      <article class="card" data-topic="фурнитура" data-has="0" data-q="рекл 664 заказ 14035 неверный расчет фурнитуры 14035 фурнитура">
+        <header class="card-h" onclick="this.parentElement.classList.toggle('open')">
+          <div class="left">
+            <span class="pill">08 июля</span>
+            <span class="pill topic">фурнитура</span>
+            <span class="pill warn">нет задачи</span>
+            <h3>рекл 664 · заказ 14035</h3>
+          </div>
+        </header>
+        <div class="card-b">
+          <div class="recl">📢 08 июля · рекл 664 · заказ <b>14035</b> — неверный расчет фурнитуры</div>
+          <h4>Задачи / проекты в CRM</h4>
+          <div class="muted">В CRM у Мизинцова задача/проект с этим номером заказа не найдены.</div>
+        </div>
+      </article>
+
+      <article class="card" data-topic="плёнка/ламинация" data-has="1" data-q="рекл 668 заказ 14871 в заявку на ламинацию попадает штапик которого там быть не должно 14871 плёнка/ламинация">
+        <header class="card-h" onclick="this.parentElement.classList.toggle('open')">
+          <div class="left">
+            <span class="pill">08 июля</span>
+            <span class="pill topic">плёнка/ламинация</span>
+            <span class="pill ok">1 задач</span>
+            <h3>рекл 668 · заказ 14871</h3>
+          </div>
+        </header>
+        <div class="card-b">
+          <div class="recl">📢 08 июля · рекл 668 · заказ <b>14871</b> — в заявку на ламинацию попадает штапик которого там быть не должно</div>
+          <h4>Задачи / проекты в CRM</h4>
+          
+            <div class="task">
+              <div class="task-head">
+                <span class="badge">Проект №447</span>
+                <strong>ошибка 14871</strong>
+                <span class="muted">08.07.2026, 11:34 · Прошкина Наталья Владимировна · номер в задаче · Завершено</span>
+              </div>
+              <div class="task-body">
+                <div><b>Описание:</b></div>
+                <pre>Добрый день! заказ 14871 — в заявку на ламинацию попадает штапик на ламинацию, пленка на него не рассчитана. Штапик в заказе должен быть белый Во вложении скрин заявки на ламинацию. Прошу исправить!</pre>
+                <div class="muted">В чате явных уточнений/дополнений к описанию не отмечено.</div>
+                <details class="allchat"><summary>Весь чат (3 сообщ.)</summary><div class="msg"><b>13.07.2026, 11:09</b> Мизинцов Александр: сложно мне даются эти штапики. Почему белые?</div><div class="msg"><b>13.07.2026, 11:09</b> Мизинцов Александр: типо как у створки внешний цвет?</div><div class="msg"><b>13.07.2026, 11:21</b> Прошкина Наталья: Расчет то верный, штапик белый, потому что Т створка, ламинация со стороны петель с улицы, а штапики в этому случае внутри Беда в том, что штапики в оптимизацию по этому заказу попадают как ламинированные, хотя пленки нет и быть ее не должно</div></details>
+              </div>
+            </div>
+        </div>
+      </article>
+
+      <article class="card" data-topic="привод" data-has="0" data-q="рекл 671 заказ 14107 выбился привод 661-1160, нужен 500-660 14107 привод">
+        <header class="card-h" onclick="this.parentElement.classList.toggle('open')">
+          <div class="left">
+            <span class="pill">09 июля</span>
+            <span class="pill topic">привод</span>
+            <span class="pill warn">нет задачи</span>
+            <h3>рекл 671 · заказ 14107</h3>
+          </div>
+        </header>
+        <div class="card-b">
+          <div class="recl">📢 09 июля · рекл 671 · заказ <b>14107</b> — выбился привод 661-1160, нужен 500-660</div>
+          <h4>Задачи / проекты в CRM</h4>
+          <div class="muted">В CRM у Мизинцова задача/проект с этим номером заказа не найдены.</div>
+        </div>
+      </article>
+
+      <article class="card" data-topic="привод" data-has="0" data-q="рекл 672 заказ 13183 выбился привод 661-1160, нужен 500-660 13183 привод">
+        <header class="card-h" onclick="this.parentElement.classList.toggle('open')">
+          <div class="left">
+            <span class="pill">09 июля</span>
+            <span class="pill topic">привод</span>
+            <span class="pill warn">нет задачи</span>
+            <h3>рекл 672 · заказ 13183</h3>
+          </div>
+        </header>
+        <div class="card-b">
+          <div class="recl">📢 09 июля · рекл 672 · заказ <b>13183</b> — выбился привод 661-1160, нужен 500-660</div>
+          <h4>Задачи / проекты в CRM</h4>
+          <div class="muted">В CRM у Мизинцова задача/проект с этим номером заказа не найдены.</div>
+        </div>
+      </article>
+
+      <article class="card" data-topic="сэндвич" data-has="1" data-q="рекл 673 заказ 15454 выбился сендвич прозрачный вместо цветного 15454 сэндвич">
+        <header class="card-h" onclick="this.parentElement.classList.toggle('open')">
+          <div class="left">
+            <span class="pill">10 июля</span>
+            <span class="pill topic">сэндвич</span>
+            <span class="pill ok">1 задач</span>
+            <h3>рекл 673 · заказ 15454</h3>
+          </div>
+        </header>
+        <div class="card-b">
+          <div class="recl">📢 10 июля · рекл 673 · заказ <b>15454</b> — выбился сендвич прозрачный вместо цветного</div>
+          <h4>Задачи / проекты в CRM</h4>
+          
+            <div class="task">
+              <div class="task-head">
+                <span class="badge">Проект №468</span>
+                <strong>ошибка 15 454 и 15 453</strong>
+                <span class="muted">10.07.2026, 11:01 · Прошкина Наталья Владимировна · номер в задаче · Новая</span>
+              </div>
+              <div class="task-body">
+                <div><b>Описание:</b></div>
+                <pre>Добрый день! В заказах 15 453 и 15 454 сэндвич с характеристикой прозрачный. Прошу исправить. Воронину С.В. писала, он к вам отправил. Заранее благодарна!</pre>
+                <div class="notes"><b>Из чата (для оценки — уточнения / возможные расхождения с описанием):</b><div class="note"><span class="pill">сомнение / просьба уточнить</span> <span class="muted">14.07.2026, 10:23 · Мизинцов Александр</span><div>«не понял, что такое характеристика - прозрачный. Вижу лам/бел»</div></div><div class="note"><span class="pill">уточнение в чате</span> <span class="muted">17.07.2026, 10:48 · Мизинцов Александр</span><div>«это запрос по 1С, там так же должно быть. что то не так может сделали? или попробуй еще раз, может настроек не было»</div></div></div>
+                <details class="allchat"><summary>Весь чат (13 сообщ.)</summary><div class="msg"><b>14.07.2026, 10:23</b> Мизинцов Александр: не понял, что такое характеристика - прозрачный. Вижу лам/бел</div><div class="msg"><b>14.07.2026, 11:31</b> Прошкина Наталья: В 1С характеристика затянулась как прозрачный Воронин сказал что это беда из АВ идет</div><div class="msg"><b>14.07.2026, 11:37</b> Мизинцов Александр: скинь картинку, что там в 1с</div><div class="msg"><b>14.07.2026, 11:39</b> Прошкина Наталья: Приложила</div><div class="msg"><b>15.07.2026, 09:27</b> Прошкина Наталья: Данный размер сэндвича заламинировать невозможно!!! Путь: Сэндвич &gt; Сэндвич &gt; Предупреждения!</div><div class="msg"><b>15.07.2026, 09:28</b> Прошкина Наталья: Можешь отключить данную ругачку? Не могу пересчитать заказ 46280</div><div class="msg"><b>15.07.2026, 09:28</b> Прошкина Наталья: Для проверки</div><div class="msg"><b>15.07.2026, 09:38</b> Мизинцов Александр: отключил</div><div class="msg"><b>15.07.2026, 10:03</b> Прошкина Наталья: Все равно тянется с характеристикой прозрачный</div><div class="msg"><b>17.07.2026, 10:19</b> Мизинцов Александр: сейчас сделал копию заказа и перерасчитал. Цвет белый. Файл скрин в карте</div><div class="msg"><b>17.07.2026, 10:23</b> Прошкина Наталья: Характеристика материала так и остается в 1С прозрачный</div><div class="msg"><b>17.07.2026, 10:48</b> Мизинцов Александр: это запрос по 1С, там так же должно быть. что то не так может сделали? или попробуй еще раз, может настроек не было</div><div class="msg"><b>17.07.2026, 10:59</b> Прошкина Наталья: Ошибка осталась. Перезаходила и в АВ и в 1С</div></details>
+              </div>
+            </div>
+        </div>
+      </article>
+
+      <article class="card" data-topic="привод" data-has="0" data-q="рекл 674 заказ 14771 выбился привод 661-1160, нужен 500-660 14771 привод">
+        <header class="card-h" onclick="this.parentElement.classList.toggle('open')">
+          <div class="left">
+            <span class="pill">10 июля</span>
+            <span class="pill topic">привод</span>
+            <span class="pill warn">нет задачи</span>
+            <h3>рекл 674 · заказ 14771</h3>
+          </div>
+        </header>
+        <div class="card-b">
+          <div class="recl">📢 10 июля · рекл 674 · заказ <b>14771</b> — выбился привод 661-1160, нужен 500-660</div>
+          <h4>Задачи / проекты в CRM</h4>
+          <div class="muted">В CRM у Мизинцова задача/проект с этим номером заказа не найдены.</div>
+        </div>
+      </article>
+
+      <article class="card" data-topic="фурнитура" data-has="1" data-q="рекл 684 заказ 15507 на заказ считается окрашенная фурнитура хотя должна быть неокрашенная 15507 фурнитура">
+        <header class="card-h" onclick="this.parentElement.classList.toggle('open')">
+          <div class="left">
+            <span class="pill">11 июля</span>
+            <span class="pill topic">фурнитура</span>
+            <span class="pill ok">2 задач</span>
+            <h3>рекл 684 · заказ 15507</h3>
+          </div>
+        </header>
+        <div class="card-b">
+          <div class="recl">📢 11 июля · рекл 684 · заказ <b>15507</b> — на заказ считается окрашенная фурнитура хотя должна быть неокрашенная</div>
+          <h4>Задачи / проекты в CRM</h4>
+          
+            <div class="task">
+              <div class="task-head">
+                <span class="badge">Задача №1479</span>
+                <strong>Ошибка расчета основы для ламинации.</strong>
+                <span class="muted">06.07.2026, 07:50 · Рагулин Юрий Иванович · номер в задаче · done</span>
+              </div>
+              <div class="task-body">
+                <div><b>Описание:</b></div>
+                <pre>Добрый день. В зак. 14530 в заявке на ламинацию арт. 1550777 Ложный импост 70 PULS рассчитан на серой основе, а все остальные профили на белой основе. Прошу исправить, для данного импоста так же нужна белая основа.</pre>
+                <div class="notes"><b>Из чата (для оценки — уточнения / возможные расхождения с описанием):</b><div class="note"><span class="pill">детали, которых может не быть в описании</span> <span class="muted">06.07.2026, 15:21 · Мизинцов Александр</span><div>«на белой основе будет различаться ценой? Я так понимаю артикул должен быть другой?»</div></div><div class="note"><span class="pill">повтор / ошибка осталась</span> <span class="muted">07.07.2026, 13:37 · Рагулин Юрий</span><div>«Артикул тот же самый 1550777, но в оптимизацию он попал как серая основа.»</div></div><div class="note"><span class="pill">детали, которых может не быть в описании</span> <span class="muted">08.07.2026, 10:30 · Мизинцов Александр</span><div>«у нас в АВ не заведен белый, мне нужен артикул и цена»</div></div><div class="note"><span class="pill">повтор / ошибка осталась</span> <span class="muted">08.07.2026, 10:34 · Рагулин Юрий</span><div>«Мы новый арт. заводить не будем. У нас есть 1550777 Ложный импост 70 PULS это белый цвет. Как он может попасть в оптимизацию как серая основа? Я не могу это смоделировать, но ошибка такая была.»</div></div><div class="note"><span class="pill">повтор / ошибка осталась</span> <span class="muted">08.07.2026, 11:00 · Рагулин Юрий</span><div>«Видимо существует и белая и серая основа и не ламинированная сторона видна. Я не знаю. Как и откуда формируется заявка на ламинацию? В ней надо смотреть.»</div></div></div>
+                <details class="allchat"><summary>Весь чат (12 сообщ.)</summary><div class="msg"><b>06.07.2026, 15:21</b> Мизинцов Александр: на белой основе будет различаться ценой? Я так понимаю артикул должен быть другой?</div><div class="msg"><b>06.07.2026, 15:22</b> Рагулин Юрий: Конечно артикул другой.</div><div class="msg"><b>07.07.2026, 12:59</b> Мизинцов Александр: Какой?</div><div class="msg"><b>07.07.2026, 13:37</b> Рагулин Юрий: Артикул тот же самый 1550777, но в оптимизацию он попал как серая основа.</div><div class="msg"><b>08.07.2026, 10:30</b> Мизинцов Александр: у нас в АВ не заведен белый, мне нужен артикул и цена</div><div class="msg"><b>08.07.2026, 10:34</b> Рагулин Юрий: Мы новый арт. заводить не будем. У нас есть 1550777 Ложный импост 70 PULS это белый цвет. Как он может попасть в оптимизацию как серая основа? Я не могу это смоделировать, но ошибка такая была.</div><div class="msg"><b>08.07.2026, 10:49</b> Мизинцов Александр: а, смысл в том что он не серый а белый</div><div class="msg"><b>08.07.2026, 10:58</b> Мизинцов Александр: доступно с 09.07.2026г.</div><div class="msg"><b>08.07.2026, 11:00</b> Рагулин Юрий: Видимо существует и белая и серая основа и не ламинированная сторона видна. Я не знаю. Как и откуда формируется заявка на ламинацию? В ней надо смотреть.</div><div class="msg"><b>08.07.2026, 11:04</b> Мизинцов Александр: как мне задачу делать? Что нужно сделать?</div><div class="msg"><b>08.07.2026, 11:17</b> Рагулин Юрий: Откуда формируется документ ЗАЯВКА НА ЛАМИНАЦИЮ?</div><div class="msg"><b>08.07.2026, 15:31</b> Мизинцов Александр: Из компонента Сменные задачи, в отчете - Ламинация, это у диспетчера</div></details>
+              </div>
+            </div>
+            <div class="task">
+              <div class="task-head">
+                <span class="badge">Проект №470</span>
+                <strong>ошибка 15507</strong>
+                <span class="muted">10.07.2026, 12:07 · Прошкина Наталья Владимировна · номер в задаче · Завершено</span>
+              </div>
+              <div class="task-body">
+                <div><b>Описание:</b></div>
+                <pre>Добрый день! На заказ 15507 считается СТН-1850-61-9006 Откидная фурнитура СТН-1850-61 (9006) — уже исправляли недавно , что на алюминий должна считаться неокрашенная фурнитура Прошу исправить</pre>
+                <div class="muted">В чате явных уточнений/дополнений к описанию не отмечено.</div>
+                
+              </div>
+            </div>
+        </div>
+      </article>
+
+      <article class="card" data-topic="привод" data-has="1" data-q="рекл 692 заказ 15396 выбился привод 661-1160, нужен 500-660 15396 привод">
+        <header class="card-h" onclick="this.parentElement.classList.toggle('open')">
+          <div class="left">
+            <span class="pill">14 июля</span>
+            <span class="pill topic">привод</span>
+            <span class="pill ok">2 задач</span>
+            <h3>рекл 692 · заказ 15396</h3>
+          </div>
+        </header>
+        <div class="card-b">
+          <div class="recl">📢 14 июля · рекл 692 · заказ <b>15396</b> — выбился привод 661-1160, нужен 500-660</div>
+          <h4>Задачи / проекты в CRM</h4>
+          
+            <div class="task">
+              <div class="task-head">
+                <span class="badge">Задача №1683</span>
+                <strong>Изменение комплектации пов-отк створок Резе 400-500</strong>
+                <span class="muted">13.07.2026, 12:28 · Рагулин Юрий Иванович · номер в чате · done</span>
+              </div>
+              <div class="task-body">
+                <div><b>Описание:</b></div>
+                <pre>Добрый день. В настоящее время применяется правило расчета пов-отк створок Резе такое: Высота по фальцу 296-500 идет сочетание 201121 + 203104 от 501 - 201121 + 203101. Столкнулись с ошибкой в диапазоне 400-500 Изменения: 296-400 остается 201121 + 203104 401-500 будет 201122 + 203104 от 501 остается 201121 + 203101</pre>
+                <div class="notes"><b>Из чата (для оценки — уточнения / возможные расхождения с описанием):</b><div class="note"><span class="pill">детали, которых может не быть в описании</span> <span class="muted">13.07.2026, 13:54 · Рагулин Юрий</span><div>«После исправления прошу сделать список заказов на пересчет, где фигурируют вместе арт. R201121 и R203104»</div></div><div class="note"><span class="pill">детали, которых может не быть в описании</span> <span class="muted">13.07.2026, 13:55 · Рагулин Юрий</span><div>«Или изделия на Резе, с высотой по фальцу до 501 мм»</div></div><div class="note"><span class="pill">уточнение в чате</span> <span class="muted">13.07.2026, 14:16 · Мизинцов Александр</span><div>«скину только с R 201121. Можно их прощелкать проверить. Это с 25 числа прошлого месяца по сегодня»</div></div><div class="note"><span class="pill">уточнение в чате</span> <span class="muted">13.07.2026, 14:17 · Рагулин Юрий</span><div>«ок. А исправления уже внесены? Пересчет даст изменения?»</div></div><div class="note"><span class="pill">уточнение в чате</span> <span class="muted">13.07.2026, 14:25 · Мизинцов Александр</span><div>«а это новая задача что ли? Я исправлял ранее?»</div></div><div class="note"><span class="pill">уточнение в чате</span> <span class="muted">13.07.2026, 14:32 · Рагулин Юрий</span><div>«Прошу оперативно внести исправления. Надо пересчитать заказы.»</div></div></div>
+                <details class="allchat"><summary>Весь чат (15 сообщ.)</summary><div class="msg"><b>13.07.2026, 13:54</b> Рагулин Юрий: После исправления прошу сделать список заказов на пересчет, где фигурируют вместе арт. R201121 и R203104</div><div class="msg"><b>13.07.2026, 13:55</b> Рагулин Юрий: Или изделия на Резе, с высотой по фальцу до 501 мм</div><div class="msg"><b>13.07.2026, 14:07</b> Мизинцов Александр: таких заказов не обнаружено</div><div class="msg"><b>13.07.2026, 14:08</b> Рагулин Юрий: Странно. Сегодня не смогли собрать 15396 и 15397, о них в задаче я написал. Новых таких нет?</div><div class="msg"><b>13.07.2026, 14:10</b> Мизинцов Александр: вообще конечно 15397 долэжен был сейчас отобразиться. сейчас посмотрю почему выдачи нет</div><div class="msg"><b>13.07.2026, 14:16</b> Мизинцов Александр: Отправлено 1 файл(ов): R 201121.xls</div><div class="msg"><b>13.07.2026, 14:16</b> Мизинцов Александр: скину только с R 201121. Можно их прощелкать проверить. Это с 25 числа прошлого месяца по сегодня</div><div class="msg"><b>13.07.2026, 14:17</b> Рагулин Юрий: ок. А исправления уже внесены? Пересчет даст изменения?</div><div class="msg"><b>13.07.2026, 14:25</b> Мизинцов Александр: а это новая задача что ли? Я исправлял ранее?</div><div class="msg"><b>13.07.2026, 14:27</b> Рагулин Юрий: Это я сегодня прислал</div><div class="msg"><b>13.07.2026, 14:32</b> Рагулин Юрий: Прошу оперативно внести исправления. Надо пересчитать заказы.</div><div class="msg"><b>14.07.2026, 08:15</b> Мизинцов Александр: Настройки готовы, надо в рабочую влить. Либо через коммерцию, в когда все выйдут из базы, либо по стандарту завтра.</div><div class="msg"><b>14.07.2026, 08:23</b> Рагулин Юрий: Написал всем. Пробуем сделать сегодня.</div><div class="msg"><b>14.07.2026, 08:24</b> Рагулин Юрий: Тестовый заказ уже можно сделать или после вливания?</div><div class="msg"><b>14.07.2026, 08:39</b> Мизинцов Александр: после вливания</div></details>
+              </div>
+            </div>
+            <div class="task">
+              <div class="task-head">
+                <span class="badge">Задача №1684</span>
+                <strong>Не считаются ответные планки Резе на маленьких створках</strong>
+                <span class="muted">13.07.2026, 12:31 · Рагулин Юрий Иванович · номер в задаче · done</span>
+              </div>
+              <div class="task-body">
+                <div><b>Описание:</b></div>
+                <pre>Добрый день. Пример заказов 15396, 15397 На изделиях 1, 2 в обоих заказах не считаются отв. планки R211103, должно быть по 1 шт на изделие. На более высоких створках они есть (изд. 3,4), но арт. R211101 прошу везде поменять на R211103</pre>
+                <div class="muted">В чате явных уточнений/дополнений к описанию не отмечено.</div>
+                <details class="allchat"><summary>Весь чат (1 сообщ.)</summary><div class="msg"><b>16.07.2026, 13:17</b> Мизинцов Александр: Доступно с 16.07.2026г.</div></details>
+              </div>
+            </div>
+        </div>
+      </article>
+
+      <article class="card" data-topic="привод" data-has="1" data-q="рекл 693 заказ 15397 выбился привод 661-1160, нужен 500-660 15397 привод">
+        <header class="card-h" onclick="this.parentElement.classList.toggle('open')">
+          <div class="left">
+            <span class="pill">14 июля</span>
+            <span class="pill topic">привод</span>
+            <span class="pill ok">2 задач</span>
+            <h3>рекл 693 · заказ 15397</h3>
+          </div>
+        </header>
+        <div class="card-b">
+          <div class="recl">📢 14 июля · рекл 693 · заказ <b>15397</b> — выбился привод 661-1160, нужен 500-660</div>
+          <h4>Задачи / проекты в CRM</h4>
+          
+            <div class="task">
+              <div class="task-head">
+                <span class="badge">Задача №1683</span>
+                <strong>Изменение комплектации пов-отк створок Резе 400-500</strong>
+                <span class="muted">13.07.2026, 12:28 · Рагулин Юрий Иванович · номер в чате · done</span>
+              </div>
+              <div class="task-body">
+                <div><b>Описание:</b></div>
+                <pre>Добрый день. В настоящее время применяется правило расчета пов-отк створок Резе такое: Высота по фальцу 296-500 идет сочетание 201121 + 203104 от 501 - 201121 + 203101. Столкнулись с ошибкой в диапазоне 400-500 Изменения: 296-400 остается 201121 + 203104 401-500 будет 201122 + 203104 от 501 остается 201121 + 203101</pre>
+                <div class="notes"><b>Из чата (для оценки — уточнения / возможные расхождения с описанием):</b><div class="note"><span class="pill">детали, которых может не быть в описании</span> <span class="muted">13.07.2026, 13:54 · Рагулин Юрий</span><div>«После исправления прошу сделать список заказов на пересчет, где фигурируют вместе арт. R201121 и R203104»</div></div><div class="note"><span class="pill">детали, которых может не быть в описании</span> <span class="muted">13.07.2026, 13:55 · Рагулин Юрий</span><div>«Или изделия на Резе, с высотой по фальцу до 501 мм»</div></div><div class="note"><span class="pill">уточнение в чате</span> <span class="muted">13.07.2026, 14:16 · Мизинцов Александр</span><div>«скину только с R 201121. Можно их прощелкать проверить. Это с 25 числа прошлого месяца по сегодня»</div></div><div class="note"><span class="pill">уточнение в чате</span> <span class="muted">13.07.2026, 14:17 · Рагулин Юрий</span><div>«ок. А исправления уже внесены? Пересчет даст изменения?»</div></div><div class="note"><span class="pill">уточнение в чате</span> <span class="muted">13.07.2026, 14:25 · Мизинцов Александр</span><div>«а это новая задача что ли? Я исправлял ранее?»</div></div><div class="note"><span class="pill">уточнение в чате</span> <span class="muted">13.07.2026, 14:32 · Рагулин Юрий</span><div>«Прошу оперативно внести исправления. Надо пересчитать заказы.»</div></div></div>
+                <details class="allchat"><summary>Весь чат (15 сообщ.)</summary><div class="msg"><b>13.07.2026, 13:54</b> Рагулин Юрий: После исправления прошу сделать список заказов на пересчет, где фигурируют вместе арт. R201121 и R203104</div><div class="msg"><b>13.07.2026, 13:55</b> Рагулин Юрий: Или изделия на Резе, с высотой по фальцу до 501 мм</div><div class="msg"><b>13.07.2026, 14:07</b> Мизинцов Александр: таких заказов не обнаружено</div><div class="msg"><b>13.07.2026, 14:08</b> Рагулин Юрий: Странно. Сегодня не смогли собрать 15396 и 15397, о них в задаче я написал. Новых таких нет?</div><div class="msg"><b>13.07.2026, 14:10</b> Мизинцов Александр: вообще конечно 15397 долэжен был сейчас отобразиться. сейчас посмотрю почему выдачи нет</div><div class="msg"><b>13.07.2026, 14:16</b> Мизинцов Александр: Отправлено 1 файл(ов): R 201121.xls</div><div class="msg"><b>13.07.2026, 14:16</b> Мизинцов Александр: скину только с R 201121. Можно их прощелкать проверить. Это с 25 числа прошлого месяца по сегодня</div><div class="msg"><b>13.07.2026, 14:17</b> Рагулин Юрий: ок. А исправления уже внесены? Пересчет даст изменения?</div><div class="msg"><b>13.07.2026, 14:25</b> Мизинцов Александр: а это новая задача что ли? Я исправлял ранее?</div><div class="msg"><b>13.07.2026, 14:27</b> Рагулин Юрий: Это я сегодня прислал</div><div class="msg"><b>13.07.2026, 14:32</b> Рагулин Юрий: Прошу оперативно внести исправления. Надо пересчитать заказы.</div><div class="msg"><b>14.07.2026, 08:15</b> Мизинцов Александр: Настройки готовы, надо в рабочую влить. Либо через коммерцию, в когда все выйдут из базы, либо по стандарту завтра.</div><div class="msg"><b>14.07.2026, 08:23</b> Рагулин Юрий: Написал всем. Пробуем сделать сегодня.</div><div class="msg"><b>14.07.2026, 08:24</b> Рагулин Юрий: Тестовый заказ уже можно сделать или после вливания?</div><div class="msg"><b>14.07.2026, 08:39</b> Мизинцов Александр: после вливания</div></details>
+              </div>
+            </div>
+            <div class="task">
+              <div class="task-head">
+                <span class="badge">Задача №1684</span>
+                <strong>Не считаются ответные планки Резе на маленьких створках</strong>
+                <span class="muted">13.07.2026, 12:31 · Рагулин Юрий Иванович · номер в задаче · done</span>
+              </div>
+              <div class="task-body">
+                <div><b>Описание:</b></div>
+                <pre>Добрый день. Пример заказов 15396, 15397 На изделиях 1, 2 в обоих заказах не считаются отв. планки R211103, должно быть по 1 шт на изделие. На более высоких створках они есть (изд. 3,4), но арт. R211101 прошу везде поменять на R211103</pre>
+                <div class="muted">В чате явных уточнений/дополнений к описанию не отмечено.</div>
+                <details class="allchat"><summary>Весь чат (1 сообщ.)</summary><div class="msg"><b>16.07.2026, 13:17</b> Мизинцов Александр: Доступно с 16.07.2026г.</div></details>
+              </div>
+            </div>
+        </div>
+      </article>
+
+      <article class="card" data-topic="планки" data-has="1" data-q="рекл 694 заказ 15396 не посчитаны ответные планки 15396 планки">
+        <header class="card-h" onclick="this.parentElement.classList.toggle('open')">
+          <div class="left">
+            <span class="pill">14 июля</span>
+            <span class="pill topic">планки</span>
+            <span class="pill ok">1 задач</span>
+            <h3>рекл 694 · заказ 15396</h3>
+          </div>
+        </header>
+        <div class="card-b">
+          <div class="recl">📢 14 июля · рекл 694 · заказ <b>15396</b> — не посчитаны ответные планки</div>
+          <h4>Задачи / проекты в CRM</h4>
+          
+            <div class="task">
+              <div class="task-head">
+                <span class="badge">Задача №1684</span>
+                <strong>Не считаются ответные планки Резе на маленьких створках</strong>
+                <span class="muted">13.07.2026, 12:31 · Рагулин Юрий Иванович · номер в задаче · done</span>
+              </div>
+              <div class="task-body">
+                <div><b>Описание:</b></div>
+                <pre>Добрый день. Пример заказов 15396, 15397 На изделиях 1, 2 в обоих заказах не считаются отв. планки R211103, должно быть по 1 шт на изделие. На более высоких створках они есть (изд. 3,4), но арт. R211101 прошу везде поменять на R211103</pre>
+                <div class="muted">В чате явных уточнений/дополнений к описанию не отмечено.</div>
+                <details class="allchat"><summary>Весь чат (1 сообщ.)</summary><div class="msg"><b>16.07.2026, 13:17</b> Мизинцов Александр: Доступно с 16.07.2026г.</div></details>
+              </div>
+            </div>
+        </div>
+      </article>
+
+      <article class="card" data-topic="привод" data-has="0" data-q="рекл 695 заказ 15579 выбился привод 500-660 нужен 661-1160 15579 привод">
+        <header class="card-h" onclick="this.parentElement.classList.toggle('open')">
+          <div class="left">
+            <span class="pill">14 июля</span>
+            <span class="pill topic">привод</span>
+            <span class="pill warn">нет задачи</span>
+            <h3>рекл 695 · заказ 15579</h3>
+          </div>
+        </header>
+        <div class="card-b">
+          <div class="recl">📢 14 июля · рекл 695 · заказ <b>15579</b> — выбился привод 500-660 нужен 661-1160</div>
+          <h4>Задачи / проекты в CRM</h4>
+          <div class="muted">В CRM у Мизинцова задача/проект с этим номером заказа не найдены.</div>
+        </div>
+      </article>
+
+      <article class="card" data-topic="привод" data-has="0" data-q="рекл 696 заказ 15262 выбился привод 500-660 нужен 661-1160 15262 привод">
+        <header class="card-h" onclick="this.parentElement.classList.toggle('open')">
+          <div class="left">
+            <span class="pill">14 июля</span>
+            <span class="pill topic">привод</span>
+            <span class="pill warn">нет задачи</span>
+            <h3>рекл 696 · заказ 15262</h3>
+          </div>
+        </header>
+        <div class="card-b">
+          <div class="recl">📢 14 июля · рекл 696 · заказ <b>15262</b> — выбился привод 500-660 нужен 661-1160</div>
+          <h4>Задачи / проекты в CRM</h4>
+          <div class="muted">В CRM у Мизинцова задача/проект с этим номером заказа не найдены.</div>
+        </div>
+      </article>
+
+      <article class="card" data-topic="привод" data-has="0" data-q="рекл 701 заказ 15464 выбился привод 500-660 нужен 661-1160 15464 привод">
+        <header class="card-h" onclick="this.parentElement.classList.toggle('open')">
+          <div class="left">
+            <span class="pill">14 июля</span>
+            <span class="pill topic">привод</span>
+            <span class="pill warn">нет задачи</span>
+            <h3>рекл 701 · заказ 15464</h3>
+          </div>
+        </header>
+        <div class="card-b">
+          <div class="recl">📢 14 июля · рекл 701 · заказ <b>15464</b> — выбился привод 500-660 нужен 661-1160</div>
+          <h4>Задачи / проекты в CRM</h4>
+          <div class="muted">В CRM у Мизинцова задача/проект с этим номером заказа не найдены.</div>
+        </div>
+      </article>
+
+      <article class="card" data-topic="планки" data-has="0" data-q="рекл 704 заказ 15104 не посчитаны ответные планки 15104 планки">
+        <header class="card-h" onclick="this.parentElement.classList.toggle('open')">
+          <div class="left">
+            <span class="pill">15 июля</span>
+            <span class="pill topic">планки</span>
+            <span class="pill warn">нет задачи</span>
+            <h3>рекл 704 · заказ 15104</h3>
+          </div>
+        </header>
+        <div class="card-b">
+          <div class="recl">📢 15 июля · рекл 704 · заказ <b>15104</b> — не посчитаны ответные планки</div>
+          <h4>Задачи / проекты в CRM</h4>
+          <div class="muted">В CRM у Мизинцова задача/проект с этим номером заказа не найдены.</div>
+        </div>
+      </article>
+
+      <article class="card" data-topic="ручки/наж.гар" data-has="0" data-q="рекл 705 заказ 15289 не верно посчитан наж гар 15289 ручки/наж.гар">
+        <header class="card-h" onclick="this.parentElement.classList.toggle('open')">
+          <div class="left">
+            <span class="pill">15 июля</span>
+            <span class="pill topic">ручки/наж.гар</span>
+            <span class="pill warn">нет задачи</span>
+            <h3>рекл 705 · заказ 15289</h3>
+          </div>
+        </header>
+        <div class="card-b">
+          <div class="recl">📢 15 июля · рекл 705 · заказ <b>15289</b> — не верно посчитан наж гар</div>
+          <h4>Задачи / проекты в CRM</h4>
+          <div class="muted">В CRM у Мизинцова задача/проект с этим номером заказа не найдены.</div>
+        </div>
+      </article>
+
+      <article class="card" data-topic="плёнка/ламинация" data-has="1" data-q="рекл 706 заказ 16116 неверно рассчитана пленка для ламинации 16116 плёнка/ламинация">
+        <header class="card-h" onclick="this.parentElement.classList.toggle('open')">
+          <div class="left">
+            <span class="pill">15 июля</span>
+            <span class="pill topic">плёнка/ламинация</span>
+            <span class="pill ok">1 задач</span>
+            <h3>рекл 706 · заказ 16116</h3>
+          </div>
+        </header>
+        <div class="card-b">
+          <div class="recl">📢 15 июля · рекл 706 · заказ <b>16116</b> — неверно рассчитана пленка для ламинации</div>
+          <h4>Задачи / проекты в CRM</h4>
+          
+            <div class="task">
+              <div class="task-head">
+                <span class="badge">Проект №486</span>
+                <strong>ошибка 16116</strong>
+                <span class="muted">14.07.2026, 13:56 · Прошкина Наталья Владимировна · номер в задаче · Завершено</span>
+              </div>
+              <div class="task-body">
+                <div><b>Описание:</b></div>
+                <pre>На заказ 16116 на Штапик для с/п 32 мм считается пленка 40 мм, должна считаться 30 мм прошу исправить Нашла по переписке - это уже исправляли</pre>
+                <div class="notes"><b>Из чата (для оценки — уточнения / возможные расхождения с описанием):</b><div class="note"><span class="pill">детали, которых может не быть в описании</span> <span class="muted">15.07.2026, 07:58 · Мизинцов Александр</span><div>«ранее делали для экспроф и прона 40мм. Заменил для обоих на 30»</div></div></div>
+                <details class="allchat"><summary>Весь чат (1 сообщ.)</summary><div class="msg"><b>15.07.2026, 07:58</b> Мизинцов Александр: ранее делали для экспроф и прона 40мм. Заменил для обоих на 30</div></details>
+              </div>
+            </div>
+        </div>
+      </article>
+
+      <article class="card" data-topic="привод" data-has="0" data-q="рекл 711 заказ 15378 выбился привод 500-660 нужен 661-1160 15378 привод">
+        <header class="card-h" onclick="this.parentElement.classList.toggle('open')">
+          <div class="left">
+            <span class="pill">15 июля</span>
+            <span class="pill topic">привод</span>
+            <span class="pill warn">нет задачи</span>
+            <h3>рекл 711 · заказ 15378</h3>
+          </div>
+        </header>
+        <div class="card-b">
+          <div class="recl">📢 15 июля · рекл 711 · заказ <b>15378</b> — выбился привод 500-660 нужен 661-1160</div>
+          <h4>Задачи / проекты в CRM</h4>
+          <div class="muted">В CRM у Мизинцова задача/проект с этим номером заказа не найдены.</div>
+        </div>
+      </article>
+
+      <article class="card" data-topic="планки" data-has="1" data-q="рекл 712 заказ 14407 не посчитаны ответные планки 14407 планки">
+        <header class="card-h" onclick="this.parentElement.classList.toggle('open')">
+          <div class="left">
+            <span class="pill">15 июля</span>
+            <span class="pill topic">планки</span>
+            <span class="pill ok">1 задач</span>
+            <h3>рекл 712 · заказ 14407</h3>
+          </div>
+        </header>
+        <div class="card-b">
+          <div class="recl">📢 15 июля · рекл 712 · заказ <b>14407</b> — не посчитаны ответные планки</div>
+          <h4>Задачи / проекты в CRM</h4>
+          
+            <div class="task">
+              <div class="task-head">
+                <span class="badge">Задача №1744</span>
+                <strong>Неверный расчет количества ответных планок Резе</strong>
+                <span class="muted">15.07.2026, 08:53 · Рагулин Юрий Иванович · номер в задаче · done</span>
+              </div>
+              <div class="task-body">
+                <div><b>Описание:</b></div>
+                <pre>Добрый день. В зак. 14 407 в каждом изделии по 7 ответных планок R211103, а считается по 3 шт. Прошу проверить и исправить.</pre>
+                <div class="notes"><b>Из чата (для оценки — уточнения / возможные расхождения с описанием):</b><div class="note"><span class="pill">детали, которых может не быть в описании</span> <span class="muted">15.07.2026, 11:32 · Мизинцов Александр</span><div>«Доступно с после обновления стеклопакетов по задаче от коммерческого отдела. Дополнительно уведомлю по почте письмом, что все обновления были влиты, если еще будут сегодня по задачам готовые.»</div></div></div>
+                <details class="allchat"><summary>Весь чат (1 сообщ.)</summary><div class="msg"><b>15.07.2026, 11:32</b> Мизинцов Александр: Доступно с после обновления стеклопакетов по задаче от коммерческого отдела. Дополнительно уведомлю по почте письмом, что все обновления были влиты, если еще будут сегодня по задачам готовые.</div></details>
+              </div>
+            </div>
+        </div>
+      </article>
+
+      <article class="card" data-topic="привод" data-has="0" data-q="рекл 713 заказ 14752 выбился привод 500-660 нужен 661-1160 14752 привод">
+        <header class="card-h" onclick="this.parentElement.classList.toggle('open')">
+          <div class="left">
+            <span class="pill">15 июля</span>
+            <span class="pill topic">привод</span>
+            <span class="pill warn">нет задачи</span>
+            <h3>рекл 713 · заказ 14752</h3>
+          </div>
+        </header>
+        <div class="card-b">
+          <div class="recl">📢 15 июля · рекл 713 · заказ <b>14752</b> — выбился привод 500-660 нужен 661-1160</div>
+          <h4>Задачи / проекты в CRM</h4>
+          <div class="muted">В CRM у Мизинцова задача/проект с этим номером заказа не найдены.</div>
+        </div>
+      </article>
+
+      <article class="card" data-topic="привод" data-has="0" data-q="рекл 714 заказ 14737 выбился привод 500-660 нужен 661-1160 14737 привод">
+        <header class="card-h" onclick="this.parentElement.classList.toggle('open')">
+          <div class="left">
+            <span class="pill">15 июля</span>
+            <span class="pill topic">привод</span>
+            <span class="pill warn">нет задачи</span>
+            <h3>рекл 714 · заказ 14737</h3>
+          </div>
+        </header>
+        <div class="card-b">
+          <div class="recl">📢 15 июля · рекл 714 · заказ <b>14737</b> — выбился привод 500-660 нужен 661-1160</div>
+          <h4>Задачи / проекты в CRM</h4>
+          <div class="muted">В CRM у Мизинцова задача/проект с этим номером заказа не найдены.</div>
+        </div>
+      </article>
+
+      <article class="card" data-topic="плёнка/ламинация" data-has="1" data-q="рекл 715 заказ 14850 неверно рассчитана пленка для ламинации 14850 плёнка/ламинация">
+        <header class="card-h" onclick="this.parentElement.classList.toggle('open')">
+          <div class="left">
+            <span class="pill">15 июля</span>
+            <span class="pill topic">плёнка/ламинация</span>
+            <span class="pill ok">1 задач</span>
+            <h3>рекл 715 · заказ 14850</h3>
+          </div>
+        </header>
+        <div class="card-b">
+          <div class="recl">📢 15 июля · рекл 715 · заказ <b>14850</b> — неверно рассчитана пленка для ламинации</div>
+          <h4>Задачи / проекты в CRM</h4>
+          
+            <div class="task">
+              <div class="task-head">
+                <span class="badge">Проект №499</span>
+                <strong>ошибка 14 850</strong>
+                <span class="muted">15.07.2026, 10:55 · Прошкина Наталья Владимировна · номер в задаче · Завершено</span>
+              </div>
+              <div class="task-body">
+                <div><b>Описание:</b></div>
+                <pre>На заказ 14 850 Пленка LG стандарт 160 мм с характеристикой _белый,прошу исправить Цвет пленки должен быть как у остальных - Антрацитово серый гладкий KDB74-F7(стандарт) Скрин во вложении</pre>
+                <div class="muted">В чате явных уточнений/дополнений к описанию не отмечено.</div>
+                
+              </div>
+            </div>
+        </div>
+      </article>
+
+      <article class="card" data-topic="плёнка/ламинация" data-has="1" data-q="рекл 716 заказ 15374 неверно рассчитана пленка для ламинации 15374 плёнка/ламинация">
+        <header class="card-h" onclick="this.parentElement.classList.toggle('open')">
+          <div class="left">
+            <span class="pill">15 июля</span>
+            <span class="pill topic">плёнка/ламинация</span>
+            <span class="pill ok">1 задач</span>
+            <h3>рекл 716 · заказ 15374</h3>
+          </div>
+        </header>
+        <div class="card-b">
+          <div class="recl">📢 15 июля · рекл 716 · заказ <b>15374</b> — неверно рассчитана пленка для ламинации</div>
+          <h4>Задачи / проекты в CRM</h4>
+          
+            <div class="task">
+              <div class="task-head">
+                <span class="badge">Проект №497</span>
+                <strong>ошибка 15 374</strong>
+                <span class="muted">15.07.2026, 09:01 · Прошкина Наталья Владимировна · номер в задаче · Завершено</span>
+              </div>
+              <div class="task-body">
+                <div><b>Описание:</b></div>
+                <pre>Добрый день! На заказ 15 374 пленка 90 мм белая, прошу исправить Цвет должен быть как у остальных пленок Орех UK103(стандарт) Скрин из 1С во вложении</pre>
+                <div class="notes"><b>Из чата (для оценки — уточнения / возможные расхождения с описанием):</b><div class="note"><span class="pill">повтор / ошибка осталась</span> <span class="muted">16.07.2026, 12:33 · Мизинцов Александр</span><div>«смысл от рабочих групп, если приходим опять к тому же. Понял»</div></div><div class="note"><span class="pill">уточнение в чате</span> <span class="muted">16.07.2026, 12:34 · Мизинцов Александр</span><div>«мы вроде как определялись, что отдел пишет коннкретно мне задачу. Что бы не было как сейчас, я например спрашиваю что то, а тебе приходится писать в производство и уточнять, а потом мне передавать»</div></div></div>
+                <details class="allchat"><summary>Весь чат (5 сообщ.)</summary><div class="msg"><b>16.07.2026, 12:15</b> Мизинцов Александр: а почему ты пишешь эти задачи а не производство мне?</div><div class="msg"><b>16.07.2026, 12:31</b> Прошкина Наталья: Потому что за ошибки меня назначили как ответственное лицо Ком отдел оформляет рекламации и все замыкается на нас</div><div class="msg"><b>16.07.2026, 12:33</b> Мизинцов Александр: смысл от рабочих групп, если приходим опять к тому же. Понял</div><div class="msg"><b>16.07.2026, 12:33</b> Прошкина Наталья: Про какие рабочие группы идет речь?</div><div class="msg"><b>16.07.2026, 12:34</b> Мизинцов Александр: мы вроде как определялись, что отдел пишет коннкретно мне задачу. Что бы не было как сейчас, я например спрашиваю что то, а тебе приходится писать в производство и уточнять, а потом мне передавать</div></details>
+              </div>
+            </div>
+        </div>
+      </article>
+
+      <article class="card" data-topic="плёнка/ламинация" data-has="0" data-q="рекл 717 заказ 14624 неверно рассчитана пленка для ламинации 14624 плёнка/ламинация">
+        <header class="card-h" onclick="this.parentElement.classList.toggle('open')">
+          <div class="left">
+            <span class="pill">15 июля</span>
+            <span class="pill topic">плёнка/ламинация</span>
+            <span class="pill warn">нет задачи</span>
+            <h3>рекл 717 · заказ 14624</h3>
+          </div>
+        </header>
+        <div class="card-b">
+          <div class="recl">📢 15 июля · рекл 717 · заказ <b>14624</b> — неверно рассчитана пленка для ламинации</div>
+          <h4>Задачи / проекты в CRM</h4>
+          <div class="muted">В CRM у Мизинцова задача/проект с этим номером заказа не найдены.</div>
+        </div>
+      </article>
+
+      <article class="card" data-topic="плёнка/ламинация" data-has="1" data-q="рекл 718 заказ 15476 неверно рассчитана пленка для ламинации 15476 плёнка/ламинация">
+        <header class="card-h" onclick="this.parentElement.classList.toggle('open')">
+          <div class="left">
+            <span class="pill">15 июля</span>
+            <span class="pill topic">плёнка/ламинация</span>
+            <span class="pill ok">1 задач</span>
+            <h3>рекл 718 · заказ 15476</h3>
+          </div>
+        </header>
+        <div class="card-b">
+          <div class="recl">📢 15 июля · рекл 718 · заказ <b>15476</b> — неверно рассчитана пленка для ламинации</div>
+          <h4>Задачи / проекты в CRM</h4>
+          
+            <div class="task">
+              <div class="task-head">
+                <span class="badge">Проект №498</span>
+                <strong>ошибка 15 476</strong>
+                <span class="muted">15.07.2026, 09:03 · Прошкина Наталья Владимировна · номер в задаче · Завершено</span>
+              </div>
+              <div class="task-body">
+                <div><b>Описание:</b></div>
+                <pre>Добрый день! На заказ 15 476 считается Пленка LG стандарт 90 мм белая, прошу исправить Цвет пленки должен быть как у остальных Коричневый дуб UQ901(стандарт) Скрин во вложении</pre>
+                <div class="muted">В чате явных уточнений/дополнений к описанию не отмечено.</div>
+                
+              </div>
+            </div>
+        </div>
+      </article>
+
+      <article class="card" data-topic="плёнка/ламинация" data-has="1" data-q="рекл 720 заказ 14527 неверно рассчитана пленка для ламинации 14527 плёнка/ламинация">
+        <header class="card-h" onclick="this.parentElement.classList.toggle('open')">
+          <div class="left">
+            <span class="pill">15 июля</span>
+            <span class="pill topic">плёнка/ламинация</span>
+            <span class="pill ok">1 задач</span>
+            <h3>рекл 720 · заказ 14527</h3>
+          </div>
+        </header>
+        <div class="card-b">
+          <div class="recl">📢 15 июля · рекл 720 · заказ <b>14527</b> — неверно рассчитана пленка для ламинации</div>
+          <h4>Задачи / проекты в CRM</h4>
+          
+            <div class="task">
+              <div class="task-head">
+                <span class="badge">Проект №501</span>
+                <strong>ошибка 14338,14527,14623</strong>
+                <span class="muted">15.07.2026, 13:35 · Прошкина Наталья Владимировна · номер в задаче · Новая</span>
+              </div>
+              <div class="task-body">
+                <div><b>Описание:</b></div>
+                <pre>Добрый день! На заказ 14338,14527,14623 не рассчитана пленка на 732460 прошу проверить что произошло с пленкой на арт 732460 , что она перестала считаться</pre>
+                <div class="muted">В чате явных уточнений/дополнений к описанию не отмечено.</div>
+                <details class="allchat"><summary>Весь чат (3 сообщ.)</summary><div class="msg"><b>15.07.2026, 14:28</b> Мизинцов Александр: картинку скинул с примером, там же есть пленка</div><div class="msg"><b>16.07.2026, 15:42</b> Мизинцов Александр: а тут видела сообщение?</div><div class="msg"><b>16.07.2026, 15:52</b> Прошкина Наталья: Видела. Завтра пойду к начальнику производства, будем разбираться</div></details>
+              </div>
+            </div>
+        </div>
+      </article>
+
+      <article class="card" data-topic="плёнка/ламинация" data-has="0" data-q="рекл 721 заказ 14643 неверно рассчитана пленка для ламинации 14643 плёнка/ламинация">
+        <header class="card-h" onclick="this.parentElement.classList.toggle('open')">
+          <div class="left">
+            <span class="pill">15 июля</span>
+            <span class="pill topic">плёнка/ламинация</span>
+            <span class="pill warn">нет задачи</span>
+            <h3>рекл 721 · заказ 14643</h3>
+          </div>
+        </header>
+        <div class="card-b">
+          <div class="recl">📢 15 июля · рекл 721 · заказ <b>14643</b> — неверно рассчитана пленка для ламинации</div>
+          <h4>Задачи / проекты в CRM</h4>
+          <div class="muted">В CRM у Мизинцова задача/проект с этим номером заказа не найдены.</div>
+        </div>
+      </article>
+
+      <article class="card" data-topic="плёнка/ламинация" data-has="0" data-q="рекл 722 заказ 14643 неверно рассчитана пленка для ламинации штапика 14643 плёнка/ламинация">
+        <header class="card-h" onclick="this.parentElement.classList.toggle('open')">
+          <div class="left">
+            <span class="pill">16 июля</span>
+            <span class="pill topic">плёнка/ламинация</span>
+            <span class="pill warn">нет задачи</span>
+            <h3>рекл 722 · заказ 14643</h3>
+          </div>
+        </header>
+        <div class="card-b">
+          <div class="recl">📢 16 июля · рекл 722 · заказ <b>14643</b> — неверно рассчитана пленка для ламинации штапика</div>
+          <h4>Задачи / проекты в CRM</h4>
+          <div class="muted">В CRM у Мизинцова задача/проект с этим номером заказа не найдены.</div>
+        </div>
+      </article>
+
+      <article class="card" data-topic="плёнка/ламинация" data-has="0" data-q="рекл 723 заказ 14643 неверно рассчитана пленка для ламинации 14643 плёнка/ламинация">
+        <header class="card-h" onclick="this.parentElement.classList.toggle('open')">
+          <div class="left">
+            <span class="pill">16 июля</span>
+            <span class="pill topic">плёнка/ламинация</span>
+            <span class="pill warn">нет задачи</span>
+            <h3>рекл 723 · заказ 14643</h3>
+          </div>
+        </header>
+        <div class="card-b">
+          <div class="recl">📢 16 июля · рекл 723 · заказ <b>14643</b> — неверно рассчитана пленка для ламинации</div>
+          <h4>Задачи / проекты в CRM</h4>
+          <div class="muted">В CRM у Мизинцова задача/проект с этим номером заказа не найдены.</div>
+        </div>
+      </article>
+
+      <article class="card" data-topic="плёнка/ламинация" data-has="1" data-q="рекл 724 заказ 14338 неверно рассчитана пленка для ламинации 14338 плёнка/ламинация">
+        <header class="card-h" onclick="this.parentElement.classList.toggle('open')">
+          <div class="left">
+            <span class="pill">16 июля</span>
+            <span class="pill topic">плёнка/ламинация</span>
+            <span class="pill ok">1 задач</span>
+            <h3>рекл 724 · заказ 14338</h3>
+          </div>
+        </header>
+        <div class="card-b">
+          <div class="recl">📢 16 июля · рекл 724 · заказ <b>14338</b> — неверно рассчитана пленка для ламинации</div>
+          <h4>Задачи / проекты в CRM</h4>
+          
+            <div class="task">
+              <div class="task-head">
+                <span class="badge">Проект №501</span>
+                <strong>ошибка 14338,14527,14623</strong>
+                <span class="muted">15.07.2026, 13:35 · Прошкина Наталья Владимировна · номер в задаче · Новая</span>
+              </div>
+              <div class="task-body">
+                <div><b>Описание:</b></div>
+                <pre>Добрый день! На заказ 14338,14527,14623 не рассчитана пленка на 732460 прошу проверить что произошло с пленкой на арт 732460 , что она перестала считаться</pre>
+                <div class="muted">В чате явных уточнений/дополнений к описанию не отмечено.</div>
+                <details class="allchat"><summary>Весь чат (3 сообщ.)</summary><div class="msg"><b>15.07.2026, 14:28</b> Мизинцов Александр: картинку скинул с примером, там же есть пленка</div><div class="msg"><b>16.07.2026, 15:42</b> Мизинцов Александр: а тут видела сообщение?</div><div class="msg"><b>16.07.2026, 15:52</b> Прошкина Наталья: Видела. Завтра пойду к начальнику производства, будем разбираться</div></details>
+              </div>
+            </div>
+        </div>
+      </article>
+
+      <article class="card" data-topic="плёнка/ламинация" data-has="0" data-q="рекл 726 заказ 16382 неверно рассчитана пленка для ламинации 16382 плёнка/ламинация">
+        <header class="card-h" onclick="this.parentElement.classList.toggle('open')">
+          <div class="left">
+            <span class="pill">16 июля</span>
+            <span class="pill topic">плёнка/ламинация</span>
+            <span class="pill warn">нет задачи</span>
+            <h3>рекл 726 · заказ 16382</h3>
+          </div>
+        </header>
+        <div class="card-b">
+          <div class="recl">📢 16 июля · рекл 726 · заказ <b>16382</b> — неверно рассчитана пленка для ламинации</div>
+          <h4>Задачи / проекты в CRM</h4>
+          <div class="muted">В CRM у Мизинцова задача/проект с этим номером заказа не найдены.</div>
+        </div>
+      </article>
+
+      <article class="card" data-topic="привод" data-has="0" data-q="рекл 727 заказ 14799 выбился привод 500-660 нужен 661-1160 14799 привод">
+        <header class="card-h" onclick="this.parentElement.classList.toggle('open')">
+          <div class="left">
+            <span class="pill">16 июля</span>
+            <span class="pill topic">привод</span>
+            <span class="pill warn">нет задачи</span>
+            <h3>рекл 727 · заказ 14799</h3>
+          </div>
+        </header>
+        <div class="card-b">
+          <div class="recl">📢 16 июля · рекл 727 · заказ <b>14799</b> — выбился привод 500-660 нужен 661-1160</div>
+          <h4>Задачи / проекты в CRM</h4>
+          <div class="muted">В CRM у Мизинцова задача/проект с этим номером заказа не найдены.</div>
+        </div>
+      </article>
+
+      <article class="card" data-topic="плёнка/ламинация" data-has="0" data-q="рекл 729 заказ 16070 неверно рассчитана пленка для ламинации 16070 плёнка/ламинация">
+        <header class="card-h" onclick="this.parentElement.classList.toggle('open')">
+          <div class="left">
+            <span class="pill">16 июля</span>
+            <span class="pill topic">плёнка/ламинация</span>
+            <span class="pill warn">нет задачи</span>
+            <h3>рекл 729 · заказ 16070</h3>
+          </div>
+        </header>
+        <div class="card-b">
+          <div class="recl">📢 16 июля · рекл 729 · заказ <b>16070</b> — неверно рассчитана пленка для ламинации</div>
+          <h4>Задачи / проекты в CRM</h4>
+          <div class="muted">В CRM у Мизинцова задача/проект с этим номером заказа не найдены.</div>
+        </div>
+      </article>
+
+      <article class="card" data-topic="плёнка/ламинация" data-has="1" data-q="рекл 730 заказ 16246 неверно рассчитана пленка для ламинации 16246 плёнка/ламинация">
+        <header class="card-h" onclick="this.parentElement.classList.toggle('open')">
+          <div class="left">
+            <span class="pill">16 июля</span>
+            <span class="pill topic">плёнка/ламинация</span>
+            <span class="pill ok">1 задач</span>
+            <h3>рекл 730 · заказ 16246</h3>
+          </div>
+        </header>
+        <div class="card-b">
+          <div class="recl">📢 16 июля · рекл 730 · заказ <b>16246</b> — неверно рассчитана пленка для ламинации</div>
+          <h4>Задачи / проекты в CRM</h4>
+          
+            <div class="task">
+              <div class="task-head">
+                <span class="badge">Проект №513</span>
+                <strong>ошибка 16246</strong>
+                <span class="muted">16.07.2026, 08:50 · Прошкина Наталья Владимировна · номер в задаче · Завершено</span>
+              </div>
+              <div class="task-body">
+                <div><b>Описание:</b></div>
+                <pre>Доброе утро! На заказ 16246 опять пленка 90 мм белая, прошу исправить, эти все характеристики влияют на результат незавершенки — а потом у нас ламинаторщик пленку по 5 раз пересчитывает, потому что результаты не сходятся</pre>
+                <div class="muted">В чате явных уточнений/дополнений к описанию не отмечено.</div>
+                
+              </div>
+            </div>
+        </div>
+      </article>
+
+      <article class="card" data-topic="планки" data-has="1" data-q="рекл 732 заказ 15529 не посчитаны ответные планки 15529 планки">
+        <header class="card-h" onclick="this.parentElement.classList.toggle('open')">
+          <div class="left">
+            <span class="pill">16 июля</span>
+            <span class="pill topic">планки</span>
+            <span class="pill ok">1 задач</span>
+            <h3>рекл 732 · заказ 15529</h3>
+          </div>
+        </header>
+        <div class="card-b">
+          <div class="recl">📢 16 июля · рекл 732 · заказ <b>15529</b> — не посчитаны ответные планки</div>
+          <h4>Задачи / проекты в CRM</h4>
+          
+            <div class="task">
+              <div class="task-head">
+                <span class="badge">Задача №1796</span>
+                <strong>Лишняя планка  Резе при выборе ступ. проветривания</strong>
+                <span class="muted">16.07.2026, 10:03 · Рагулин Юрий Иванович · номер в задаче · done</span>
+              </div>
+              <div class="task-body">
+                <div><b>Описание:</b></div>
+                <pre>Добрый день. Ошибка количества ответок появляется только при выборе ступенчатого проветривания. В зак. 15529 для всех изделий выбрано ступенчатое проветривание. Если проветривания нет, то ошибки - нет. Количество цапф на створках = 3 (205107 - 1, 201123 - 1, 203106 - 1) При этом считается 4 ответки: 211101 - 2 + 212101 - 2. Арт. 212101 - должно быть 1 шт. Прошу исправить.</pre>
+                <div class="muted">В чате явных уточнений/дополнений к описанию не отмечено.</div>
+                <details class="allchat"><summary>Весь чат (1 сообщ.)</summary><div class="msg"><b>16.07.2026, 15:03</b> Мизинцов Александр: Доступно с 17.07.2026г.</div></details>
+              </div>
+            </div>
+        </div>
+      </article></div>
+</div>
+<script>
+function f(){
+  const q=(document.getElementById('q').value||'').toLowerCase();
+  const topic=document.getElementById('topic').value;
+  const has=document.getElementById('has').value;
+  document.querySelectorAll('.card').forEach(c=>{
+    const okQ=!q||(c.dataset.q||'').includes(q);
+    const okT=!topic||c.dataset.topic===topic;
+    const okH=!has||c.dataset.has===has;
+    c.style.display=(okQ&&okT&&okH)?'':'none';
+  });
+}
+</script>
+</body>
+</html>

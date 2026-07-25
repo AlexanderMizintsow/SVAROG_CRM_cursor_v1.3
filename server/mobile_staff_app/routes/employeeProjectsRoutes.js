@@ -24,6 +24,8 @@ const employeeProjectsRoutes = () => {
   router.post('/:projectId/approval', ctrl.setApproval())
   router.get('/:projectId/messages', ctrl.getMessages())
   router.post('/:projectId/messages', ctrl.sendMessage())
+  router.patch('/:projectId/messages/:messageId', ctrl.updateMessage())
+  router.delete('/:projectId/messages/:messageId', ctrl.deleteMessage())
   router.get('/:projectId/history', ctrl.getHistory())
   router.get('/:projectId/subtasks', ctrl.getSubtasks())
   router.post(

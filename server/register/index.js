@@ -67,6 +67,8 @@ const {
   getMessagesNotificationDealer,
   sendTaskMessage,
   getTaskMessages,
+  updateTaskMessage,
+  deleteTaskMessage,
   markMessagesAsRead,
   createGlobalTask,
   getGlobalTasks,
@@ -98,6 +100,8 @@ const {
   updateAdditionalInfo,
   getChatMessages,
   sendChatMessage,
+  updateChatMessage,
+  deleteChatMessage,
   getGlobalTaskHistory,
   updateGlobalTaskHistory,
   getGlobalTaskTitle,
@@ -541,6 +545,8 @@ app.get('/api/tasks/:taskId/comments', getTaskComments(dbPool))
 app.post('/api/tasks/:taskId/comments', addTaskComment(dbPool))
 app.get('/api/tasks/:taskId/messages-chat-task', getTaskMessages(dbPool))
 app.post('/api/tasks/:taskId/messages-chat-task', sendTaskMessage(dbPool, io))
+app.patch('/api/tasks/:taskId/messages-chat-task/:messageId', updateTaskMessage(dbPool, io))
+app.delete('/api/tasks/:taskId/messages-chat-task/:messageId', deleteTaskMessage(dbPool, io))
 app.post('/api/tasks/:taskId/mark-messages-as-read', markMessagesAsRead(dbPool))
 app.post('/api/chat-files/add', addChatFile(dbPool))
 app.get('/api/chat-files/:taskId', getChatFilesByTaskId(dbPool))
@@ -611,6 +617,14 @@ app.put('/api/tasks/:id/update-goals', updateGoals(dbPool, io))
 app.put('/api/tasks/:id/update-additional-info', updateAdditionalInfo(dbPool, io))
 app.get('/api/global-tasks/chat/:globalTaskId', getChatMessages(dbPool))
 app.post('/api/global-tasks/chat', sendChatMessage(dbPool, io))
+app.patch(
+  '/api/global-tasks/chat/:globalTaskId/:messageId',
+  updateChatMessage(dbPool, io)
+)
+app.delete(
+  '/api/global-tasks/chat/:globalTaskId/:messageId',
+  deleteChatMessage(dbPool, io)
+)
 
 app.get('/api/global-task/:globalTaskId/history', getGlobalTaskHistory(dbPool))
 app.post('/api/global-task/:globalTaskId/history', updateGlobalTaskHistory(dbPool))

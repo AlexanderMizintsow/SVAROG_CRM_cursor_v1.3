@@ -6,6 +6,7 @@ const { REGISTER_URL } = require('./registerClient')
 const RELAY_EVENTS = [
   'taskCreated',
   'newMessage',
+  'taskChatMessageUpdated',
   'taskAccept',
   'taskApproval',
   'taskUpdateTaskStatus',

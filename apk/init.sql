@@ -750,6 +750,10 @@ REFERENCES global_task_chat_messages(id) ON DELETE SET NULL;
 
 CREATE INDEX idx_chat_messages_task_id ON global_task_chat_messages(global_task_id);
 
+ALTER TABLE global_task_chat_messages ADD COLUMN IF NOT EXISTS edited_at TIMESTAMP NULL;
+ALTER TABLE global_task_chat_messages ADD COLUMN IF NOT EXISTS is_deleted BOOLEAN NOT NULL DEFAULT FALSE;
+ALTER TABLE global_task_chat_messages ADD COLUMN IF NOT EXISTS deleted_at TIMESTAMP NULL;
+
 -- Комментарии при действиях. Например если провал, то запросить комментарий о причине провала
 CREATE TABLE action_global_task_comment (
   id SERIAL PRIMARY KEY,
@@ -946,6 +950,10 @@ ADD COLUMN replied_to_message_id INT NULL,
 ADD CONSTRAINT fk_replied_message 
 FOREIGN KEY (replied_to_message_id) 
 REFERENCES messages_task(id) ON DELETE SET NULL;
+
+ALTER TABLE messages_task ADD COLUMN IF NOT EXISTS edited_at TIMESTAMP NULL;
+ALTER TABLE messages_task ADD COLUMN IF NOT EXISTS is_deleted BOOLEAN NOT NULL DEFAULT FALSE;
+ALTER TABLE messages_task ADD COLUMN IF NOT EXISTS deleted_at TIMESTAMP NULL;
     
 
 -- хранения истории изменений задач.

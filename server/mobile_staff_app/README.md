@@ -24,6 +24,7 @@ Caddy, домен `api.mobiletest2026m.ru:8443` и NAT **менять не ну�
 - `PUT /api/mobile/employee/tasks/:id/status` — статус (исполнитель)
 - `POST /api/mobile/employee/tasks/:id/decision` — принять / вернуть
 - `GET/POST /api/mobile/employee/tasks/:id/messages` — чат
+- `PATCH/DELETE /api/mobile/employee/tasks/:id/messages/:messageId` — редактирование / мягкое удаление своего сообщения
 - `POST /api/mobile/employee/tasks/:id/attachments` — вложение
 - `GET /api/mobile/employee/tasks/files/:filename` — прокси файла
 - `GET /api/mobile/employee/tasks/extensions/pending` — запросы продления

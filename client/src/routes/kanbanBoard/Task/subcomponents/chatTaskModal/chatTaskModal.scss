@@ -237,10 +237,59 @@ $transition: all 0.3s ease;
             outline-offset: 1px;
           }
         }
+
+        .message-edit-btn,
+        .message-delete-btn {
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          width: 26px;
+          height: 26px;
+          padding: 0;
+          border: none;
+          border-radius: 50%;
+          cursor: pointer;
+          opacity: 0;
+          font-size: 12px;
+          transition:
+            opacity 0.15s ease,
+            background 0.15s ease,
+            transform 0.15s ease;
+
+          &:focus-visible {
+            opacity: 1;
+            outline: 2px solid #667eea;
+            outline-offset: 1px;
+          }
+        }
+
+        .message-edit-btn {
+          background: rgba(102, 126, 234, 0.12);
+          color: #667eea;
+
+          &:hover {
+            background: rgba(102, 126, 234, 0.22);
+            transform: scale(1.05);
+          }
+        }
+
+        .message-delete-btn {
+          background: rgba(220, 53, 69, 0.12);
+          color: #dc3545;
+
+          &:hover {
+            background: rgba(220, 53, 69, 0.22);
+            transform: scale(1.05);
+          }
+        }
       }
 
       &:hover .message-reply-btn,
-      &:focus-within .message-reply-btn {
+      &:hover .message-edit-btn,
+      &:hover .message-delete-btn,
+      &:focus-within .message-reply-btn,
+      &:focus-within .message-edit-btn,
+      &:focus-within .message-delete-btn {
         opacity: 1;
       }
 
@@ -254,6 +303,73 @@ $transition: all 0.3s ease;
         margin-bottom: 8px;
         user-select: text;
         cursor: text;
+
+        &--deleted {
+          font-style: italic;
+          color: #6c757d;
+          user-select: none;
+          cursor: default;
+        }
+      }
+
+      .message-edited-label {
+        display: block;
+        margin-top: 6px;
+        font-size: 11px;
+        color: #dc3545;
+        font-style: italic;
+        white-space: nowrap;
+      }
+
+      .message-edit-box {
+        margin-bottom: 8px;
+      }
+
+      .message-edit-input {
+        width: 100%;
+        min-height: 64px;
+        resize: vertical;
+        border: 1px solid #ced4da;
+        border-radius: 8px;
+        padding: 8px 10px;
+        font-size: 14px;
+        font-family: inherit;
+        box-sizing: border-box;
+      }
+
+      .message-edit-actions {
+        display: flex;
+        justify-content: flex-end;
+        gap: 8px;
+        margin-top: 6px;
+      }
+
+      .message-edit-cancel,
+      .message-edit-save {
+        border: none;
+        border-radius: 6px;
+        padding: 6px 10px;
+        font-size: 12px;
+        cursor: pointer;
+      }
+
+      .message-edit-cancel {
+        background: #e9ecef;
+        color: #495057;
+      }
+
+      .message-edit-save {
+        background: #667eea;
+        color: #fff;
+
+        &:disabled {
+          opacity: 0.6;
+          cursor: default;
+        }
+      }
+
+      &.deleted {
+        opacity: 0.85;
       }
 
       .message-status {
@@ -405,6 +521,71 @@ $transition: all 0.3s ease;
         font-size: 14px;
       }
     }
+  }
+
+  .chat-confirm-overlay {
+    position: absolute;
+    inset: 0;
+    z-index: 40;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 16px;
+    background: rgba(33, 37, 41, 0.45);
+  }
+
+  .chat-confirm-dialog {
+    width: 100%;
+    max-width: 320px;
+    background: #fff;
+    border-radius: 12px;
+    padding: 18px 16px 14px;
+    box-shadow: 0 12px 28px rgba(0, 0, 0, 0.22);
+  }
+
+  .chat-confirm-title {
+    margin: 0 0 6px;
+    font-size: 16px;
+    font-weight: 600;
+    color: #212529;
+  }
+
+  .chat-confirm-text {
+    margin: 0 0 16px;
+    font-size: 13px;
+    color: #6c757d;
+    line-height: 1.4;
+  }
+
+  .chat-confirm-actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: 8px;
+  }
+
+  .chat-confirm-cancel,
+  .chat-confirm-delete {
+    border: none;
+    border-radius: 8px;
+    padding: 8px 14px;
+    font-size: 13px;
+    cursor: pointer;
+    font-family: inherit;
+
+    &:disabled {
+      opacity: 0.6;
+      cursor: default;
+    }
+  }
+
+  .chat-confirm-cancel {
+    background: #f1f3f5;
+    color: #495057;
+  }
+
+  .chat-confirm-delete {
+    background: #dc3545;
+    color: #fff;
   }
 }
 

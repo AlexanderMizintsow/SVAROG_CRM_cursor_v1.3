@@ -97,18 +97,16 @@ const UserRoleSectionTask = ({
               const user = users.find((u) => String(u.id) === String(userId))
               const note = notesByEffectiveId[String(userId)]
               return user ? (
-                <div
-                  style={{ display: 'flex', alignItems: 'flex-start', flexWrap: 'wrap' }}
-                  key={userId}
-                >
-                  <span>{getUserFullName(user)}</span>
-                  <LuDelete
-                    style={{ marginLeft: 'auto' }}
-                    title="Удалить"
-                    onClick={() => handleRemoveUser(roleKey, userId)}
-                    className={styles.removeFile}
-                  />
-                  {note ? <span className={styles.absenceNote}>{note}</span> : null}
+                <div key={userId} className={styles.addedUserRow}>
+                  <div className={styles.addedUserMain}>
+                    <span>{getUserFullName(user)}</span>
+                    <LuDelete
+                      title="Удалить"
+                      onClick={() => handleRemoveUser(roleKey, userId)}
+                      className={styles.removeFile}
+                    />
+                  </div>
+                  {note ? <div className={styles.absenceNote}>{note}</div> : null}
                 </div>
               ) : null
             })}

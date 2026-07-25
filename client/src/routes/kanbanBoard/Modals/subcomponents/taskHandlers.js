@@ -255,6 +255,10 @@ export const useTaskHandlers = (state, setters) => {
         '0'
       )}:${String(now.getMinutes()).padStart(2, '0')}`
       e.target.value = formattedDate
+      // Синхронизируем React-state: иначе срок в DOM есть, а в taskData.deadline пусто
+      if (e.target.name) {
+        setTaskData((prev) => ({ ...prev, [e.target.name]: formattedDate }))
+      }
     }
   }
 

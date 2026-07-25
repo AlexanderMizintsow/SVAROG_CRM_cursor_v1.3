@@ -175,16 +175,7 @@ const createProject = () => async (req, res) => {
     })
 
     const projectId = created?.taskId || created?.id
-    if (projectId) {
-      notifyProjectParticipants(pool, {
-        projectId,
-        excludeUserId: userId,
-        userIds: (responsibles || []).map((r) => Number(r.id)),
-        title: 'Новый проект',
-        body: String(title).trim(),
-        type: 'project_created',
-      })
-    }
+    // push: register emitGlobalTaskChanged(created)
 
     return res.status(201).json({
       projectId,
@@ -228,13 +219,7 @@ const updateStatus = () => async (req, res) => {
         method: 'DELETE',
         body: { userId },
       })
-      notifyProjectParticipants(pool, {
-        projectId,
-        excludeUserId: userId,
-        title: 'Проект удалён',
-        body: project.title || `Проект #${projectId}`,
-        type: 'project_deleted',
-      })
+      // push: register emitGlobalTaskChanged(deleted)
       return res.json({ result })
     }
 
@@ -242,13 +227,7 @@ const updateStatus = () => async (req, res) => {
       method: 'PUT',
       body: { status, userId },
     })
-    notifyProjectParticipants(pool, {
-      projectId,
-      excludeUserId: userId,
-      title: 'Статус проекта',
-      body: `${project.title || 'Проект'}: ${status}`,
-      type: 'project_status',
-    })
+    // push: register emitGlobalTaskChanged(status)
     return res.json({ result })
   } catch (error) {
     console.error('[mobile_staff_app][projects][status]', error)
@@ -330,6 +309,57 @@ const sendMessage = () => async (req, res) => {
     return res
       .status(error.status || 500)
       .json({ message: error.message || 'Ошибка отправки сообщения' })
+  }
+}
+
+const updateMessage = () => async (req, res) => {
+  try {
+    const userId = req.user.userId
+    const { projectId, messageId } = req.params
+    const { text } = req.body || {}
+    if (!text || !String(text).trim()) {
+      return res.status(400).json({ message: 'Текст сообщения обязателен' })
+    }
+
+    const message = await registerFetch(
+      `/api/global-tasks/chat/${projectId}/${messageId}`,
+      {
+        method: 'PATCH',
+        body: {
+          userId,
+          text: String(text).trim(),
+        },
+      }
+    )
+
+    return res.json({ message })
+  } catch (error) {
+    console.error('[mobile_staff_app][projects][updateMessage]', error)
+    return res
+      .status(error.status || 500)
+      .json({ message: error.message || 'Ошибка редактирования сообщения' })
+  }
+}
+
+const deleteMessage = () => async (req, res) => {
+  try {
+    const userId = req.user.userId
+    const { projectId, messageId } = req.params
+
+    const message = await registerFetch(
+      `/api/global-tasks/chat/${projectId}/${messageId}?userId=${encodeURIComponent(userId)}`,
+      {
+        method: 'DELETE',
+        body: { userId },
+      }
+    )
+
+    return res.json({ message })
+  } catch (error) {
+    console.error('[mobile_staff_app][projects][deleteMessage]', error)
+    return res
+      .status(error.status || 500)
+      .json({ message: error.message || 'Ошибка удаления сообщения' })
   }
 }
 
@@ -549,16 +579,7 @@ const addResponsibles = () => async (req, res) => {
         },
       }
     )
-    const meta = await getProjectMeta(pool, projectId).catch(() => null)
-    safeNotify(pool, {
-      userIds: uniqueUserIds(
-        responsibles.map((r) => r.id),
-        userId
-      ),
-      title: 'Вас добавили в проект',
-      body: meta?.title || `Проект #${projectId}`,
-      data: { type: 'project_responsible_added', projectId: Number(projectId) },
-    })
+    // push: register participant_added / responsiblesAdded
     return res.status(201).json(result)
   } catch (error) {
     console.error('[mobile_staff_app][projects][addResponsibles]', error)
@@ -581,13 +602,7 @@ const removeResponsible = () => async (req, res) => {
         body: { requesterId: userId },
       }
     )
-    const meta = await getProjectMeta(pool, projectId).catch(() => null)
-    safeNotify(pool, {
-      userIds: uniqueUserIds([targetUserId], userId),
-      title: 'Вас исключили из проекта',
-      body: meta?.title || `Проект #${projectId}`,
-      data: { type: 'project_responsible_removed', projectId: Number(projectId) },
-    })
+    // push: register participant_removed
     return res.json(result)
   } catch (error) {
     console.error('[mobile_staff_app][projects][removeResponsible]', error)
@@ -605,6 +620,8 @@ module.exports = {
   setApproval,
   getMessages,
   sendMessage,
+  updateMessage,
+  deleteMessage,
   addAttachment,
   getHistory,
   getSubtasks,

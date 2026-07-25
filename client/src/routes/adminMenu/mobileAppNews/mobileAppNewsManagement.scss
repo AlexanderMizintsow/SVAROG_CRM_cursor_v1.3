@@ -350,6 +350,53 @@
     flex-wrap: wrap;
     gap: 6px;
     margin-top: 8px;
+
+    &--scrollable {
+      max-height: 220px;
+      overflow-y: auto;
+      padding-right: 4px;
+      align-content: flex-start;
+    }
+  }
+
+  &__chip-select {
+    margin-top: 4px;
+  }
+
+  &__chip-search-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-top: 6px;
+  }
+
+  &__chip-search {
+    flex: 1;
+    min-width: 0;
+    border: 1px solid #ccd3df;
+    border-radius: 8px;
+    padding: 8px 12px;
+    font-size: 14px;
+    background: #fff;
+
+    &:focus {
+      outline: none;
+      border-color: #2f6bdb;
+      box-shadow: 0 0 0 2px rgba(47, 107, 219, 0.15);
+    }
+  }
+
+  &__chip-selected-count {
+    flex-shrink: 0;
+    font-size: 12px;
+    font-weight: 600;
+    color: #5b6578;
+  }
+
+  &__chip-empty {
+    font-size: 13px;
+    color: #8a93a6;
+    padding: 6px 2px;
   }
 
   &__chip {
@@ -358,11 +405,26 @@
     background: #fff;
     padding: 5px 10px;
     cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    max-width: 100%;
+
     &.active {
       border-color: #2f6bdb;
       background: #ebf2ff;
       color: #184fbf;
     }
+  }
+
+  &__chip-hint {
+    font-size: 11px;
+    opacity: 0.72;
+    font-weight: 500;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    max-width: 140px;
   }
 
   &__chip--good {

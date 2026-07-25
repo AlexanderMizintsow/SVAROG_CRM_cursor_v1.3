@@ -12,7 +12,7 @@ import { getStatusLabel } from './taskUtils'
 
 //const socket = io(`${API_BASE_URL}5000`)
 
-const useWebSocket = (userId, stableSetMessages, currentTaskId) => {
+const useWebSocket = (userId, stableSetMessages, currentTaskId, onChatMessageUpdated) => {
   const { fetchTasks } = useTasksStore()
   const { addOrUpdateTask, fetchExtensionRequests, fetchUnreadNotifications } =
     useTaskStateTracker()
@@ -73,6 +73,22 @@ const useWebSocket = (userId, stableSetMessages, currentTaskId) => {
           }
           stableSetMessages((prevMessages) => [...prevMessages, message])
         }
+      })
+
+      socket.current.on('taskChatMessageUpdated', (message) => {
+        if (!message) return
+        const msgTaskId = message.task_id ?? message.task_ids
+        if (currentTaskId != null && String(msgTaskId) !== String(currentTaskId)) {
+          return
+        }
+        if (typeof onChatMessageUpdated === 'function') {
+          onChatMessageUpdated(message)
+        }
+      })
+
+      socket.current.on('projectChatMessageUpdated', (message) => {
+        if (!message?.global_task_id) return
+        fetchMessages(message.global_task_id)
       })
 
       // Событие отправка собщения в глобальную задачу чата
@@ -349,6 +365,8 @@ const useWebSocket = (userId, stableSetMessages, currentTaskId) => {
         socket.current.off('taskApproval')
         socket.current.off('taskAccept')
         socket.current.off('newMessage')
+        socket.current.off('taskChatMessageUpdated')
+        socket.current.off('projectChatMessageUpdated')
         socket.current.off('taskUpdateTaskStatus')
         socket.current.off('newMessageGlobalTaskChat')
         socket.current.off('updateStatusSubTasks')
@@ -365,6 +383,8 @@ const useWebSocket = (userId, stableSetMessages, currentTaskId) => {
     fetchTasksManager,
     socket,
     stableSetMessages,
+    currentTaskId,
+    onChatMessageUpdated,
     fetchCompletedTasks,
     addUnreadMessage,
     addOrUpdateTask,

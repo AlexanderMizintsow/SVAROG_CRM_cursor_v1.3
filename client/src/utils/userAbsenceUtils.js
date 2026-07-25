@@ -35,6 +35,7 @@ export function normalizeDateOnly(value) {
   if (value == null || value === '') return ''
   if (value instanceof Date) {
     if (Number.isNaN(value.getTime())) return ''
+    // Локальные компоненты — для Date из datetime-local / пользовательского ввода
     const y = value.getFullYear()
     const m = String(value.getMonth() + 1).padStart(2, '0')
     const d = String(value.getDate()).padStart(2, '0')
@@ -42,13 +43,16 @@ export function normalizeDateOnly(value) {
   }
   const str = String(value).trim()
   if (!str) return ''
+  // Важно: брать префикс даты ДО new Date(...), иначе ISO с Z съезжает на −1/+1 день
+  const prefix = str.match(/^(\d{4}-\d{2}-\d{2})/)
+  if (prefix) return prefix[1]
   if (str.includes('T')) {
     const d = new Date(str)
     if (!Number.isNaN(d.getTime())) {
       return normalizeDateOnly(d)
     }
   }
-  return str.length >= 10 ? str.slice(0, 10) : str
+  return str
 }
 
 function formatDateRu(dateStr) {
@@ -231,23 +235,72 @@ export function getAbsenceLabel(absence) {
  * Записи замещения, по которым при сохранении нужен выбор «замещающий / исходный».
  * @param {Array} absenceMeta
  * @param {string|Date|null} deadline
+ * @param {object} [absencesMap] — актуальная карта отсутствий (предпочтительнее снимка в meta)
  */
-export function getAbsenceChoicesAtSave(absenceMeta, deadline) {
+export function getAbsenceChoicesAtSave(absenceMeta, deadline, absencesMap = {}) {
   if (!Array.isArray(absenceMeta) || !absenceMeta.length) return []
-  return absenceMeta.filter((entry) => {
-    if (!entry?.substituted || !entry.originalId || !entry.effectiveId) return false
-    if (String(entry.originalId) === String(entry.effectiveId)) return false
-    return isDeadlineAfterAbsence(deadline, entry.absence)
+  return absenceMeta
+    .map((entry) => {
+      const liveAbsence =
+        (absencesMap && absencesMap[Number(entry.originalId)]) || entry.absence || null
+      return { ...entry, absence: liveAbsence }
+    })
+    .filter((entry) => {
+      if (!entry?.substituted || !entry.originalId || !entry.effectiveId) return false
+      if (String(entry.originalId) === String(entry.effectiveId)) return false
+      return isDeadlineAfterAbsence(deadline, entry.absence)
+    })
+}
+
+/**
+ * Fallback: если meta потерялась, ищем в списке назначенных замещающих,
+ * у которых исходный сейчас в отпуске, а срок задачи — после выхода.
+ */
+export function findAbsenceChoicesFromAssignees(
+  assigneeIds,
+  deadline,
+  absencesMap = {},
+  roleKey = 'implementers'
+) {
+  if (!Array.isArray(assigneeIds) || !assigneeIds.length) return []
+  if (!deadline || !absencesMap) return []
+
+  const result = []
+  const absences = Object.values(absencesMap)
+
+  assigneeIds.forEach((assigneeId) => {
+    const match = absences.find(
+      (a) =>
+        a &&
+        Number(a.substitute_user_id) === Number(assigneeId) &&
+        isDeadlineAfterAbsence(deadline, a)
+    )
+    if (!match) return
+    if (result.some((e) => String(e.effectiveId) === String(assigneeId))) return
+    result.push({
+      roleKey,
+      effectiveId: String(assigneeId),
+      originalId: String(match.user_id),
+      substituted: true,
+      needsSkipSubstitution: false,
+      choiceAtSavePossible: true,
+      note: null,
+      absence: match,
+    })
   })
+
+  return result
 }
 
 /** Обновляет тексты пометок при смене дедлайна */
-export function refreshAbsenceMetaNotes(absenceMeta, deadline, users = []) {
+export function refreshAbsenceMetaNotes(absenceMeta, deadline, users = [], absencesMap = {}) {
   return (absenceMeta || []).map((entry) => {
-    if (!entry?.absence) return entry
-    const after = isDeadlineAfterAbsence(deadline, entry.absence)
-    const days = after ? daysAvailableAfterReturn(deadline, entry.absence) : null
-    const endDay = getAbsenceEndDate(entry.absence)
+    const absence =
+      (absencesMap && absencesMap[Number(entry.originalId)]) || entry.absence || null
+    if (!absence) return entry
+    const after = isDeadlineAfterAbsence(deadline, absence)
+    const days = after ? daysAvailableAfterReturn(deadline, absence) : null
+    const endDay = getAbsenceEndDate(absence)
     const endLabel = endDay ? formatDateRu(endDay) : null
     const originalUser = users.find((u) => String(u.id) === String(entry.originalId))
     const originalName = formatUserFullName(originalUser) || `ID ${entry.originalId}`
@@ -255,6 +308,7 @@ export function refreshAbsenceMetaNotes(absenceMeta, deadline, users = []) {
     if (entry.substituted) {
       return {
         ...entry,
+        absence,
         note: after
           ? `Замещает ${originalName} (до ${endLabel}). При сохранении возможен выбор ${originalName} (~${days} дн. после отпуска).`
           : endLabel
@@ -267,6 +321,7 @@ export function refreshAbsenceMetaNotes(absenceMeta, deadline, users = []) {
       if (!after) {
         return {
           ...entry,
+          absence,
           note: endLabel
             ? `Срок теперь в период отсутствия (до ${endLabel}). Измените срок или удалите сотрудника.`
             : entry.note,
@@ -274,11 +329,12 @@ export function refreshAbsenceMetaNotes(absenceMeta, deadline, users = []) {
       }
       return {
         ...entry,
+        absence,
         note: `Отсутствует до ${endLabel}. После отпуска на выполнение: ${days} дн.`,
       }
     }
 
-    return entry
+    return { ...entry, absence }
   })
 }
 

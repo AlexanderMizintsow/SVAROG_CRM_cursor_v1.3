@@ -15,6 +15,7 @@ import {
   getAbsenceLabel,
   showAbsenceMessage,
   getAbsenceChoicesAtSave,
+  findAbsenceChoicesFromAssignees,
   getAbsenceEndDate,
   isDeadlineAfterAbsence,
   normalizeDateOnly,
@@ -68,8 +69,10 @@ const ResponsibleSelector = ({
   }, [])
 
   useEffect(() => {
-    setAbsenceMeta((prev) => refreshAbsenceMetaNotes(prev, projectDeadline, users))
-  }, [projectDeadline, users])
+    setAbsenceMeta((prev) =>
+      refreshAbsenceMetaNotes(prev, projectDeadline, users, absencesMap)
+    )
+  }, [projectDeadline, users, absencesMap])
 
   const notesByEffectiveId = (() => {
     const map = {}
@@ -124,9 +127,39 @@ const ResponsibleSelector = ({
       return
     }
 
-    const choices = getAbsenceChoicesAtSave(absenceMeta, projectDeadline)
+    const choicesFromMeta = getAbsenceChoicesAtSave(
+      absenceMeta,
+      projectDeadline,
+      absencesMap
+    )
+    const choiceKeys = new Set(
+      choicesFromMeta.map((c) => String(c.effectiveId))
+    )
+    const choices = [...choicesFromMeta]
+    findAbsenceChoicesFromAssignees(
+      responsibles.map((r) => r.id),
+      projectDeadline,
+      absencesMap,
+      'responsibles'
+    ).forEach((entry) => {
+      if (!choiceKeys.has(String(entry.effectiveId))) {
+        choiceKeys.add(String(entry.effectiveId))
+        choices.push(entry)
+      }
+    })
+
     if (choices.length > 0) {
       choiceDecisionsRef.current = {}
+      setAbsenceMeta((prev) => {
+        const next = [...(prev || [])]
+        choices.forEach((entry) => {
+          const exists = next.some(
+            (e) => String(e.effectiveId) === String(entry.effectiveId)
+          )
+          if (!exists) next.push(entry)
+        })
+        return refreshAbsenceMetaNotes(next, projectDeadline, users, absencesMap)
+      })
       setChoiceQueue(choices)
       setCurrentChoice(choices[0])
       return
