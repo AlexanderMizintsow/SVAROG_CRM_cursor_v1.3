@@ -232,7 +232,11 @@ const TaskModals = ({
                 Выберите нового исполнителя
               </MenuItem>
               {users
-                .filter((user) => !selectedTaskForReplacement?.assigned_user_ids?.includes(user.id))
+                .filter(
+                  (user) =>
+                    !selectedTaskForReplacement?.assigned_user_ids?.includes(user.id) &&
+                    String(user.role_name || '').trim() !== 'Директор'
+                )
                 .map((user) => {
                   const absenceLabel = getAbsenceLabel(absencesMap[Number(user.id)])
                   return (

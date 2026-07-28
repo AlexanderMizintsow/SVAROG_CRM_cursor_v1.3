@@ -5,6 +5,7 @@ const fs = require('fs')
 const path = require('path')
 const { BPE_API_URL } = require('../config')
 const userAbsence = require('../userAbsenceService')
+const { assertNotDirectorAssignee } = require('../directorAssigneeGuard')
 const {
   notifyStaffDevicesSafe,
   notifyStaffProjectEvent,
@@ -312,6 +313,11 @@ function replaceTaskAssignment(dbPool, io) {
 
     try {
       // 1. Получаем информацию о задаче и пользователях
+      const directorGuard = await assertNotDirectorAssignee(dbPool, new_user_id)
+      if (!directorGuard.ok) {
+        return res.status(422).json({ error: directorGuard.error })
+      }
+
       const taskInfo = await dbPool.query(
         `SELECT t.title, t.created_by,
           CONCAT(u1.first_name, ' ', u1.last_name) as old_user_name, 
@@ -341,6 +347,12 @@ function replaceTaskAssignment(dbPool, io) {
       }
 
       const effectiveNewUserId = resolvedNew.effectiveId
+      if (Number(effectiveNewUserId) !== Number(new_user_id)) {
+        const effectiveGuard = await assertNotDirectorAssignee(dbPool, effectiveNewUserId)
+        if (!effectiveGuard.ok) {
+          return res.status(422).json({ error: effectiveGuard.error })
+        }
+      }
       let new_user_name = initialNewUserName
       if (resolvedNew.resolved.substituted) {
         const nameRes = await dbPool.query(
@@ -460,6 +472,12 @@ function addTaskAssignment(dbPool, io) {
       const skipAbsenceSubstitution = skip_absence_substitution === true
 
       for (const rawUserId of userIds) {
+        const directorGuard = await assertNotDirectorAssignee(dbPool, rawUserId)
+        if (!directorGuard.ok) {
+          warnings.push(directorGuard.error)
+          continue
+        }
+
         const resolved = await userAbsence.resolveForAssignment(dbPool, io, rawUserId, {
           notifyUserId: taskInfo?.created_by,
           roleLabel: 'исполнитель',
@@ -471,6 +489,17 @@ function addTaskAssignment(dbPool, io) {
         if (!resolved.ok) {
           warnings.push(resolved.error)
           continue
+        }
+
+        if (Number(resolved.effectiveId) !== Number(rawUserId)) {
+          const effectiveGuard = await assertNotDirectorAssignee(
+            dbPool,
+            resolved.effectiveId
+          )
+          if (!effectiveGuard.ok) {
+            warnings.push(effectiveGuard.error)
+            continue
+          }
         }
 
         if (resolved.resolved.substituted && resolved.resolved.absence) {

@@ -247,6 +247,16 @@ const {
 } = require('./handleController/handleController')
 
 const { submitAppIdea, getAppIdeas, applyAppIdea } = require('./appIdeasController/appIdeasController')
+const {
+  getMyManager: getManagerRequestManager,
+  listMine: listManagerRequestsMine,
+  listInbox: listManagerRequestsInbox,
+  getOne: getManagerRequestOne,
+  createRequest: createManagerRequest,
+  answerRequest: answerManagerRequest,
+  closeRequest: closeManagerRequest,
+  markConverted: markManagerRequestConverted,
+} = require('./managerRequestsController/managerRequestsController')
 const { getCorsOrigins } = require('./config')
 
 const app = express()
@@ -518,6 +528,16 @@ app.get('/api/reviews', getAllReviews(dbPool))
 app.post('/api/app-ideas', uploadFile.single('file'), submitAppIdea(dbPool))
 app.get('/api/app-ideas', getAppIdeas(dbPool))
 app.patch('/api/app-ideas/:id', applyAppIdea(dbPool))
+
+// Обращения к руководителю
+app.get('/api/manager-requests/manager', getManagerRequestManager(dbPool))
+app.get('/api/manager-requests/mine', listManagerRequestsMine(dbPool))
+app.get('/api/manager-requests/inbox', listManagerRequestsInbox(dbPool))
+app.get('/api/manager-requests/:id', getManagerRequestOne(dbPool))
+app.post('/api/manager-requests', createManagerRequest(dbPool))
+app.post('/api/manager-requests/:id/answer', answerManagerRequest(dbPool))
+app.post('/api/manager-requests/:id/close', closeManagerRequest(dbPool))
+app.post('/api/manager-requests/:id/convert', markManagerRequestConverted(dbPool))
 
 app.get('/api/introduction/version/:userId', getIntroductionNewVersion(dbPool))
 app.post('/api/introduction/version', postVersionApp(dbPool))

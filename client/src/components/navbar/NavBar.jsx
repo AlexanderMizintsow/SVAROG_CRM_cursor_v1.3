@@ -25,6 +25,7 @@ import { PiLockKeyOpenFill } from 'react-icons/pi'
 import { TbApps } from 'react-icons/tb'
 import { MdAssessment, MdSearch, MdEdit, MdCampaign } from 'react-icons/md'
 import { FcFlowChart } from 'react-icons/fc'
+import { HiOutlineMail } from 'react-icons/hi'
 
 const NavBar = () => {
   const { user } = useUserStore()
@@ -48,6 +49,16 @@ const NavBar = () => {
       icon: FaTasks,
       link: '/task-manager',
     },
+    // Временно только для Администратора (тестирование). Потом открыть всем.
+    ...(roleAdministrator
+      ? [
+          {
+            name: 'Обращения',
+            icon: HiOutlineMail,
+            link: '/manager-requests',
+          },
+        ]
+      : []),
     {
       name: 'Рабочие группы',
       icon: GiTeamIdea,

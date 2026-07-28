@@ -37,6 +37,11 @@ import {
   refreshAbsenceMetaNotes,
 } from "../../../utils/userAbsenceUtils";
 import AbsenceAssigneeChoiceModal from "../../../components/absenceAssigneeChoice/AbsenceAssigneeChoiceModal";
+import {
+  clearManagerRequestTaskDraft,
+  managerRequestsApi,
+  readManagerRequestTaskDraft,
+} from "../../managerRequests/managerRequestsApi";
 
 const formatDateRuLocal = (dateStr) => {
   const normalized = normalizeDateOnly(dateStr);
@@ -576,6 +581,27 @@ const AddModal = ({
             backgroundColor: "linear-gradient(to right, #006400, #00FF00)",
           }).showToast();
 
+          const requestDraft = readManagerRequestTaskDraft();
+          if (
+            requestDraft?.managerRequestId &&
+            taskIds?.[0] &&
+            (requestDraft.userId || userId)
+          ) {
+            try {
+              await managerRequestsApi.markConverted(
+                requestDraft.userId || userId,
+                requestDraft.managerRequestId,
+                taskIds[0]
+              );
+              clearManagerRequestTaskDraft();
+            } catch (linkError) {
+              console.warn(
+                "Не удалось связать задачу с обращением:",
+                linkError
+              );
+            }
+          }
+
           resetFormAfterSuccessfulCreate();
           setOpen(false);
 
@@ -810,13 +836,20 @@ const AddModal = ({
 
   const remainingUsersForRole = useCallback(
     (roleKey) => {
-      return users.filter(
-        (user) => !taskData[roleKey].includes(user.id)
+      return users.filter((user) => {
+        if (taskData[roleKey].includes(user.id)) return false
+        if (
+          roleKey === 'implementers' &&
+          String(user.role_name || '').trim() === 'Директор'
+        ) {
+          return false
+        }
+        return true
         // user.id !== taskData.created_by // ДАННУЮ ЛОГИКУ УДАЛЯТЬ НЕЛЬЗЯ! Запрещает создателю задачи назначать себя исполнителем/зрителем/утверждающим
-      );
+      })
     },
     [users, taskData]
-  );
+  )
 
   return (
     <div className={`${styles.modal} ${isOpen ? "" : styles.hidden} `}>

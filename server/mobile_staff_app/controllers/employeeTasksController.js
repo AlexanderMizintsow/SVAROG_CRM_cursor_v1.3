@@ -290,6 +290,15 @@ const createTask = () => async (req, res) => {
       return res.status(400).json({ message: 'Укажите исполнителя' })
     }
 
+    const users = await registerFetch('/api/users').catch(() => [])
+    const assignee = (users || []).find((u) => Number(u.id) === Number(assigneeId))
+    if (assignee && String(assignee.role_name || '').trim() === 'Директор') {
+      return res.status(422).json({
+        message:
+          'Пользователя с ролью «Директор» нельзя назначить исполнителем задачи. Используйте обращение к руководителю.',
+      })
+    }
+
     const created = await registerFetch('/api/tasks/create', {
       method: 'POST',
       body: {
@@ -642,6 +651,8 @@ const listUsers = () => async (req, res) => {
       name: formatUserName(u),
       username: u.username,
       department_id: u.department_id || null,
+      roleName: u.role_name || null,
+      isDirector: String(u.role_name || '').trim() === 'Директор',
     }))
     return res.json({ users: mapped })
   } catch (error) {

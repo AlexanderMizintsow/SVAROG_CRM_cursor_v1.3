@@ -31,6 +31,7 @@ import BusinessProcesses from '../routes/businessProcesses/BusinessProcesses.jsx
 import ProcessMonitoring from '../routes/statistics/ProcessMonitoring.jsx'
 import MobileAppNewsManagement from '../routes/adminMenu/mobileAppNews/MobileAppNewsManagement.jsx'
 import StaffNewsManagement from '../routes/adminMenu/staffNews/StaffNewsManagement.jsx'
+import ManagerRequestsPage from '../routes/managerRequests/ManagerRequestsPage.jsx'
 
 const routes = (bgSeason, roleAdministrator, roleAdminOrDirector, isConnectBD) => [
   {
@@ -72,6 +73,7 @@ const routes = (bgSeason, roleAdministrator, roleAdminOrDirector, isConnectBD) =
         ),
       },
       { path: 'work-groups', element: <WorkGroup /> },
+      { path: 'manager-requests', element: roleAdministrator ? <ManagerRequestsPage /> : <NotFound /> },
       {
         path: 'business-processes',
         element: (

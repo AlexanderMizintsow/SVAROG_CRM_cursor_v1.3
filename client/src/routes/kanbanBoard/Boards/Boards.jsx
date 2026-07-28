@@ -41,6 +41,7 @@ import GlobalTasksContainer from '../globalTask/GlobalTasksContainer'
 import { IoMdNotificationsOff } from 'react-icons/io'
 import { AiOutlineQuestionCircle } from 'react-icons/ai'
 import HelpModalKanban from './subcomponents/HelpModalKanban'
+import { readManagerRequestTaskDraft } from '../../managerRequests/managerRequestsApi'
 
 const Boards = () => {
   // Получение состояний из zustand-хранилищ
@@ -59,6 +60,7 @@ const Boards = () => {
   const [isSidebarOpen, setSidebarOpen] = useState(false)
   const [contextMenuOpen, setContextMenuOpen] = useState(false)
   const [modalOpen, setModalOpen] = useState(false)
+  const [managerRequestInitialTask, setManagerRequestInitialTask] = useState(null)
   const [isTaskListManagerOpen, setTaskListManagerOpen] = useState(false)
   const [isGlobalProjectOpen, setGlobalProjectOpen] = useState(false)
   const [selectedProjectToOpen, setSelectedProjectToOpen] = useState(null)
@@ -229,8 +231,21 @@ const Boards = () => {
     setModalOpen(true)
   }, [])
 
+  useEffect(() => {
+    const draft = readManagerRequestTaskDraft()
+    if (!draft?.managerRequestId) return
+    setManagerRequestInitialTask({
+      title: draft.title || '',
+      description: draft.description
+        ? `<p>${String(draft.description).replace(/\n/g, '<br/>')}</p>`
+        : '',
+    })
+    setModalOpen(true)
+  }, [])
+
   const closeModal = useCallback(() => {
     setModalOpen(false)
+    setManagerRequestInitialTask(null)
   }, [])
 
   // Обработчик подтверждения в диалоге
@@ -420,6 +435,7 @@ const Boards = () => {
           setOpen={setModalOpen}
           userId={userId}
           globalTaskId={null}
+          initialTaskData={managerRequestInitialTask || undefined}
         />{' '}
       </Suspense>
       {/* Боковое меню */}
