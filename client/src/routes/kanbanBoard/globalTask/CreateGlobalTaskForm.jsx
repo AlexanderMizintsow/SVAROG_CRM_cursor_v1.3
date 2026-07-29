@@ -20,6 +20,7 @@ import {
   normalizeDateOnly,
   refreshAbsenceMetaNotes,
   applyAbsenceDecisionsToResponsibles,
+  sortUsersByLastName,
 } from '../../../utils/userAbsenceUtils'
 import AbsenceAssigneeChoiceModal from '../../../components/absenceAssigneeChoice/AbsenceAssigneeChoiceModal'
 import './styles/CreateGlobalTaskForm.scss'
@@ -694,12 +695,12 @@ const CreateGlobalTaskForm = ({ onSave, onCancel, initialData }) => {
                     ? 'Загрузка пользователей...'
                     : 'Выберите ответственного'}
                 </option>
-                {users
-                  .filter(
+                {sortUsersByLastName(
+                  users.filter(
                     (user) =>
                       !formData.responsibles.find((resp) => resp.id === user.id)
                   )
-                  .map((user) => {
+                ).map((user) => {
                     const absenceLabel = getAbsenceLabel(absencesMap[Number(user.id)])
                     return (
                       <option key={user.id} value={user.id}>

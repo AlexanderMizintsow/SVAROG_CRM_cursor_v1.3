@@ -30,6 +30,27 @@ export function formatUserFullName(user) {
     .trim()
 }
 
+/** Сравнение сотрудников для сортировки: фамилия → имя → отчество (русская локаль). */
+export function compareUsersByLastName(a, b) {
+  const lastCmp = (a?.last_name || '').trim().localeCompare((b?.last_name || '').trim(), 'ru', {
+    sensitivity: 'base',
+  })
+  if (lastCmp !== 0) return lastCmp
+  const firstCmp = (a?.first_name || '').trim().localeCompare((b?.first_name || '').trim(), 'ru', {
+    sensitivity: 'base',
+  })
+  if (firstCmp !== 0) return firstCmp
+  return (a?.middle_name || '').trim().localeCompare((b?.middle_name || '').trim(), 'ru', {
+    sensitivity: 'base',
+  })
+}
+
+/** Копия массива сотрудников, отсортированная по фамилии. */
+export function sortUsersByLastName(users) {
+  if (!Array.isArray(users)) return []
+  return [...users].sort(compareUsersByLastName)
+}
+
 /** Календарная дата YYYY-MM-DD без сдвига из-за UTC (node-pg DATE → ISO с T) */
 export function normalizeDateOnly(value) {
   if (value == null || value === '') return ''

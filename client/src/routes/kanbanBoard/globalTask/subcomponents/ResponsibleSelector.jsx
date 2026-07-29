@@ -21,6 +21,7 @@ import {
   normalizeDateOnly,
   refreshAbsenceMetaNotes,
   applyAbsenceDecisionsToResponsibles,
+  sortUsersByLastName,
 } from '../../../../utils/userAbsenceUtils'
 import AbsenceAssigneeChoiceModal from '../../../../components/absenceAssigneeChoice/AbsenceAssigneeChoiceModal'
 import './ResponsibleSelector.scss'
@@ -363,13 +364,13 @@ const ResponsibleSelector = ({
             <option value="" disabled>
               {loading ? 'Загрузка пользователей...' : 'Выберите ответственного'}
             </option>
-            {users
-              .filter(
+            {sortUsersByLastName(
+              users.filter(
                 (u) =>
                   !responsibles.some((resp) => resp.id === u.id) &&
                   !responsiblesBefor.some((resp) => resp.id === u.id)
               )
-              .map((u) => {
+            ).map((u) => {
                 const absenceLabel = getAbsenceLabel(absencesMap[Number(u.id)])
                 return (
                   <option key={u.id} value={u.id}>

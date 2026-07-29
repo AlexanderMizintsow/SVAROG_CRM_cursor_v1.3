@@ -35,6 +35,7 @@ import {
   isDeadlineAfterAbsence,
   normalizeDateOnly,
   refreshAbsenceMetaNotes,
+  sortUsersByLastName,
 } from "../../../utils/userAbsenceUtils";
 import AbsenceAssigneeChoiceModal from "../../../components/absenceAssigneeChoice/AbsenceAssigneeChoiceModal";
 import {
@@ -836,17 +837,19 @@ const AddModal = ({
 
   const remainingUsersForRole = useCallback(
     (roleKey) => {
-      return users.filter((user) => {
-        if (taskData[roleKey].includes(user.id)) return false
-        if (
-          roleKey === 'implementers' &&
-          String(user.role_name || '').trim() === 'Директор'
-        ) {
-          return false
-        }
-        return true
-        // user.id !== taskData.created_by // ДАННУЮ ЛОГИКУ УДАЛЯТЬ НЕЛЬЗЯ! Запрещает создателю задачи назначать себя исполнителем/зрителем/утверждающим
-      })
+      return sortUsersByLastName(
+        users.filter((user) => {
+          if (taskData[roleKey].includes(user.id)) return false
+          if (
+            roleKey === 'implementers' &&
+            String(user.role_name || '').trim() === 'Директор'
+          ) {
+            return false
+          }
+          return true
+          // user.id !== taskData.created_by // ДАННУЮ ЛОГИКУ УДАЛЯТЬ НЕЛЬЗЯ! Запрещает создателю задачи назначать себя исполнителем/зрителем/утверждающим
+        })
+      )
     },
     [users, taskData]
   )
