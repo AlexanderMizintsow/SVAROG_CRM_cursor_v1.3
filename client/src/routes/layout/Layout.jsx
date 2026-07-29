@@ -50,6 +50,16 @@ function Layout({ isConnectBD }) {
   useEffect(() => {
     setBackgroundImage(getSeasonalBackground())
   }, [])
+
+  // Тема на <html>, чтобы .dark работал и в MUI Modal / portal (вне .layout)
+  useEffect(() => {
+    const root = document.documentElement
+    root.classList.remove('light', 'dark')
+    root.classList.add(theme)
+    return () => {
+      root.classList.remove('light', 'dark')
+    }
+  }, [theme])
   //
 
   //<Outlet />   <AccountActivation /> <Table/>

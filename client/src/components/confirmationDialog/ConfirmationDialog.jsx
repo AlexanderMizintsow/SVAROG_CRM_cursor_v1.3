@@ -69,6 +69,7 @@ const ConfirmationDialog = ({
       aria-labelledby="alert-dialog-title"
       aria-describedby="alert-dialog-description"
       className="customDialog"
+      sx={{ zIndex: 13000 }}
     >
       <DialogTitle id="alert-dialog-title">{title}</DialogTitle>
       <DialogContent>

@@ -479,3 +479,219 @@
   border: 1px solid #d0d0d0;
 }
 
+/* ========== Тёмная тема: создание / редактирование задачи ========== */
+:global(.dark) {
+  .modal {
+    background: rgba(8, 10, 16, 0.72);
+
+    .titleInput {
+      color: #d5dbe6;
+    }
+
+    .addPerson {
+      color: #8b95a5;
+    }
+
+    .overlay {
+      background: rgba(8, 10, 16, 0.65);
+    }
+
+    .content {
+      background: #1a1f2b;
+      box-shadow: 0 20px 48px rgba(0, 0, 0, 0.55);
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      color: #c4ccd8;
+
+      input,
+      select {
+        background: #252b38;
+        border-color: #3a4254;
+        color: #c4ccd8;
+
+        &::placeholder {
+          color: #6b7385;
+        }
+
+        option {
+          background: #252b38;
+          color: #c4ccd8;
+        }
+
+        &:focus {
+          border-color: #38bdf8;
+          box-shadow: 0 0 0 2px rgba(56, 189, 248, 0.22);
+        }
+      }
+
+      label {
+        color: #aeb6c4;
+      }
+
+      .left .editorContainer {
+        border-color: #3a4254;
+        background: #252b38;
+
+        .ql-editor {
+          background: #252b38;
+          color: #c4ccd8;
+        }
+      }
+
+      .right {
+        .image-preview {
+          border-color: #3a4254;
+          box-shadow: 0 8px 20px rgba(0, 0, 0, 0.4);
+        }
+      }
+
+      .tag {
+        background: linear-gradient(135deg, #3b4a6b, #2f3648);
+        color: #b8c0ce;
+        border: 1px solid rgba(255, 255, 255, 0.08);
+      }
+    }
+
+    .commentInput {
+      background: #252b38;
+      border-color: #3a4254;
+      color: #c4ccd8;
+    }
+
+    .fileInputLabel {
+      border-color: rgba(56, 189, 248, 0.4);
+      background-color: rgba(56, 189, 248, 0.1);
+      color: #7dd3fc;
+    }
+
+    .fileInputLabel:hover {
+      background-color: rgba(56, 189, 248, 0.16);
+      border-color: #38bdf8;
+    }
+
+    .fileItem {
+      border-bottom-color: #3a4254;
+      background-color: #252b38;
+      color: #c4ccd8;
+    }
+
+    .fileItem:hover {
+      background-color: #2a3142;
+    }
+
+    .removeFile {
+      color: #f87171;
+    }
+
+    .border {
+      border-color: rgba(255, 255, 255, 0.1);
+    }
+
+    .icon_tag_add:hover {
+      color: #7dd3fc;
+    }
+  }
+
+  .commentModal {
+    background-color: rgba(8, 10, 16, 0.7);
+  }
+
+  .commentModalContent {
+    background: #1f2430;
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    box-shadow: 0 16px 40px rgba(0, 0, 0, 0.5);
+    color: #c4ccd8;
+  }
+
+  .commentTextarea {
+    background: #252b38;
+    border-color: #3a4254;
+    color: #c4ccd8;
+
+    &::placeholder {
+      color: #6b7385;
+    }
+  }
+
+  .commentCancelButton {
+    background-color: #2a3142;
+    color: #a8b0be;
+    border-color: #3a4254;
+
+    &:hover {
+      background-color: #343b4f;
+    }
+  }
+
+  .absenceNote {
+    color: #e0b84e;
+  }
+
+  .absenceChoiceOverlay {
+    background: rgba(8, 10, 16, 0.7);
+  }
+
+  .absenceChoiceModal {
+    background: #1f2430;
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    box-shadow: 0 16px 40px rgba(0, 0, 0, 0.55);
+
+    h3 {
+      color: #d5dbe6;
+    }
+
+    p {
+      color: #aeb6c4;
+    }
+  }
+
+  .absenceChoiceSecondary {
+    background: rgba(120, 53, 15, 0.35);
+    color: #e8c56a;
+    border-color: rgba(234, 179, 8, 0.4);
+  }
+
+  .absenceChoiceCancel {
+    background: #2a3142;
+    color: #a8b0be;
+    border-color: #3a4254;
+  }
+}
+
+/* Quill toolbar / контейнер внутри тёмной темы */
+:global(.dark) {
+  :global(.ql-toolbar.ql-snow),
+  :global(.ql-container.ql-snow) {
+    border-color: #3a4254 !important;
+  }
+
+  :global(.ql-toolbar.ql-snow) {
+    background: #222837;
+  }
+
+  :global(.ql-container.ql-snow) {
+    background: #252b38;
+  }
+
+  :global(.ql-editor) {
+    color: #c4ccd8 !important;
+    background: #252b38 !important;
+  }
+
+  :global(.ql-snow .ql-stroke) {
+    stroke: #8b95a5 !important;
+  }
+
+  :global(.ql-snow .ql-fill) {
+    fill: #8b95a5 !important;
+  }
+
+  :global(.ql-snow .ql-picker) {
+    color: #aeb6c4 !important;
+  }
+
+  :global(.ql-snow .ql-picker-options) {
+    background: #1f2430 !important;
+    border-color: #3a4254 !important;
+  }
+}
+

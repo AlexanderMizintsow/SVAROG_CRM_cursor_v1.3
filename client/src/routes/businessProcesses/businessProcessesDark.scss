@@ -1,0 +1,668 @@
+/* Тёмная тема только для Бизнес-процессов.
+   Селекторы жёстко привязаны к префиксам раздела — без общих .modal / .title / .header. */
+
+.dark {
+  /* ----- Оболочка раздела ----- */
+  .business-processes {
+    color: #c4ccd8;
+
+    .business-processes__title {
+      color: #d5dbe6;
+    }
+
+    .business-processes__help-btn {
+      color: #a5b4fc;
+      background: rgba(99, 102, 241, 0.15);
+      border-color: rgba(99, 102, 241, 0.35);
+
+      &:hover {
+        background: rgba(99, 102, 241, 0.25);
+        color: #c7d2fe;
+      }
+    }
+
+    .business-processes__tab {
+      border-color: #3a4254;
+      background: #252b38;
+      color: #aeb6c4;
+
+      &:hover {
+        background: #2a3142;
+        border-color: #4b5568;
+        color: #c4ccd8;
+      }
+    }
+
+    .business-processes__tab--active {
+      background: #2563eb;
+      border-color: #2563eb;
+      color: #eef2ff;
+
+      &:hover {
+        background: #1d4ed8;
+        border-color: #1d4ed8;
+        color: #eef2ff;
+      }
+    }
+
+    .business-processes__sub-tab {
+      border-color: #3a4254;
+      background: #1f2430;
+      color: #8b95a5;
+
+      &:hover {
+        background: #252b38;
+        border-color: #4b5568;
+        color: #c4ccd8;
+      }
+    }
+
+    .business-processes__sub-tab--active {
+      background: rgba(37, 99, 235, 0.2);
+      border-color: #38bdf8;
+      color: #7dd3fc;
+
+      &:hover {
+        background: rgba(37, 99, 235, 0.28);
+      }
+    }
+  }
+
+  /* ----- Список процессов / карточки ----- */
+  .process-list--loading,
+  .process-list__empty {
+    color: #8b95a5;
+  }
+
+  .process-list__create-btn {
+    border-color: #3a4254;
+    background: #252b38;
+    color: #c4ccd8;
+
+    &:hover {
+      background: #2a3142;
+    }
+  }
+
+  .process-card {
+    border-color: #2f3648;
+    background: #1f2430;
+    box-shadow: 0 4px 14px rgba(0, 0, 0, 0.3);
+
+    &:hover {
+      box-shadow: 0 6px 18px rgba(0, 0, 0, 0.4);
+      border-color: #3a4254;
+    }
+  }
+
+  .process-card__toggle {
+    color: #8b95a5;
+
+    &:hover {
+      background: #2a3142;
+      color: #d5dbe6;
+    }
+  }
+
+  .process-card__title {
+    color: #d5dbe6;
+  }
+
+  .process-card__description {
+    color: #8b95a5;
+  }
+
+  .process-card__actions {
+    border-top-color: #2f3648;
+  }
+
+  .process-card__badge {
+    background: #2a3142;
+    color: #aeb6c4;
+  }
+
+  .process-card__btn-edit {
+    border-color: #3a4254;
+    background: #252b38;
+    color: #c4ccd8;
+
+    &:hover {
+      background: #2a3142;
+    }
+  }
+
+  .process-card__btn-delete {
+    border-color: rgba(248, 113, 113, 0.35);
+    background: rgba(185, 28, 28, 0.12);
+    color: #fca5a5;
+
+    &:hover {
+      background: rgba(185, 28, 28, 0.22);
+    }
+  }
+
+  .process-card-schedule {
+    border-top-color: #2f3648;
+  }
+
+  .process-card-schedule--collapsed {
+    border-top-color: #2f3648;
+  }
+
+  .process-card-schedule__summary,
+  .process-card-schedule__loading,
+  .process-card-schedule__label,
+  .process-card-schedule__sublabel {
+    color: #8b95a5;
+  }
+
+  .process-card-schedule__checkbox-wrap {
+    color: #c4ccd8;
+  }
+
+  .process-card-schedule__form {
+    background: #252b38;
+  }
+
+  .process-card-schedule__select,
+  .process-card-schedule__time,
+  .process-card-schedule__number,
+  .process-card-schedule__date-input {
+    background: #1a1f2b;
+    border-color: #3a4254;
+    color: #c4ccd8;
+  }
+
+  .process-card-schedule__radios label {
+    color: #c4ccd8;
+  }
+
+  .process-card-schedule__weekday {
+    color: #c4ccd8;
+    background: #1a1f2b;
+    border-color: #3a4254;
+  }
+
+  .process-card-schedule__hint {
+    color: #8b95a5;
+  }
+
+  .process-card-schedule__next-runs {
+    border-top-color: #2f3648;
+  }
+
+  .process-card-schedule__next-runs-title {
+    color: #d5dbe6;
+  }
+
+  .process-card-schedule__next-runs-list {
+    color: #8b95a5;
+  }
+
+  .process-card-schedule__btn-add {
+    border-color: #3a4254;
+    color: #8b95a5;
+
+    &:hover {
+      background: #2a3142;
+      color: #c4ccd8;
+    }
+  }
+
+  .process-card-schedule__btn-remove {
+    border-color: rgba(248, 113, 113, 0.35);
+    background: rgba(185, 28, 28, 0.12);
+    color: #fca5a5;
+
+    &:hover {
+      background: rgba(185, 28, 28, 0.22);
+    }
+  }
+
+  /* ----- Модалка запуска (уникальный префикс) ----- */
+  .start-process-modal-overlay {
+    background: rgba(8, 10, 16, 0.7);
+  }
+
+  .start-process-modal {
+    background: #1f2430;
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    box-shadow: 0 20px 48px rgba(0, 0, 0, 0.55);
+    color: #c4ccd8;
+  }
+
+  .start-process-modal__title {
+    color: #d5dbe6;
+  }
+
+  .start-process-modal__close {
+    color: #8b95a5;
+
+    &:hover {
+      color: #f87171;
+    }
+  }
+
+  .start-process-modal__process-name,
+  .start-process-modal__params-hint {
+    color: #8b95a5;
+  }
+
+  .start-process-modal__params {
+    background: #252b38;
+  }
+
+  .start-process-modal__label {
+    color: #aeb6c4;
+  }
+
+  .start-process-modal__input {
+    background: #1a1f2b;
+    border-color: #3a4254;
+    color: #c4ccd8;
+
+    &:focus {
+      border-color: #38bdf8;
+      box-shadow: 0 0 0 2px rgba(56, 189, 248, 0.2);
+    }
+  }
+
+  .start-process-modal__btn-cancel {
+    border-color: #3a4254;
+    background: #2a3142;
+    color: #aeb6c4;
+
+    &:hover {
+      background: #343b4f;
+    }
+  }
+
+  /* ----- Экземпляры ----- */
+  .bp-instances--loading,
+  .bp-instances__empty {
+    color: #8b95a5;
+  }
+
+  .bp-instances__search,
+  .bp-instances__select,
+  .bp-instances__refresh {
+    border-color: #3a4254;
+    background: #252b38;
+    color: #c4ccd8;
+
+    &::placeholder {
+      color: #6b7385;
+    }
+  }
+
+  .bp-instances__refresh:hover {
+    background: #2a3142;
+  }
+
+  .bp-instances__group {
+    border-color: #2f3648;
+    background: #1f2430;
+  }
+
+  .bp-instances__group-header {
+    background: #252b38;
+    color: #c4ccd8;
+  }
+
+  .bp-instances__group-title {
+    color: #d5dbe6;
+  }
+
+  .bp-instances__group-count {
+    border-color: #3a4254;
+    background: #1a1f2b;
+    color: #8b95a5;
+  }
+
+  .bp-instances__row--head {
+    color: #8b95a5;
+  }
+
+  .bp-instances__row:not(.bp-instances__row--head):hover {
+    background: #222837;
+  }
+
+  .bp-instances__row--error {
+    border-color: rgba(248, 113, 113, 0.4);
+    background: rgba(185, 28, 28, 0.12);
+  }
+
+  .bp-instances__row-error-text {
+    color: #fca5a5;
+  }
+
+  .bp-instances__btn--secondary {
+    border-color: #3a4254;
+    background: #252b38;
+    color: #c4ccd8;
+
+    &:hover {
+      background: #2a3142;
+    }
+  }
+
+  .bp-instances__btn--danger {
+    border-color: rgba(248, 113, 113, 0.35);
+    background: rgba(185, 28, 28, 0.12);
+    color: #fca5a5;
+
+    &:hover {
+      background: rgba(185, 28, 28, 0.22);
+    }
+  }
+
+  /* ----- Конструктор: только внутри .process-designer ----- */
+  .process-designer {
+    .process-designer__palette,
+    .process-designer__properties {
+      background: #1f2430;
+      border-color: #2f3648;
+    }
+
+    .process-designer__canvas {
+      background: #151922;
+    }
+
+    .designer-toolbar {
+      border-bottom-color: #2f3648;
+      background: #1a1f2b;
+    }
+
+    .designer-toolbar__label,
+    .designer-toolbar__checkbox {
+      color: #8b95a5;
+    }
+
+    .designer-toolbar__input {
+      background: #252b38;
+      border-color: #3a4254;
+      color: #c4ccd8;
+
+      &:focus {
+        border-color: #38bdf8;
+      }
+    }
+
+    .designer-toolbar__btn--secondary {
+      border-color: #3a4254;
+      background: #252b38;
+      color: #c4ccd8;
+
+      &:hover {
+        background: #2a3142;
+      }
+    }
+
+    .designer-toolbar__btn--danger {
+      border-color: rgba(248, 113, 113, 0.35);
+      background: rgba(185, 28, 28, 0.12);
+      color: #fca5a5;
+
+      &:hover {
+        background: rgba(185, 28, 28, 0.22);
+        border-color: rgba(248, 113, 113, 0.5);
+      }
+    }
+
+    .process-designer__palette .palette__title {
+      color: #d5dbe6;
+    }
+
+    .process-designer__palette .palette__hint {
+      color: #8b95a5;
+    }
+
+    .process-designer__palette .palette__btn {
+      border-color: #3a4254;
+      background: #252b38;
+      color: #c4ccd8;
+
+      &:hover {
+        background: #2a3142;
+        border-color: #4b5568;
+      }
+    }
+
+    .process-designer__palette .palette__group-toggle {
+      border-color: #3a4254;
+      background: #252b38;
+      color: #c4ccd8;
+
+      &:hover {
+        background: #2a3142;
+        border-color: #4b5568;
+      }
+    }
+
+    .process-designer__palette .palette__group-label--static,
+    .process-designer__palette .palette__group-arrow {
+      color: #8b95a5;
+    }
+
+    .process-designer__palette .palette__list--nested {
+      border-left-color: #3a4254;
+    }
+
+    .process-designer__properties .properties-panel--empty,
+    .process-designer__properties .properties-panel__hint,
+    .process-designer__properties .properties-panel__label,
+    .process-designer__properties .properties-panel__list-simple {
+      color: #8b95a5;
+    }
+
+    .process-designer__properties .properties-panel__title {
+      color: #d5dbe6;
+    }
+
+    .process-designer__properties .properties-panel__btn-copy-paste {
+      border-color: #3a4254;
+      background: #252b38;
+      color: #aeb6c4;
+
+      &:hover:not(:disabled) {
+        border-color: #38bdf8;
+        color: #7dd3fc;
+      }
+    }
+
+    .process-designer__properties .properties-panel__input,
+    .process-designer__properties .properties-panel__select,
+    .process-designer__properties .properties-panel__textarea {
+      background: #252b38;
+      border-color: #3a4254;
+      color: #c4ccd8;
+
+      option {
+        background: #252b38;
+        color: #c4ccd8;
+      }
+
+      &:focus {
+        border-color: #38bdf8;
+      }
+    }
+
+    .process-designer__properties .properties-panel__checkbox-row {
+      color: #c4ccd8;
+    }
+
+    .process-designer__properties .properties-panel__btn-add {
+      border-color: #4b5568;
+      color: #8b95a5;
+
+      &:hover {
+        border-color: #38bdf8;
+        color: #7dd3fc;
+      }
+    }
+
+    .process-designer__properties .properties-panel__btn-remove {
+      color: #fca5a5;
+    }
+
+    /* список пользователей — только в панели свойств БП */
+    .user-checkbox-list {
+      border-color: #3a4254;
+      background: #252b38;
+    }
+
+    .user-checkbox-list__row {
+      color: #c4ccd8;
+
+      &:hover {
+        background: #2a3142;
+      }
+
+      &--checked {
+        background: rgba(37, 99, 235, 0.18);
+      }
+    }
+
+    .user-checkbox-list__check {
+      border-color: #4b5568;
+      background: #1a1f2b;
+    }
+
+    .user-checkbox-list__row--checked .user-checkbox-list__check {
+      background: #2563eb;
+      border-color: #2563eb;
+    }
+
+    .process-designer-visibility__loading {
+      color: #8b95a5;
+    }
+
+    .process-designer-visibility {
+      border-top-color: #2f3648;
+
+      .process-designer-visibility__loading,
+      .process-designer-visibility__empty,
+      .process-designer-visibility__hint,
+      .process-designer-visibility__user-empty,
+      .process-designer-visibility__user-dept,
+      .process-designer-visibility__summary {
+        color: #8b95a5;
+      }
+
+      .process-designer-visibility__section-title {
+        color: #d5dbe6;
+      }
+
+      .process-designer-visibility__dept-check,
+      .process-designer-visibility__user-row {
+        color: #c4ccd8;
+      }
+
+      .process-designer-visibility__dept-expand {
+        border-color: #3a4254;
+        background: #252b38;
+        color: #aeb6c4;
+
+        &:hover {
+          background: #2a3142;
+        }
+      }
+
+      .process-designer-visibility__user-list {
+        border-left-color: #3a4254;
+      }
+
+      .process-designer-visibility__all-users {
+        border-color: #3a4254;
+        background: #1a1f2b;
+      }
+
+      .process-designer-visibility__modal-backdrop {
+        background: rgba(8, 10, 16, 0.72);
+      }
+
+      .process-designer-visibility__modal {
+        background: #1f2430;
+        border: 1px solid rgba(255, 255, 255, 0.08);
+        box-shadow: 0 20px 48px rgba(0, 0, 0, 0.55);
+        color: #c4ccd8;
+      }
+
+      .process-designer-visibility__modal-header {
+        border-bottom-color: #2f3648;
+
+        h3 {
+          color: #d5dbe6;
+        }
+      }
+
+      .process-designer-visibility__modal-close {
+        border-color: #3a4254;
+        background: #252b38;
+        color: #aeb6c4;
+
+        &:hover {
+          background: #2a3142;
+        }
+      }
+
+      .process-designer-visibility__modal-footer {
+        border-top-color: #2f3648;
+      }
+    }
+
+    /* ноды на холсте — только внутри дизайнера */
+    .block-node {
+      background: #252b38;
+      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.35);
+    }
+
+    .block-node__label {
+      color: #d5dbe6;
+    }
+
+    .block-node__handle {
+      border-color: #1f2430;
+    }
+
+    .lane-node {
+      border-color: rgba(148, 163, 184, 0.4);
+    }
+
+    .lane-node__header {
+      background: rgba(42, 49, 66, 0.55);
+      border-right-color: rgba(148, 163, 184, 0.35);
+    }
+
+    .lane-node__label {
+      color: #aeb6c4;
+    }
+
+    .lane-node__resize-handle {
+      border-color: #1f2430;
+    }
+
+    .flow-canvas__controls button {
+      background: #252b38 !important;
+      border-color: #3a4254 !important;
+      color: #c4ccd8 !important;
+
+      &:hover {
+        background: #2a3142 !important;
+      }
+    }
+
+    .flow-canvas__background {
+      color: #2f3648;
+    }
+
+    .react-flow__minimap {
+      background: #1a1f2b !important;
+    }
+
+    .react-flow__attribution {
+      background: rgba(31, 36, 48, 0.85) !important;
+      color: #8b95a5 !important;
+    }
+  }
+}

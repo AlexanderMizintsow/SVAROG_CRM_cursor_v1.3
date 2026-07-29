@@ -355,6 +355,20 @@ const useWebSocket = (userId, stableSetMessages, currentTaskId, onChatMessageUpd
           fetchTasksManager(userId)
           fetchUnreadNotifications(userId)
         }
+
+        // База знаний: новый / обновлённый документ → баннер уведомлений
+        if (
+          (notification.type === 'knowledge_document_new' ||
+            notification.type === 'knowledge_document_updated') &&
+          notification.userId === userId
+        ) {
+          const title =
+            notification.type === 'knowledge_document_new'
+              ? 'База знаний / Новый документ'
+              : 'База знаний / Обновление документа'
+          sendNotification(title, notification.message || notification.title || '')
+          fetchUnreadNotifications(userId)
+        }
       })
     }
     // Очистка при размонтировании

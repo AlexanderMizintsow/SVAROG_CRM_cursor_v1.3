@@ -654,3 +654,325 @@
     white-space: nowrap;
   }
 }
+
+/* ========== Тёмная тема: Управление мобильным приложением ========== */
+.dark {
+  .mobile-news__loading {
+    color: #8b95a5;
+  }
+
+  .mobile-news {
+    color: #c4ccd8;
+
+    &__header {
+      border-bottom-color: #2f3648;
+
+      h1 {
+        color: #d5dbe6;
+      }
+
+      p {
+        color: #8b95a5;
+      }
+    }
+
+    &__help-icon {
+      color: #93c5fd;
+      border-color: rgba(96, 165, 250, 0.45);
+      background: rgba(37, 99, 235, 0.18);
+
+      &:hover {
+        background: rgba(37, 99, 235, 0.28);
+      }
+    }
+
+    &__tabs {
+      border-bottom-color: #2f3648;
+    }
+
+    &__tab {
+      border-color: #3a4254;
+      background: #252b38;
+      color: #aeb6c4;
+
+      &:hover {
+        background: #2a3142;
+        color: #c4ccd8;
+      }
+
+      &.active {
+        border-color: #60a5fa;
+        background: rgba(37, 99, 235, 0.22);
+        color: #93c5fd;
+      }
+    }
+
+    &__panel {
+      background: #1f2430;
+      border-color: #2f3648;
+    }
+
+    &__search,
+    &__chip-search,
+    &__grid label input,
+    &__grid label textarea,
+    &__grid label select,
+    &__permission-row select {
+      background: #252b38;
+      border-color: #3a4254;
+      color: #c4ccd8;
+
+      &::placeholder {
+        color: #6b7385;
+      }
+
+      option {
+        background: #252b38;
+        color: #c4ccd8;
+      }
+
+      &:focus {
+        outline: none;
+        border-color: #60a5fa;
+        box-shadow: 0 0 0 2px rgba(96, 165, 250, 0.2);
+      }
+    }
+
+    &__grid label {
+      color: #aeb6c4;
+    }
+
+    &__ghost-btn {
+      border-color: #3a4254;
+      background: #252b38;
+      color: #c4ccd8;
+
+      &:hover {
+        background: #2a3142;
+      }
+    }
+
+    &__card {
+      background: #1a1f2b;
+      border-color: #2f3648;
+
+      &:hover {
+        border-color: #3a4254;
+      }
+    }
+
+    &__card-main {
+      h3 {
+        color: #d5dbe6;
+      }
+
+      p {
+        color: #8b95a5;
+      }
+
+      img {
+        border-color: #3a4254;
+      }
+    }
+
+    .status {
+      background: #252b38;
+      color: #aeb6c4;
+
+      &--published {
+        background: rgba(16, 185, 129, 0.18);
+        color: #6ee7b7;
+      }
+
+      &--scheduled {
+        background: rgba(245, 158, 11, 0.18);
+        color: #fcd34d;
+      }
+
+      &--draft {
+        background: rgba(59, 130, 246, 0.18);
+        color: #93c5fd;
+      }
+
+      &--archived {
+        background: rgba(185, 28, 28, 0.18);
+        color: #fca5a5;
+      }
+    }
+
+    &__card-actions button,
+    &__media-actions button,
+    &__cover-preview-wrap button,
+    &__permission-item button,
+    &__preview-close,
+    &__symbols button {
+      border-color: #3a4254;
+      background: #252b38;
+      color: #c4ccd8;
+
+      &:hover {
+        background: #2a3142;
+      }
+    }
+
+    &__publish-date,
+    &__empty,
+    &__chip-empty,
+    &__chip-selected-count,
+    &__chip-hint {
+      color: #8b95a5;
+    }
+
+    &__section {
+      border-top-color: #2f3648;
+
+      h3 {
+        color: #d5dbe6;
+      }
+    }
+
+    &__upload-btn {
+      border-color: rgba(96, 165, 250, 0.45);
+      background: rgba(37, 99, 235, 0.18);
+      color: #93c5fd;
+    }
+
+    &__preview,
+    &__media-item img {
+      border-color: #3a4254;
+    }
+
+    &__media-item span {
+      color: #aeb6c4;
+    }
+
+    &__editor {
+      background: #252b38;
+      border-color: #3a4254;
+      color: #c4ccd8;
+
+      .tiptap {
+        color: #c4ccd8;
+      }
+    }
+
+    &__hint {
+      color: #fbbf24;
+    }
+
+    &__chip {
+      border-color: #3a4254;
+      background: #252b38;
+      color: #c4ccd8;
+
+      &.active {
+        border-color: #60a5fa;
+        background: rgba(37, 99, 235, 0.22);
+        color: #93c5fd;
+      }
+
+      &--good {
+        border-color: rgba(52, 168, 83, 0.45);
+        background: rgba(16, 185, 129, 0.15);
+        color: #6ee7b7;
+      }
+
+      &--bad {
+        border-color: rgba(216, 76, 76, 0.45);
+        background: rgba(185, 28, 28, 0.15);
+        color: #fca5a5;
+      }
+    }
+
+    &__compat-legend {
+      .good {
+        color: #6ee7b7;
+      }
+
+      .bad {
+        color: #fca5a5;
+      }
+    }
+
+    &__permission-item,
+    &__history-item {
+      background: #1a1f2b;
+      border-color: #2f3648;
+      color: #c4ccd8;
+    }
+
+    &__warning {
+      color: #fca5a5;
+      background: rgba(185, 28, 28, 0.15);
+      border-color: rgba(248, 113, 113, 0.35);
+    }
+
+    &__preview-overlay {
+      background: rgba(8, 10, 16, 0.72);
+    }
+
+    &__preview-modal {
+      background: #1f2430;
+      border-color: #2f3648;
+      color: #c4ccd8;
+    }
+
+    &__preview-card img {
+      border-color: #3a4254;
+    }
+
+    &__preview-content {
+      h3 {
+        color: #d5dbe6;
+      }
+
+      p {
+        color: #aeb6c4;
+      }
+    }
+
+    &__preview-html img {
+      border-color: #3a4254;
+    }
+
+    &__preview-loading {
+      color: #8b95a5;
+    }
+
+    &__ack-report h2 {
+      color: #d5dbe6;
+    }
+
+    &__ack-title {
+      color: #8b95a5;
+    }
+
+    &__ack-summary {
+      background: #252b38;
+      border-color: #3a4254;
+      color: #c4ccd8;
+    }
+
+    &__ack-tabs button {
+      border-color: #3a4254;
+      background: #252b38;
+      color: #aeb6c4;
+
+      &.active {
+        border-color: #60a5fa;
+        background: rgba(37, 99, 235, 0.22);
+        color: #93c5fd;
+      }
+    }
+
+    &__ack-item {
+      background: #1a1f2b;
+      border-color: #2f3648;
+      color: #c4ccd8;
+    }
+
+    &__ack-pending {
+      color: #fbbf24;
+    }
+  }
+}

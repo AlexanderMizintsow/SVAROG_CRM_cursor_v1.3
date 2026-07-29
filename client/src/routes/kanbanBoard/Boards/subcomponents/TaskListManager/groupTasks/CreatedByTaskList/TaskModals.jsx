@@ -9,6 +9,7 @@ import { getUserNames } from '../../../../../Task/utils/taskUtils'
 import { getAbsenceLabel } from '../../../../../../../utils/userAbsenceUtils'
 import { ReactFlowProvider } from 'react-flow-renderer'
 import EditorToolbar from '../../../../../../../components/EditorToolbar/EditorToolbar'
+import useThemeStore from '../../../../../../../store/themeStore'
 
 const TaskModals = ({
   // Состояния для редактирования описания
@@ -42,6 +43,11 @@ const TaskModals = ({
   users,
   absencesMap = {},
 }) => {
+  const { theme } = useThemeStore()
+  const isDarkTheme = theme === 'dark'
+  const modalBg = isDarkTheme ? '#1f2430' : 'background.paper'
+  const modalPaperClass = `task-list-modal-paper ${theme}`
+
   const editor = useEditor({
     extensions: [StarterKit /*, Link, и др.*/],
     content: newDescription || '',
@@ -84,6 +90,7 @@ const TaskModals = ({
       {isEditing && (
         <Modal open={isEditing} onClose={() => setIsEditing(false)}>
           <Box
+            className={modalPaperClass}
             sx={{
               position: 'absolute',
               top: '50%',
@@ -91,7 +98,7 @@ const TaskModals = ({
               transform: 'translate(-50%, -50%)',
               width: '80%',
               maxWidth: 700,
-              bgcolor: 'background.paper',
+              bgcolor: modalBg,
               boxShadow: 24,
               p: 2,
               borderRadius: 2,
@@ -144,6 +151,7 @@ const TaskModals = ({
           aria-describedby="hierarchy-modal-description"
         >
           <Box
+            className={modalPaperClass}
             sx={{
               position: 'absolute',
               top: '50%',
@@ -151,7 +159,7 @@ const TaskModals = ({
               transform: 'translate(-50%, -50%)',
               width: '80%',
               maxWidth: '800px',
-              bgcolor: 'background.paper',
+              bgcolor: modalBg,
               boxShadow: 24,
               p: 4,
               maxHeight: '90vh',
@@ -198,13 +206,14 @@ const TaskModals = ({
           aria-describedby="replace-user-modal-description"
         >
           <Box
+            className={modalPaperClass}
             sx={{
               position: 'absolute',
               top: '50%',
               left: '50%',
               transform: 'translate(-50%, -50%)',
               width: 400,
-              bgcolor: 'background.paper',
+              bgcolor: modalBg,
               boxShadow: 24,
               p: 4,
               borderRadius: 2,

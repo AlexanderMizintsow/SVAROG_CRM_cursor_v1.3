@@ -1,6 +1,6 @@
 // components/alertBanner/subcomponents/TaskNotifications.js Тут все из таблици notifications
 import React from 'react'
-import { FaClock, FaEnvelope, FaLightbulb } from 'react-icons/fa'
+import { FaClock, FaEnvelope, FaLightbulb, FaBookOpen, FaFileAlt } from 'react-icons/fa'
 import useTaskStateTracker from '../../../store/useTaskStateTracker'
 import { FcLeave } from 'react-icons/fc'
 import { FcPlanner } from 'react-icons/fc'
@@ -18,7 +18,6 @@ const useTaskNotifications = ({ currentUserId }) => {
   const handleMarkAsRead = async (notificationId) => {
     try {
       await axios.patch(`${API_BASE_URL}5000/api/notifications/${notificationId}/read`)
-      // Удаляем уведомление из локального хранилища
       removeNotificationTask(notificationId)
     } catch (error) {
       console.error('Ошибка при обновлении статуса уведомления:', error)
@@ -27,7 +26,6 @@ const useTaskNotifications = ({ currentUserId }) => {
 
   React.useEffect(() => {
     if (currentUserId) {
-      console.log('fetchUnreadNotifications вызван')
       fetchUnreadNotifications(currentUserId)
     }
   }, [currentUserId, fetchUnreadNotifications])
@@ -35,8 +33,6 @@ const useTaskNotifications = ({ currentUserId }) => {
   if (notificationsTask && Object.keys(notificationsTask).length > 0) {
     Object.entries(notificationsTask).forEach(([id, notification]) => {
       if (!notification) return
-      //   console.log('notificationsTask обновлён', JSON.stringify(notificationsTask))
-      // console.log(999)
       const notificationConfig = {
         extension_request_rejected: {
           icon: <FcLeave />,
@@ -82,6 +78,22 @@ const useTaskNotifications = ({ currentUserId }) => {
           statusText: 'Идея применена в приложении',
           showDetails: true,
         },
+        knowledge_document_new: {
+          icon: <FaBookOpen color="#0f766e" />,
+          className: 'extension-notification-knowledge',
+          statusText: 'База знаний — новый документ',
+          showDetails: true,
+          confirmLabel: 'Ок',
+          iconClass: 'icon-knowledge',
+        },
+        knowledge_document_updated: {
+          icon: <FaFileAlt color="#0f766e" />,
+          className: 'extension-notification-knowledge',
+          statusText: 'База знаний — обновление документа',
+          showDetails: true,
+          confirmLabel: 'Ок',
+          iconClass: 'icon-knowledge',
+        },
         default: {
           icon: <FaEnvelope />,
           className: '',
@@ -126,6 +138,7 @@ const useTaskNotifications = ({ currentUserId }) => {
           </div>
         ),
         icon: config.icon,
+        iconClass: config.iconClass || '',
         type: notification.type,
         notificationId: id,
         createdAt: notification.createdAt,
@@ -146,6 +159,7 @@ const useTaskNotifications = ({ currentUserId }) => {
   return {
     notifications,
     handleTaskNotificationClick,
+    handleMarkAsRead,
   }
 }
 

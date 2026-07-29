@@ -32,6 +32,7 @@ import ProcessMonitoring from '../routes/statistics/ProcessMonitoring.jsx'
 import MobileAppNewsManagement from '../routes/adminMenu/mobileAppNews/MobileAppNewsManagement.jsx'
 import StaffNewsManagement from '../routes/adminMenu/staffNews/StaffNewsManagement.jsx'
 import ManagerRequestsPage from '../routes/managerRequests/ManagerRequestsPage.jsx'
+import KnowledgeBasePage from '../routes/knowledgeBase/KnowledgeBasePage.jsx'
 
 const routes = (bgSeason, roleAdministrator, roleAdminOrDirector, isConnectBD) => [
   {
@@ -60,6 +61,7 @@ const routes = (bgSeason, roleAdministrator, roleAdminOrDirector, isConnectBD) =
         path: 'task-manager',
         element: (
           <div
+            className="seasonal-board-bg"
             style={{
               overflowY: 'auto',
               height: '100%',
@@ -78,6 +80,7 @@ const routes = (bgSeason, roleAdministrator, roleAdminOrDirector, isConnectBD) =
         path: 'business-processes',
         element: (
           <div
+            className="seasonal-board-bg"
             style={{
               overflowY: 'auto',
               height: '100%',
@@ -139,6 +142,10 @@ const routes = (bgSeason, roleAdministrator, roleAdminOrDirector, isConnectBD) =
       {
         path: '/hierarchy-tree-employee',
         element: <HierarchyTreeEmployee />,
+      },
+      {
+        path: 'knowledge-base',
+        element: <KnowledgeBasePage />,
       },
       // карта дилеров
       {

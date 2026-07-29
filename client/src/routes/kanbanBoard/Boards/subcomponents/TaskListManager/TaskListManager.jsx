@@ -10,6 +10,7 @@ import SearchBar from '../../../../../components/searchBar/SearchBar'
 import MiniProjectStrip from './MiniProjectStrip'
 import { getLocalMonthDateRangeYyyyMmDd } from '../taskUtils'
 import styles from './taskListManager.module.scss'
+import './taskListManagerDark.scss'
 
 /** Локальная полночь / конец дня для input type="date" (YYYY-MM-DD) — как в GlobalTasksContainer */
 function parseLocalDayStartMs(yyyyMmDd) {
@@ -415,7 +416,7 @@ const TaskListManager = ({ onClose, onOpenProject, stripRefreshKey, initialActiv
   }
 
   return (
-    <Box className={styles.container}>
+    <Box className={`${styles.container} task-list-manager`}>
       <Box className={styles.close} onClick={onClose}>
         &times;
       </Box>

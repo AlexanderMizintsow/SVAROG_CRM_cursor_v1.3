@@ -112,13 +112,14 @@ function AccountActivation() {
     const token = localStorage.getItem('token')
 
     // Создайте объект с необходимыми полями для обновления
+    // birth_date только как YYYY-MM-DD: ISO из API (полночь локального TZ → UTC) иначе сдвигает день на −1
     const updatedUserData = {
       last_name: user.last_name,
       first_name: user.first_name,
       middle_name: user.middle_name,
       gender: user.gender,
       email: user.email,
-      birth_date: user.birth_date,
+      birth_date: toDateOnlyString(user.birth_date),
       role_id: user.role_id,
       department_id: user.department_id,
       position_id: user.position_id,
@@ -155,12 +156,32 @@ function AccountActivation() {
       })
   }
 
-  const formatDate = (isoString) => {
-    if (!isoString) return '-'
-    const date = new Date(isoString)
-    const day = date.getDate().toString().padStart(2, '0')
-    const month = (date.getMonth() + 1).toString().padStart(2, '0')
-    const year = date.getFullYear()
+  /** Календарная дата без сдвига TZ (DATE из API / input type="date"). */
+  const toDateOnlyString = (value) => {
+    if (value == null || value === '') return null
+    if (value instanceof Date) {
+      if (Number.isNaN(value.getTime())) return null
+      const y = value.getFullYear()
+      const m = String(value.getMonth() + 1).padStart(2, '0')
+      const d = String(value.getDate()).padStart(2, '0')
+      return `${y}-${m}-${d}`
+    }
+    const str = String(value).trim()
+    if (!str) return null
+    if (/^\d{4}-\d{2}-\d{2}$/.test(str)) return str
+    if (str.includes('T')) {
+      const date = new Date(str)
+      if (Number.isNaN(date.getTime())) return null
+      return toDateOnlyString(date)
+    }
+    const match = str.match(/^(\d{4}-\d{2}-\d{2})/)
+    return match ? match[1] : null
+  }
+
+  const formatDate = (value) => {
+    const ymd = toDateOnlyString(value)
+    if (!ymd) return '-'
+    const [year, month, day] = ymd.split('-')
     return `${day}.${month}.${year}`
   }
 
@@ -307,6 +328,7 @@ function AccountActivation() {
                         <input
                           type="date"
                           className="date-input"
+                          value={toDateOnlyString(user.birth_date) || ''}
                           onChange={(e) => handleInputChange(e, user.id, 'birth_date')}
                         />
                       </div>

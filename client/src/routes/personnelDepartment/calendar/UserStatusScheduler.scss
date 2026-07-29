@@ -831,3 +831,391 @@ $user-button-bg-hover: #0056b3;
     }
   }
 }
+
+/* ========== Тёмная тема: Статусы сотрудников ========== */
+.dark {
+  .user-status-scheduler {
+    background: #1f2430;
+    border-color: #2f3648;
+    box-shadow: 0 4px 18px rgba(0, 0, 0, 0.35);
+    color: #c4ccd8;
+
+    h2 {
+      color: #d5dbe6;
+    }
+
+    &__tabs {
+      border-bottom-color: #2f3648;
+    }
+
+    &__tab {
+      color: #8b95a5;
+
+      &:hover {
+        color: #93c5fd;
+      }
+
+      &--active {
+        color: #93c5fd;
+        border-bottom-color: #60a5fa;
+      }
+    }
+
+    &__tab-badge {
+      background: rgba(37, 99, 235, 0.22);
+      color: #93c5fd;
+
+      &--upcoming {
+        background: rgba(245, 158, 11, 0.2);
+        color: #fbbf24;
+      }
+    }
+
+    &__form {
+      label {
+        color: #aeb6c4;
+      }
+
+      select,
+      input[type='date'] {
+        background: #252b38;
+        border-color: #3a4254;
+        color: #c4ccd8;
+
+        option {
+          background: #252b38;
+          color: #c4ccd8;
+        }
+
+        &:focus {
+          border-color: #60a5fa;
+        }
+      }
+
+      .mode-selection label {
+        color: #c4ccd8;
+      }
+    }
+
+    &__btn-secondary {
+      background: #252b38;
+      border-color: #3a4254;
+      color: #c4ccd8;
+
+      &:hover {
+        background: #2a3142;
+      }
+    }
+
+    &__dates-list li {
+      color: #c4ccd8;
+      border-bottom-color: #2f3648;
+
+      button {
+        color: #fca5a5;
+      }
+    }
+
+    &__hint {
+      background: rgba(37, 99, 235, 0.15);
+      border-left-color: #60a5fa;
+      color: #aeb6c4;
+    }
+
+    &__no-access {
+      color: #8b95a5;
+    }
+  }
+
+  .active-absences {
+    &__count {
+      color: #8b95a5;
+
+      strong {
+        color: #d5dbe6;
+      }
+    }
+
+    &__refresh {
+      background: #252b38;
+      border-color: #3a4254;
+      color: #c4ccd8;
+
+      &:hover {
+        background: #2a3142;
+      }
+    }
+
+    &__table-wrap {
+      border-color: #2f3648;
+    }
+
+    &__table {
+      th {
+        background: #1a1f2b;
+        color: #aeb6c4;
+        border-bottom-color: #2f3648;
+      }
+
+      td {
+        color: #c4ccd8;
+        border-bottom-color: #2f3648;
+      }
+
+      tbody tr:hover td {
+        background: #222837;
+      }
+    }
+
+    &__row--hoverable:hover td {
+      background: rgba(37, 99, 235, 0.12);
+    }
+
+    &__hover-hint {
+      color: #6b7385;
+    }
+
+    &__dept,
+    &__substitute {
+      color: #8b95a5;
+    }
+
+    &__period {
+      color: #aeb6c4;
+    }
+
+    &__edit-btn {
+      background: rgba(37, 99, 235, 0.15);
+      border-color: rgba(96, 165, 250, 0.4);
+      color: #93c5fd;
+
+      &:hover {
+        background: rgba(37, 99, 235, 0.25);
+        border-color: #60a5fa;
+      }
+    }
+
+    &__empty {
+      color: #8b95a5;
+    }
+  }
+
+  .absence-status {
+    &--vacation {
+      background: rgba(37, 99, 235, 0.2);
+      color: #93c5fd;
+    }
+
+    &--sick {
+      background: rgba(185, 28, 28, 0.2);
+      color: #fca5a5;
+    }
+
+    &--trip {
+      background: rgba(124, 58, 237, 0.2);
+      color: #c4b5fd;
+    }
+
+    &--training {
+      background: rgba(16, 185, 129, 0.2);
+      color: #6ee7b7;
+    }
+
+    &--default {
+      background: #252b38;
+      color: #aeb6c4;
+    }
+  }
+
+  .status-edit-modal__overlay {
+    background: rgba(8, 10, 16, 0.72);
+  }
+
+  .status-edit-modal {
+    background: #1f2430;
+    box-shadow: 0 16px 48px rgba(0, 0, 0, 0.55);
+    color: #c4ccd8;
+
+    &__header h3 {
+      color: #d5dbe6;
+    }
+
+    &__close {
+      color: #8b95a5;
+
+      &:hover {
+        background: #252b38;
+        color: #d5dbe6;
+      }
+    }
+
+    &__employee {
+      color: #aeb6c4;
+    }
+
+    &__form {
+      label {
+        color: #aeb6c4;
+      }
+
+      select,
+      input[type='date'] {
+        background: #252b38;
+        border-color: #3a4254;
+        color: #c4ccd8;
+
+        option {
+          background: #252b38;
+          color: #c4ccd8;
+        }
+      }
+    }
+
+    &__mode label {
+      color: #c4ccd8;
+    }
+
+    &__add-date button {
+      background: #252b38;
+      border-color: #3a4254;
+      color: #c4ccd8;
+
+      &:hover {
+        background: #2a3142;
+      }
+    }
+
+    &__dates-list li {
+      border-bottom-color: #2f3648;
+      color: #c4ccd8;
+
+      button {
+        color: #fca5a5;
+      }
+    }
+
+    &__actions {
+      border-top-color: #2f3648;
+    }
+
+    &__btn--secondary {
+      background: #252b38;
+      border-color: #3a4254;
+      color: #c4ccd8;
+
+      &:hover:not(:disabled) {
+        background: #2a3142;
+      }
+    }
+
+    &__btn--danger {
+      background: rgba(185, 28, 28, 0.12);
+      border-color: rgba(248, 113, 113, 0.35);
+      color: #fca5a5;
+
+      &:hover:not(:disabled) {
+        background: rgba(185, 28, 28, 0.22);
+      }
+    }
+  }
+
+  .workload-tooltip {
+    background: #1f2430;
+    border-color: #3a4254;
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.45);
+    color: #c4ccd8;
+  }
+
+  .workload-summary {
+    &__loading,
+    &__empty {
+      color: #8b95a5;
+    }
+
+    &__line--warn {
+      color: #fbbf24;
+    }
+
+    &__line--ok {
+      color: #6ee7b7;
+    }
+
+    &__line--muted {
+      color: #8b95a5;
+    }
+
+    &__sections {
+      border-top-color: #2f3648;
+    }
+
+    &__section-title {
+      color: #d5dbe6;
+    }
+
+    &__list {
+      color: #aeb6c4;
+    }
+
+    &__item-meta {
+      color: #8b95a5;
+    }
+
+    &__item-deadline {
+      color: #fbbf24;
+    }
+
+    &__more {
+      color: #6b7385;
+    }
+
+    &__note {
+      border-top-color: #3a4254;
+      color: #6b7385;
+    }
+  }
+
+  .workload-summary-modal__overlay {
+    background: rgba(8, 10, 16, 0.72);
+  }
+
+  .workload-summary-modal {
+    background: #1f2430;
+    box-shadow: 0 16px 48px rgba(0, 0, 0, 0.55);
+    color: #c4ccd8;
+
+    &__header h3 {
+      color: #d5dbe6;
+    }
+
+    &__close {
+      color: #8b95a5;
+
+      &:hover {
+        background: #252b38;
+        color: #d5dbe6;
+      }
+    }
+
+    &__employee {
+      color: #aeb6c4;
+    }
+
+    &__period {
+      color: #8b95a5;
+    }
+
+    &__actions {
+      border-top-color: #2f3648;
+    }
+
+    &__btn--secondary {
+      background: #252b38;
+      border-color: #3a4254;
+      color: #c4ccd8;
+
+      &:hover:not(:disabled) {
+        background: #2a3142;
+      }
+    }
+  }
+}

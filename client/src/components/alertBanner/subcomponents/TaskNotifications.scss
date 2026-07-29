@@ -359,6 +359,38 @@
     }
   }
 
+  // База знаний — новый / обновлённый документ
+  &-knowledge {
+    background: linear-gradient(135deg, #0f766e33, #134e4a55);
+    border-left: 4px solid #14b8a6;
+
+    .extension-notification-border {
+      width: 4px;
+      background: #14b8a6;
+      box-shadow: -2px 0 8px #14b8a6, -4px 0 16px rgba(20, 184, 166, 0.45);
+      animation: pulse-glow-knowledge 1.8s infinite ease-in-out;
+    }
+
+    .extension-notification-status {
+      color: #5eead4;
+      font-size: 13px;
+      font-weight: 700;
+    }
+
+    .extension-notification-message {
+      color: #ecfeff;
+      white-space: pre-wrap;
+    }
+
+    .extension-notification-confirm {
+      background: linear-gradient(135deg, #0f766e, #0d9488);
+
+      &:hover {
+        background: linear-gradient(135deg, #14b8a6, #0f766e);
+      }
+    }
+  }
+
   // Анимация для оранжевого свечения
   @keyframes pulse-glow-orange {
     0%,
@@ -368,6 +400,18 @@
     }
     50% {
       box-shadow: -2px 0 12px #ff5e5e, -6px 0 20px rgba(255, 94, 94, 0.6);
+      opacity: 1;
+    }
+  }
+
+  @keyframes pulse-glow-knowledge {
+    0%,
+    100% {
+      box-shadow: -2px 0 8px rgba(20, 184, 166, 0.35), -4px 0 12px rgba(15, 118, 110, 0.25);
+      opacity: 0.85;
+    }
+    50% {
+      box-shadow: -2px 0 12px #14b8a6, -6px 0 20px rgba(20, 184, 166, 0.55);
       opacity: 1;
     }
   }

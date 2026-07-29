@@ -1,0 +1,296 @@
+/* Тёмная тема: Лист задач + MUI-карточки / фильтры / вложенные модалки
+   Палитра: #1a1f2b / #252b38, текст #c4ccd8 / #d5dbe6 / #8b95a5 */
+
+.dark {
+  .task-list-manager {
+    /* MUI Paper (хедер фильтров и т.п.) */
+    .MuiPaper-root {
+      background-color: #252b38 !important;
+      background-image: none !important;
+      color: #c4ccd8;
+      border: 1px solid rgba(255, 255, 255, 0.06);
+      box-shadow: 0 4px 16px rgba(0, 0, 0, 0.35) !important;
+    }
+
+    .MuiCard-root {
+      background-color: #252b38 !important;
+      color: #c4ccd8;
+      border: 1px solid rgba(255, 255, 255, 0.06);
+    }
+
+    .MuiCardContent-root,
+    .MuiCardActions-root {
+      color: #c4ccd8;
+    }
+
+    .MuiTypography-root {
+      color: #c4ccd8;
+    }
+
+    .MuiTypography-h4,
+    .MuiTypography-h6,
+    .MuiTypography-h1 {
+      color: #d5dbe6 !important;
+    }
+
+    .MuiTypography-colorTextSecondary,
+    .MuiTypography-body2 {
+      color: #8b95a5 !important;
+    }
+
+    .MuiTypography-colorPrimary {
+      color: #7dd3fc !important;
+    }
+
+    .MuiDivider-root {
+      border-color: #3a4254;
+    }
+
+    .MuiChip-root {
+      border-color: #3a4254;
+    }
+
+    .MuiChip-outlined {
+      background: transparent;
+      color: #aeb6c4;
+      border-color: #3a4254;
+    }
+
+    .MuiChip-colorDefault {
+      background-color: #2a3142;
+      color: #aeb6c4;
+    }
+
+    .MuiIconButton-root {
+      color: #aeb6c4;
+
+      &:hover {
+        background-color: rgba(255, 255, 255, 0.06);
+      }
+    }
+
+    .MuiSvgIcon-root {
+      color: inherit;
+    }
+
+    /* Поля фильтров */
+    .MuiOutlinedInput-root {
+      background-color: #1a1f2b;
+      color: #c4ccd8;
+
+      .MuiOutlinedInput-notchedOutline {
+        border-color: #3a4254;
+      }
+
+      &:hover .MuiOutlinedInput-notchedOutline {
+        border-color: #4b5568;
+      }
+
+      &.Mui-focused .MuiOutlinedInput-notchedOutline {
+        border-color: #38bdf8;
+      }
+
+      .MuiOutlinedInput-input {
+        color: #c4ccd8;
+      }
+    }
+
+    .MuiInputLabel-root {
+      color: #8b95a5;
+
+      &.Mui-focused {
+        color: #7dd3fc;
+      }
+    }
+
+    .MuiSelect-icon {
+      color: #8b95a5;
+    }
+
+    .MuiMenuItem-root {
+      color: #c4ccd8;
+    }
+
+    .MuiList-root {
+      background-color: transparent;
+    }
+
+    .MuiListItem-root {
+      color: #c4ccd8;
+    }
+
+    .MuiListItemText-primary {
+      color: #d5dbe6 !important;
+    }
+
+    .MuiListItemText-secondary {
+      color: #8b95a5 !important;
+    }
+
+    /* Поиск SearchBar внутри листа */
+    .search-container .search-input {
+      background-color: #1a1f2b;
+      border-color: #3a4254;
+      color: #c4ccd8;
+    }
+  }
+
+  /* Вложенные модалки листа задач (portal) */
+  .task-list-modal-paper {
+    background-color: #1f2430 !important;
+    color: #c4ccd8 !important;
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    box-shadow: 0 20px 48px rgba(0, 0, 0, 0.55) !important;
+
+    .MuiTypography-root {
+      color: #c4ccd8;
+    }
+
+    .MuiTypography-h6 {
+      color: #d5dbe6 !important;
+    }
+
+    .MuiOutlinedInput-root {
+      background-color: #252b38;
+      color: #c4ccd8;
+
+      .MuiOutlinedInput-notchedOutline {
+        border-color: #3a4254;
+      }
+
+      .MuiOutlinedInput-input {
+        color: #c4ccd8;
+      }
+    }
+
+    .MuiInputLabel-root {
+      color: #8b95a5;
+    }
+
+    .MuiButton-outlined {
+      border-color: #3a4254;
+      color: #aeb6c4;
+
+      &:hover {
+        border-color: #4b5568;
+        background: rgba(255, 255, 255, 0.04);
+      }
+    }
+
+    /* TipTap редактор */
+    .ProseMirror {
+      color: #c4ccd8;
+      min-height: 160px;
+
+      &:focus {
+        outline: none;
+      }
+    }
+  }
+
+  /* ConfirmationDialog */
+  .customDialog {
+    .MuiPaper-root {
+      background-color: #1f2430 !important;
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      box-shadow: 0 16px 40px rgba(0, 0, 0, 0.5);
+    }
+
+    .MuiTypography-root,
+    .dialogDescription {
+      color: #c4ccd8 !important;
+    }
+
+    .MuiDialogTitle-root {
+      color: #d5dbe6 !important;
+    }
+
+    .MuiOutlinedInput-root {
+      background-color: #252b38;
+      color: #c4ccd8;
+
+      .MuiOutlinedInput-notchedOutline {
+        border-color: #3a4254;
+      }
+
+      input,
+      textarea {
+        color: #c4ccd8;
+      }
+    }
+
+    .MuiInputLabel-root {
+      color: #8b95a5;
+    }
+
+    .MuiFormHelperText-root {
+      color: #8b95a5;
+    }
+
+    .MuiButton-root {
+      color: #7dd3fc;
+    }
+  }
+
+  /* Выпадающие списки MUI (portal) */
+  .MuiMenu-paper,
+  .MuiPopover-paper {
+    background-color: #1f2430 !important;
+    color: #c4ccd8 !important;
+    border: 1px solid #3a4254;
+
+    .MuiMenuItem-root {
+      color: #c4ccd8;
+
+      &:hover {
+        background-color: #2a3142;
+      }
+
+      &.Mui-selected {
+        background-color: rgba(56, 189, 248, 0.15);
+
+        &:hover {
+          background-color: rgba(56, 189, 248, 0.22);
+        }
+      }
+    }
+  }
+
+  /* TipTap toolbar внутри модалки */
+  .task-list-modal-paper {
+    .editor-toolbar,
+    [class*='EditorToolbar'],
+    .ProseMirror {
+      color: #c4ccd8;
+    }
+  }
+
+  /* Справка листа задач */
+  .modal-overlay-creat-group .modal-content-creat-group {
+    background: #1f2430;
+    border-color: #3a4254;
+    color: #c4ccd8;
+    font-family: inherit;
+
+    .title-creat-group {
+      color: #d5dbe6;
+    }
+
+    p {
+      color: #aeb6c4;
+      font-family: inherit;
+    }
+
+    button {
+      font-family: inherit;
+    }
+  }
+
+  .modal-overlay-creat-group .modal-overlay-close-creat-group {
+    color: #7dd3fc;
+
+    &:hover {
+      color: #f87171;
+    }
+  }
+}

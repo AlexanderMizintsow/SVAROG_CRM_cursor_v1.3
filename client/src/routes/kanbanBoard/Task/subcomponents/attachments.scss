@@ -160,3 +160,72 @@
     max-width: 200px;
   }
 }
+
+/* ========== Тёмная тема: вложения ========== */
+.dark {
+  .attachment-item {
+    border-color: #3a4254;
+    background: #252b38;
+
+    &:hover {
+      border-color: #4b5568;
+      background: #2a3142;
+    }
+  }
+
+  .attachment-thumb-wrap {
+    background: #1a1f2b;
+
+    &:hover {
+      box-shadow: 0 4px 14px rgba(0, 0, 0, 0.4);
+    }
+
+    &:focus {
+      outline-color: #38bdf8;
+    }
+  }
+
+  .attachment-file-row .attachment-file-icon {
+    color: #94a3b8;
+  }
+
+  .attachment-name {
+    color: #c4ccd8;
+  }
+
+  .attachment-open-btn {
+    background: rgba(34, 197, 94, 0.15);
+    color: #4ade80;
+
+    &:hover {
+      background: #16a34a;
+      color: #fff;
+    }
+  }
+
+  .attachment-download-btn {
+    background: rgba(56, 189, 248, 0.15);
+    color: #38bdf8;
+
+    &:hover {
+      background: #0284c7;
+      color: #fff;
+    }
+
+    &:focus {
+      outline-color: #38bdf8;
+    }
+  }
+
+  .task-modal-content .attachments {
+    .attachment-item {
+      border-color: rgba(255, 255, 255, 0.1);
+      background: #222837;
+
+      &:hover {
+        border-color: rgba(56, 189, 248, 0.35);
+        background: #2a3142;
+      }
+    }
+  }
+}

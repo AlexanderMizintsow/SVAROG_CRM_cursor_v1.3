@@ -840,3 +840,358 @@
   min-height: 200px;
   padding: 1rem 1.25rem;
 }
+
+/* ========== Тёмная тема: Мониторинг процессов ========== */
+.dark {
+  .content-process-monitoring {
+    color: #c4ccd8;
+  }
+
+  .process-monitoring {
+    color: #c4ccd8;
+
+    &__title {
+      color: #d5dbe6;
+    }
+
+    &__title-icon {
+      color: #a5b4fc;
+    }
+
+    &__subtitle,
+    &__charts-desc,
+    &__filter-hint,
+    &__loading,
+    &__bp-detail-desc,
+    &__bp-nodes-empty,
+    &__detail-loading,
+    &__detail-empty,
+    &__detail-filters-hint,
+    &__detail-debug-hint {
+      color: #8b95a5;
+    }
+
+    &__help-btn {
+      color: #a5b4fc;
+      background: rgba(99, 102, 241, 0.15);
+      border-color: rgba(99, 102, 241, 0.35);
+
+      &:hover {
+        background: rgba(99, 102, 241, 0.25);
+        color: #c7d2fe;
+      }
+    }
+
+    &__filters {
+      background: #1f2430;
+      border-color: #2f3648;
+      box-shadow: 0 4px 14px rgba(0, 0, 0, 0.3);
+    }
+
+    &__filters-row {
+      color: #aeb6c4;
+    }
+
+    &__filters-icon {
+      color: #a5b4fc;
+    }
+
+    &__filter-group {
+      label {
+        color: #8b95a5;
+      }
+
+      input:not([type='checkbox']),
+      select {
+        background: #252b38;
+        border-color: #3a4254;
+        color: #c4ccd8;
+
+        option {
+          background: #252b38;
+          color: #c4ccd8;
+        }
+
+        &:focus {
+          border-color: #818cf8;
+          box-shadow: 0 0 0 2px rgba(129, 140, 248, 0.2);
+        }
+      }
+    }
+
+    &__view-toggle {
+      border-top-color: #2f3648;
+
+      button {
+        background: #252b38;
+        border-color: #3a4254;
+        color: #aeb6c4;
+
+        &:hover {
+          background: #2a3142;
+          color: #c4ccd8;
+        }
+
+        &.active {
+          background: #6366f1;
+          border-color: #6366f1;
+          color: #eef2ff;
+        }
+      }
+
+      .process-monitoring__refresh-btn:hover:not(:disabled) {
+        background: rgba(37, 99, 235, 0.2);
+        color: #93c5fd;
+        border-color: rgba(96, 165, 250, 0.45);
+      }
+    }
+
+    &__error {
+      color: #fca5a5;
+    }
+
+    &__card {
+      background: #1f2430;
+      border-color: #2f3648;
+      box-shadow: 0 4px 14px rgba(0, 0, 0, 0.3);
+      color: #c4ccd8;
+
+      &:hover {
+        box-shadow: 0 6px 18px rgba(0, 0, 0, 0.4);
+        border-color: #4b5568;
+      }
+
+      &:focus {
+        border-color: #818cf8;
+        box-shadow: 0 0 0 2px rgba(129, 140, 248, 0.2);
+      }
+    }
+
+    &__card-label,
+    &__card-detail {
+      color: #8b95a5;
+    }
+
+    &__card-value {
+      color: #d5dbe6;
+    }
+
+    &__section-title {
+      color: #d5dbe6;
+    }
+
+    &__pie-chart,
+    &__table-block,
+    &__bp-detail {
+      background: #1f2430;
+      border-color: #2f3648;
+      box-shadow: 0 4px 14px rgba(0, 0, 0, 0.3);
+    }
+
+    &__pie-wrap {
+      background: #252b38;
+
+      &--empty {
+        background: #1a1f2b;
+        border-color: #3a4254;
+      }
+    }
+
+    &__pie-empty,
+    &__pie-empty-hint,
+    &__pie-description {
+      color: #8b95a5;
+    }
+
+    &__pie-empty-title,
+    &__pie-title {
+      color: #aeb6c4;
+    }
+
+    &__pie-hole {
+      background: #1f2430;
+      box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.06);
+    }
+
+    &__pie-total {
+      color: #d5dbe6;
+    }
+
+    &__pie-legend {
+      color: #8b95a5;
+    }
+
+    &__legend-value {
+      color: #aeb6c4;
+    }
+
+    &__table-block h3 {
+      background: #1a1f2b;
+      color: #d5dbe6;
+      border-bottom-color: #2f3648;
+    }
+
+    &__process-summary {
+      color: #aeb6c4;
+
+      strong {
+        color: #d5dbe6;
+      }
+    }
+
+    &__cell-total {
+      color: #d5dbe6;
+    }
+
+    &__table-legend {
+      color: #8b95a5;
+    }
+
+    &__legend-label {
+      color: #aeb6c4;
+    }
+
+    &__table {
+      th {
+        background: #1a1f2b;
+        color: #aeb6c4;
+        border-bottom-color: #2f3648;
+      }
+
+      td {
+        color: #c4ccd8;
+        border-bottom-color: #2f3648;
+      }
+
+      tbody tr:hover {
+        background: #222837;
+      }
+
+      .process-monitoring__cell--overdue {
+        color: #fca5a5;
+      }
+    }
+
+    &__bp-detail {
+      border-top-color: #2f3648;
+    }
+
+    &__bp-detail-label {
+      color: #aeb6c4;
+    }
+
+    &__bp-detail-select {
+      background: #252b38;
+      border-color: #3a4254;
+      color: #c4ccd8;
+
+      option {
+        background: #252b38;
+        color: #c4ccd8;
+      }
+    }
+
+    &__table--nodes thead th:first-child {
+      background: #1a1f2b;
+    }
+
+    &__table--nodes tbody tr:hover .process-monitoring__cell-stage {
+      background: #222837;
+    }
+
+    &__time-empty {
+      color: #6b7385;
+    }
+
+    &__time-label {
+      color: #a5b4fc;
+    }
+
+    &__time-avg {
+      color: #c4ccd8;
+    }
+
+    &__time-max,
+    &__tasks-in-projects-cell .process-monitoring__tasks-count {
+      color: #8b95a5;
+    }
+
+    &__row--bottleneck {
+      background: rgba(239, 68, 68, 0.12) !important;
+
+      .process-monitoring__cell-stage {
+        background: rgba(239, 68, 68, 0.12);
+      }
+    }
+
+    &__bottleneck-badge {
+      color: #fca5a5;
+      background: rgba(239, 68, 68, 0.2);
+    }
+
+    &__bottlenecks {
+      border-top-color: #2f3648;
+    }
+
+    &__bottlenecks-title {
+      color: #d5dbe6;
+    }
+
+    &__bottlenecks .process-monitoring__table-block h4 {
+      color: #aeb6c4;
+    }
+
+    &__breakdown-cell {
+      color: #aeb6c4;
+    }
+
+    &__breakdown-label {
+      color: #8b95a5;
+    }
+
+    &__detail-overlay {
+      background: rgba(8, 10, 16, 0.72);
+    }
+
+    &__detail-modal {
+      background: #1f2430;
+      border-color: #2f3648;
+      box-shadow: 0 20px 50px rgba(0, 0, 0, 0.55);
+    }
+
+    &__detail-header {
+      background: #1a1f2b;
+      border-bottom-color: #2f3648;
+
+      h3 {
+        color: #d5dbe6;
+      }
+    }
+
+    &__detail-close {
+      color: #8b95a5;
+
+      &:hover {
+        background: #252b38;
+        color: #d5dbe6;
+      }
+    }
+
+    &__detail-status-filter {
+      label {
+        color: #aeb6c4;
+      }
+
+      select {
+        background: #252b38;
+        border-color: #3a4254;
+        color: #c4ccd8;
+
+        option {
+          background: #252b38;
+          color: #c4ccd8;
+        }
+      }
+    }
+  }
+}

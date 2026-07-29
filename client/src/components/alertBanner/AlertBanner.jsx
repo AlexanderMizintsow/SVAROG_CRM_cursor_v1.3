@@ -147,7 +147,11 @@ const AlertBanner = () => {
   const removeProjectNotification = useTaskStateTracker((state) => state.removeProjectNotification)
 
   // ==================== Вспомогательные хуки ====================
-  const { notifications: taskNotifications, handleTaskNotificationClick } = useNotificationsTask({
+  const {
+    notifications: taskNotifications,
+    handleTaskNotificationClick,
+    handleMarkAsRead,
+  } = useNotificationsTask({
     notificationsTask,
     currentUserId,
     fetchUnreadNotifications: useTaskStateTracker((state) => state.fetchUnreadNotifications),
@@ -755,7 +759,19 @@ const AlertBanner = () => {
           extensionNotifications.length > 0 ||
           taskNotifications.length > 0) ? (
           <div className="notifications-container">
-            {[...allNotifications].map(({ key, text, icon, taskId, title, projectNotificationKey, projectNotificationType }) => (
+            {[...allNotifications].map(
+              ({
+                key,
+                text,
+                icon,
+                iconClass,
+                taskId,
+                title,
+                projectNotificationKey,
+                projectNotificationType,
+                type,
+                notificationId,
+              }) => (
               <div
                 className="alert-banner-content"
                 key={key}
@@ -764,7 +780,9 @@ const AlertBanner = () => {
                     key.startsWith('global-') ||
                     key.startsWith('project-msg-') ||
                     key.startsWith('task-decision-') ||
-                    key === 'approval'
+                    key === 'approval' ||
+                    type === 'knowledge_document_new' ||
+                    type === 'knowledge_document_updated'
                       ? 'pointer'
                       : undefined,
                 }}
@@ -798,6 +816,15 @@ const AlertBanner = () => {
                   } else if (key.startsWith('assigneeMessage-')) {
                     handleAuthorNotificationClick(taskId)
                     setMessageType('assigneeMessage-')
+                  } else if (
+                    key.startsWith('task-notification-') &&
+                    (type === 'knowledge_document_new' || type === 'knowledge_document_updated')
+                  ) {
+                    // AlertBanner вне <Router> — без useNavigate
+                    window.location.assign('/knowledge-base')
+                    if (notificationId && typeof handleMarkAsRead === 'function') {
+                      handleMarkAsRead(notificationId)
+                    }
                   } else if (key.startsWith('task-notification-')) {
                     handleTaskNotificationClick(taskId)
                   } else if (key.startsWith('task-decision-')) {
@@ -822,6 +849,10 @@ const AlertBanner = () => {
                     className={`alert-banner-icon ${key.startsWith('global-') ? 'global' : ''} ${
                       key.startsWith('assigneeMessage-') || key.startsWith('authorMessage-')
                         ? 'icon-yellow'
+                        : ''
+                    } ${iconClass || ''} ${
+                      type === 'knowledge_document_new' || type === 'knowledge_document_updated'
+                        ? 'icon-knowledge'
                         : ''
                     }`}
                   >

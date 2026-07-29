@@ -109,6 +109,7 @@ module.exports = {
   DIRECTOR_POSITION_NAME,
   DEPARTMENT_HEAD_ROLE_NAME,
   getActorProfile,
+  getHeadDepartmentIds,
   canManageEmployeeStatus,
   getManagePermissions,
   canManageByDepartment,

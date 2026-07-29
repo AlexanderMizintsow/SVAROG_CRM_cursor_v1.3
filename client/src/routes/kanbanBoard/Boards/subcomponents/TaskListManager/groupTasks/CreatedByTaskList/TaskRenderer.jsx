@@ -224,10 +224,9 @@ const TaskRenderer = ({
             flexDirection: 'column',
             borderLeft: `4px solid ${getPriorityColor(task.priority)}`,
             boxShadow: isOverdue ? '0 4px 8px rgba(244, 67, 54, 0.3)' : '0 2px 4px rgba(0,0,0,0.1)',
+            transition: 'box-shadow 0.2s ease-in-out',
             '&:hover': {
               boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
-              transform: 'translateY(-2px)',
-              transition: 'all 0.2s ease-in-out',
             },
             ...(allowDescDblClick ? { cursor: 'pointer' } : {}),
           }}

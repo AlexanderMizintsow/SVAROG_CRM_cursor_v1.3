@@ -6,6 +6,22 @@ const binaryToBase64 = (binaryData) => {
   return Buffer.from(binaryData).toString('base64')
 }
 
+/** DATE из node-pg — полночь локального TZ; JSON via toISOString() сдвигает календарный день на −1 */
+const formatPgDateOnly = (value) => {
+  if (value == null || value === '') return null
+  if (value instanceof Date) {
+    if (Number.isNaN(value.getTime())) return null
+    return `${value.getFullYear()}-${String(value.getMonth() + 1).padStart(2, '0')}-${String(value.getDate()).padStart(2, '0')}`
+  }
+  const str = String(value).trim()
+  if (!str) return null
+  if (str.includes('T')) {
+    const d = new Date(str)
+    if (!Number.isNaN(d.getTime())) return formatPgDateOnly(d)
+  }
+  return str.length >= 10 ? str.slice(0, 10) : str
+}
+
 // Получение списка всех пользователей из таблицы users
 const getUsers = (dbPool) => async (req, res) => {
   try {
@@ -36,7 +52,12 @@ const getUsers = (dbPool) => async (req, res) => {
       LEFT JOIN positions ON users.position_id = positions.id
       LEFT JOIN users AS supervisor ON users.supervisor_id = supervisor.id
     `)
-    res.json(result.rows)
+    res.json(
+      result.rows.map((row) => ({
+        ...row,
+        birth_date: formatPgDateOnly(row.birth_date),
+      }))
+    )
   } catch (err) {
     console.error('Ошибка при получении пользователей:', err)
     res.status(500).json({ error: 'Ошибка при получении пользователей' })
@@ -77,6 +98,8 @@ const updateUser = (dbPool) => async (req, res) => {
       RETURNING *
     `
 
+    const birthDateOnly = formatPgDateOnly(birth_date)
+
     // Выполняем обновление и возвращаем обновленные данные
     const updatedUser = await dbPool.query(updateUserQuery, [
       last_name,
@@ -84,7 +107,7 @@ const updateUser = (dbPool) => async (req, res) => {
       middle_name,
       gender,
       email,
-      birth_date,
+      birthDateOnly,
       role_id, // Обновляем role_id
       department_id,
       position_id,
@@ -92,7 +115,8 @@ const updateUser = (dbPool) => async (req, res) => {
       role_assigned,
       id,
     ])
-    res.json(updatedUser.rows[0])
+    const row = updatedUser.rows[0]
+    res.json(row ? { ...row, birth_date: formatPgDateOnly(row.birth_date) } : row)
   } catch (error) {
     console.error('Ошибка при обновлении данных пользователя:', error)
     res.status(500).send('Ошибка сервера')
@@ -177,7 +201,7 @@ const createUser = (dbPool) => async (req, res) => {
       first_name,
       middle_name,
       last_name,
-      birth_date,
+      formatPgDateOnly(birth_date),
       username,
       hashedPassword,
       email,

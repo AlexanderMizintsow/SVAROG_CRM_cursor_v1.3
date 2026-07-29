@@ -1,3 +1,33 @@
+/* Сезонные обои канбана / процессов — затемнение в тёмной теме */
+.seasonal-board-bg {
+  position: relative;
+  isolation: isolate;
+
+  &::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    z-index: 0;
+    pointer-events: none;
+    background: transparent;
+    transition: background 0.35s ease;
+  }
+
+  > * {
+    position: relative;
+    z-index: 1;
+  }
+}
+
+.dark .seasonal-board-bg::before {
+  background: linear-gradient(
+    165deg,
+    rgba(10, 12, 18, 0.72) 0%,
+    rgba(18, 22, 34, 0.62) 45%,
+    rgba(12, 14, 22, 0.7) 100%
+  );
+}
+
 .board-content {
   width: 100%;
   max-width: 100%;
@@ -149,5 +179,128 @@
 .pause-column {
   .column-header {
     background: rgb(142 109 171 / 82%);
+  }
+}
+
+/* ========== Тёмная тема канбан-доски ========== */
+.dark .seasonal-board-bg,
+.dark .board-content {
+  .links .link {
+    color: rgba(196, 204, 216, 0.8);
+
+    &:hover {
+      color: #d5dbe6;
+    }
+  }
+
+  .file-icon {
+    color: #8b95a5;
+  }
+
+  .toggle-sidebar-button {
+    color: #7dd3fc;
+  }
+
+  .column {
+    background: rgba(30, 35, 48, 0.82);
+    box-shadow: 0 4px 18px rgba(0, 0, 0, 0.35);
+    border: 1px solid rgba(255, 255, 255, 0.06);
+  }
+
+  .column-header {
+    background: rgba(36, 42, 58, 0.92);
+    color: #d5dbe6;
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    box-shadow: 0 1px 0 rgba(255, 255, 255, 0.04);
+  }
+
+  .add-task-button {
+    background: rgba(45, 52, 70, 0.9);
+    color: #aeb6c4;
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    transition:
+      background 0.2s ease,
+      color 0.2s ease;
+
+    &:hover {
+      background: rgba(56, 65, 88, 0.95);
+      color: #d5dbe6;
+    }
+  }
+
+  .notifications-column-body {
+    background: rgba(120, 20, 90, 0.18);
+  }
+
+  .notifications-header {
+    background: rgba(90, 30, 55, 0.75);
+    color: #f0d4e4;
+  }
+
+  .pause-column .column-header {
+    background: rgba(95, 70, 130, 0.75);
+  }
+
+  .task {
+    background: rgba(38, 44, 60, 0.92);
+    color: #c4ccd8;
+    border: 1px solid rgba(255, 255, 255, 0.07);
+    box-shadow: 0 6px 16px rgba(0, 0, 0, 0.4);
+
+    &.highlighted {
+      background: rgba(72, 48, 88, 0.88);
+      border-color: rgba(196, 132, 252, 0.25);
+    }
+
+    .task-description {
+      color: #aeb6c4;
+    }
+
+    .task-icon {
+      color: #c4ccd8;
+    }
+
+    .task-id {
+      color: #8b95a5;
+      opacity: 0.45;
+    }
+
+    .taks-deadline {
+      color: #b4a5ef;
+    }
+
+    .task-attachments-badge {
+      color: #aeb6c4;
+      background: rgba(30, 35, 48, 0.9);
+      border-color: rgba(255, 255, 255, 0.12);
+    }
+  }
+
+  .dealer-group-header {
+    color: #c4ccd8;
+    border-color: rgba(255, 255, 255, 0.14);
+    background: rgba(36, 42, 58, 0.65);
+
+    .dealer-group-title {
+      color: #d5dbe6;
+    }
+
+    span:last-child {
+      color: #8b95a5;
+    }
+  }
+
+  .sidebar {
+    background-color: rgba(26, 31, 43, 0.97);
+    box-shadow: -4px 0 24px rgba(0, 0, 0, 0.45);
+    border: 1px solid rgba(255, 255, 255, 0.06);
+
+    .employee-list {
+      color: #c4ccd8;
+    }
+
+    .employee-item {
+      border-bottom-color: rgba(255, 255, 255, 0.06);
+    }
   }
 }

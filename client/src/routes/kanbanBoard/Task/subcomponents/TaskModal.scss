@@ -127,3 +127,53 @@
     transform: translateY(0);
   }
 }
+
+/* ========== Тёмная тема: раскрытая карточка задачи ========== */
+.dark {
+  .task-modal {
+    background-color: rgba(8, 10, 16, 0.72);
+  }
+
+  .task-modal-content {
+    background: linear-gradient(160deg, #1f2430 0%, #1a1f2b 100%);
+    box-shadow: 0 20px 56px rgba(0, 0, 0, 0.55);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    color: #c4ccd8;
+  }
+
+  .task-modal .close-button {
+    color: #8b95a5;
+    background-color: rgba(148, 163, 184, 0.1);
+
+    &:hover {
+      background-color: rgba(248, 113, 113, 0.18);
+      color: #fca5a5;
+    }
+  }
+
+  .task-modal .task-image {
+    box-shadow: 0 6px 20px rgba(0, 0, 0, 0.4);
+    border: 1px solid rgba(255, 255, 255, 0.06);
+  }
+
+  .task-modal .task-title {
+    color: #d5dbe6;
+    border-bottom-color: #38bdf8;
+  }
+
+  .task-modal .task-title-content {
+    color: #aeb6c4;
+  }
+
+  .task-modal-attachments {
+    border-top-color: rgba(255, 255, 255, 0.1);
+  }
+
+  .task-modal-attachments-title {
+    color: #c4ccd8;
+  }
+
+  .task-modal .task-footer {
+    border-top-color: rgba(255, 255, 255, 0.1);
+  }
+}

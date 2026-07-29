@@ -257,6 +257,25 @@ const {
   closeRequest: closeManagerRequest,
   markConverted: markManagerRequestConverted,
 } = require('./managerRequestsController/managerRequestsController')
+const {
+  getPermissions: getKnowledgePermissions,
+  listDocuments: listKnowledgeDocuments,
+  getDocument: getKnowledgeDocument,
+  createDocument: createKnowledgeDocument,
+  updateDocument: updateKnowledgeDocument,
+  deleteDocument: deleteKnowledgeDocument,
+  downloadDocument: downloadKnowledgeDocument,
+  reindexDocuments: reindexKnowledgeDocuments,
+  listVersions: listKnowledgeVersions,
+  downloadVersion: downloadKnowledgeVersion,
+  listEvents: listKnowledgeEvents,
+  createCategory: createKnowledgeCategory,
+  deleteCategory: deleteKnowledgeCategory,
+  createTag: createKnowledgeTag,
+  deleteTag: deleteKnowledgeTag,
+  addFavoriteDocument: addKnowledgeFavoriteDocument,
+  removeFavoriteDocument: removeKnowledgeFavoriteDocument,
+} = require('./knowledgeBaseController/knowledgeBaseController')
 const { getCorsOrigins } = require('./config')
 
 const app = express()
@@ -299,6 +318,24 @@ const storageFile = multer.diskStorage({
   },
 })
 const uploadFile = multer({ storage: storageFile })
+
+const knowledgeUploadsDir = path.join(uploadsDir, 'knowledge')
+if (!fs.existsSync(knowledgeUploadsDir)) {
+  fs.mkdirSync(knowledgeUploadsDir, { recursive: true })
+}
+const storageKnowledge = multer.diskStorage({
+  destination: (req, file, cb) => {
+    cb(null, knowledgeUploadsDir)
+  },
+  filename: (req, file, cb) => {
+    const safeName = decodeUtf8Filename(file.originalname) || file.originalname
+    cb(null, Date.now() + '-' + safeName)
+  },
+})
+const uploadKnowledge = multer({
+  storage: storageKnowledge,
+  limits: { fileSize: 80 * 1024 * 1024 },
+})
 
 const storage = multer.memoryStorage()
 const upload = multer({ storage: storage })
@@ -538,6 +575,42 @@ app.post('/api/manager-requests', createManagerRequest(dbPool))
 app.post('/api/manager-requests/:id/answer', answerManagerRequest(dbPool))
 app.post('/api/manager-requests/:id/close', closeManagerRequest(dbPool))
 app.post('/api/manager-requests/:id/convert', markManagerRequestConverted(dbPool))
+
+// База знаний отделов
+app.get('/api/knowledge/permissions', getKnowledgePermissions(dbPool))
+app.get('/api/knowledge/documents', listKnowledgeDocuments(dbPool))
+app.get('/api/knowledge/documents/:id', getKnowledgeDocument(dbPool))
+app.get(
+  '/api/knowledge/documents/:id/download',
+  downloadKnowledgeDocument(dbPool, uploadsDir)
+)
+app.post(
+  '/api/knowledge/documents',
+  uploadKnowledge.single('file'),
+  createKnowledgeDocument(dbPool, io)
+)
+app.put(
+  '/api/knowledge/documents/:id',
+  uploadKnowledge.single('file'),
+  updateKnowledgeDocument(dbPool, io)
+)
+app.delete('/api/knowledge/documents/:id', deleteKnowledgeDocument(dbPool))
+app.get('/api/knowledge/documents/:id/versions', listKnowledgeVersions(dbPool))
+app.get(
+  '/api/knowledge/documents/:id/versions/:versionId/download',
+  downloadKnowledgeVersion(dbPool, uploadsDir)
+)
+app.get('/api/knowledge/documents/:id/events', listKnowledgeEvents(dbPool))
+app.post('/api/knowledge/documents/:id/favorite', addKnowledgeFavoriteDocument(dbPool))
+app.delete('/api/knowledge/documents/:id/favorite', removeKnowledgeFavoriteDocument(dbPool))
+app.post(
+  '/api/knowledge/reindex',
+  reindexKnowledgeDocuments(dbPool, uploadsDir)
+)
+app.post('/api/knowledge/categories', createKnowledgeCategory(dbPool))
+app.delete('/api/knowledge/categories/:id', deleteKnowledgeCategory(dbPool))
+app.post('/api/knowledge/tags', createKnowledgeTag(dbPool))
+app.delete('/api/knowledge/tags/:id', deleteKnowledgeTag(dbPool))
 
 app.get('/api/introduction/version/:userId', getIntroductionNewVersion(dbPool))
 app.post('/api/introduction/version', postVersionApp(dbPool))

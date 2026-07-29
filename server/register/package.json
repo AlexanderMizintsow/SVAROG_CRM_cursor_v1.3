@@ -22,13 +22,16 @@
     "helmet": "^7.1.0",
     "jsonwebtoken": "^9.0.2",
     "luxon": "^3.6.1",
+    "mammoth": "^1.12.0",
     "mime-types": "^3.0.1",
     "multer": "^1.4.5-lts.1",
     "node-cron": "^4.1.1",
     "nodemailer": "^6.9.14",
+    "pdf-parse": "^2.4.5",
     "pg": "^8.12.0",
     "register": "file:",
     "sharp": "^0.33.5",
-    "socket.io": "^4.8.1"
+    "socket.io": "^4.8.1",
+    "xlsx": "^0.18.5"
   }
 }

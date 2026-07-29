@@ -259,3 +259,178 @@
     }
   }
 }
+
+/* ========== Тёмная тема: Обращения ========== */
+.dark {
+  .mgr-req {
+    color: #c4ccd8;
+
+    &__header {
+      h1 {
+        color: #d5dbe6;
+      }
+
+      p {
+        color: #8b95a5;
+      }
+    }
+
+    &__tabs button {
+      border-color: #3a4254;
+      background: #252b38;
+      color: #aeb6c4;
+
+      &:hover {
+        background: #2a3142;
+        color: #c4ccd8;
+      }
+
+      &.is-active {
+        border-color: #2dd4bf;
+        color: #5eead4;
+        background: rgba(15, 118, 110, 0.22);
+      }
+    }
+
+    &__error {
+      background: #3f1d1d;
+      color: #fecaca;
+      border: 1px solid #7f1d1d;
+    }
+
+    &__create {
+      background: #1f2430;
+      border-color: #2f3648;
+
+      input,
+      textarea {
+        background: #252b38;
+        border-color: #3a4254;
+        color: #c4ccd8;
+
+        &::placeholder {
+          color: #6b7385;
+        }
+
+        &:focus {
+          outline: none;
+          border-color: #38bdf8;
+          box-shadow: 0 0 0 2px rgba(56, 189, 248, 0.2);
+        }
+      }
+    }
+
+    &__manager strong {
+      color: #d5dbe6;
+    }
+
+    &__warn {
+      color: #fca5a5;
+    }
+
+    &__types button {
+      border-color: #3a4254;
+      background: #252b38;
+      color: #aeb6c4;
+
+      &:hover {
+        background: #2a3142;
+      }
+
+      &.is-active {
+        border-color: #2dd4bf;
+        color: #5eead4;
+        background: rgba(15, 118, 110, 0.22);
+      }
+    }
+
+    &__label {
+      color: #8b95a5;
+    }
+
+    &__list,
+    &__detail {
+      background: #1f2430;
+      border-color: #2f3648;
+    }
+
+    &__row {
+      background: #252b38;
+      color: #c4ccd8;
+
+      &:hover {
+        border-color: #4b5568;
+        background: #2a3142;
+      }
+
+      &.is-selected {
+        border-color: #2dd4bf;
+        background: rgba(15, 118, 110, 0.18);
+      }
+    }
+
+    &__row-title {
+      color: #d5dbe6;
+    }
+
+    &__row-meta {
+      color: #8b95a5;
+    }
+
+    &__detail h2 {
+      color: #d5dbe6;
+    }
+
+    &__body {
+      color: #c4ccd8;
+    }
+
+    &__answer-block {
+      border-top-color: #2f3648;
+    }
+
+    &__actions textarea {
+      background: #252b38;
+      border-color: #3a4254;
+      color: #c4ccd8;
+
+      &::placeholder {
+        color: #6b7385;
+      }
+
+      &:focus {
+        outline: none;
+        border-color: #38bdf8;
+        box-shadow: 0 0 0 2px rgba(56, 189, 248, 0.2);
+      }
+    }
+
+    &__btn {
+      border-color: #3a4254;
+      background: #252b38;
+      color: #aeb6c4;
+
+      &:hover:not(:disabled) {
+        background: #2a3142;
+        color: #c4ccd8;
+      }
+
+      &--primary {
+        border-color: #0f766e;
+        background: #0f766e;
+        color: #eef2ff;
+
+        &:hover:not(:disabled) {
+          background: #0d9488;
+          border-color: #0d9488;
+          color: #eef2ff;
+        }
+      }
+    }
+
+    &__empty {
+      color: #6b7385;
+    }
+  }
+}
+

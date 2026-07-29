@@ -231,3 +231,124 @@
 .tags-manager-save-button:hover {
   background-color: #4f46e5;
 }
+
+/* ========== Тёмная тема: редактор тегов ========== */
+.dark {
+  .tags-manager-container {
+    .tags-manager-close {
+      color: #7dd3fc;
+
+      &:hover {
+        color: #f87171;
+      }
+    }
+  }
+
+  .tags-manager-card {
+    background-color: #1a1f2b;
+    box-shadow: 0 20px 48px rgba(0, 0, 0, 0.55);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    color: #c4ccd8;
+
+    &::before {
+      background: linear-gradient(to bottom, #38bdf8, #6366f1);
+    }
+  }
+
+  .tags-manager-header {
+    .title {
+      color: #d5dbe6;
+    }
+  }
+
+  .add-button {
+    background-color: #4f46e5;
+    color: #eef2ff;
+
+    &:hover {
+      background-color: #4338ca;
+    }
+  }
+
+  .tag-item {
+    background-color: rgba(99, 102, 241, 0.16);
+    color: #a5b4fc;
+    border: 1px solid rgba(99, 102, 241, 0.28);
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.25);
+
+    span {
+      color: #b4bff5;
+    }
+
+    &:hover {
+      background-color: rgba(99, 102, 241, 0.24);
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.35);
+    }
+  }
+
+  .remove-tag-button {
+    color: #8b95a5;
+
+    &:hover {
+      color: #f87171;
+    }
+  }
+
+  .tag-input {
+    background: #252b38;
+    border-color: #3a4254;
+    color: #c4ccd8;
+
+    &::placeholder {
+      color: #6b7385;
+    }
+
+    &:focus {
+      border-color: #38bdf8;
+      box-shadow: 0 0 0 3px rgba(56, 189, 248, 0.22);
+    }
+  }
+
+  .icon-picker {
+    color: #8b95a5;
+
+    &:hover {
+      color: #7dd3fc;
+    }
+  }
+
+  .icon-selector {
+    background: #1f2430;
+    border-color: #3a4254;
+    box-shadow: 0 12px 28px rgba(0, 0, 0, 0.5);
+  }
+
+  .icon-option:hover {
+    background-color: rgba(99, 102, 241, 0.22);
+  }
+
+  .icon-option.selected {
+    background-color: rgba(99, 102, 241, 0.35);
+    color: #a5b4fc;
+  }
+
+  .tags-manager-cancel-button {
+    background-color: #2a3142;
+    color: #a8b0be;
+    border: 1px solid #3a4254;
+
+    &:hover {
+      background-color: #343b4f;
+      color: #c4ccd8;
+    }
+  }
+
+  .tags-manager-save-button {
+    background-color: #4f46e5;
+    color: #eef2ff;
+
+    &:hover {
+      background-color: #4338ca;
+    }
+  }
+}

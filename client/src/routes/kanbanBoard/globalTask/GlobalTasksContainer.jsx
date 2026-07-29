@@ -12,6 +12,7 @@ import { formatDeadlineDateTime, getRemainingDays } from './utils/globalTaskUtil
 import { handleGlobalTaskChangedPayload } from './utils/projectNotificationsHandler'
 import useTaskStateTracker from '../../../store/useTaskStateTracker'
 import './styles/GlobalTasksContainer.scss'
+import './styles/globalTaskDark.scss'
 import axios from 'axios'
 
 const TERMINAL_STATUSES = ['Завершено', 'Провал', 'Удален']

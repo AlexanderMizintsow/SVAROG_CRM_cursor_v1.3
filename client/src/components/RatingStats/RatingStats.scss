@@ -733,3 +733,200 @@
     gap: 12px;
   }
 }
+
+/* ========== Тёмная тема: Сервисные рейтинги ========== */
+.dark .rating-stats {
+  background: linear-gradient(135deg, #151922 0%, #1a1f2b 45%, #252038 100%);
+  color: #c4ccd8;
+
+  &__header {
+    background: rgba(31, 36, 48, 0.85);
+    border-color: #2f3648;
+  }
+
+  &__title {
+    color: #d5dbe6;
+    text-shadow: none;
+  }
+
+  &__process-selector,
+  &__period-selector,
+  &__refresh-btn {
+    background: #252b38;
+    color: #c4ccd8;
+    border: 1px solid #3a4254;
+
+    &:hover {
+      background: #2a3142;
+    }
+
+    option {
+      background: #252b38;
+      color: #c4ccd8;
+    }
+  }
+
+  &__loading,
+  &__error,
+  &__empty {
+    background: #1f2430;
+    border-color: #2f3648;
+    color: #aeb6c4;
+  }
+
+  .process-overview {
+    background: #1f2430;
+    border-color: #2f3648;
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.35);
+
+    &__title {
+      color: #d5dbe6;
+    }
+
+    &__stat {
+      background: rgba(99, 102, 241, 0.18);
+    }
+
+    &__stat-value {
+      color: #a5b4fc;
+    }
+
+    &__stat-label,
+    &__updated {
+      color: #8b95a5;
+    }
+
+    &__meta {
+      border-top-color: #2f3648;
+    }
+
+    &__star {
+      color: #3a4254;
+
+      &.active {
+        color: #fbbf24;
+      }
+    }
+  }
+
+  .rating-distribution {
+    background: #1f2430;
+    border-color: #2f3648;
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.35);
+
+    &__title {
+      color: #d5dbe6;
+    }
+
+    &__count,
+    &__total,
+    &__empty {
+      color: #8b95a5;
+    }
+
+    &__progress {
+      background: #2f3648;
+    }
+
+    &__percentage {
+      color: #c4ccd8;
+    }
+
+    &__summary {
+      border-top-color: #2f3648;
+    }
+  }
+
+  .dealer-stats {
+    background: #1f2430;
+    color: #c4ccd8;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.35);
+
+    &__title {
+      color: #d5dbe6;
+    }
+
+    &__empty {
+      color: #8b95a5;
+      border-color: #3a4254;
+      background: #1a1f2b;
+    }
+
+    &__item {
+      border-color: #2f3648;
+
+      &.expanded {
+        border-color: #3a4254;
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.35);
+      }
+    }
+
+    &__header {
+      background: #1a1f2b;
+
+      &:hover {
+        background: #222837;
+      }
+    }
+
+    &__rank,
+    &__company,
+    &__metrics {
+      color: #8b95a5;
+    }
+
+    &__name {
+      color: #d5dbe6;
+    }
+
+    &__stars span {
+      color: #3a4254;
+
+      &.active {
+        color: #fbbf24;
+      }
+    }
+
+    &__comments {
+      background: #151922;
+    }
+
+    &__comments-title {
+      color: #aeb6c4;
+    }
+
+    &__comment {
+      background: #1f2430;
+      box-shadow: 0 1px 3px rgba(0, 0, 0, 0.25);
+    }
+
+    &__comment-date {
+      color: #8b95a5;
+    }
+
+    &__comment-request {
+      color: #93c5fd;
+    }
+
+    &__comment-text {
+      color: #c4ccd8;
+    }
+
+    &__no-comments {
+      color: #6b7385;
+      background: #1a1f2b;
+      border-color: #3a4254;
+    }
+
+    &__show-more {
+      background: #252b38;
+      border-color: #3a4254;
+      color: #93c5fd;
+
+      &:hover {
+        background: #2a3142;
+        border-color: #4b5568;
+      }
+    }
+  }
+}

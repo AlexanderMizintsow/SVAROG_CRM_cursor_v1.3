@@ -1,0 +1,1337 @@
+/* Тёмная тема: проекты (карточка + связанные компоненты)
+   Палитра: фон #1a1f2b / #252b38, текст #c4ccd8 / #d5dbe6 / #8b95a5 */
+
+.dark {
+  /* ----- Список проектов / страница ----- */
+  .global-tasks-container {
+    background-color: #1a1f2b;
+    color: #c4ccd8;
+  }
+
+  .global-tasks-container__title {
+    color: #d5dbe6;
+  }
+
+  .global-tasks-container__tabs {
+    border-color: #2f3648;
+  }
+
+  .global-tasks-container__tab {
+    background: #222837;
+    color: #8b95a5;
+
+    &:hover {
+      background: #2a3142;
+      color: #c4ccd8;
+    }
+
+    &--active {
+      background: #2563eb;
+      color: #eef2ff;
+
+      &:hover {
+        background: #1d4ed8;
+        color: #eef2ff;
+      }
+    }
+  }
+
+  .global-tasks-container__completed-extra,
+  .global-tasks-container__completed-filters {
+    color: #aeb6c4;
+  }
+
+  .global-tasks-container__completed-extra {
+    background: #252b38;
+    border-color: #3a4254;
+  }
+
+  .global-tasks-container__date-field-label,
+  .global-tasks-container__search-label,
+  .global-tasks-container__filter-label {
+    color: #8b95a5;
+  }
+
+  .global-tasks-container__date-input,
+  .global-tasks-container__search-input {
+    background: #1a1f2b;
+    border-color: #3a4254;
+    color: #c4ccd8;
+
+    &::placeholder {
+      color: #6b7385;
+    }
+
+    &:focus {
+      border-color: #38bdf8;
+      box-shadow: 0 0 0 2px rgba(56, 189, 248, 0.2);
+    }
+  }
+
+  .global-tasks-container__filter-reset,
+  .global-tasks-container__filter-btn {
+    background: #2a3142;
+    border-color: #3a4254;
+    color: #aeb6c4;
+
+    &:hover {
+      background: #343b4f;
+      color: #c4ccd8;
+    }
+  }
+
+  .global-tasks-container__filter-btn--active {
+    background: #2563eb;
+    border-color: #2563eb;
+    color: #eef2ff;
+
+    &:hover {
+      background: #1d4ed8;
+      color: #eef2ff;
+    }
+  }
+
+  .global-tasks-container__help-button {
+    background-color: #3a4254;
+
+    &:hover {
+      background-color: #4b5568;
+    }
+  }
+
+  .global-tasks-container .close-button {
+    color: #8b95a5;
+
+    &:hover {
+      color: #f87171;
+    }
+  }
+
+  .global-tasks-container__create-button {
+    background-color: #2563eb;
+    color: #eef2ff;
+
+    &:hover {
+      background-color: #1d4ed8;
+    }
+  }
+
+  .global-tasks-container__list-item {
+    background-color: #252b38;
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.35);
+    border: 1px solid rgba(255, 255, 255, 0.06);
+
+    &:hover {
+      box-shadow: 0 8px 24px rgba(0, 0, 0, 0.45);
+    }
+  }
+
+  .global-tasks-container__item-title {
+    color: #d5dbe6;
+  }
+
+  .global-tasks-container__item-priority {
+    &--high {
+      background-color: rgba(185, 28, 28, 0.3);
+      color: #fca5a5;
+    }
+    &--medium {
+      background-color: rgba(180, 83, 9, 0.3);
+      color: #fcd34d;
+    }
+    &--low {
+      background-color: rgba(5, 150, 105, 0.3);
+      color: #6ee7b7;
+    }
+  }
+
+  .global-tasks-container__item-description {
+    color: #aeb6c4;
+  }
+
+  .global-tasks-container__item-meta {
+    color: #8b95a5;
+  }
+
+  .global-tasks-container__item-progress-track {
+    background: #2f3648;
+  }
+
+  .global-tasks-container__item-progress-percent {
+    color: #8b95a5;
+  }
+
+  .global-task-page {
+    background-color: #1a1f2b;
+  }
+
+  .global-task-page__back-button {
+    color: #8b95a5;
+
+    &:hover {
+      color: #d5dbe6;
+    }
+  }
+
+  /* ----- Карточка проекта ----- */
+  .global-task-card {
+    background-color: #1f2430;
+    box-shadow: 0 10px 28px rgba(0, 0, 0, 0.4);
+    border: 1px solid rgba(255, 255, 255, 0.06);
+    color: #c4ccd8;
+
+    &__nav-arrow {
+      background-color: rgba(37, 43, 56, 0.92);
+      border-color: #3a4254;
+      color: #aeb6c4;
+
+      &:hover:not(:disabled) {
+        background-color: #2a3142;
+        border-color: #4b5568;
+        color: #d5dbe6;
+      }
+    }
+
+    &__title {
+      color: #d5dbe6;
+    }
+
+    &__description {
+      color: #aeb6c4;
+    }
+
+    &__mail-btn {
+      background: #252b38;
+      border-color: #3a4254;
+      color: #aeb6c4;
+
+      &:hover {
+        background: #2a3142;
+        color: #7dd3fc;
+        border-color: rgba(56, 189, 248, 0.45);
+      }
+    }
+
+    &__section-title {
+      color: #d5dbe6;
+    }
+
+    &__section-content {
+      background-color: #252b38;
+      border: 1px solid rgba(255, 255, 255, 0.05);
+    }
+
+    &__additional-info-label {
+      color: #8b95a5;
+    }
+
+    &__additional-info-value {
+      color: #c4ccd8;
+    }
+
+    &__responsible-item {
+      &--blue {
+        background-color: rgba(59, 130, 246, 0.18);
+      }
+      &--purple {
+        background-color: rgba(139, 92, 246, 0.18);
+      }
+      &--green {
+        background-color: rgba(16, 185, 129, 0.18);
+      }
+      &--default {
+        background-color: #2a3142;
+      }
+    }
+
+    &__responsible-name {
+      color: #c4ccd8;
+    }
+
+    &__responsible-role {
+      &--blue {
+        color: #7dd3fc;
+      }
+      &--purple {
+        color: #c4b5fd;
+      }
+      &--green {
+        color: #6ee7b7;
+      }
+      &--default {
+        color: #8b95a5;
+      }
+    }
+
+    &__approval-comment {
+      color: #8b95a5;
+    }
+
+    &__approval-btn {
+      &--approve {
+        background-color: rgba(22, 163, 74, 0.2);
+        color: #86efac;
+        &:hover:not(:disabled) {
+          background-color: rgba(22, 163, 74, 0.35);
+        }
+      }
+      &--reject {
+        background-color: rgba(185, 28, 28, 0.25);
+        color: #fca5a5;
+        &:hover:not(:disabled) {
+          background-color: rgba(185, 28, 28, 0.4);
+        }
+      }
+      &--cancel {
+        background-color: #2a3142;
+        color: #aeb6c4;
+        &:hover:not(:disabled) {
+          background-color: #343b4f;
+        }
+      }
+    }
+
+    &__remove-responsible-btn {
+      color: #fca5a5;
+      background: rgba(185, 28, 28, 0.15);
+      border-color: rgba(248, 113, 113, 0.35);
+      &:hover:not(:disabled) {
+        background: rgba(185, 28, 28, 0.28);
+      }
+    }
+
+    &__approval-modal {
+      background: #1f2430;
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      box-shadow: 0 16px 40px rgba(0, 0, 0, 0.5);
+      color: #c4ccd8;
+
+      h4 {
+        color: #d5dbe6;
+      }
+    }
+
+    &__approval-hint {
+      color: #8b95a5;
+    }
+
+    &__approval-textarea {
+      background: #252b38;
+      border-color: #3a4254;
+      color: #c4ccd8;
+    }
+
+    &__add-responsible-button {
+      background-color: #2a3142;
+      color: #aeb6c4;
+
+      &:hover {
+        background-color: #343b4f;
+      }
+    }
+
+    &__add-responsible-icon {
+      color: #8b95a5;
+    }
+
+    &__footer {
+      border-top-color: rgba(255, 255, 255, 0.1);
+    }
+
+    &__footer-item {
+      color: #8b95a5;
+    }
+
+    &__footer-button {
+      color: #7dd3fc;
+      &:hover {
+        color: #38bdf8;
+      }
+    }
+
+    .context-menu {
+      background: #1f2430;
+      border-color: #3a4254;
+      box-shadow: 0 8px 24px rgba(0, 0, 0, 0.45);
+
+      li:hover {
+        background-color: #2a3142;
+      }
+    }
+  }
+
+  /* ----- Header / Tabs / Progress ----- */
+  .global-task-header {
+    &__title {
+      color: #d5dbe6;
+    }
+
+    &__meta > span {
+      color: #8b95a5;
+    }
+  }
+
+  .global-task-tabs {
+    border-bottom-color: #2f3648;
+
+    &__button {
+      color: #8b95a5;
+
+      &:hover {
+        color: #c4ccd8;
+      }
+
+      &--active {
+        border-bottom-color: #38bdf8;
+        color: #7dd3fc;
+      }
+    }
+  }
+
+  .global-task-progress {
+    &__label {
+      color: #aeb6c4;
+    }
+
+    &__status {
+      &--new {
+        background-color: #2a3142;
+        color: #aeb6c4;
+      }
+      &--in-progress {
+        background-color: rgba(37, 99, 235, 0.25);
+        color: #93c5fd;
+      }
+      &--completed {
+        background-color: rgba(22, 163, 74, 0.25);
+        color: #86efac;
+      }
+      &--on-hold {
+        background-color: rgba(180, 83, 9, 0.3);
+        color: #fcd34d;
+      }
+      &--cancelled {
+        background-color: rgba(185, 28, 28, 0.3);
+        color: #fca5a5;
+      }
+    }
+
+    &__track {
+      background-color: #2f3648;
+    }
+
+    &__dates > span,
+    &__deadline-hint {
+      color: #8b95a5;
+    }
+
+    &__set-deadline-btn {
+      background: rgba(37, 99, 235, 0.25);
+      color: #93c5fd;
+      border-color: rgba(56, 189, 248, 0.35);
+
+      &:hover {
+        background: rgba(37, 99, 235, 0.4);
+      }
+    }
+
+    &__date-picker {
+      background: #252b38;
+      border-color: #3a4254;
+      color: #c4ccd8;
+    }
+
+    &__controller {
+      background-color: #1f2430;
+      box-shadow: 0 4px 16px rgba(0, 0, 0, 0.35);
+      border: 1px solid rgba(255, 255, 255, 0.06);
+    }
+
+    &__controller-title {
+      color: #d5dbe6;
+    }
+
+    &__slider {
+      background-color: #2f3648;
+    }
+
+    &__controller-button {
+      &--decrease {
+        background-color: #2a3142;
+        color: #c4ccd8;
+        &:hover {
+          background-color: #343b4f;
+        }
+      }
+
+      &--complete {
+        background-color: rgba(22, 163, 74, 0.22);
+        color: #86efac;
+        &:hover {
+          background-color: rgba(22, 163, 74, 0.35);
+        }
+      }
+
+      &--sync {
+        background-color: rgba(56, 189, 248, 0.18);
+        color: #7dd3fc;
+        &:hover {
+          background-color: rgba(56, 189, 248, 0.3);
+        }
+      }
+
+      &--pause {
+        background-color: rgba(180, 83, 9, 0.25);
+        color: #fcd34d;
+        &:hover {
+          background-color: rgba(180, 83, 9, 0.4);
+        }
+      }
+
+      &--play {
+        background-color: rgba(22, 163, 74, 0.22);
+        color: #86efac;
+        &:hover {
+          background-color: rgba(22, 163, 74, 0.35);
+        }
+      }
+
+      &--delete {
+        background-color: rgba(185, 28, 28, 0.25);
+        color: #fca5a5;
+        &:hover {
+          background-color: rgba(185, 28, 28, 0.4);
+        }
+      }
+    }
+  }
+
+  /* ----- Подзадачи ----- */
+  .global-task-subtasks {
+    background-color: #1f2430;
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.35);
+    border: 1px solid rgba(255, 255, 255, 0.06);
+
+    &__title {
+      color: #d5dbe6;
+    }
+
+    &__add-button {
+      color: #7dd3fc;
+      &:hover {
+        color: #38bdf8;
+      }
+    }
+
+    table {
+      thead {
+        background-color: #252b38;
+
+        tr {
+          border-bottom-color: #3a4254;
+        }
+      }
+
+      th {
+        color: #8b95a5;
+      }
+
+      tbody {
+        background-color: #1f2430;
+
+        tr {
+          border-bottom-color: #2f3648;
+        }
+      }
+
+      td {
+        color: #c4ccd8;
+      }
+    }
+
+    &__name {
+      color: #d5dbe6;
+    }
+
+    &__description {
+      color: #8b95a5;
+    }
+
+    &__status {
+      &--new {
+        background-color: #2a3142;
+        color: #aeb6c4;
+      }
+      &--in-progress {
+        background-color: rgba(37, 99, 235, 0.25);
+        color: #93c5fd;
+      }
+      &--completed {
+        background-color: rgba(22, 163, 74, 0.25);
+        color: #86efac;
+      }
+      &--on-hold {
+        background-color: rgba(180, 83, 9, 0.3);
+        color: #fcd34d;
+      }
+      &--cancelled {
+        background-color: rgba(185, 28, 28, 0.3);
+        color: #fca5a5;
+      }
+    }
+
+    &__row--blink-yellow {
+      animation: subtaskBlinkYellowDark 1.5s ease-in-out infinite;
+    }
+  }
+
+  /* ----- Документы ----- */
+  .global-task-document__footer-file-view {
+    background-color: #252b38;
+    box-shadow: inset 0 0 10px rgba(0, 0, 0, 0.25);
+  }
+
+  .project-documents-list__table {
+    th {
+      background: #252b38;
+      color: #aeb6c4;
+      border-bottom-color: #3a4254;
+    }
+
+    td {
+      border-bottom-color: #2f3648;
+      color: #c4ccd8;
+    }
+  }
+
+  .project-documents-list__row:hover {
+    background: #222837;
+  }
+
+  .project-documents-list__thumb-wrap {
+    background: #1a1f2b;
+  }
+
+  .project-documents-list__action-btn {
+    &--open {
+      background: rgba(34, 197, 94, 0.15);
+      color: #4ade80;
+      &:hover {
+        background: #16a34a;
+        color: #fff;
+      }
+    }
+
+    &--download {
+      background: rgba(56, 189, 248, 0.15);
+      color: #38bdf8;
+      &:hover {
+        background: #0284c7;
+        color: #fff;
+      }
+    }
+  }
+
+  /* ----- История ----- */
+  .history-container {
+    .card {
+      background-color: #1f2430;
+      box-shadow: 0 4px 16px rgba(0, 0, 0, 0.35);
+      border: 1px solid rgba(255, 255, 255, 0.06);
+    }
+
+    .header {
+      border-bottom-color: #2f3648;
+      background: linear-gradient(to right, #1e293b, #252b38);
+    }
+
+    .title {
+      color: #d5dbe6;
+    }
+
+    .btn {
+      background-color: #252b38;
+      border-color: #3a4254;
+      color: #c4ccd8;
+
+      &:hover {
+        background-color: #2a3142;
+      }
+    }
+
+    .filter-btn i,
+    .search-btn i {
+      color: #8b95a5;
+    }
+
+    .date-btn {
+      background-color: rgba(99, 102, 241, 0.18);
+      color: #a5b4fc;
+
+      &:hover {
+        background-color: rgba(99, 102, 241, 0.28);
+      }
+
+      &.active {
+        background-color: rgba(56, 189, 248, 0.3);
+        color: #7dd3fc;
+      }
+    }
+
+    .event-count {
+      color: #8b95a5;
+    }
+  }
+
+  /* ----- Финальные решения ----- */
+  .final-solutions-block__title {
+    color: #d5dbe6;
+  }
+
+  .final-solutions-block__card {
+    background: linear-gradient(145deg, #252b38 0%, #1f2430 100%);
+    border-color: #3a4254;
+    box-shadow: 0 4px 14px rgba(0, 0, 0, 0.3);
+  }
+
+  .final-solutions-block__content {
+    color: #c4ccd8;
+  }
+
+  .final-solutions-block__meta {
+    color: #8b95a5;
+  }
+
+  .final-solutions-block__author {
+    color: #aeb6c4;
+  }
+
+  .final-solutions-block__actions {
+    border-top-color: #3a4254;
+  }
+
+  .final-solutions-block__action-btn {
+    &--edit {
+      background-color: rgba(37, 99, 235, 0.2);
+      color: #93c5fd;
+      &:hover {
+        background-color: rgba(37, 99, 235, 0.35);
+      }
+    }
+
+    &--delete {
+      background-color: rgba(185, 28, 28, 0.2);
+      color: #fca5a5;
+      &:hover {
+        background-color: rgba(185, 28, 28, 0.35);
+      }
+    }
+  }
+
+  .final-solution-modal-overlay {
+    background-color: rgba(8, 10, 16, 0.7);
+  }
+
+  .final-solution-modal {
+    background: #1f2430;
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    box-shadow: 0 16px 40px rgba(0, 0, 0, 0.5);
+    color: #c4ccd8;
+  }
+
+  .final-solution-modal__title {
+    color: #d5dbe6;
+  }
+
+  .final-solution-modal__textarea {
+    background: #252b38;
+    border-color: #3a4254;
+    color: #c4ccd8;
+
+    &:focus {
+      border-color: #38bdf8;
+      box-shadow: 0 0 0 2px rgba(56, 189, 248, 0.2);
+    }
+  }
+
+  .final-solution-modal__btn--cancel {
+    background-color: #2a3142;
+    color: #aeb6c4;
+    &:hover {
+      background-color: #343b4f;
+    }
+  }
+
+  /* ----- Редакторы целей / доп. инфо / ответственные ----- */
+  .global-task-additional__modal-overlay,
+  .global-task-additional-info-overlay,
+  .global-task-responsibles__modal-overlay {
+    background-color: rgba(8, 10, 16, 0.65);
+  }
+
+  .goals-additional-info__modal {
+    background-color: #1f2430 !important;
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    color: #c4ccd8;
+    box-shadow: 0 16px 40px rgba(0, 0, 0, 0.5);
+  }
+
+  .goals-additional-info__header {
+    color: #d5dbe6;
+  }
+
+  .goals-additional-info__list {
+    border-color: #3a4254;
+    background-color: #252b38;
+
+    li {
+      border-bottom-color: #3a4254;
+      color: #c4ccd8;
+    }
+  }
+
+  .goals-additional-info__input {
+    background: #252b38;
+    border-color: #3a4254;
+    color: #c4ccd8;
+  }
+
+  .additional-info-editor {
+    background-color: #1f2430 !important;
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    color: #c4ccd8;
+    box-shadow: 0 16px 40px rgba(0, 0, 0, 0.5);
+
+    &__header {
+      color: #d5dbe6;
+    }
+
+    &__list {
+      border-color: #3a4254;
+      background-color: #252b38;
+
+      li {
+        border-bottom-color: #3a4254;
+        color: #c4ccd8;
+      }
+    }
+  }
+
+  .global-task-responsibles__modal-content {
+    background-color: #1f2430;
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    box-shadow: 0 16px 40px rgba(0, 0, 0, 0.5);
+    color: #c4ccd8;
+  }
+
+  .global-task-responsibles__cancel-button {
+    background-color: #2a3142;
+    color: #aeb6c4;
+
+    &:hover {
+      background-color: #343b4f;
+    }
+  }
+
+  .create-global-task-form__absence-note {
+    color: #e0b84e;
+  }
+
+  /* ----- Форма создания проекта (уточнение поверх layout) ----- */
+  .create-global-task-form {
+    background-color: #1a1f2b;
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    color: #c4ccd8;
+
+    &__title {
+      color: #d5dbe6;
+    }
+
+    &__label {
+      color: #aeb6c4;
+    }
+
+    &__input,
+    &__textarea,
+    &__select {
+      background-color: #252b38;
+      border-color: #3a4254;
+      color: #c4ccd8;
+
+      &:focus {
+        border-color: #38bdf8;
+        box-shadow: 0 0 0 3px rgba(56, 189, 248, 0.22);
+      }
+    }
+
+    &__add-button {
+      background-color: #2a3142;
+      color: #aeb6c4;
+
+      &:hover {
+        background-color: #343b4f;
+      }
+    }
+
+    &__responsible-item {
+      background-color: #2a3142 !important;
+      color: #c4ccd8 !important;
+
+      &--bg-blue {
+        background-color: rgba(59, 130, 246, 0.25) !important;
+        color: #c4ccd8 !important;
+      }
+      &--bg-purple {
+        background-color: rgba(139, 92, 246, 0.25) !important;
+        color: #c4ccd8 !important;
+      }
+      &--bg-green {
+        background-color: rgba(16, 185, 129, 0.25) !important;
+        color: #c4ccd8 !important;
+      }
+    }
+
+    &__responsible-name {
+      color: #c4ccd8 !important;
+    }
+  }
+
+  .create-global-task-form-overlay {
+    background-color: rgba(8, 10, 16, 0.7);
+  }
+
+  /* ----- Почта / подпись / комментарии к файлам / ответ на тред ----- */
+  .send-project-mail-overlay,
+  .signature-template-modal-overlay,
+  .file-comments-modal-overlay,
+  .reply-to-thread-overlay {
+    background: rgba(8, 10, 16, 0.7);
+  }
+
+  .send-project-mail-modal,
+  .reply-to-thread-modal {
+    background: #1f2430;
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    box-shadow: 0 16px 40px rgba(0, 0, 0, 0.5);
+    color: #c4ccd8;
+
+    &__header {
+      border-bottom-color: #2f3648;
+
+      h3 {
+        color: #d5dbe6;
+      }
+    }
+
+    &__close {
+      color: #8b95a5;
+      &:hover {
+        color: #f87171;
+      }
+    }
+
+    &__textarea,
+    textarea,
+    input,
+    select {
+      background: #252b38;
+      border-color: #3a4254;
+      color: #c4ccd8;
+    }
+
+    &__signature-hint {
+      color: #8b95a5;
+    }
+  }
+
+  .signature-template-modal,
+  .file-comments-modal {
+    background: #1f2430;
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    box-shadow: 0 16px 40px rgba(0, 0, 0, 0.5);
+    color: #c4ccd8;
+  }
+
+  .signature-template-modal__header h3,
+  .file-comments-modal__title {
+    color: #d5dbe6;
+  }
+
+  .signature-template-modal__close,
+  .file-comments-modal__close {
+    color: #8b95a5;
+
+    &:hover {
+      color: #f87171;
+    }
+  }
+
+  .signature-template-modal__loading,
+  .file-comments-modal__empty {
+    color: #8b95a5;
+  }
+
+  /* ----- История: события / таймлайн ----- */
+  .history-container {
+    .event-details {
+      background-color: #252b38;
+      color: #aeb6c4;
+    }
+
+    .timeline-line {
+      background-color: #3a4254;
+    }
+
+    .event-content {
+      background-color: #252b38;
+    }
+
+    .event-title {
+      color: #d5dbe6;
+    }
+
+    .event-time,
+    .event-description,
+    .duration,
+    .ellipsis {
+      color: #8b95a5;
+    }
+
+    .prev-btn,
+    .next-btn {
+      background-color: #252b38;
+      border-color: #3a4254;
+      color: #c4ccd8;
+
+      &:hover:not(:disabled) {
+        background-color: #2a3142;
+      }
+    }
+
+    .page-number {
+      background-color: #252b38;
+      color: #aeb6c4;
+
+      &:hover {
+        background-color: #2a3142;
+      }
+
+      &.active {
+        background-color: #4f46e5;
+        color: #eef2ff;
+      }
+    }
+
+    .change-info-block {
+      background-color: rgba(56, 189, 248, 0.1);
+      border-color: rgba(56, 189, 248, 0.3);
+      color: #c4ccd8;
+    }
+
+    .error-box {
+      background-color: rgba(185, 28, 28, 0.2);
+      border-color: rgba(248, 113, 113, 0.35);
+    }
+
+    .bg-indigo-icon {
+      background-color: rgba(99, 102, 241, 0.25);
+      color: #a5b4fc;
+    }
+    .bg-yellow-icon {
+      background-color: rgba(234, 179, 8, 0.25);
+      color: #fcd34d;
+    }
+    .bg-blue {
+      background-color: rgba(59, 130, 246, 0.25);
+      color: #93c5fd;
+    }
+    .bg-green,
+    .bg-green-icon {
+      background-color: rgba(16, 185, 129, 0.25);
+      color: #6ee7b7;
+    }
+    .bg-red-icon {
+      background-color: rgba(239, 68, 68, 0.25);
+      color: #fca5a5;
+    }
+    .bg-purple-icon {
+      background-color: rgba(139, 92, 246, 0.25);
+      color: #c4b5fd;
+    }
+  }
+
+  /* ----- Финальные решения: треды / пагинация ----- */
+  .final-solutions-block__action-btn {
+    &--reply {
+      background-color: rgba(16, 185, 129, 0.2);
+      color: #6ee7b7;
+      &:hover {
+        background-color: rgba(16, 185, 129, 0.35);
+      }
+    }
+
+    &--publish {
+      background-color: rgba(37, 99, 235, 0.2);
+      color: #93c5fd;
+      &:hover {
+        background-color: rgba(37, 99, 235, 0.35);
+      }
+    }
+  }
+
+  .final-solutions-block__thread-msg {
+    border-color: #3a4254;
+    background: #252b38;
+
+    &--we_sent {
+      background: rgba(37, 99, 235, 0.12);
+      border-left-color: #3b82f6;
+    }
+
+    &--they_replied {
+      background: rgba(16, 185, 129, 0.12);
+      border-left-color: #10b981;
+    }
+  }
+
+  .final-solutions-block__thread-msg-author {
+    color: #c4ccd8;
+  }
+
+  .final-solutions-block__thread-msg-date {
+    color: #8b95a5;
+  }
+
+  .final-solutions-block__thread-msg-body {
+    color: #aeb6c4;
+  }
+
+  .final-solutions-block__thread-attachments {
+    border-top-color: #3a4254;
+  }
+
+  .final-solutions-block__thread-att span {
+    color: #aeb6c4;
+  }
+
+  .final-solutions-block__thread-att-btn {
+    background: #252b38;
+    border-color: #3a4254;
+    color: #aeb6c4;
+
+    &:hover {
+      background: #2a3142;
+    }
+  }
+
+  .final-solutions-block__thread-msg-actions {
+    border-top-color: #3a4254;
+  }
+
+  .final-solutions-block__thread-action {
+    &--publish {
+      background: rgba(37, 99, 235, 0.2);
+      color: #93c5fd;
+    }
+    &--unpublish {
+      background: rgba(180, 83, 9, 0.25);
+      color: #fcd34d;
+    }
+    &--edit {
+      background: #2a3142;
+      color: #aeb6c4;
+    }
+    &--delete {
+      background: rgba(185, 28, 28, 0.2);
+      color: #fca5a5;
+    }
+  }
+
+  .final-solutions-block__edit-msg-overlay {
+    background: rgba(8, 10, 16, 0.7);
+  }
+
+  .final-solutions-block__edit-msg-modal {
+    background: #1f2430;
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    color: #c4ccd8;
+  }
+
+  .final-solutions-block__edit-msg-title {
+    color: #d5dbe6;
+  }
+
+  .final-solutions-block__edit-msg-textarea {
+    background: #252b38;
+    border-color: #3a4254;
+    color: #c4ccd8;
+  }
+
+  .final-solutions-block__page-arrow,
+  .final-solutions-block__page-num {
+    background: #252b38;
+    border-color: #3a4254;
+    color: #aeb6c4;
+
+    &:hover:not(:disabled) {
+      background: #2a3142;
+    }
+  }
+
+  .final-solutions-block__page-num--active {
+    background-color: #2563eb;
+    border-color: #2563eb;
+    color: #eef2ff;
+  }
+
+  /* ----- Редактор доп. инфо: кнопки ----- */
+  .additional-info-editor {
+    &__input {
+      background: #252b38;
+      border-color: #3a4254;
+      color: #c4ccd8;
+    }
+
+    &__cancel-btn {
+      background-color: #2a3142 !important;
+      color: #aeb6c4 !important;
+
+      &:hover {
+        background-color: #343b4f !important;
+      }
+    }
+
+    &__delete {
+      background-color: transparent !important;
+      color: #f87171 !important;
+    }
+  }
+
+  .goals-additional-info__cancel-btn {
+    background-color: #2a3142;
+    color: #aeb6c4;
+
+    &:hover {
+      background-color: #343b4f;
+    }
+  }
+
+  /* ----- Почта проекта: детали ----- */
+  .send-project-mail-modal {
+    &__list {
+      border-color: #3a4254;
+      background: #252b38;
+
+      .email {
+        color: #8b95a5 !important;
+      }
+    }
+
+    &__preview {
+      background: #252b38;
+      color: #aeb6c4;
+    }
+
+    &__btn-cancel {
+      background: #2a3142;
+      border-color: #3a4254;
+      color: #aeb6c4;
+
+      &:hover {
+        background: #343b4f;
+      }
+    }
+  }
+
+  .signature-template-modal {
+    &__hint {
+      color: #8b95a5;
+    }
+
+    &__error {
+      background: rgba(185, 28, 28, 0.2);
+      color: #fca5a5;
+    }
+
+    &__textarea {
+      background: #252b38;
+      border-color: #3a4254;
+      color: #c4ccd8;
+    }
+
+    &__image-preview {
+      background: #252b38;
+      border-color: #3a4254;
+    }
+
+    &__remove-img {
+      background: rgba(185, 28, 28, 0.15);
+      border-color: rgba(248, 113, 113, 0.35);
+      color: #fca5a5;
+
+      &:hover {
+        background: rgba(185, 28, 28, 0.28);
+      }
+    }
+
+    &__actions {
+      border-top-color: #2f3648;
+    }
+
+    &__btn-cancel {
+      background: #2a3142;
+      border-color: #3a4254;
+      color: #aeb6c4;
+
+      &:hover {
+        background: #343b4f;
+      }
+    }
+  }
+
+  .file-comments-modal {
+    &__hint,
+    &__filename {
+      color: #8b95a5;
+    }
+
+    &__header,
+    &__actions {
+      border-color: #2f3648;
+    }
+
+    &__input {
+      background: #252b38;
+      border-color: #3a4254;
+      color: #c4ccd8;
+    }
+
+    &__btn-cancel {
+      background: #2a3142;
+      border-color: #3a4254;
+      color: #aeb6c4;
+
+      &:hover {
+        background: #343b4f;
+      }
+    }
+  }
+
+  .reply-to-thread-modal {
+    &__field label {
+      color: #aeb6c4;
+    }
+  }
+}
+
+
+
+@keyframes subtaskBlinkYellowDark {
+  0%,
+  100% {
+    background-color: #1f2430;
+  }
+  50% {
+    background-color: #3f3a1f;
+  }
+}

@@ -9,6 +9,7 @@ import { getRandomColors } from '../helpers/getRandomColors'
 import useRemindersStore from '../../../store/useRemindersStore'
 import UserStore from '../../../store/userStore'
 import useKanbanStore from '../../../store/useKanbanStore'
+import useThemeStore from '../../../store/themeStore'
 import useCompleteNotifications from './subcomponents/useCompleteNotifications'
 import useTasksStore from '../../../store/useTasksStore'
 import {
@@ -46,9 +47,12 @@ import { readManagerRequestTaskDraft } from '../../managerRequests/managerReques
 const Boards = () => {
   // Получение состояний из zustand-хранилищ
   const { user } = UserStore()
+  const { theme } = useThemeStore()
   const { tasks, fetchTasks } = useTasksStore()
   const { reminders, setReminders } = useRemindersStore()
   const { selectedEmployeeId, setSelectedEmployeeId } = useKanbanStore()
+  const isDarkTheme = theme === 'dark'
+  const modalSurfaceBg = isDarkTheme ? '#1a1f2b' : 'background.paper'
   // Локальные состояния
   const [columns, setColumns] = useState(initialColumns)
   const [searchTerm, setSearchTerm] = useState('')
@@ -469,6 +473,7 @@ const Boards = () => {
         aria-describedby="task-list-manager-modal-description"
       >
         <Box
+          className={theme}
           sx={{
             position: 'absolute',
             top: '0',
@@ -478,7 +483,7 @@ const Boards = () => {
             minHeight: '100vh',
             display: 'flex',
             flexDirection: 'column',
-            bgcolor: 'background.paper',
+            bgcolor: modalSurfaceBg,
             boxShadow: 24,
             p: 4,
             overflow: 'hidden',
@@ -499,13 +504,14 @@ const Boards = () => {
         aria-describedby="task-list-manager-modal-description"
       >
         <Box
+          className={theme}
           sx={{
             position: 'absolute',
             top: '0',
             left: '0',
             width: '100%',
             height: '100%',
-            bgcolor: 'background.paper',
+            bgcolor: modalSurfaceBg,
             boxShadow: 24,
             p: 4,
             overflow: 'auto',

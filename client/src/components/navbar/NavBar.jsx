@@ -14,7 +14,7 @@ import { SlCallIn } from 'react-icons/sl'
 import { BsTelephonePlus } from 'react-icons/bs'
 import { FiSettings } from 'react-icons/fi'
 import { GiPalmTree } from 'react-icons/gi'
-import { FaTasks } from 'react-icons/fa'
+import { FaTasks, FaBookOpen } from 'react-icons/fa'
 import { GiTeamIdea, GiSwordwoman } from 'react-icons/gi'
 import { VscTypeHierarchySub } from 'react-icons/vsc'
 import { HiOutlineChatBubbleLeftRight } from 'react-icons/hi2'
@@ -205,6 +205,11 @@ const NavBar = () => {
   ]
 
   const references = [
+    {
+      name: 'База знаний',
+      icon: FaBookOpen,
+      link: '/knowledge-base',
+    },
     {
       name: 'Иерархия сотрудников',
       icon: VscTypeHierarchySub,

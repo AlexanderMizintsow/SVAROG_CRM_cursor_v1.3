@@ -8,6 +8,7 @@ import ProcessInstances from './ProcessInstances/ProcessInstances'
 import HelpModalBusinessProcesses from './HelpModalBusinessProcesses'
 import useBusinessProcessStore from '../../store/useBusinessProcessStore'
 import './businessProcesses.scss'
+import './businessProcessesDark.scss'
 
 const TABS = [
   { id: 'list', label: 'Готовые процессы', icon: AiOutlineUnorderedList },
