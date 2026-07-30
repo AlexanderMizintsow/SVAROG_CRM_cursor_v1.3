@@ -18,6 +18,14 @@ const configureSecurity = (app) => {
       windowMs: 15 * 60 * 1000,
       max: 200,
       message: 'Слишком много запросов, попробуйте позже.',
+      skip: (req) => {
+        const path = req.path || ''
+        return (
+          path.startsWith('/api/mobile/employee/knowledge') &&
+          req.method !== 'POST' &&
+          req.method !== 'PUT'
+        )
+      },
     })
   )
 }

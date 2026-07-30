@@ -27,13 +27,32 @@ const hashFile = (filePath) => {
 }
 
 const decodeOriginalName = (reqFile) => {
-  const name = reqFile.originalname || reqFile.filename
+  const name = reqFile?.originalname || reqFile?.filename
+  return fixFilenameEncoding(name)
+}
+
+/** Восстановление кириллицы из mojibake (UTF-8, прочитанный как Latin-1). */
+const fixFilenameEncoding = (raw) => {
+  const name = String(raw || '').trim()
+  if (!name) return name
   if (/[\u0400-\u04FF]/.test(name)) return name
   try {
     const decoded = Buffer.from(name, 'latin1').toString('utf8')
-    if (/[\u0400-\u04FF]/.test(decoded) || decoded.length !== name.length) return decoded
+    if (/[\u0400-\u04FF]/.test(decoded)) return decoded
+    if (decoded.includes('\uFFFD')) return name
+    if (decoded.length !== name.length) return decoded
   } catch (_) {}
   return name
+}
+
+/** Имя для БЗ: явная UTF-8 строка из body надёжнее Content-Disposition. */
+const resolveUploadFileName = (req) => {
+  const fromBody = String(
+    req.body?.originalFileName || req.body?.fileName || ''
+  ).trim()
+  if (fromBody) return fixFilenameEncoding(fromBody)
+  if (req.file) return decodeOriginalName(req.file)
+  return ''
 }
 
 /** Сравнение имён файлов без учёта регистра и пути */
@@ -242,7 +261,7 @@ const mapDoc = (row, segments = [], canManage = false) => ({
   visibilityMode: row.visibility_mode,
   visibilityLabel: VISIBILITY_LABELS[row.visibility_mode] || row.visibility_mode,
   fileUrl: row.file_url,
-  fileName: row.file_name || null,
+  fileName: fixFilenameEncoding(row.file_name || '') || null,
   fileType: row.file_type || null,
   fileSize: row.file_size != null ? Number(row.file_size) : null,
   fileHash: row.file_hash || null,
@@ -777,7 +796,7 @@ const createDocument = (dbPool, io) => async (req, res) => {
     if (!req.file) return res.status(400).json({ error: 'Прикрепите файл' })
 
     const fileUrl = `/uploads/knowledge/${req.file.filename}`
-    const originalName = decodeOriginalName(req.file)
+    const originalName = resolveUploadFileName(req)
     const fileHash = hashFile(req.file.path)
     const forceDuplicate = String(req.body.forceDuplicate || '') === '1'
     const replaceDocumentId =
@@ -1103,7 +1122,7 @@ const updateDocument = (dbPool, io) => async (req, res) => {
 
     if (req.file) {
       fileUrl = `/uploads/knowledge/${req.file.filename}`
-      fileName = decodeOriginalName(req.file)
+      fileName = resolveUploadFileName(req)
       fileType = req.file.mimetype || null
       fileSize = req.file.size != null ? Number(req.file.size) : null
       fileHash = hashFile(req.file.path)

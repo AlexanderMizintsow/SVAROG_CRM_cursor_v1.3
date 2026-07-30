@@ -3,7 +3,6 @@
  * Проксирует register /api/knowledge/* с userId из JWT.
  */
 
-const FormData = require('form-data')
 const { REGISTER_URL, registerFetch } = require('../services/registerClient')
 
 const qs = (params = {}) => {
@@ -15,19 +14,49 @@ const qs = (params = {}) => {
   return p.toString()
 }
 
+const stripHtmlMessage = (text) =>
+  String(text || '')
+    .replace(/<[^>]+>/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim()
+    .slice(0, 400)
+
 const sendRegisterError = (res, error) => {
   const status = error.status || 500
-  if (error.data && typeof error.data === 'object') {
+  if (error.data && typeof error.data === 'object' && !Array.isArray(error.data)) {
     return res.status(status).json(error.data)
   }
   return res.status(status).json({
-    message: error.message || 'Ошибка базы знаний',
+    message: stripHtmlMessage(error.message) || 'Ошибка базы знаний',
   })
 }
 
+/** Поля из multipart часто приходят строкой JSON — нормализуем. */
+const normalizeField = (value) => {
+  if (value == null || value === '') return undefined
+  if (typeof value !== 'string') return value
+  const trimmed = value.trim()
+  if (
+    (trimmed.startsWith('{') && trimmed.endsWith('}')) ||
+    (trimmed.startsWith('[') && trimmed.endsWith(']'))
+  ) {
+    try {
+      return JSON.parse(trimmed)
+    } catch {
+      return value
+    }
+  }
+  return value
+}
+
+/**
+ * Отправка multipart в register через нативный FormData/Blob.
+ * Пакет `form-data` + fetch даёт «[object FormData]» → Unexpected end of form (500).
+ */
 const forwardMultipart = async (path, method, fields, file) => {
   const form = new FormData()
   Object.entries(fields || {}).forEach(([key, value]) => {
+    if (key === 'originalFileName') return
     if (value == null || value === '') return
     if (typeof value === 'object') {
       form.append(key, JSON.stringify(value))
@@ -35,17 +64,30 @@ const forwardMultipart = async (path, method, fields, file) => {
       form.append(key, String(value))
     }
   })
-  if (file) {
-    form.append('file', file.buffer, {
-      filename: file.originalname || file.filename || 'file',
-      contentType: file.mimetype || 'application/octet-stream',
-    })
+
+  if (file?.buffer) {
+    const fromFields = fixFilenameEncoding(fields?.originalFileName || '')
+    const fromFile = fixFilenameEncoding(
+      file.originalname || file.filename || ''
+    )
+    const fixedSafe = (fromFields || fromFile || 'file')
+      .replace(/[\\/]/g, '_')
+      .slice(0, 500)
+    const extMatch = fixedSafe.match(/(\.[a-zA-Z0-9]{1,12})$/)
+    const ext = extMatch ? extMatch[1] : ''
+    form.append('originalFileName', fixedSafe)
+    form.append(
+      'file',
+      new Blob([file.buffer], {
+        type: file.mimetype || 'application/octet-stream',
+      }),
+      `upload${ext || '.bin'}`
+    )
   }
 
   const response = await fetch(`${REGISTER_URL}${path}`, {
     method,
     body: form,
-    headers: form.getHeaders(),
   })
   const text = await response.text()
   let data = null
@@ -55,18 +97,50 @@ const forwardMultipart = async (path, method, fields, file) => {
     data = text
   }
   if (!response.ok) {
-    const message =
+    const raw =
       (data && (data.error || data.message || data)) ||
+      stripHtmlMessage(text) ||
       `Register error ${response.status}`
-    const err = new Error(
-      typeof message === 'string' ? message : 'Ошибка register API'
-    )
+    const message =
+      typeof raw === 'string' ? stripHtmlMessage(raw) : 'Ошибка register API'
+    const err = new Error(message || 'Ошибка register API')
     err.status = response.status
-    err.data = data
+    err.data =
+      data && typeof data === 'object' ? data : { error: message, message }
     throw err
   }
   return data
 }
+
+const buildKnowledgeFields = (req, userId) => ({
+  userId,
+  title: req.body.title,
+  description: req.body.description,
+  category: req.body.category,
+  ownerDepartmentId: req.body.ownerDepartmentId,
+  visibilityMode: req.body.visibilityMode,
+  tags: normalizeField(req.body.tags),
+  segments: normalizeField(req.body.segments),
+  forceDuplicate: req.body.forceDuplicate,
+  replaceDocumentId: req.body.replaceDocumentId,
+  confirmDifferentFileName:
+    req.body.confirmDifferentFileName || req.body.confirmFileNameMismatch,
+  // Кириллическое имя только отдельным полем (не через Content-Disposition)
+  originalFileName: req.body.originalFileName || undefined,
+})
+
+/** Чинит mojibake UTF-8↔Latin-1 в имени файла. */
+const fixFilenameEncoding = (raw) => {
+  const name = String(raw || '').trim()
+  if (!name) return name
+  if (/[\u0400-\u04FF]/.test(name)) return name
+  try {
+    const decoded = Buffer.from(name, 'latin1').toString('utf8')
+    if (/[\u0400-\u04FF]/.test(decoded)) return decoded
+  } catch (_) {}
+  return name
+}
+
 
 const proxyBinary = async (req, res, path) => {
   const upstream = await fetch(`${REGISTER_URL}${path}`)
@@ -164,18 +238,12 @@ const getDocument = () => async (req, res) => {
 const createDocument = () => async (req, res) => {
   try {
     const userId = Number(req.user.userId)
-    const fields = {
-      userId,
-      title: req.body.title,
-      description: req.body.description,
-      category: req.body.category,
-      ownerDepartmentId: req.body.ownerDepartmentId,
-      visibilityMode: req.body.visibilityMode,
-      tags: req.body.tags,
-      segments: req.body.segments,
-      forceDuplicate: req.body.forceDuplicate,
-      replaceDocumentId: req.body.replaceDocumentId,
+    if (!req.file || !req.file.buffer?.length) {
+      return res.status(400).json({
+        error: 'Прикрепите файл для загрузки документа',
+      })
     }
+    const fields = buildKnowledgeFields(req, userId)
     const data = await forwardMultipart(
       '/api/knowledge/documents',
       'POST',
@@ -193,18 +261,39 @@ const updateDocument = () => async (req, res) => {
   try {
     const userId = Number(req.user.userId)
     const id = Number(req.params.id)
-    const fields = {
-      userId,
-      title: req.body.title,
-      description: req.body.description,
-      category: req.body.category,
-      ownerDepartmentId: req.body.ownerDepartmentId,
-      visibilityMode: req.body.visibilityMode,
-      tags: req.body.tags,
-      segments: req.body.segments,
-      forceDuplicate: req.body.forceDuplicate,
-      confirmFileNameMismatch: req.body.confirmFileNameMismatch,
+    const fields = buildKnowledgeFields(req, userId)
+    const expectFile =
+      String(req.body.expectFile || '') === '1' ||
+      String(req.body.hasFile || '') === '1'
+
+    if (expectFile && !req.file) {
+      return res.status(400).json({
+        error: 'Файл не получен сервером. Выберите файл ещё раз и повторите.',
+      })
     }
+
+    // Без нового файла — JSON (без multer/multipart), надёжнее для правок метаданных
+    if (!req.file) {
+      const data = await registerFetch(`/api/knowledge/documents/${id}`, {
+        method: 'PUT',
+        body: fields,
+      })
+      return res.json(data)
+    }
+
+    if (!req.file.buffer || !req.file.buffer.length) {
+      return res.status(400).json({
+        error: 'Пустой файл. Выберите другой файл и повторите.',
+      })
+    }
+
+    console.log(
+      '[mobile_staff_app][knowledge][update] forward file',
+      req.file.originalname,
+      req.file.size,
+      req.file.mimetype
+    )
+
     const data = await forwardMultipart(
       `/api/knowledge/documents/${id}`,
       'PUT',
