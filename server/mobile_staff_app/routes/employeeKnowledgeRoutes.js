@@ -8,12 +8,12 @@ const upload = multer({
   limits: { fileSize: 50 * 1024 * 1024 },
 })
 
-/** PUT/POST с файлом: принимаем file или files[0] */
+/** PUT/POST с файлом(ами): принимаем file / files */
 const uploadKnowledgeFile = (req, res, next) => {
   upload.any()(req, res, (err) => {
     if (err) return next(err)
+    const list = Array.isArray(req.files) ? req.files : []
     if (!req.file) {
-      const list = Array.isArray(req.files) ? req.files : []
       const found =
         list.find((f) => f.fieldname === 'file') ||
         list.find((f) => f.fieldname === 'files') ||
@@ -35,6 +35,23 @@ module.exports = (pool) => {
   router.put('/documents/:id', uploadKnowledgeFile, ctrl.updateDocument())
   router.delete('/documents/:id', ctrl.deleteDocument())
   router.get('/documents/:id/download', ctrl.downloadDocument())
+  router.post('/documents/:id/files', uploadKnowledgeFile, ctrl.addDocumentFile())
+  router.put(
+    '/documents/:id/files/:fileId',
+    uploadKnowledgeFile,
+    ctrl.replaceDocumentFile()
+  )
+  router.patch('/documents/:id/files/:fileId', ctrl.renameDocumentFile())
+  router.get('/documents/:id/files/:fileId/versions', ctrl.listFileVersions())
+  router.get(
+    '/documents/:id/files/:fileId/versions/:versionId/download',
+    ctrl.downloadFileVersion()
+  )
+  router.delete('/documents/:id/files/:fileId', ctrl.deleteDocumentFile())
+  router.get(
+    '/documents/:id/files/:fileId/download',
+    ctrl.downloadDocumentFile()
+  )
   router.get('/documents/:id/versions', ctrl.listVersions())
   router.get(
     '/documents/:id/versions/:versionId/download',

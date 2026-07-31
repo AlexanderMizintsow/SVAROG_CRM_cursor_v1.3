@@ -16,6 +16,8 @@ import { CiTimer } from 'react-icons/ci'
 import { RiDeleteBinLine } from 'react-icons/ri'
 import { sanitizeFilename } from '../../../utils/fileUtils'
 import ComplaintManagerChat from './subcomponents/ComplaintManagerChat'
+import { handleKnowledgeDescriptionClick } from '../../knowledgeBase/openKnowledgeLink'
+import { enhanceKnowledgeLinksInHtml } from '../../knowledgeBase/knowledgeLinkUtils'
 import './Task.scss'
 
 const TaskNotification = forwardRef(
@@ -217,7 +219,13 @@ const TaskNotification = forwardRef(
           <div className="task-details">
             <span className="task-time-reminder">Создано: {formatDate(createdAt)}</span>
             <span className="task-title">{title}</span>
-            <div className="task-description" dangerouslySetInnerHTML={{ __html: description }} />
+            <div
+              className="task-description"
+              onClick={(e) => handleKnowledgeDescriptionClick(e, user?.id)}
+              dangerouslySetInnerHTML={{
+                __html: enhanceKnowledgeLinksInHtml(description),
+              }}
+            />
           </div>
           {links && links.length > 0 && (
             <div className="links">

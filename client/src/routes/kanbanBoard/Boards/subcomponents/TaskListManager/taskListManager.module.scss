@@ -606,6 +606,14 @@
   :global(p:last-child) {
     margin-bottom: 0;
   }
+
+  :global(a.kb-link),
+  :global(a[href*='knowledge-base']) {
+    color: #2563eb;
+    font-weight: 600;
+    text-decoration: underline;
+    cursor: pointer;
+  }
 }
 
 .taskCardParticipants {

@@ -9,6 +9,9 @@ import axios from 'axios'
 import { API_BASE_URL } from '../../../../../../config'
 import useTasksManageStore from '../../../../../store/useTasksManageStore'
 import useTaskStateTracker from '../../../../../store/useTaskStateTracker'
+import KnowledgeLinkPicker from '../../../../knowledgeBase/KnowledgeLinkPicker'
+import { buildKnowledgePlainMarker } from '../../../../knowledgeBase/knowledgeLinkUtils'
+import { makeChatKnowledgeRenderer } from '../../../../knowledgeBase/chatKnowledgeText'
 
 const GlobalTaskChat = ({
   onClick,
@@ -28,6 +31,7 @@ const GlobalTaskChat = ({
     (state) => state.messagesGlobalTaskById[String(globalTaskId ?? '')]
   )
   const [showEmojiPicker, setShowEmojiPicker] = useState(false)
+  const [kbLinkPickerOpen, setKbLinkPickerOpen] = useState(false)
   const [replyingTo, setReplyingTo] = useState(null)
   const [editingMessageId, setEditingMessageId] = useState(null)
   const [editDraft, setEditDraft] = useState('')
@@ -37,6 +41,7 @@ const GlobalTaskChat = ({
   const messageRefs = useRef({})
 
   const userId = user ? user.id : null
+  const renderKbText = useCallback(makeChatKnowledgeRenderer(userId), [userId])
 
   useEffect(() => {
     globalTaskIdRef.current = globalTaskId
@@ -364,7 +369,7 @@ const GlobalTaskChat = ({
                 isDeleted ? 'text-bubble--deleted' : ''
               }`}
             >
-              {isDeleted ? 'Сообщение удалено' : msg.text}
+              {isDeleted ? 'Сообщение удалено' : renderKbText(msg.text)}
             </div>
             {!isDeleted && msg.edited_at ? (
               <div className="message-edited-label">редактировано</div>
@@ -531,6 +536,14 @@ const GlobalTaskChat = ({
             </div>
             <button
               className="icon-button emoji-btn"
+              type="button"
+              title="Ссылка на базу знаний"
+              onClick={() => setKbLinkPickerOpen(true)}
+            >
+              📚
+            </button>
+            <button
+              className="icon-button emoji-btn"
               onClick={toggleEmojiPicker}
             >
               <i className="far fa-smile" style={{ fontSize: '24px' }}></i>
@@ -540,6 +553,22 @@ const GlobalTaskChat = ({
             </button>
           </div>
         </div>
+
+        <KnowledgeLinkPicker
+          open={kbLinkPickerOpen}
+          userId={userId}
+          onClose={() => setKbLinkPickerOpen(false)}
+          onPick={(item) => {
+            const chunk =
+              buildKnowledgePlainMarker({
+                documentId: item.documentId,
+                fileId: item.fileId,
+                label: item.label,
+              }) || item.href
+            if (!chunk) return
+            setInputText((prev) => (prev ? `${prev.trim()} ${chunk}` : chunk))
+          }}
+        />
 
         {messagePendingDelete ? (
           <div className="chat-confirm-overlay" role="presentation" onClick={cancelDeleteMessage}>

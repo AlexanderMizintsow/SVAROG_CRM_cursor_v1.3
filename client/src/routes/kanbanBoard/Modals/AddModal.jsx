@@ -19,6 +19,11 @@ const TagsManager = React.lazy(() =>
 );
 import "quill/dist/quill.snow.css";
 import styles from "./AddModal.module.scss";
+import KnowledgeLinkPicker from "../../knowledgeBase/KnowledgeLinkPicker";
+import {
+  buildKnowledgeAnchorHtml,
+  formatKnowledgeLinkLabel,
+} from "../../knowledgeBase/knowledgeLinkUtils";
 import {
   getAddModalDraftKey,
   loadAddModalDraft,
@@ -141,6 +146,7 @@ const AddModal = ({
   const [selectedApprover, setSelectedApprover] = useState("");
   const [selectedViewer, setSelectedViewer] = useState("");
   const [quillInstance, setQuillInstance] = useState(null);
+  const [kbLinkPickerOpen, setKbLinkPickerOpen] = useState(false);
   const [selectedTemplate, setSelectedTemplate] = useState(null);
   const [selectedFiles, setSelectedFiles] = useState([]);
   const [hasDangerousFiles, setHasDangerousFiles] = useState(false);
@@ -882,6 +888,15 @@ const AddModal = ({
             onMouseDown={(e) => e.stopPropagation()}
             onFocus={(e) => e.stopPropagation()}
           >
+            <div className={styles.kbLinkToolbar}>
+              <button
+                type="button"
+                className={styles.kbLinkBtn}
+                onClick={() => setKbLinkPickerOpen(true)}
+              >
+                Ссылка на базу знаний
+              </button>
+            </div>
             <div ref={quillRef} className="ql-editor" />
           </div>
 
@@ -1088,6 +1103,30 @@ const AddModal = ({
           </div>
         </div>
       )}
+
+      <KnowledgeLinkPicker
+        open={kbLinkPickerOpen}
+        userId={userId}
+        onClose={() => setKbLinkPickerOpen(false)}
+        onPick={(item) => {
+          if (!quillInstance || !item?.href) return;
+          const label = formatKnowledgeLinkLabel(item.label || "База знаний");
+          const range = quillInstance.getSelection(true);
+          const index = range ? range.index : quillInstance.getLength();
+          try {
+            const html = buildKnowledgeAnchorHtml({
+              documentId: item.documentId,
+              fileId: item.fileId,
+              label: item.label,
+            });
+            quillInstance.clipboard.dangerouslyPasteHTML(index, html);
+            quillInstance.setSelection(index + label.length, 0, "user");
+          } catch {
+            quillInstance.insertText(index, label, "link", item.href, "user");
+            quillInstance.setSelection(index + label.length, 0, "user");
+          }
+        }}
+      />
     </div>
   );
 };

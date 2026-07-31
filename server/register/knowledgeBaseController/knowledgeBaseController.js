@@ -20,6 +20,16 @@ const {
   tokenizeSearchQuery,
 } = require('./extractKnowledgeText')
 const { notifyDepartmentAboutDocument } = require('./knowledgeNotify')
+const {
+  mapFileRow,
+  loadFilesMap,
+  loadFilesCounts,
+  insertDocumentFile,
+  syncPrimaryFileFromChildren,
+  rebuildDocumentSearchText,
+  collectUploadFiles,
+  archiveFileVersion,
+} = require('./knowledgeFolderFiles')
 
 const hashFile = (filePath) => {
   const buf = fs.readFileSync(filePath)
@@ -53,6 +63,26 @@ const resolveUploadFileName = (req) => {
   if (fromBody) return fixFilenameEncoding(fromBody)
   if (req.file) return decodeOriginalName(req.file)
   return ''
+}
+
+/** Имя файла из multipart при множественной загрузке. */
+const resolveUploadFileNameAt = (req, file, index) => {
+  let names = req.body?.originalFileNames
+  if (typeof names === 'string') {
+    try {
+      names = JSON.parse(names)
+    } catch (_) {
+      names = null
+    }
+  }
+  if (Array.isArray(names) && names[index]) {
+    return fixFilenameEncoding(String(names[index]))
+  }
+  if (Number(index) === 0) {
+    const single = resolveUploadFileName(req)
+    if (single) return single
+  }
+  return decodeOriginalName(file)
 }
 
 /** Сравнение имён файлов без учёта регистра и пути */
@@ -250,42 +280,64 @@ function isVisibleToUser(doc, segments, userId, userDeptId, perms) {
   return false
 }
 
-const mapDoc = (row, segments = [], canManage = false) => ({
-  id: Number(row.id),
-  title: row.title,
-  description: row.description || '',
-  category: row.category,
-  categoryLabel: row.category_label || CATEGORY_LABELS[row.category] || row.category,
-  ownerDepartmentId: Number(row.owner_department_id),
-  ownerDepartmentName: row.owner_department_name || null,
-  visibilityMode: row.visibility_mode,
-  visibilityLabel: VISIBILITY_LABELS[row.visibility_mode] || row.visibility_mode,
-  fileUrl: row.file_url,
-  fileName: fixFilenameEncoding(row.file_name || '') || null,
-  fileType: row.file_type || null,
-  fileSize: row.file_size != null ? Number(row.file_size) : null,
-  fileHash: row.file_hash || null,
-  versionNumber: row.version_number != null ? Number(row.version_number) : 1,
-  tags: Array.isArray(row.tags) ? row.tags : [],
-  uploadedBy: row.uploaded_by != null ? Number(row.uploaded_by) : null,
-  uploadedByName: row.uploaded_by_name || null,
-  updatedBy: row.updated_by != null ? Number(row.updated_by) : null,
-  createdAt: row.created_at,
-  updatedAt: row.updated_at,
-  isFavorite:
-    row.is_favorite === true ||
-    row.is_favorite === 1 ||
-    String(row.is_favorite || '') === 'true',
-  segments: {
-    departments: segments
-      .filter((s) => s.segment_type === 'department')
-      .map((s) => String(s.segment_value)),
-    users: segments
-      .filter((s) => s.segment_type === 'user')
-      .map((s) => String(s.segment_value)),
-  },
-  canManage: Boolean(canManage),
-})
+const mapDoc = (row, segments = [], canManage = false, extra = {}) => {
+  const files = Array.isArray(extra.files)
+    ? extra.files.map((f) => mapFileRow(f, fixFilenameEncoding))
+    : undefined
+  const filesCount =
+    extra.filesCount != null
+      ? Number(extra.filesCount)
+      : files
+        ? files.length
+        : row.file_url
+          ? 1
+          : 0
+  const isFolder =
+    row.is_folder === true ||
+    row.is_folder === 1 ||
+    String(row.is_folder || '') === 'true' ||
+    filesCount > 1
+
+  return {
+    id: Number(row.id),
+    title: row.title,
+    description: row.description || '',
+    category: row.category,
+    categoryLabel: row.category_label || CATEGORY_LABELS[row.category] || row.category,
+    ownerDepartmentId: Number(row.owner_department_id),
+    ownerDepartmentName: row.owner_department_name || null,
+    visibilityMode: row.visibility_mode,
+    visibilityLabel: VISIBILITY_LABELS[row.visibility_mode] || row.visibility_mode,
+    isFolder: Boolean(isFolder),
+    filesCount,
+    files,
+    fileUrl: row.file_url,
+    fileName: fixFilenameEncoding(row.file_name || '') || null,
+    fileType: row.file_type || null,
+    fileSize: row.file_size != null ? Number(row.file_size) : null,
+    fileHash: row.file_hash || null,
+    versionNumber: row.version_number != null ? Number(row.version_number) : 1,
+    tags: Array.isArray(row.tags) ? row.tags : [],
+    uploadedBy: row.uploaded_by != null ? Number(row.uploaded_by) : null,
+    uploadedByName: row.uploaded_by_name || null,
+    updatedBy: row.updated_by != null ? Number(row.updated_by) : null,
+    createdAt: row.created_at,
+    updatedAt: row.updated_at,
+    isFavorite:
+      row.is_favorite === true ||
+      row.is_favorite === 1 ||
+      String(row.is_favorite || '') === 'true',
+    segments: {
+      departments: segments
+        .filter((s) => s.segment_type === 'department')
+        .map((s) => String(s.segment_value)),
+      users: segments
+        .filter((s) => s.segment_type === 'user')
+        .map((s) => String(s.segment_value)),
+    },
+    canManage: Boolean(canManage),
+  }
+}
 
 const SELECT_BASE = `
   SELECT
@@ -584,8 +636,19 @@ const listDocuments = (dbPool) => async (req, res) => {
       if (tokens.length) {
         // Каждое слово запроса должно встретиться (AND). search_text уже
         // нормализован (регистр + латиница/кириллица-двойники вроде T/Т).
+        // Ищем и в карточке, и в файлах папки.
         for (const token of tokens) {
-          sql += ` AND COALESCE(d.search_text, '') ILIKE $${idx}`
+          sql += ` AND (
+            COALESCE(d.search_text, '') ILIKE $${idx}
+            OR EXISTS (
+              SELECT 1 FROM knowledge_document_files kf
+              WHERE kf.document_id = d.id
+                AND (
+                  COALESCE(kf.search_text, '') ILIKE $${idx}
+                  OR COALESCE(kf.file_name, '') ILIKE $${idx}
+                )
+            )
+          )`
           params.push(`%${token}%`)
           idx += 1
         }
@@ -598,6 +661,7 @@ const listDocuments = (dbPool) => async (req, res) => {
     const ids = rows.map((r) => Number(r.id))
     const segmentsMap = await loadSegmentsMap(dbPool, ids)
     const favoriteIds = await loadFavoriteIds(dbPool, userId)
+    const filesCounts = await loadFilesCounts(dbPool, ids)
 
     const visible = rows
       .filter((row) =>
@@ -611,13 +675,15 @@ const listDocuments = (dbPool) => async (req, res) => {
       )
       .map((row) => {
         const canManage = canManageDocumentSync(perms, row.owner_department_id)
+        const id = Number(row.id)
         return mapDoc(
           {
             ...row,
-            is_favorite: favoriteIds.has(Number(row.id)),
+            is_favorite: favoriteIds.has(id),
           },
-          segmentsMap[Number(row.id)] || [],
-          canManage
+          segmentsMap[id] || [],
+          canManage,
+          { filesCount: filesCounts[id] || (row.file_url ? 1 : 0) }
         )
       })
 
@@ -677,6 +743,27 @@ const getDocument = (dbPool) => async (req, res) => {
 
     const canManage = canManageDocumentSync(perms, rows[0].owner_department_id)
     const favoriteIds = await loadFavoriteIds(dbPool, userId)
+    const filesMap = await loadFilesMap(dbPool, [id])
+    let files = filesMap[id] || []
+    // Совместимость: старый документ без строк в knowledge_document_files
+    if (!files.length && rows[0].file_url) {
+      files = [
+        {
+          id: null,
+          document_id: id,
+          file_url: rows[0].file_url,
+          file_name: rows[0].file_name,
+          file_type: rows[0].file_type,
+          file_size: rows[0].file_size,
+          file_hash: rows[0].file_hash,
+          version_number: rows[0].version_number,
+          sort_order: 0,
+          uploaded_by: rows[0].uploaded_by,
+          created_at: rows[0].created_at,
+          updated_at: rows[0].updated_at,
+        },
+      ]
+    }
     return res.json({
       document: mapDoc(
         {
@@ -684,7 +771,8 @@ const getDocument = (dbPool) => async (req, res) => {
           is_favorite: favoriteIds.has(id),
         },
         segments,
-        canManage
+        canManage,
+        { files, filesCount: files.length }
       ),
     })
   } catch (error) {
@@ -793,21 +881,51 @@ const createDocument = (dbPool, io) => async (req, res) => {
       }
     }
 
-    if (!req.file) return res.status(400).json({ error: 'Прикрепите файл' })
+    const uploadFiles = collectUploadFiles(req)
+    if (!uploadFiles.length) {
+      return res.status(400).json({ error: 'Прикрепите хотя бы один файл' })
+    }
 
-    const fileUrl = `/uploads/knowledge/${req.file.filename}`
-    const originalName = resolveUploadFileName(req)
-    const fileHash = hashFile(req.file.path)
+    // В одной загрузке нельзя два файла с одинаковым именем
+    const namesInBatch = new Set()
+    for (let i = 0; i < uploadFiles.length; i += 1) {
+      const n = resolveUploadFileNameAt(req, uploadFiles[i], i)
+      const key = normalizeFileName(n)
+      if (key && namesInBatch.has(key)) {
+        return res.status(400).json({
+          error: `В одной загрузке два файла с одинаковым именем: «${n}»`,
+        })
+      }
+      if (key) namesInBatch.add(key)
+    }
+
+    const wantFolder =
+      String(req.body.isFolder || '') === '1' ||
+      String(req.body.is_folder || '') === '1' ||
+      uploadFiles.length > 1
+
+    // Для проверки дублей / replace используем первый файл
+    req.file = uploadFiles[0]
+    const fileUrl = `/uploads/knowledge/${uploadFiles[0].filename}`
+    const originalName = resolveUploadFileNameAt(req, uploadFiles[0], 0)
+    const fileHash = hashFile(uploadFiles[0].path)
     const forceDuplicate = String(req.body.forceDuplicate || '') === '1'
     const replaceDocumentId =
       req.body.replaceDocumentId != null && req.body.replaceDocumentId !== ''
         ? Number(req.body.replaceDocumentId)
         : null
 
+    if (replaceDocumentId && wantFolder && uploadFiles.length > 1) {
+      return res.status(400).json({
+        error:
+          'Замена версии поддерживает один файл. Для папки добавляйте файлы отдельно.',
+      })
+    }
+
     const tags = await resolveAllowedTags(dbPool, parseTags(req.body.tags))
-    const extractedText = await extractTextFromFile(req.file.path, {
+    const extractedText = await extractTextFromFile(uploadFiles[0].path, {
       fileName: originalName,
-      mimeType: req.file.mimetype,
+      mimeType: uploadFiles[0].mimetype,
     })
     const searchBlob = buildSearchBlob({
       title,
@@ -839,7 +957,7 @@ const createDocument = (dbPool, io) => async (req, res) => {
     // То же название в отделе — предложить новую версию
     if (!replaceDocumentId) {
       const dupTitle = await dbPool.query(
-        `SELECT id, title, version_number FROM knowledge_documents
+        `SELECT id, title, version_number, is_folder FROM knowledge_documents
          WHERE is_archived = FALSE
            AND owner_department_id = $1
            AND lower(trim(title)) = lower(trim($2))
@@ -847,6 +965,17 @@ const createDocument = (dbPool, io) => async (req, res) => {
         [ownerDepartmentId, title]
       )
       if (dupTitle.rows.length) {
+        const existingIsFolder =
+          dupTitle.rows[0].is_folder === true ||
+          dupTitle.rows[0].is_folder === 1
+        if (wantFolder || existingIsFolder) {
+          return res.status(409).json({
+            code: 'TITLE_EXISTS',
+            error: `В этом отделе уже есть «${dupTitle.rows[0].title}». Откройте карточку и добавьте файлы в папку, либо выберите другое название.`,
+            documentId: Number(dupTitle.rows[0].id),
+            versionNumber: Number(dupTitle.rows[0].version_number || 1),
+          })
+        }
         return res.status(409).json({
           code: 'TITLE_EXISTS',
           error: `В этом отделе уже есть документ «${dupTitle.rows[0].title}». Можно заменить файл новой версией.`,
@@ -869,6 +998,13 @@ const createDocument = (dbPool, io) => async (req, res) => {
         return res.status(404).json({ error: 'Документ для замены не найден' })
       }
       const prev = existing.rows[0]
+      if (prev.is_folder === true || prev.is_folder === 1) {
+        await client.query('ROLLBACK')
+        return res.status(400).json({
+          error:
+            'Это папка. Добавляйте файлы через «Добавить файл», а не через замену версии.',
+        })
+      }
       const canReplace = await canManageDocument(dbPool, perms, prev.owner_department_id)
       if (!canReplace) {
         await client.query('ROLLBACK')
@@ -931,8 +1067,8 @@ const createDocument = (dbPool, io) => async (req, res) => {
           visibilityMode,
           fileUrl,
           originalName,
-          req.file.mimetype || null,
-          req.file.size != null ? Number(req.file.size) : null,
+          uploadFiles[0].mimetype || null,
+          uploadFiles[0].size != null ? Number(uploadFiles[0].size) : null,
           fileHash,
           tags,
           searchBlobKept || null,
@@ -941,6 +1077,50 @@ const createDocument = (dbPool, io) => async (req, res) => {
           replaceDocumentId,
         ]
       )
+
+      // Обновить/создать строку файла
+      try {
+        const existingFiles = await client.query(
+          `SELECT id FROM knowledge_document_files
+           WHERE document_id = $1 ORDER BY sort_order ASC, id ASC LIMIT 1`,
+          [replaceDocumentId]
+        )
+        if (existingFiles.rows.length) {
+          await client.query(
+            `UPDATE knowledge_document_files SET
+              file_url = $1, file_name = $2, file_type = $3, file_size = $4,
+              file_hash = $5, search_text = $6, version_number = $7,
+              uploaded_by = $8, updated_at = CURRENT_TIMESTAMP
+             WHERE id = $9`,
+            [
+              fileUrl,
+              originalName,
+              uploadFiles[0].mimetype || null,
+              uploadFiles[0].size != null ? Number(uploadFiles[0].size) : null,
+              fileHash,
+              searchBlobKept || null,
+              nextVersion,
+              userId,
+              existingFiles.rows[0].id,
+            ]
+          )
+        } else {
+          await insertDocumentFile(client, {
+            documentId: replaceDocumentId,
+            fileUrl,
+            fileName: originalName,
+            fileType: uploadFiles[0].mimetype || null,
+            fileSize: uploadFiles[0].size,
+            fileHash,
+            searchText: searchBlobKept,
+            sortOrder: 0,
+            versionNumber: nextVersion,
+            uploadedBy: userId,
+          })
+        }
+      } catch (fileTableError) {
+        if (!fileTableError || fileTableError.code !== '42P01') throw fileTableError
+      }
 
       if (visibilityMode === 'segments') {
         await replaceSegments(client, replaceDocumentId, segments)
@@ -954,6 +1134,7 @@ const createDocument = (dbPool, io) => async (req, res) => {
 
       const { rows } = await dbPool.query(`${SELECT_BASE} WHERE d.id = $1`, [replaceDocumentId])
       const segmentsMap = await loadSegmentsMap(dbPool, [replaceDocumentId])
+      const filesMap = await loadFilesMap(dbPool, [replaceDocumentId])
       notifyDepartmentAboutDocument(dbPool, io, {
         documentId: replaceDocumentId,
         title: keptTitle,
@@ -964,7 +1145,15 @@ const createDocument = (dbPool, io) => async (req, res) => {
       }).catch(() => {})
 
       return res.status(200).json({
-        document: mapDoc(rows[0], segmentsMap[replaceDocumentId] || [], true),
+        document: mapDoc(
+          rows[0],
+          segmentsMap[replaceDocumentId] || [],
+          true,
+          {
+            files: filesMap[replaceDocumentId] || [],
+            filesCount: (filesMap[replaceDocumentId] || []).length || 1,
+          }
+        ),
         replaced: true,
       })
     }
@@ -973,8 +1162,8 @@ const createDocument = (dbPool, io) => async (req, res) => {
       `INSERT INTO knowledge_documents (
         title, description, category, owner_department_id, visibility_mode,
         file_url, file_name, file_type, file_size, file_hash, tags, search_text,
-        version_number, uploaded_by, updated_by
-      ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,1,$13,$13)
+        version_number, uploaded_by, updated_by, is_folder
+      ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,1,$13,$13,$14)
       RETURNING id`,
       [
         title,
@@ -984,22 +1173,67 @@ const createDocument = (dbPool, io) => async (req, res) => {
         visibilityMode,
         fileUrl,
         originalName,
-        req.file.mimetype || null,
-        req.file.size != null ? Number(req.file.size) : null,
+        uploadFiles[0].mimetype || null,
+        uploadFiles[0].size != null ? Number(uploadFiles[0].size) : null,
         fileHash,
         tags,
         searchBlob || null,
         userId,
+        wantFolder,
       ]
     )
     const docId = Number(insert.rows[0].id)
     if (visibilityMode === 'segments') {
       await replaceSegments(client, docId, segments)
     }
+
+    // Все файлы папки / один файл документа
+    try {
+      for (let i = 0; i < uploadFiles.length; i += 1) {
+        const f = uploadFiles[i]
+        const name = resolveUploadFileNameAt(req, f, i)
+        const hash = i === 0 ? fileHash : hashFile(f.path)
+        const extracted =
+          i === 0
+            ? extractedText
+            : await extractTextFromFile(f.path, {
+                fileName: name,
+                mimeType: f.mimetype,
+              })
+        const fileSearch = buildSearchBlob({
+          title,
+          description,
+          tags,
+          fileName: name,
+          extractedText: extracted,
+        })
+        await insertDocumentFile(client, {
+          documentId: docId,
+          fileUrl: `/uploads/knowledge/${f.filename}`,
+          fileName: name,
+          fileType: f.mimetype || null,
+          fileSize: f.size,
+          fileHash: hash,
+          searchText: fileSearch,
+          sortOrder: i,
+          versionNumber: 1,
+          uploadedBy: userId,
+        })
+      }
+      await rebuildDocumentSearchText(client, docId, {
+        title,
+        description,
+        tags,
+      })
+    } catch (fileTableError) {
+      if (!fileTableError || fileTableError.code !== '42P01') throw fileTableError
+    }
+
     await client.query('COMMIT')
 
     const { rows } = await dbPool.query(`${SELECT_BASE} WHERE d.id = $1`, [docId])
     const segmentsMap = await loadSegmentsMap(dbPool, [docId])
+    const filesMap = await loadFilesMap(dbPool, [docId])
 
     notifyDepartmentAboutDocument(dbPool, io, {
       documentId: docId,
@@ -1011,7 +1245,10 @@ const createDocument = (dbPool, io) => async (req, res) => {
     }).catch(() => {})
 
     return res.status(201).json({
-      document: mapDoc(rows[0], segmentsMap[docId] || [], true),
+      document: mapDoc(rows[0], segmentsMap[docId] || [], true, {
+        files: filesMap[docId] || [],
+        filesCount: (filesMap[docId] || []).length || uploadFiles.length,
+      }),
     })
   } catch (error) {
     try {
@@ -1121,6 +1358,12 @@ const updateDocument = (dbPool, io) => async (req, res) => {
     let fileChanged = false
 
     if (req.file) {
+      if (prev.is_folder === true || prev.is_folder === 1) {
+        return res.status(400).json({
+          error:
+            'Это папка. Чтобы добавить файл, используйте действие «Добавить файл в папку».',
+        })
+      }
       fileUrl = `/uploads/knowledge/${req.file.filename}`
       fileName = resolveUploadFileName(req)
       fileType = req.file.mimetype || null
@@ -1196,6 +1439,48 @@ const updateDocument = (dbPool, io) => async (req, res) => {
     if (fileChanged) {
       await archiveCurrentFileVersion(client, prev)
       versionNumber = Number(prev.version_number || 1) + 1
+      try {
+        const existingFiles = await client.query(
+          `SELECT id FROM knowledge_document_files
+           WHERE document_id = $1 ORDER BY sort_order ASC, id ASC LIMIT 1`,
+          [id]
+        )
+        if (existingFiles.rows.length) {
+          await client.query(
+            `UPDATE knowledge_document_files SET
+              file_url = $1, file_name = $2, file_type = $3, file_size = $4,
+              file_hash = $5, search_text = $6, version_number = $7,
+              uploaded_by = $8, updated_at = CURRENT_TIMESTAMP
+             WHERE id = $9`,
+            [
+              fileUrl,
+              fileName,
+              fileType,
+              fileSize,
+              fileHash,
+              searchBlob || null,
+              versionNumber,
+              userId,
+              existingFiles.rows[0].id,
+            ]
+          )
+        } else {
+          await insertDocumentFile(client, {
+            documentId: id,
+            fileUrl,
+            fileName,
+            fileType,
+            fileSize,
+            fileHash,
+            searchText: searchBlob,
+            sortOrder: 0,
+            versionNumber,
+            uploadedBy: userId,
+          })
+        }
+      } catch (fileTableError) {
+        if (!fileTableError || fileTableError.code !== '42P01') throw fileTableError
+      }
     }
 
     await client.query(
@@ -1768,6 +2053,945 @@ const deleteTag = (dbPool) => async (req, res) => {
   }
 }
 
+const addDocumentFile = (dbPool, io) => async (req, res) => {
+  const client = await dbPool.connect()
+  try {
+    const userId = resolveUserId(req)
+    if (!userId) return res.status(400).json({ error: 'Укажите userId' })
+    const id = Number(req.params.id)
+    if (!Number.isFinite(id)) return res.status(400).json({ error: 'Некорректный id' })
+
+    const perms = await getKnowledgePermissions(dbPool, userId)
+    if (!perms.canUpload) {
+      return res.status(403).json({ error: 'Недостаточно прав' })
+    }
+
+    const uploadFiles = collectUploadFiles(req)
+    if (!uploadFiles.length) {
+      return res.status(400).json({ error: 'Прикрепите файл' })
+    }
+
+    const existing = await dbPool.query(
+      `SELECT * FROM knowledge_documents WHERE id = $1 AND is_archived = FALSE`,
+      [id]
+    )
+    if (!existing.rows.length) return res.status(404).json({ error: 'Документ не найден' })
+    const prev = existing.rows[0]
+
+    const allowed = await canManageDocument(dbPool, perms, prev.owner_department_id)
+    if (!allowed) return res.status(403).json({ error: 'Нет прав на редактирование' })
+
+    // Текущие файлы папки (для проверки имён)
+    let currentFiles = []
+    try {
+      const cur = await dbPool.query(
+        `SELECT id, file_name, version_number, file_url, file_type, file_size, file_hash,
+                search_text, uploaded_by, document_id
+         FROM knowledge_document_files
+         WHERE document_id = $1
+         ORDER BY sort_order ASC, id ASC`,
+        [id]
+      )
+      currentFiles = cur.rows
+    } catch (e) {
+      if (!e || e.code !== '42P01') throw e
+    }
+
+    // Если у старого документа ещё нет строк — учитываем file_* карточки
+    if (
+      !currentFiles.length &&
+      prev.file_url &&
+      prev.file_name
+    ) {
+      currentFiles = [
+        {
+          id: null,
+          document_id: id,
+          file_name: prev.file_name,
+          version_number: prev.version_number || 1,
+          file_url: prev.file_url,
+          file_type: prev.file_type,
+          file_size: prev.file_size,
+          file_hash: prev.file_hash,
+          search_text: prev.search_text,
+          uploaded_by: prev.uploaded_by,
+        },
+      ]
+    }
+
+    const byName = new Map()
+    currentFiles.forEach((row) => {
+      const key = normalizeFileName(row.file_name)
+      if (key) byName.set(key, row)
+    })
+
+    const planned = []
+    const conflicts = []
+    const seenInBatch = new Map()
+
+    for (let i = 0; i < uploadFiles.length; i += 1) {
+      const f = uploadFiles[i]
+      const name = resolveUploadFileNameAt(req, f, i)
+      const key = normalizeFileName(name)
+      if (!key) {
+        return res.status(400).json({ error: 'Некорректное имя файла' })
+      }
+      if (seenInBatch.has(key)) {
+        return res.status(400).json({
+          error: `В одной загрузке два файла с одинаковым именем: «${name}»`,
+        })
+      }
+      seenInBatch.set(key, true)
+
+      const existingFile = byName.get(key)
+      if (existingFile) {
+        conflicts.push({
+          fileName: name,
+          fileId: existingFile.id != null ? Number(existingFile.id) : null,
+          currentFileName: existingFile.file_name,
+          versionNumber: Number(existingFile.version_number || 1),
+          uploadIndex: i,
+        })
+        planned.push({ type: 'replace', upload: f, name, existing: existingFile, index: i })
+      } else {
+        planned.push({ type: 'add', upload: f, name, index: i })
+      }
+    }
+
+    const replaceSameNames = String(req.body.replaceSameNames || '') === '1'
+    if (conflicts.length && !replaceSameNames) {
+      const names = conflicts.map((c) => `«${c.fileName}»`).join(', ')
+      return res.status(409).json({
+        code: 'FOLDER_FILE_NAME_EXISTS',
+        error:
+          conflicts.length === 1
+            ? `В папке уже есть файл ${names}. Заменить его новой версией?`
+            : `В папке уже есть файлы с такими именами: ${names}. Заменить их новыми версиями?`,
+        documentId: id,
+        conflicts,
+      })
+    }
+
+    await client.query('BEGIN')
+    await client.query(
+      `UPDATE knowledge_documents SET is_folder = TRUE, updated_by = $1, updated_at = CURRENT_TIMESTAMP
+       WHERE id = $2`,
+      [userId, id]
+    )
+
+    const { rows: maxSort } = await client.query(
+      `SELECT COALESCE(MAX(sort_order), -1)::int AS m FROM knowledge_document_files WHERE document_id = $1`,
+      [id]
+    )
+    let sortOrder = Number(maxSort[0]?.m ?? -1) + 1
+
+    // Если у старого документа ещё нет строк файлов — переносим текущий
+    const { rows: existingFileRows } = await client.query(
+      `SELECT id FROM knowledge_document_files WHERE document_id = $1 LIMIT 1`,
+      [id]
+    )
+    if (!existingFileRows.length && prev.file_url) {
+      const insertedLegacy = await insertDocumentFile(client, {
+        documentId: id,
+        fileUrl: prev.file_url,
+        fileName: prev.file_name,
+        fileType: prev.file_type,
+        fileSize: prev.file_size,
+        fileHash: prev.file_hash,
+        searchText: prev.search_text,
+        sortOrder: 0,
+        versionNumber: prev.version_number || 1,
+        uploadedBy: prev.uploaded_by || userId,
+      })
+      sortOrder = Math.max(sortOrder, 1)
+      // подставить id для replace по имени из «legacy»
+      planned.forEach((p) => {
+        if (
+          p.type === 'replace' &&
+          p.existing &&
+          p.existing.id == null &&
+          normalizeFileName(p.existing.file_name) ===
+            normalizeFileName(prev.file_name)
+        ) {
+          p.existing = { ...p.existing, id: insertedLegacy.id }
+        }
+      })
+    }
+
+    let replacedCount = 0
+    let addedCount = 0
+
+    for (const item of planned) {
+      const f = item.upload
+      const name = item.name
+      const hash = hashFile(f.path)
+      const extracted = await extractTextFromFile(f.path, {
+        fileName: name,
+        mimeType: f.mimetype,
+      })
+      const fileSearch = buildSearchBlob({
+        title: prev.title,
+        description: prev.description || '',
+        tags: prev.tags || [],
+        fileName: name,
+        extractedText: extracted,
+      })
+      const fileUrl = `/uploads/knowledge/${f.filename}`
+
+      if (item.type === 'replace') {
+        let existingRow = item.existing
+        if (!existingRow?.id) {
+          const found = await client.query(
+            `SELECT * FROM knowledge_document_files
+             WHERE document_id = $1 AND lower(trim(file_name)) = lower(trim($2))
+             LIMIT 1`,
+            [id, name]
+          )
+          existingRow = found.rows[0]
+        } else {
+          const found = await client.query(
+            `SELECT * FROM knowledge_document_files WHERE id = $1 AND document_id = $2`,
+            [existingRow.id, id]
+          )
+          existingRow = found.rows[0]
+        }
+        if (!existingRow) {
+          await client.query('ROLLBACK')
+          return res.status(404).json({
+            error: `Не найден файл «${name}» для замены`,
+          })
+        }
+
+        try {
+          await archiveFileVersion(client, existingRow)
+        } catch (e) {
+          if (e && e.code === '42P01') {
+            await client.query('ROLLBACK')
+            return res.status(503).json({
+              error: 'Выполните миграцию add_knowledge_base_file_versions.sql',
+            })
+          }
+          throw e
+        }
+
+        const nextVersion = Number(existingRow.version_number || 1) + 1
+        await client.query(
+          `UPDATE knowledge_document_files SET
+            file_url = $1, file_name = $2, file_type = $3, file_size = $4,
+            file_hash = $5, search_text = $6, version_number = $7,
+            uploaded_by = $8, updated_at = CURRENT_TIMESTAMP
+           WHERE id = $9`,
+          [
+            fileUrl,
+            name,
+            f.mimetype || null,
+            f.size != null ? Number(f.size) : null,
+            hash,
+            fileSearch || null,
+            nextVersion,
+            userId,
+            existingRow.id,
+          ]
+        )
+        replacedCount += 1
+      } else {
+        await insertDocumentFile(client, {
+          documentId: id,
+          fileUrl,
+          fileName: name,
+          fileType: f.mimetype || null,
+          fileSize: f.size,
+          fileHash: hash,
+          searchText: fileSearch,
+          sortOrder: sortOrder,
+          versionNumber: 1,
+          uploadedBy: userId,
+        })
+        sortOrder += 1
+        addedCount += 1
+      }
+    }
+
+    await syncPrimaryFileFromChildren(client, id)
+    await rebuildDocumentSearchText(client, id)
+    await client.query('COMMIT')
+
+    const { rows } = await dbPool.query(`${SELECT_BASE} WHERE d.id = $1`, [id])
+    const segmentsMap = await loadSegmentsMap(dbPool, [id])
+    const filesMap = await loadFilesMap(dbPool, [id])
+
+    if (replacedCount > 0) {
+      const replacedNames = planned
+        .filter((p) => p.type === 'replace')
+        .map((p) => p.name)
+        .filter(Boolean)
+      notifyDepartmentAboutDocument(dbPool, io, {
+        documentId: id,
+        title: prev.title,
+        ownerDepartmentId: prev.owner_department_id,
+        uploadedBy: userId,
+        isNewVersion: true,
+        versionNumber: Number(prev.version_number || 1) + 1,
+        fileName: replacedNames.join(', ') || null,
+      }).catch(() => {})
+    }
+
+    return res.status(replacedCount && !addedCount ? 200 : 201).json({
+      document: mapDoc(rows[0], segmentsMap[id] || [], true, {
+        files: filesMap[id] || [],
+        filesCount: (filesMap[id] || []).length,
+      }),
+      replacedCount,
+      addedCount,
+    })
+  } catch (error) {
+    try {
+      await client.query('ROLLBACK')
+    } catch (_) {}
+    if (tableMissing(error)) {
+      return res.status(503).json({
+        error: 'Выполните миграцию add_knowledge_base_folders.sql',
+      })
+    }
+    console.error('knowledge addDocumentFile:', error)
+    return res.status(500).json({ error: error.message || 'Ошибка добавления файла' })
+  } finally {
+    client.release()
+  }
+}
+
+const deleteDocumentFile = (dbPool) => async (req, res) => {
+  const client = await dbPool.connect()
+  try {
+    const userId = resolveUserId(req)
+    if (!userId) return res.status(400).json({ error: 'Укажите userId' })
+    const id = Number(req.params.id)
+    const fileId = Number(req.params.fileId)
+    if (!Number.isFinite(id) || !Number.isFinite(fileId)) {
+      return res.status(400).json({ error: 'Некорректный id' })
+    }
+
+    const perms = await getKnowledgePermissions(dbPool, userId)
+    const existing = await dbPool.query(
+      `SELECT * FROM knowledge_documents WHERE id = $1 AND is_archived = FALSE`,
+      [id]
+    )
+    if (!existing.rows.length) return res.status(404).json({ error: 'Документ не найден' })
+
+    const allowed = await canManageDocument(dbPool, perms, existing.rows[0].owner_department_id)
+    if (!allowed) return res.status(403).json({ error: 'Нет прав на удаление файла' })
+
+    await client.query('BEGIN')
+    const del = await client.query(
+      `DELETE FROM knowledge_document_files
+       WHERE id = $1 AND document_id = $2
+       RETURNING id`,
+      [fileId, id]
+    )
+    if (!del.rows.length) {
+      await client.query('ROLLBACK')
+      return res.status(404).json({ error: 'Файл не найден в папке' })
+    }
+
+    const { rows: left } = await client.query(
+      `SELECT COUNT(*)::int AS cnt FROM knowledge_document_files WHERE document_id = $1`,
+      [id]
+    )
+    const count = Number(left[0]?.cnt || 0)
+    if (count <= 1) {
+      await client.query(
+        `UPDATE knowledge_documents SET is_folder = $1, updated_by = $2, updated_at = CURRENT_TIMESTAMP
+         WHERE id = $3`,
+        [count > 1, userId, id]
+      )
+    }
+    await syncPrimaryFileFromChildren(client, id)
+    await rebuildDocumentSearchText(client, id)
+    await client.query(
+      `UPDATE knowledge_documents SET is_folder = $1, updated_by = $2, updated_at = CURRENT_TIMESTAMP
+       WHERE id = $3`,
+      [count > 1, userId, id]
+    )
+    await client.query('COMMIT')
+
+    const { rows } = await dbPool.query(`${SELECT_BASE} WHERE d.id = $1`, [id])
+    const segmentsMap = await loadSegmentsMap(dbPool, [id])
+    const filesMap = await loadFilesMap(dbPool, [id])
+    return res.json({
+      ok: true,
+      document: mapDoc(rows[0], segmentsMap[id] || [], true, {
+        files: filesMap[id] || [],
+        filesCount: (filesMap[id] || []).length,
+      }),
+    })
+  } catch (error) {
+    try {
+      await client.query('ROLLBACK')
+    } catch (_) {}
+    if (tableMissing(error)) {
+      return res.status(503).json({
+        error: 'Выполните миграцию add_knowledge_base_folders.sql',
+      })
+    }
+    console.error('knowledge deleteDocumentFile:', error)
+    return res.status(500).json({ error: error.message || 'Ошибка удаления файла' })
+  } finally {
+    client.release()
+  }
+}
+
+const downloadDocumentFile = (dbPool, uploadsRoot) => async (req, res) => {
+  try {
+    const userId = resolveUserId(req)
+    if (!userId) return res.status(400).json({ error: 'Укажите userId' })
+    const id = Number(req.params.id)
+    const fileId = Number(req.params.fileId)
+    if (!Number.isFinite(id) || !Number.isFinite(fileId)) {
+      return res.status(400).json({ error: 'Некорректный id' })
+    }
+
+    const perms = await getKnowledgePermissions(dbPool, userId)
+    const { rows } = await dbPool.query(
+      `SELECT * FROM knowledge_documents WHERE id = $1 AND is_archived = FALSE`,
+      [id]
+    )
+    if (!rows.length) return res.status(404).json({ error: 'Документ не найден' })
+
+    const segmentsMap = await loadSegmentsMap(dbPool, [id])
+    if (!isVisibleToUser(rows[0], segmentsMap[id] || [], userId, perms.departmentId, perms)) {
+      return res.status(403).json({ error: 'Нет доступа к файлу' })
+    }
+
+    const fileRes = await dbPool.query(
+      `SELECT * FROM knowledge_document_files WHERE id = $1 AND document_id = $2`,
+      [fileId, id]
+    )
+    if (!fileRes.rows.length) {
+      return res.status(404).json({ error: 'Файл не найден' })
+    }
+    const fileRow = fileRes.rows[0]
+    const fileNameOnDisk = path.basename(String(fileRow.file_url || ''))
+    const filePath = path.join(uploadsRoot, 'knowledge', fileNameOnDisk)
+    if (!fileNameOnDisk || !fs.existsSync(filePath)) {
+      return res.status(404).json({ error: 'Файл на диске не найден' })
+    }
+
+    const downloadName = fileRow.file_name || fileNameOnDisk
+    const inline =
+      String(req.query.inline || '') === '1' || String(req.query.view || '') === '1'
+    const contentType =
+      fileRow.file_type ||
+      mime.lookup(downloadName) ||
+      mime.lookup(fileNameOnDisk) ||
+      'application/octet-stream'
+
+    if (inline) {
+      await logDocumentEvent(dbPool, id, userId, 'view')
+      res.setHeader('Content-Type', contentType)
+      res.setHeader(
+        'Content-Disposition',
+        `inline; filename*=UTF-8''${encodeURIComponent(downloadName)}`
+      )
+      return res.sendFile(path.resolve(filePath))
+    }
+
+    await logDocumentEvent(dbPool, id, userId, 'download')
+    return res.download(filePath, downloadName)
+  } catch (error) {
+    if (tableMissing(error)) {
+      return res.status(503).json({
+        error: 'Выполните миграцию add_knowledge_base_folders.sql',
+      })
+    }
+    console.error('knowledge downloadDocumentFile:', error)
+    return res.status(500).json({ error: error.message || 'Ошибка скачивания' })
+  }
+}
+
+const convertDocumentToFolder = (dbPool) => async (req, res) => {
+  try {
+    const userId = resolveUserId(req)
+    if (!userId) return res.status(400).json({ error: 'Укажите userId' })
+    const id = Number(req.params.id)
+    if (!Number.isFinite(id)) return res.status(400).json({ error: 'Некорректный id' })
+
+    const perms = await getKnowledgePermissions(dbPool, userId)
+    const existing = await dbPool.query(
+      `SELECT * FROM knowledge_documents WHERE id = $1 AND is_archived = FALSE`,
+      [id]
+    )
+    if (!existing.rows.length) return res.status(404).json({ error: 'Документ не найден' })
+    const prev = existing.rows[0]
+    const allowed = await canManageDocument(dbPool, perms, prev.owner_department_id)
+    if (!allowed) return res.status(403).json({ error: 'Нет прав' })
+
+    const client = await dbPool.connect()
+    try {
+      await client.query('BEGIN')
+      const { rows: files } = await client.query(
+        `SELECT id FROM knowledge_document_files WHERE document_id = $1 LIMIT 1`,
+        [id]
+      )
+      if (!files.length && prev.file_url) {
+        await insertDocumentFile(client, {
+          documentId: id,
+          fileUrl: prev.file_url,
+          fileName: prev.file_name,
+          fileType: prev.file_type,
+          fileSize: prev.file_size,
+          fileHash: prev.file_hash,
+          searchText: prev.search_text,
+          sortOrder: 0,
+          versionNumber: prev.version_number || 1,
+          uploadedBy: prev.uploaded_by || userId,
+        })
+      }
+      await client.query(
+        `UPDATE knowledge_documents SET is_folder = TRUE, updated_by = $1, updated_at = CURRENT_TIMESTAMP
+         WHERE id = $2`,
+        [userId, id]
+      )
+      await client.query('COMMIT')
+    } catch (e) {
+      try {
+        await client.query('ROLLBACK')
+      } catch (_) {}
+      throw e
+    } finally {
+      client.release()
+    }
+
+    const { rows } = await dbPool.query(`${SELECT_BASE} WHERE d.id = $1`, [id])
+    const segmentsMap = await loadSegmentsMap(dbPool, [id])
+    const filesMap = await loadFilesMap(dbPool, [id])
+    return res.json({
+      document: mapDoc(rows[0], segmentsMap[id] || [], true, {
+        files: filesMap[id] || [],
+        filesCount: (filesMap[id] || []).length,
+      }),
+    })
+  } catch (error) {
+    if (tableMissing(error)) {
+      return res.status(503).json({
+        error: 'Выполните миграцию add_knowledge_base_folders.sql',
+      })
+    }
+    console.error('knowledge convertDocumentToFolder:', error)
+    return res.status(500).json({ error: error.message || 'Ошибка' })
+  }
+}
+
+/**
+ * Замена файла в папке новой версией (история — в knowledge_document_file_versions).
+ */
+const replaceDocumentFile = (dbPool, io) => async (req, res) => {
+  const client = await dbPool.connect()
+  try {
+    const userId = resolveUserId(req)
+    if (!userId) return res.status(400).json({ error: 'Укажите userId' })
+    const id = Number(req.params.id)
+    const fileId = Number(req.params.fileId)
+    if (!Number.isFinite(id) || !Number.isFinite(fileId)) {
+      return res.status(400).json({ error: 'Некорректный id' })
+    }
+
+    const uploadFiles = collectUploadFiles(req)
+    if (!uploadFiles.length) {
+      return res.status(400).json({ error: 'Прикрепите новый файл' })
+    }
+    const upload = uploadFiles[0]
+    const newName = resolveUploadFileNameAt(req, upload, 0)
+
+    const perms = await getKnowledgePermissions(dbPool, userId)
+    if (!perms.canUpload) {
+      return res.status(403).json({ error: 'Недостаточно прав' })
+    }
+
+    const existing = await dbPool.query(
+      `SELECT * FROM knowledge_documents WHERE id = $1 AND is_archived = FALSE`,
+      [id]
+    )
+    if (!existing.rows.length) return res.status(404).json({ error: 'Документ не найден' })
+    const prev = existing.rows[0]
+    const allowed = await canManageDocument(dbPool, perms, prev.owner_department_id)
+    if (!allowed) return res.status(403).json({ error: 'Нет прав на замену файла' })
+
+    await client.query('BEGIN')
+    const fileRes = await client.query(
+      `SELECT * FROM knowledge_document_files
+       WHERE id = $1 AND document_id = $2
+       FOR UPDATE`,
+      [fileId, id]
+    )
+    if (!fileRes.rows.length) {
+      await client.query('ROLLBACK')
+      return res.status(404).json({ error: 'Файл не найден в папке' })
+    }
+    const current = fileRes.rows[0]
+
+    const confirmDifferentFileName =
+      String(req.body.confirmDifferentFileName || '') === '1'
+    if (!confirmDifferentFileName && fileNamesDiffer(current.file_name, newName)) {
+      await client.query('ROLLBACK')
+      return res.status(409).json({
+        code: 'FILE_NAME_MISMATCH',
+        error: `Вы загружаете «${newName}», а сейчас в папке «${current.file_name}». Чтобы всё же заменить — подтвердите действие.`,
+        documentId: id,
+        fileId,
+        currentFileName: current.file_name,
+        newFileName: newName,
+      })
+    }
+
+    try {
+      await archiveFileVersion(client, current)
+    } catch (e) {
+      if (e && e.code === '42P01') {
+        await client.query('ROLLBACK')
+        return res.status(503).json({
+          error: 'Выполните миграцию add_knowledge_base_file_versions.sql',
+        })
+      }
+      throw e
+    }
+
+    const nextVersion = Number(current.version_number || 1) + 1
+    const fileUrl = `/uploads/knowledge/${upload.filename}`
+    const fileHash = hashFile(upload.path)
+    const extracted = await extractTextFromFile(upload.path, {
+      fileName: newName,
+      mimeType: upload.mimetype,
+    })
+    const fileSearch = buildSearchBlob({
+      title: prev.title,
+      description: prev.description || '',
+      tags: prev.tags || [],
+      fileName: newName,
+      extractedText: extracted,
+    })
+
+    await client.query(
+      `UPDATE knowledge_document_files SET
+        file_url = $1,
+        file_name = $2,
+        file_type = $3,
+        file_size = $4,
+        file_hash = $5,
+        search_text = $6,
+        version_number = $7,
+        uploaded_by = $8,
+        updated_at = CURRENT_TIMESTAMP
+       WHERE id = $9`,
+      [
+        fileUrl,
+        newName,
+        upload.mimetype || null,
+        upload.size != null ? Number(upload.size) : null,
+        fileHash,
+        fileSearch || null,
+        nextVersion,
+        userId,
+        fileId,
+      ]
+    )
+
+    await syncPrimaryFileFromChildren(client, id)
+    await rebuildDocumentSearchText(client, id)
+    await client.query(
+      `UPDATE knowledge_documents SET updated_by = $1, updated_at = CURRENT_TIMESTAMP
+       WHERE id = $2`,
+      [userId, id]
+    )
+    await client.query('COMMIT')
+
+    const { rows } = await dbPool.query(`${SELECT_BASE} WHERE d.id = $1`, [id])
+    const segmentsMap = await loadSegmentsMap(dbPool, [id])
+    const filesMap = await loadFilesMap(dbPool, [id])
+
+    notifyDepartmentAboutDocument(dbPool, io, {
+      documentId: id,
+      title: prev.title,
+      ownerDepartmentId: prev.owner_department_id,
+      uploadedBy: userId,
+      isNewVersion: true,
+      versionNumber: nextVersion,
+      fileName: newName,
+    }).catch(() => {})
+
+    return res.json({
+      replaced: true,
+      versionNumber: nextVersion,
+      document: mapDoc(rows[0], segmentsMap[id] || [], true, {
+        files: filesMap[id] || [],
+        filesCount: (filesMap[id] || []).length,
+      }),
+    })
+  } catch (error) {
+    try {
+      await client.query('ROLLBACK')
+    } catch (_) {}
+    if (tableMissing(error)) {
+      return res.status(503).json({
+        error: 'Выполните миграцию add_knowledge_base_file_versions.sql',
+      })
+    }
+    console.error('knowledge replaceDocumentFile:', error)
+    return res.status(500).json({ error: error.message || 'Ошибка замены файла' })
+  } finally {
+    client.release()
+  }
+}
+
+/**
+ * Переименование файла в папке (только метаданные, без загрузки).
+ */
+const renameDocumentFile = (dbPool) => async (req, res) => {
+  const client = await dbPool.connect()
+  try {
+    const userId = resolveUserId(req)
+    if (!userId) return res.status(400).json({ error: 'Укажите userId' })
+    const id = Number(req.params.id)
+    const fileId = Number(req.params.fileId)
+    if (!Number.isFinite(id) || !Number.isFinite(fileId)) {
+      return res.status(400).json({ error: 'Некорректный id' })
+    }
+
+    const nextName = String(req.body.fileName || req.body.file_name || '').trim()
+    if (!nextName) {
+      return res.status(400).json({ error: 'Укажите новое имя файла' })
+    }
+    if (nextName.length > 255) {
+      return res.status(400).json({ error: 'Слишком длинное имя файла' })
+    }
+    if (/[\\/]/.test(nextName)) {
+      return res.status(400).json({ error: 'Имя файла не должно содержать слэши' })
+    }
+
+    const perms = await getKnowledgePermissions(dbPool, userId)
+    if (!perms.canUpload) {
+      return res.status(403).json({ error: 'Недостаточно прав' })
+    }
+
+    const existing = await dbPool.query(
+      `SELECT * FROM knowledge_documents WHERE id = $1 AND is_archived = FALSE`,
+      [id]
+    )
+    if (!existing.rows.length) return res.status(404).json({ error: 'Документ не найден' })
+    const prev = existing.rows[0]
+    const allowed = await canManageDocument(dbPool, perms, prev.owner_department_id)
+    if (!allowed) return res.status(403).json({ error: 'Нет прав на переименование' })
+
+    await client.query('BEGIN')
+    const fileRes = await client.query(
+      `SELECT * FROM knowledge_document_files
+       WHERE id = $1 AND document_id = $2
+       FOR UPDATE`,
+      [fileId, id]
+    )
+    if (!fileRes.rows.length) {
+      await client.query('ROLLBACK')
+      return res.status(404).json({ error: 'Файл не найден в папке' })
+    }
+    const current = fileRes.rows[0]
+
+    if (!fileNamesDiffer(current.file_name, nextName)) {
+      await client.query('ROLLBACK')
+      const { rows } = await dbPool.query(`${SELECT_BASE} WHERE d.id = $1`, [id])
+      const segmentsMap = await loadSegmentsMap(dbPool, [id])
+      const filesMap = await loadFilesMap(dbPool, [id])
+      return res.json({
+        renamed: false,
+        document: mapDoc(rows[0], segmentsMap[id] || [], true, {
+          files: filesMap[id] || [],
+          filesCount: (filesMap[id] || []).length,
+        }),
+        message: 'Имя не изменилось',
+      })
+    }
+
+    const dup = await client.query(
+      `SELECT id FROM knowledge_document_files
+       WHERE document_id = $1 AND id <> $2
+         AND lower(trim(file_name)) = lower(trim($3))
+       LIMIT 1`,
+      [id, fileId, nextName]
+    )
+    if (dup.rows.length) {
+      await client.query('ROLLBACK')
+      return res.status(409).json({
+        code: 'FOLDER_FILE_NAME_EXISTS',
+        error: `В папке уже есть файл «${nextName}»`,
+      })
+    }
+
+    const fileSearch = buildSearchBlob({
+      title: prev.title,
+      description: prev.description || '',
+      tags: prev.tags || [],
+      fileName: nextName,
+      extractedText: current.search_text || '',
+    })
+
+    await client.query(
+      `UPDATE knowledge_document_files SET
+        file_name = $1,
+        search_text = $2,
+        updated_at = CURRENT_TIMESTAMP
+       WHERE id = $3`,
+      [nextName, fileSearch || null, fileId]
+    )
+
+    await syncPrimaryFileFromChildren(client, id)
+    await rebuildDocumentSearchText(client, id)
+    await client.query(
+      `UPDATE knowledge_documents SET updated_by = $1, updated_at = CURRENT_TIMESTAMP
+       WHERE id = $2`,
+      [userId, id]
+    )
+    await client.query('COMMIT')
+
+    const { rows } = await dbPool.query(`${SELECT_BASE} WHERE d.id = $1`, [id])
+    const segmentsMap = await loadSegmentsMap(dbPool, [id])
+    const filesMap = await loadFilesMap(dbPool, [id])
+    return res.json({
+      renamed: true,
+      document: mapDoc(rows[0], segmentsMap[id] || [], true, {
+        files: filesMap[id] || [],
+        filesCount: (filesMap[id] || []).length,
+      }),
+    })
+  } catch (error) {
+    try {
+      await client.query('ROLLBACK')
+    } catch (_) {}
+    if (tableMissing(error)) {
+      return res.status(503).json({
+        error: 'Выполните миграцию add_knowledge_base_folders.sql',
+      })
+    }
+    console.error('knowledge renameDocumentFile:', error)
+    return res.status(500).json({ error: error.message || 'Ошибка переименования' })
+  } finally {
+    client.release()
+  }
+}
+
+const listFileVersions = (dbPool) => async (req, res) => {
+  try {
+    const userId = resolveUserId(req)
+    if (!userId) return res.status(400).json({ error: 'Укажите userId' })
+    const id = Number(req.params.id)
+    const fileId = Number(req.params.fileId)
+    if (!Number.isFinite(id) || !Number.isFinite(fileId)) {
+      return res.status(400).json({ error: 'Некорректный id' })
+    }
+
+    const perms = await getKnowledgePermissions(dbPool, userId)
+    const { rows: docs } = await dbPool.query(
+      `SELECT * FROM knowledge_documents WHERE id = $1 AND is_archived = FALSE`,
+      [id]
+    )
+    if (!docs.length) return res.status(404).json({ error: 'Документ не найден' })
+
+    const segmentsMap = await loadSegmentsMap(dbPool, [id])
+    if (!isVisibleToUser(docs[0], segmentsMap[id] || [], userId, perms.departmentId, perms)) {
+      return res.status(403).json({ error: 'Нет доступа' })
+    }
+
+    const fileRes = await dbPool.query(
+      `SELECT * FROM knowledge_document_files WHERE id = $1 AND document_id = $2`,
+      [fileId, id]
+    )
+    if (!fileRes.rows.length) {
+      return res.status(404).json({ error: 'Файл не найден' })
+    }
+    const current = fileRes.rows[0]
+
+    const { rows } = await dbPool.query(
+      `SELECT v.id, v.version_number, v.file_name, v.file_type, v.file_size, v.created_at,
+              TRIM(CONCAT(COALESCE(u.last_name,''),' ',COALESCE(u.first_name,''))) AS uploaded_by_name
+       FROM knowledge_document_file_versions v
+       LEFT JOIN users u ON u.id = v.uploaded_by
+       WHERE v.file_id = $1 AND v.document_id = $2
+       ORDER BY v.version_number DESC`,
+      [fileId, id]
+    )
+
+    return res.json({
+      file: mapFileRow(current, fixFilenameEncoding),
+      currentVersion: Number(current.version_number || 1),
+      versions: rows.map((r) => ({
+        id: Number(r.id),
+        versionNumber: Number(r.version_number),
+        fileName: fixFilenameEncoding(r.file_name || '') || null,
+        fileType: r.file_type,
+        fileSize: r.file_size != null ? Number(r.file_size) : null,
+        createdAt: r.created_at,
+        uploadedByName: (r.uploaded_by_name || '').trim() || null,
+      })),
+    })
+  } catch (error) {
+    if (tableMissing(error)) {
+      return res.status(503).json({
+        error: 'Выполните миграцию add_knowledge_base_file_versions.sql',
+      })
+    }
+    console.error('knowledge listFileVersions:', error)
+    return res.status(500).json({ error: error.message || 'Ошибка' })
+  }
+}
+
+const downloadFileVersion = (dbPool, uploadsRoot) => async (req, res) => {
+  try {
+    const userId = resolveUserId(req)
+    if (!userId) return res.status(400).json({ error: 'Укажите userId' })
+    const id = Number(req.params.id)
+    const fileId = Number(req.params.fileId)
+    const versionId = Number(req.params.versionId)
+    if (!Number.isFinite(id) || !Number.isFinite(fileId) || !Number.isFinite(versionId)) {
+      return res.status(400).json({ error: 'Некорректный id' })
+    }
+
+    const perms = await getKnowledgePermissions(dbPool, userId)
+    const { rows } = await dbPool.query(
+      `SELECT * FROM knowledge_documents WHERE id = $1 AND is_archived = FALSE`,
+      [id]
+    )
+    if (!rows.length) return res.status(404).json({ error: 'Документ не найден' })
+
+    const segmentsMap = await loadSegmentsMap(dbPool, [id])
+    if (!isVisibleToUser(rows[0], segmentsMap[id] || [], userId, perms.departmentId, perms)) {
+      return res.status(403).json({ error: 'Нет доступа к файлу' })
+    }
+
+    const ver = await dbPool.query(
+      `SELECT * FROM knowledge_document_file_versions
+       WHERE id = $1 AND file_id = $2 AND document_id = $3`,
+      [versionId, fileId, id]
+    )
+    if (!ver.rows.length) return res.status(404).json({ error: 'Версия не найдена' })
+
+    const fileRow = ver.rows[0]
+    const fileNameOnDisk = path.basename(String(fileRow.file_url || ''))
+    const filePath = path.join(uploadsRoot, 'knowledge', fileNameOnDisk)
+    if (!fileNameOnDisk || !fs.existsSync(filePath)) {
+      return res.status(404).json({ error: 'Файл на диске не найден' })
+    }
+
+    const downloadName = fileRow.file_name || fileNameOnDisk
+    await logDocumentEvent(dbPool, id, userId, 'download')
+    return res.download(filePath, downloadName)
+  } catch (error) {
+    if (tableMissing(error)) {
+      return res.status(503).json({
+        error: 'Выполните миграцию add_knowledge_base_file_versions.sql',
+      })
+    }
+    console.error('knowledge downloadFileVersion:', error)
+    return res.status(500).json({ error: error.message || 'Ошибка скачивания' })
+  }
+}
+
 module.exports = {
   getPermissions,
   listDocuments,
@@ -1776,6 +3000,14 @@ module.exports = {
   updateDocument,
   deleteDocument,
   downloadDocument,
+  addDocumentFile,
+  deleteDocumentFile,
+  downloadDocumentFile,
+  replaceDocumentFile,
+  renameDocumentFile,
+  listFileVersions,
+  downloadFileVersion,
+  convertDocumentToFolder,
   reindexDocuments,
   listVersions,
   downloadVersion,

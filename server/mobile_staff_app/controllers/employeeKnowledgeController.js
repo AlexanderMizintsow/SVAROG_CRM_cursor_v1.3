@@ -53,10 +53,10 @@ const normalizeField = (value) => {
  * Отправка multipart в register через нативный FormData/Blob.
  * Пакет `form-data` + fetch даёт «[object FormData]» → Unexpected end of form (500).
  */
-const forwardMultipart = async (path, method, fields, file) => {
+const forwardMultipart = async (path, method, fields, filesInput) => {
   const form = new FormData()
   Object.entries(fields || {}).forEach(([key, value]) => {
-    if (key === 'originalFileName') return
+    if (key === 'originalFileName' || key === 'originalFileNames') return
     if (value == null || value === '') return
     if (typeof value === 'object') {
       form.append(key, JSON.stringify(value))
@@ -65,24 +65,43 @@ const forwardMultipart = async (path, method, fields, file) => {
     }
   })
 
-  if (file?.buffer) {
-    const fromFields = fixFilenameEncoding(fields?.originalFileName || '')
+  const files = Array.isArray(filesInput)
+    ? filesInput.filter(Boolean)
+    : filesInput
+      ? [filesInput]
+      : []
+
+  const originalNames = []
+  files.forEach((file, index) => {
+    if (!file?.buffer) return
+    const fromFields = fixFilenameEncoding(
+      (Array.isArray(fields?.originalFileNames) &&
+        fields.originalFileNames[index]) ||
+        (index === 0 ? fields?.originalFileName : '') ||
+        ''
+    )
     const fromFile = fixFilenameEncoding(
       file.originalname || file.filename || ''
     )
     const fixedSafe = (fromFields || fromFile || 'file')
       .replace(/[\\/]/g, '_')
       .slice(0, 500)
+    originalNames.push(fixedSafe)
     const extMatch = fixedSafe.match(/(\.[a-zA-Z0-9]{1,12})$/)
     const ext = extMatch ? extMatch[1] : ''
-    form.append('originalFileName', fixedSafe)
     form.append(
-      'file',
+      files.length > 1 ? 'files' : 'file',
       new Blob([file.buffer], {
         type: file.mimetype || 'application/octet-stream',
       }),
       `upload${ext || '.bin'}`
     )
+  })
+  if (originalNames.length === 1) {
+    form.append('originalFileName', originalNames[0])
+  }
+  if (originalNames.length) {
+    form.append('originalFileNames', JSON.stringify(originalNames))
   }
 
   const response = await fetch(`${REGISTER_URL}${path}`, {
@@ -125,9 +144,22 @@ const buildKnowledgeFields = (req, userId) => ({
   replaceDocumentId: req.body.replaceDocumentId,
   confirmDifferentFileName:
     req.body.confirmDifferentFileName || req.body.confirmFileNameMismatch,
+  isFolder: req.body.isFolder || req.body.is_folder,
   // Кириллическое имя только отдельным полем (не через Content-Disposition)
   originalFileName: req.body.originalFileName || undefined,
+  originalFileNames: normalizeField(req.body.originalFileNames),
 })
+
+const collectReqFiles = (req) => {
+  const list = []
+  if (req.file) list.push(req.file)
+  if (Array.isArray(req.files)) {
+    req.files.forEach((f) => {
+      if (f && !list.includes(f)) list.push(f)
+    })
+  }
+  return list.filter((f) => f?.buffer?.length)
+}
 
 /** Чинит mojibake UTF-8↔Latin-1 в имени файла. */
 const fixFilenameEncoding = (raw) => {
@@ -238,9 +270,10 @@ const getDocument = () => async (req, res) => {
 const createDocument = () => async (req, res) => {
   try {
     const userId = Number(req.user.userId)
-    if (!req.file || !req.file.buffer?.length) {
+    const files = collectReqFiles(req)
+    if (!files.length) {
       return res.status(400).json({
-        error: 'Прикрепите файл для загрузки документа',
+        error: 'Прикрепите хотя бы один файл',
       })
     }
     const fields = buildKnowledgeFields(req, userId)
@@ -248,7 +281,7 @@ const createDocument = () => async (req, res) => {
       '/api/knowledge/documents',
       'POST',
       fields,
-      req.file
+      files
     )
     return res.status(201).json(data)
   } catch (error) {
@@ -395,6 +428,141 @@ const removeFavorite = () => async (req, res) => {
   }
 }
 
+const addDocumentFile = () => async (req, res) => {
+  try {
+    const userId = Number(req.user.userId)
+    const id = Number(req.params.id)
+    const files = collectReqFiles(req)
+    if (!files.length) {
+      return res.status(400).json({ error: 'Прикрепите файл' })
+    }
+    const fields = {
+      userId,
+      originalFileName: req.body.originalFileName,
+      replaceSameNames: req.body.replaceSameNames,
+    }
+    const data = await forwardMultipart(
+      `/api/knowledge/documents/${id}/files`,
+      'POST',
+      fields,
+      files
+    )
+    return res.status(201).json(data)
+  } catch (error) {
+    console.error('[mobile_staff_app][knowledge][addFile]', error)
+    return sendRegisterError(res, error)
+  }
+}
+
+const replaceDocumentFile = () => async (req, res) => {
+  try {
+    const userId = Number(req.user.userId)
+    const id = Number(req.params.id)
+    const fileId = Number(req.params.fileId)
+    const files = collectReqFiles(req)
+    if (!files.length) {
+      return res.status(400).json({ error: 'Прикрепите новый файл' })
+    }
+    const fields = {
+      userId,
+      originalFileName: req.body.originalFileName,
+      confirmDifferentFileName: req.body.confirmDifferentFileName,
+    }
+    const data = await forwardMultipart(
+      `/api/knowledge/documents/${id}/files/${fileId}`,
+      'PUT',
+      fields,
+      files
+    )
+    return res.json(data)
+  } catch (error) {
+    console.error('[mobile_staff_app][knowledge][replaceFile]', error)
+    return sendRegisterError(res, error)
+  }
+}
+
+const renameDocumentFile = () => async (req, res) => {
+  try {
+    const userId = Number(req.user.userId)
+    const id = Number(req.params.id)
+    const fileId = Number(req.params.fileId)
+    const fileName = req.body?.fileName || req.body?.file_name
+    const data = await registerFetch(
+      `/api/knowledge/documents/${id}/files/${fileId}`,
+      {
+        method: 'PATCH',
+        body: { userId, fileName },
+      }
+    )
+    return res.json(data)
+  } catch (error) {
+    console.error('[mobile_staff_app][knowledge][renameFile]', error)
+    return sendRegisterError(res, error)
+  }
+}
+
+const listFileVersions = () => async (req, res) => {
+  try {
+    const userId = Number(req.user.userId)
+    const id = Number(req.params.id)
+    const fileId = Number(req.params.fileId)
+    const data = await registerFetch(
+      `/api/knowledge/documents/${id}/files/${fileId}/versions?userId=${userId}`
+    )
+    return res.json(data)
+  } catch (error) {
+    console.error('[mobile_staff_app][knowledge][fileVersions]', error)
+    return sendRegisterError(res, error)
+  }
+}
+
+const downloadFileVersion = () => async (req, res) => {
+  try {
+    const userId = Number(req.user.userId)
+    const id = Number(req.params.id)
+    const fileId = Number(req.params.fileId)
+    const versionId = Number(req.params.versionId)
+    const path = `/api/knowledge/documents/${id}/files/${fileId}/versions/${versionId}/download?userId=${userId}`
+    return proxyBinary(req, res, path)
+  } catch (error) {
+    console.error('[mobile_staff_app][knowledge][fileVersionDownload]', error)
+    return sendRegisterError(res, error)
+  }
+}
+
+const deleteDocumentFile = () => async (req, res) => {
+  try {
+    const userId = Number(req.user.userId)
+    const id = Number(req.params.id)
+    const fileId = Number(req.params.fileId)
+    const data = await registerFetch(
+      `/api/knowledge/documents/${id}/files/${fileId}?userId=${userId}`,
+      { method: 'DELETE' }
+    )
+    return res.json(data || { ok: true })
+  } catch (error) {
+    console.error('[mobile_staff_app][knowledge][deleteFile]', error)
+    return sendRegisterError(res, error)
+  }
+}
+
+const downloadDocumentFile = () => async (req, res) => {
+  try {
+    const userId = Number(req.user.userId)
+    const id = Number(req.params.id)
+    const fileId = Number(req.params.fileId)
+    const inline = String(req.query.inline || '') === '1'
+    const path = `/api/knowledge/documents/${id}/files/${fileId}/download?${qs({
+      userId,
+      inline: inline ? '1' : undefined,
+    })}`
+    return proxyBinary(req, res, path)
+  } catch (error) {
+    console.error('[mobile_staff_app][knowledge][downloadFile]', error)
+    return sendRegisterError(res, error)
+  }
+}
+
 module.exports = {
   getMeta,
   listDocuments,
@@ -403,6 +571,13 @@ module.exports = {
   updateDocument,
   deleteDocument,
   downloadDocument,
+  addDocumentFile,
+  deleteDocumentFile,
+  downloadDocumentFile,
+  replaceDocumentFile,
+  renameDocumentFile,
+  listFileVersions,
+  downloadFileVersion,
   listVersions,
   downloadVersion,
   addFavorite,

@@ -32,7 +32,70 @@ import FinalSolutionModal from './subcomponents/FinalSolutionModal'
 import SendProjectMailModal from './subcomponents/SendProjectMailModal'
 import FileCommentsModal from './subcomponents/FileCommentsModal'
 import SignatureTemplateModal from './subcomponents/SignatureTemplateModal'
+import {
+  openKnowledgeLinkAction,
+  handleKnowledgeDescriptionClick,
+} from '../../knowledgeBase/openKnowledgeLink'
+import {
+  enhanceKnowledgeLinksInHtml,
+  formatKnowledgeLinkLabel,
+  parseKnowledgeHref,
+} from '../../knowledgeBase/knowledgeLinkUtils'
 import './styles/GlobalTaskCard.scss'
+
+const renderTextWithKnowledgeLinks = (text, userId) => {
+  const value = String(text || '')
+  if (!value) return null
+
+  // Если в описании уже HTML со ссылками (как в задачах) — рендерим как HTML
+  if (/<a\b[^>]*knowledge-base/i.test(value) || /class=["'][^"']*kb-link/i.test(value)) {
+    return (
+      <span
+        className="global-task-card__description-html"
+        onClick={(e) => handleKnowledgeDescriptionClick(e, userId)}
+        dangerouslySetInnerHTML={{
+          __html: enhanceKnowledgeLinksInHtml(value),
+        }}
+      />
+    )
+  }
+
+  const parts = value.split(
+    /((?:https?:\/\/[^\s<>"']+?)?(?:\/)?knowledge-base\?[^\s<>"']+)/i
+  )
+  return parts.map((part, index) => {
+    if (/knowledge-base\?/i.test(part)) {
+      const href = part.startsWith('http')
+        ? part
+        : part.startsWith('/')
+          ? part
+          : `/${part}`
+      const parsed = parseKnowledgeHref(href)
+      const linkText = formatKnowledgeLinkLabel(
+        parsed.label || 'файл из базы знаний'
+      )
+      return (
+        <a
+          key={`kb-${index}`}
+          href={href}
+          className="kb-link"
+          onClick={(e) => {
+            e.preventDefault()
+            e.stopPropagation()
+            openKnowledgeLinkAction(userId, parsed).catch(() => {})
+          }}
+        >
+          {linkText}
+        </a>
+      )
+    }
+    return String(part).replace(/\s*Ссылка\s*[-–—:]\s*[^\n]*$/i, (tail) => {
+      const next = parts[index + 1]
+      if (next && /knowledge-base\?/i.test(next)) return ''
+      return tail
+    })
+  })
+}
 
 const GlobalTaskCard = ({
   task,
@@ -341,7 +404,9 @@ const GlobalTaskCard = ({
         <div className="global-task-card__main-info">
           <h2 className="global-task-card__title">{title}</h2>
           <div className="global-task-card__description-row">
-            <p className="global-task-card__description">{description}</p>
+            <p className="global-task-card__description">
+              {renderTextWithKnowledgeLinks(description, user?.id)}
+            </p>
             {!isReadOnly && (
               <div className="global-task-card__mail-btns">
                 <button

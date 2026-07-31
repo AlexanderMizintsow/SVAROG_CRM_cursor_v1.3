@@ -23,6 +23,8 @@ import {
   sortUsersByLastName,
 } from '../../../utils/userAbsenceUtils'
 import AbsenceAssigneeChoiceModal from '../../../components/absenceAssigneeChoice/AbsenceAssigneeChoiceModal'
+import KnowledgeLinkPicker from '../../knowledgeBase/KnowledgeLinkPicker'
+import useUserStore from '../../../store/userStore'
 import './styles/CreateGlobalTaskForm.scss'
 
 // Значение для input type="datetime-local": YYYY-MM-DDTHH:mm в локальной зоне
@@ -43,9 +45,12 @@ const formatDateRuLocal = (dateStr) => {
 }
 
 const CreateGlobalTaskForm = ({ onSave, onCancel, initialData }) => {
+  const { user } = useUserStore()
+  const userId = user?.id
   const [users, setUsers] = useState([])
   const [responsibleRoles, setResponsibleRoles] = useState(responsibleRolesList)
   const [attachmentsFiles, setAttachmentsFiles] = useState([])
+  const [kbLinkPickerOpen, setKbLinkPickerOpen] = useState(false)
   const [formData, setFormData] = useState({
     title: '',
     description: '',
@@ -446,6 +451,15 @@ const CreateGlobalTaskForm = ({ onSave, onCancel, initialData }) => {
             >
               Описание <span className="required">*</span>
             </label>
+            <div style={{ marginBottom: 8 }}>
+              <button
+                type="button"
+                className="create-global-task-form__add-button"
+                onClick={() => setKbLinkPickerOpen(true)}
+              >
+                Ссылка на базу знаний
+              </button>
+            </div>
             <textarea
               id="description"
               name="description"
@@ -733,6 +747,22 @@ const CreateGlobalTaskForm = ({ onSave, onCancel, initialData }) => {
           </div>
         </form>
       </div>
+
+      <KnowledgeLinkPicker
+        open={kbLinkPickerOpen}
+        userId={userId}
+        onClose={() => setKbLinkPickerOpen(false)}
+        onPick={(item) => {
+          if (!item?.href) return
+          const chunk = item.href
+          setFormData((prev) => ({
+            ...prev,
+            description: prev.description
+              ? `${prev.description.trim()}\n${chunk}`
+              : chunk,
+          }))
+        }}
+      />
       <AbsenceAssigneeChoiceModal
         open={Boolean(currentChoice)}
         entry={currentChoice}

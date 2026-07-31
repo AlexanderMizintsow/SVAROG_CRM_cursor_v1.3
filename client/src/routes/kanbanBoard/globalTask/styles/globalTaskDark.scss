@@ -198,6 +198,14 @@
 
     &__description {
       color: #aeb6c4;
+
+      a,
+      a.kb-link,
+      a[href*='knowledge-base'] {
+        color: #60a5fa !important;
+        text-decoration: underline;
+        font-weight: 600;
+      }
     }
 
     &__mail-btn {

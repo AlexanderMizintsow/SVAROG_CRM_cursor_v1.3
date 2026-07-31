@@ -1,8 +1,9 @@
-import React, { useRef, useEffect } from 'react'
-import { Modal, Box, Typography, Button, TextField, MenuItem, Stack } from '@mui/material'
+import React, { useEffect, useState } from 'react'
+import { Modal, Box, Typography, Button, TextField, MenuItem } from '@mui/material'
 import { useEditor, EditorContent } from '@tiptap/react'
 import StarterKit from '@tiptap/starter-kit'
-import Link from '@tiptap/extension-link' // если понадобится гиперссылка
+import Link from '@tiptap/extension-link'
+import Underline from '@tiptap/extension-underline'
 import ConfirmationDialog from '../../../../../../../components/confirmationDialog/ConfirmationDialog'
 import SubTaskHierarchy from '../../../../../Task/subcomponents/subTaskHierarchy/SubTaskHierarchy'
 import { getUserNames } from '../../../../../Task/utils/taskUtils'
@@ -10,6 +11,9 @@ import { getAbsenceLabel } from '../../../../../../../utils/userAbsenceUtils'
 import { ReactFlowProvider } from 'react-flow-renderer'
 import EditorToolbar from '../../../../../../../components/EditorToolbar/EditorToolbar'
 import useThemeStore from '../../../../../../../store/themeStore'
+import useUserStore from '../../../../../../../store/userStore'
+import KnowledgeLinkPicker from '../../../../../../knowledgeBase/KnowledgeLinkPicker'
+import { buildKnowledgeAnchorHtml } from '../../../../../../knowledgeBase/knowledgeLinkUtils'
 
 const TaskModals = ({
   // Состояния для редактирования описания
@@ -44,15 +48,25 @@ const TaskModals = ({
   absencesMap = {},
 }) => {
   const { theme } = useThemeStore()
+  const { user } = useUserStore()
+  const userId = user?.id
   const isDarkTheme = theme === 'dark'
   const modalBg = isDarkTheme ? '#1f2430' : 'background.paper'
   const modalPaperClass = `task-list-modal-paper ${theme}`
+  const [kbLinkPickerOpen, setKbLinkPickerOpen] = useState(false)
 
   const editor = useEditor({
-    extensions: [StarterKit /*, Link, и др.*/],
+    extensions: [
+      StarterKit,
+      Underline,
+      Link.configure({
+        openOnClick: false,
+        HTMLAttributes: { class: 'kb-link' },
+      }),
+    ],
     content: newDescription || '',
-    onUpdate: ({ editor }) => {
-      setNewDescription(editor.getHTML())
+    onUpdate: ({ editor: ed }) => {
+      setNewDescription(ed.getHTML())
     },
   })
 
@@ -111,10 +125,11 @@ const TaskModals = ({
               Редактировать описание задачи
             </Typography>
 
-            {/* Toolbar с кнопками форматирования */}
-            <EditorToolbar editor={editor} />
+            <EditorToolbar
+              editor={editor}
+              onKnowledgeLinkClick={() => setKbLinkPickerOpen(true)}
+            />
 
-            {/* Контейнер для редактора */}
             <Box
               sx={{
                 flex: 1,
@@ -124,6 +139,11 @@ const TaskModals = ({
                 p: 2,
                 minHeight: 200,
                 overflow: 'auto',
+                '& a.kb-link, & a[href*="knowledge-base"]': {
+                  color: '#2563eb',
+                  fontWeight: 600,
+                  textDecoration: 'underline',
+                },
               }}
             >
               <EditorContent editor={editor} />
@@ -141,6 +161,21 @@ const TaskModals = ({
           </Box>
         </Modal>
       )}
+
+      <KnowledgeLinkPicker
+        open={kbLinkPickerOpen}
+        userId={userId}
+        onClose={() => setKbLinkPickerOpen(false)}
+        onPick={(item) => {
+          if (!editor || !item) return
+          const html = buildKnowledgeAnchorHtml({
+            documentId: item.documentId,
+            fileId: item.fileId,
+            label: item.label,
+          })
+          editor.chain().focus().insertContent(html).run()
+        }}
+      />
 
       {/* Иерархия подзадач */}
       {isHierarchyModalOpen && (

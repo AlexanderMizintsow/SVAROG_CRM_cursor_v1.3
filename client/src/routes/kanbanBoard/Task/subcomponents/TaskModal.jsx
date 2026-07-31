@@ -1,9 +1,14 @@
 import { FaTimes } from 'react-icons/fa'
 import Attachments from './Attachments'
+import useUserStore from '../../../../store/userStore'
+import { handleKnowledgeDescriptionClick } from '../../../knowledgeBase/openKnowledgeLink'
+import { enhanceKnowledgeLinksInHtml } from '../../../knowledgeBase/knowledgeLinkUtils'
 import './TaskModal.scss'
 
 const TaskModal = ({ onClose, image, alt, title, description, attachments }) => {
   const hasAttachments = Array.isArray(attachments) && attachments.length > 0
+  const { user } = useUserStore()
+  const userId = user?.id
 
   return (
     <div className="task-modal open" onClick={onClose}>
@@ -14,7 +19,13 @@ const TaskModal = ({ onClose, image, alt, title, description, attachments }) => 
 
         <div className="task-details">
           <span className="task-title">{title}</span>
-          <div className="task-title-content" dangerouslySetInnerHTML={{ __html: description }} />
+          <div
+            className="task-title-content"
+            onClick={(e) => handleKnowledgeDescriptionClick(e, userId)}
+            dangerouslySetInnerHTML={{
+              __html: enhanceKnowledgeLinksInHtml(description),
+            }}
+          />
         </div>
 
         {hasAttachments && (

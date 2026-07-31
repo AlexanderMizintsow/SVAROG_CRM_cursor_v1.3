@@ -86,6 +86,14 @@
   color: #34495e;
   margin-bottom: 20px;
   font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+
+  a,
+  a.kb-link,
+  a[href*='knowledge-base'] {
+    color: #2563eb !important;
+    text-decoration: underline;
+    cursor: pointer;
+  }
 }
 
 .task-modal-attachments {

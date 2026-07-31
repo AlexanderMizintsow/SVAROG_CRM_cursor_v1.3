@@ -1,10 +1,10 @@
 import { Stack, Button } from '@mui/material'
 
-const EditorToolbar = ({ editor }) => {
+const EditorToolbar = ({ editor, onKnowledgeLinkClick }) => {
   if (!editor) return null
 
   return (
-    <Stack direction="row" spacing={1} sx={{ mb: 2 }}>
+    <Stack direction="row" spacing={1} sx={{ mb: 2 }} flexWrap="wrap" useFlexGap>
       <Button
         size="small"
         variant={editor.isActive('heading', { level: 1 }) ? 'contained' : 'outlined'}
@@ -75,6 +75,19 @@ const EditorToolbar = ({ editor }) => {
       >
         Number
       </Button>
+      {typeof onKnowledgeLinkClick === 'function' ? (
+        <Button
+          size="small"
+          variant="outlined"
+          title="Ссылка на базу знаний"
+          onMouseDown={(e) => {
+            e.preventDefault()
+            onKnowledgeLinkClick()
+          }}
+        >
+          БЗ
+        </Button>
+      ) : null}
     </Stack>
   )
 }

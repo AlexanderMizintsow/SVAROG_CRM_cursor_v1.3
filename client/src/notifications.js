@@ -10,10 +10,15 @@ export const setupNotifications = () => {
   const userData = JSON.parse(userDataString)
 
   const socket = io(`${API_BASE_URL}5001`, {
-    query: { userId: userData.id }, // Передайте уникальный ID пользователя при подключении
+    query: { userId: userData.id },
+    // Почта/уведомления на :5001 — если сервис не запущен, не долбить консоль
+    reconnectionAttempts: 3,
+    reconnectionDelay: 8000,
+    timeout: 5000,
+    autoConnect: true,
   })
-  socket.on('connect_error', (error) => {
-    // console.error('Ошибка подключения:', error.message)
+  socket.on('connect_error', () => {
+    // Сервис почты (5001) недоступен — это не ошибка базы знаний
   })
   socket.on('new-emails', (newEmails) => {
     newEmails.forEach((mail) => {

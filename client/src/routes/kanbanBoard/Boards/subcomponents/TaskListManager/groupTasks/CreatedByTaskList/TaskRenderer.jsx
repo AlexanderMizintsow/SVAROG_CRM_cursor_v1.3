@@ -30,6 +30,17 @@ import { getUserNames } from '../../../../../Task/utils/taskUtils'
 import ChatTaskModal from '../../../../../Task/subcomponents/chatTaskModal/chatTaskModal'
 import Attachments from '../../../../../Task/subcomponents/Attachments'
 import TaskCardParticipants from './TaskCardParticipants'
+import { handleKnowledgeDescriptionClick } from '../../../../../../knowledgeBase/openKnowledgeLink'
+import { enhanceKnowledgeLinksInHtml } from '../../../../../../knowledgeBase/knowledgeLinkUtils'
+
+const kbDescSx = {
+  '& a.kb-link, & a[href*="knowledge-base"]': {
+    color: '#2563eb',
+    fontWeight: 600,
+    textDecoration: 'underline',
+    cursor: 'pointer',
+  },
+}
 
 const TaskRenderer = ({
   filteredTasks,
@@ -261,8 +272,12 @@ const TaskRenderer = ({
                 WebkitLineClamp: 3,
                 WebkitBoxOrient: 'vertical',
                 overflow: 'hidden',
+                ...kbDescSx,
               }}
-              dangerouslySetInnerHTML={{ __html: task.description || '' }}
+              onClick={(e) => handleKnowledgeDescriptionClick(e, userId || user?.id)}
+              dangerouslySetInnerHTML={{
+                __html: enhanceKnowledgeLinksInHtml(task.description || ''),
+              }}
             />
 
             {/* Приоритет */}
@@ -573,9 +588,13 @@ const TaskRenderer = ({
                   )}
                   <Typography
                     variant="body2"
-                    dangerouslySetInnerHTML={{ __html: task.description || '' }}
+                    onClick={(e) => handleKnowledgeDescriptionClick(e, userId || user?.id)}
+                    dangerouslySetInnerHTML={{
+                      __html: enhanceKnowledgeLinksInHtml(task.description || ''),
+                    }}
                     sx={{
                       flex: 1,
+                      ...kbDescSx,
                       ...(isArchive
                         ? {
                             display: '-webkit-box',
@@ -810,7 +829,10 @@ const TaskRenderer = ({
         </div>
         <div
           className={styles.descriptionModalBody}
-          dangerouslySetInnerHTML={{ __html: descriptionModalTask.description || '' }}
+          onClick={(e) => handleKnowledgeDescriptionClick(e, userId || user?.id)}
+          dangerouslySetInnerHTML={{
+            __html: enhanceKnowledgeLinksInHtml(descriptionModalTask.description || ''),
+          }}
         />
       </div>
     </div>

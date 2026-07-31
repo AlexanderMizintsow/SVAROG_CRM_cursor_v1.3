@@ -9,6 +9,9 @@ import useUserStore from '../../../../../store/userStore'
 import ChatFileUploader from './ChatFileUploader'
 import ChatFileViewer from './ChatFileViewer'
 import ChatFileManager from './ChatFileManager'
+import KnowledgeLinkPicker from '../../../../knowledgeBase/KnowledgeLinkPicker'
+import { buildKnowledgePlainMarker } from '../../../../knowledgeBase/knowledgeLinkUtils'
+import { makeChatKnowledgeRenderer } from '../../../../knowledgeBase/chatKnowledgeText'
 import './chatTaskModal.scss'
 
 /** Отпечаток файла: SHA-256 при наличии crypto.subtle, иначе FNV (не-secure context). */
@@ -44,6 +47,11 @@ const ChatTaskModal = ({
   const messagesContainerRef = useRef(null)
   const [messages, setMessages] = useState([])
   const [newMessage, setNewMessage] = useState('')
+  const [kbLinkPickerOpen, setKbLinkPickerOpen] = useState(false)
+  const renderKbText = useCallback(
+    makeChatKnowledgeRenderer(user?.id || currentUser),
+    [user?.id, currentUser]
+  )
   const [participants, setParticipants] = useState([])
   const [isClosing, setIsClosing] = useState(false)
   const [showEmojiPicker, setShowEmojiPicker] = useState(false)
@@ -994,7 +1002,7 @@ const ChatTaskModal = ({
               ) : (
                 <>
                   <div className={`message-text ${isDeleted ? 'message-text--deleted' : ''}`}>
-                    {isDeleted ? 'Сообщение удалено' : message.text}
+                    {isDeleted ? 'Сообщение удалено' : renderKbText(message.text)}
                   </div>
                   {!isDeleted && message.edited_at ? (
                     <div className="message-edited-label">редактировано</div>
@@ -1059,6 +1067,13 @@ const ChatTaskModal = ({
               style={{ resize: 'none', whiteSpace: 'pre-wrap' }}
             />
             <div className="input-buttons">
+              <button
+                type="button"
+                title="Ссылка на базу знаний"
+                onClick={() => setKbLinkPickerOpen(true)}
+              >
+                📚
+              </button>
               <button onClick={() => setShowEmojiPicker((prev) => !prev)}>😊</button>
               <button onClick={handleSendMessage} disabled={isUploading}>
                 {isUploading ? 'Отправка...' : 'Отправить'}
@@ -1066,6 +1081,22 @@ const ChatTaskModal = ({
             </div>
           </div>
         </div>
+
+        <KnowledgeLinkPicker
+          open={kbLinkPickerOpen}
+          userId={user?.id || currentUser}
+          onClose={() => setKbLinkPickerOpen(false)}
+          onPick={(item) => {
+            const chunk =
+              buildKnowledgePlainMarker({
+                documentId: item.documentId,
+                fileId: item.fileId,
+                label: item.label,
+              }) || item.href
+            if (!chunk) return
+            setNewMessage((prev) => (prev ? `${prev.trim()} ${chunk}` : chunk))
+          }}
+        />
 
         {/* Эмодзи пикер */}
         {showEmojiPicker && (

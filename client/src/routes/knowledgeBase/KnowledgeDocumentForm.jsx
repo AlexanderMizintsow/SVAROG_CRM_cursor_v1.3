@@ -9,6 +9,7 @@ const emptyForm = {
   selectedTags: [],
   departmentIds: [],
   userIds: [],
+  isFolder: false,
 }
 
 const KnowledgeDocumentForm = ({
@@ -24,9 +25,11 @@ const KnowledgeDocumentForm = ({
   headDepartmentIds,
   isElevated,
   initial = null,
+  overlayClassName = '',
 }) => {
   const [form, setForm] = useState(emptyForm)
   const [file, setFile] = useState(null)
+  const [files, setFiles] = useState([])
   const [userSearch, setUserSearch] = useState('')
 
   useEffect(() => {
@@ -46,6 +49,7 @@ const KnowledgeDocumentForm = ({
         selectedTags,
         departmentIds: (initial.segments?.departments || []).map(String),
         userIds: (initial.segments?.users || []).map(String),
+        isFolder: Boolean(initial.isFolder),
       })
     } else {
       const defaultDept =
@@ -59,6 +63,7 @@ const KnowledgeDocumentForm = ({
       })
     }
     setFile(null)
+    setFiles([])
     setUserSearch('')
   }, [open, initial, isElevated, headDepartmentIds, categories, tags])
 
@@ -95,7 +100,8 @@ const KnowledgeDocumentForm = ({
   if (!open) return null
 
   const isEdit = Boolean(initial)
-  const titleLocked = isEdit && Boolean(file)
+  const isFolderMode = Boolean(form.isFolder) && !isEdit
+  const titleLocked = isEdit && Boolean(file) && !form.isFolder
 
   const toggleId = (key, id) => {
     const sid = String(id)
@@ -121,7 +127,10 @@ const KnowledgeDocumentForm = ({
     if (!form.title.trim()) return
     if (!form.ownerDepartmentId) return
     if (!form.category) return
-    if (!initial && !file) return
+    if (!initial) {
+      if (isFolderMode && (!files || files.length === 0)) return
+      if (!isFolderMode && !file) return
+    }
     onSubmit({
       ...form,
       tags: form.selectedTags.join(', '),
@@ -129,7 +138,9 @@ const KnowledgeDocumentForm = ({
       ownerDepartmentId: titleLocked
         ? String(initial.ownerDepartmentId || form.ownerDepartmentId)
         : form.ownerDepartmentId,
-      file,
+      file: isFolderMode ? null : file,
+      files: isFolderMode ? files : file ? [file] : [],
+      isFolder: isFolderMode || Boolean(initial?.isFolder),
       isEdit: Boolean(initial),
       id: initial?.id,
     })
@@ -147,19 +158,76 @@ const KnowledgeDocumentForm = ({
     }
   }
 
+  const handleFilesChange = (e) => {
+    const list = Array.from(e.target.files || [])
+    setFiles(list)
+  }
+
+  const removeSelectedFile = (index) => {
+    setFiles((prev) => prev.filter((_, i) => i !== index))
+  }
+
   return (
-    <div className="kb-modal-overlay">
+    <div
+      className={`kb-modal-overlay${overlayClassName ? ` ${overlayClassName}` : ''}`}
+    >
       <div className="kb-modal" role="dialog" aria-modal="true">
         <div className="kb-modal__header">
-          <h2>{initial ? 'Редактировать документ' : 'Загрузить документ'}</h2>
+          <h2>
+            {initial
+              ? initial.isFolder
+                ? 'Редактировать папку'
+                : 'Редактировать документ'
+              : form.isFolder
+                ? 'Создать папку'
+                : 'Загрузить документ'}
+          </h2>
           <button type="button" className="kb-modal__close" onClick={onClose}>
             ×
           </button>
         </div>
 
         <form className="kb-modal__form" onSubmit={handleSubmit}>
+          {!isEdit ? (
+            <div className="kb-modal__mode">
+              <p className="kb-modal__seg-title">Тип</p>
+              <div className="kb-modal__chips">
+                <label className={!form.isFolder ? 'is-on' : ''}>
+                  <input
+                    type="radio"
+                    name="kb-type"
+                    checked={!form.isFolder}
+                    onChange={() => {
+                      setForm((p) => ({ ...p, isFolder: false }))
+                      setFiles([])
+                    }}
+                  />
+                  Один документ
+                </label>
+                <label className={form.isFolder ? 'is-on' : ''}>
+                  <input
+                    type="radio"
+                    name="kb-type"
+                    checked={form.isFolder}
+                    onChange={() => {
+                      setForm((p) => ({ ...p, isFolder: true }))
+                      setFile(null)
+                    }}
+                  />
+                  Папка (несколько файлов)
+                </label>
+              </div>
+              {form.isFolder ? (
+                <span className="kb-modal__hint">
+                  Укажите название папки (например «Фурнитура ФУТУРУСС») и вложите
+                  все связанные файлы. Позже можно добавить ещё файлы в карточке.
+                </span>
+              ) : null}
+            </div>
+          ) : null}
+
           <label>
-            Название
+            {form.isFolder || initial?.isFolder ? 'Название папки' : 'Название'}
             <input
               type="text"
               value={form.title}
@@ -167,20 +235,22 @@ const KnowledgeDocumentForm = ({
               required
               maxLength={500}
               disabled={titleLocked}
-              placeholder="Например: Регламент согласования счетов"
+              placeholder={
+                form.isFolder || initial?.isFolder
+                  ? 'Например: Фурнитура ФУТУРУСС'
+                  : 'Например: Регламент согласования счетов'
+              }
             />
             {titleLocked && (
               <span className="kb-modal__hint">
                 При замене файла название карточки не меняется. Если имя выбранного
-                файла отличается от текущего — система попросит подтверждение (защита
-                от ошибки). Чтобы только переименовать карточку — сохраните без нового
-                файла.
+                файла отличается от текущего — система попросит подтверждение.
               </span>
             )}
             {isEdit && !file && (
               <span className="kb-modal__hint">
-                Переименование карточки — отдельно: измените название и сохраните без
-                нового файла.
+                Переименование карточки — измените название и сохраните без нового
+                файла.
               </span>
             )}
           </label>
@@ -191,7 +261,7 @@ const KnowledgeDocumentForm = ({
               value={form.description}
               onChange={(e) => setForm((p) => ({ ...p, description: e.target.value }))}
               rows={3}
-              placeholder="Кратко, о чём документ"
+              placeholder="Кратко, о чём материалы"
             />
           </label>
 
@@ -323,20 +393,60 @@ const KnowledgeDocumentForm = ({
             </div>
           )}
 
-          <label>
-            Файл{' '}
-            {isEdit
-              ? '(новый файл = новая версия; название документа не меняется)'
-              : ''}
-            <input type="file" onChange={handleFileChange} required={!initial} />
-          </label>
+          {isFolderMode ? (
+            <label>
+              Файлы папки
+              <input
+                type="file"
+                multiple
+                onChange={handleFilesChange}
+                required={!initial}
+              />
+              {files.length ? (
+                <ul className="kb-modal__file-list">
+                  {files.map((f, index) => (
+                    <li key={`${f.name}-${index}`}>
+                      <span>{f.name}</span>
+                      <button
+                        type="button"
+                        className="kb-btn kb-btn--ghost"
+                        onClick={() => removeSelectedFile(index)}
+                      >
+                        Убрать
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+              ) : (
+                <span className="kb-modal__hint">Можно выбрать несколько файлов сразу</span>
+              )}
+            </label>
+          ) : !initial?.isFolder ? (
+            <label>
+              Файл{' '}
+              {isEdit
+                ? '(новый файл = новая версия; название документа не меняется)'
+                : ''}
+              <input type="file" onChange={handleFileChange} required={!initial} />
+            </label>
+          ) : (
+            <span className="kb-modal__hint">
+              Файлы папки добавляются и удаляются в карточке папки.
+            </span>
+          )}
 
           <div className="kb-modal__actions">
             <button type="button" className="kb-btn kb-btn--ghost" onClick={onClose}>
               Отмена
             </button>
             <button type="submit" className="kb-btn kb-btn--primary" disabled={saving}>
-              {saving ? 'Сохранение…' : initial ? 'Сохранить' : 'Загрузить'}
+              {saving
+                ? 'Сохранение…'
+                : initial
+                  ? 'Сохранить'
+                  : form.isFolder
+                    ? 'Создать папку'
+                    : 'Загрузить'}
             </button>
           </div>
         </form>

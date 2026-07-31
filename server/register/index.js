@@ -265,6 +265,14 @@ const {
   updateDocument: updateKnowledgeDocument,
   deleteDocument: deleteKnowledgeDocument,
   downloadDocument: downloadKnowledgeDocument,
+  addDocumentFile: addKnowledgeDocumentFile,
+  deleteDocumentFile: deleteKnowledgeDocumentFile,
+  downloadDocumentFile: downloadKnowledgeDocumentFile,
+  replaceDocumentFile: replaceKnowledgeDocumentFile,
+  renameDocumentFile: renameKnowledgeDocumentFile,
+  listFileVersions: listKnowledgeFileVersions,
+  downloadFileVersion: downloadKnowledgeFileVersion,
+  convertDocumentToFolder: convertKnowledgeDocumentToFolder,
   reindexDocuments: reindexKnowledgeDocuments,
   listVersions: listKnowledgeVersions,
   downloadVersion: downloadKnowledgeVersion,
@@ -586,7 +594,7 @@ app.get(
 )
 app.post(
   '/api/knowledge/documents',
-  uploadKnowledge.single('file'),
+  uploadKnowledge.any(),
   createKnowledgeDocument(dbPool, io)
 )
 app.put(
@@ -595,6 +603,40 @@ app.put(
   updateKnowledgeDocument(dbPool, io)
 )
 app.delete('/api/knowledge/documents/:id', deleteKnowledgeDocument(dbPool))
+app.post(
+  '/api/knowledge/documents/:id/files',
+  uploadKnowledge.any(),
+  addKnowledgeDocumentFile(dbPool, io)
+)
+app.put(
+  '/api/knowledge/documents/:id/files/:fileId',
+  uploadKnowledge.any(),
+  replaceKnowledgeDocumentFile(dbPool, io)
+)
+app.patch(
+  '/api/knowledge/documents/:id/files/:fileId',
+  renameKnowledgeDocumentFile(dbPool)
+)
+app.get(
+  '/api/knowledge/documents/:id/files/:fileId/versions',
+  listKnowledgeFileVersions(dbPool)
+)
+app.get(
+  '/api/knowledge/documents/:id/files/:fileId/versions/:versionId/download',
+  downloadKnowledgeFileVersion(dbPool, uploadsDir)
+)
+app.delete(
+  '/api/knowledge/documents/:id/files/:fileId',
+  deleteKnowledgeDocumentFile(dbPool)
+)
+app.get(
+  '/api/knowledge/documents/:id/files/:fileId/download',
+  downloadKnowledgeDocumentFile(dbPool, uploadsDir)
+)
+app.post(
+  '/api/knowledge/documents/:id/convert-to-folder',
+  convertKnowledgeDocumentToFolder(dbPool)
+)
 app.get('/api/knowledge/documents/:id/versions', listKnowledgeVersions(dbPool))
 app.get(
   '/api/knowledge/documents/:id/versions/:versionId/download',

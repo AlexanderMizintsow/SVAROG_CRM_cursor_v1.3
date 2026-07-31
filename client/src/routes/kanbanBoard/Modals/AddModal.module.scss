@@ -89,7 +89,7 @@
       .editorContainer {
         max-width: 500px;
         min-height: 250px;
-        max-height: 250px;
+        max-height: 280px;
 
         overflow-y: auto;
         border: 1px solid #e0e0e0;
@@ -98,9 +98,34 @@
         position: relative;
         z-index: 10001;
 
+        .kbLinkToolbar {
+          display: flex;
+          padding: 6px 8px;
+          border-bottom: 1px solid #e8e8e8;
+          background: #f7f7f8;
+          position: sticky;
+          top: 0;
+          z-index: 2;
+        }
+
+        .kbLinkBtn {
+          border: 1px solid #d0d5dd;
+          background: #fff;
+          border-radius: 6px;
+          padding: 4px 10px;
+          font-size: 12px;
+          cursor: pointer;
+          color: #334155;
+        }
+
+        .kbLinkBtn:hover {
+          border-color: #94a3b8;
+          background: #f8fafc;
+        }
+
         .ql-editor {
           max-width: 500px;
-          min-height: 200px;
+          min-height: 180px;
           padding: 1rem;
           background: #fdfdfd;
           font-family: "Roboto", sans-serif;
@@ -109,6 +134,12 @@
           z-index: 10001;
           font-size: 1rem;
           color: #333;
+
+          a,
+          a.kb-link {
+            color: #2563eb;
+            text-decoration: underline;
+          }
         }
       }
     }

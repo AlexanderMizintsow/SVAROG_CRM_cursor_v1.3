@@ -2,14 +2,37 @@
  * Уведомления отдела о новом / обновлённом документе базы знаний.
  */
 
-const buildMessage = ({ title, departmentName, uploaderName, isNewVersion, versionNumber }) => {
+const buildMessage = ({
+  title,
+  departmentName,
+  uploaderName,
+  isNewVersion,
+  versionNumber,
+  fileName,
+}) => {
   const dept = departmentName || 'отдела'
   const who = uploaderName || 'Сотрудник'
+  if (fileName && isNewVersion) {
+    return [
+      `В базе знаний в «${title}» обновлён файл «${fileName}» (версия ${versionNumber}).`,
+      `Отдел: ${dept}.`,
+      `Обновил: ${who}.`,
+      'Откройте раздел «Справочники → База знаний».',
+    ].join('\n')
+  }
   if (isNewVersion) {
     return [
       `В базе знаний обновлён документ «${title}» (версия ${versionNumber}).`,
       `Отдел: ${dept}.`,
       `Обновил: ${who}.`,
+      'Откройте раздел «Справочники → База знаний».',
+    ].join('\n')
+  }
+  if (fileName) {
+    return [
+      `В базе знаний в «${title}» добавлен файл «${fileName}».`,
+      `Отдел: ${dept}.`,
+      `Загрузил: ${who}.`,
       'Откройте раздел «Справочники → База знаний».',
     ].join('\n')
   }
@@ -58,6 +81,7 @@ async function notifyDepartmentAboutDocument(dbPool, io, options) {
     uploadedBy,
     isNewVersion = false,
     versionNumber = 1,
+    fileName = null,
   } = options
 
   try {
@@ -75,6 +99,7 @@ async function notifyDepartmentAboutDocument(dbPool, io, options) {
       uploaderName,
       isNewVersion,
       versionNumber,
+      fileName,
     })
     const eventType = isNewVersion ? 'knowledge_document_updated' : 'knowledge_document_new'
 

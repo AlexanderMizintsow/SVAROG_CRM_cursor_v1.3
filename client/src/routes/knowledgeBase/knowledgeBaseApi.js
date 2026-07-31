@@ -108,6 +108,77 @@ export const knowledgeBaseApi = {
     return data
   },
 
+  async addFiles(userId, id, fileList, options = {}) {
+    const fd = new FormData()
+    fd.append('userId', String(userId))
+    if (options.replaceSameNames) {
+      fd.append('replaceSameNames', '1')
+    }
+    const list = Array.from(fileList || [])
+    list.forEach((f) => fd.append('files', f))
+    fd.append(
+      'originalFileNames',
+      JSON.stringify(list.map((f) => f.name || 'file'))
+    )
+    const { data } = await axios.post(`${BASE}/documents/${id}/files`, fd, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+    })
+    return data
+  },
+
+  async deleteFile(userId, id, fileId) {
+    const { data } = await axios.delete(
+      `${BASE}/documents/${id}/files/${fileId}`,
+      { params: withUser(userId) }
+    )
+    return data?.document
+  },
+
+  async replaceFile(userId, id, fileId, file, options = {}) {
+    const fd = new FormData()
+    fd.append('userId', String(userId))
+    fd.append('file', file)
+    if (file?.name) fd.append('originalFileName', file.name)
+    if (options.confirmDifferentFileName) {
+      fd.append('confirmDifferentFileName', '1')
+    }
+    const { data } = await axios.put(
+      `${BASE}/documents/${id}/files/${fileId}`,
+      fd,
+      { headers: { 'Content-Type': 'multipart/form-data' } }
+    )
+    return data
+  },
+
+  async renameFile(userId, id, fileId, fileName) {
+    const { data } = await axios.patch(
+      `${BASE}/documents/${id}/files/${fileId}`,
+      { userId, fileName },
+      { headers: { 'Content-Type': 'application/json' } }
+    )
+    return data
+  },
+
+  async listFileVersions(userId, id, fileId) {
+    const { data } = await axios.get(
+      `${BASE}/documents/${id}/files/${fileId}/versions`,
+      { params: withUser(userId) }
+    )
+    return data
+  },
+
+  fileVersionDownloadUrl(userId, id, fileId, versionId) {
+    return `${BASE}/documents/${id}/files/${fileId}/versions/${versionId}/download?userId=${encodeURIComponent(userId)}`
+  },
+
+  fileDownloadUrl(userId, id, fileId) {
+    return `${BASE}/documents/${id}/files/${fileId}/download?userId=${encodeURIComponent(userId)}`
+  },
+
+  fileViewUrl(userId, id, fileId) {
+    return `${BASE}/documents/${id}/files/${fileId}/download?userId=${encodeURIComponent(userId)}&inline=1`
+  },
+
   async createCategory(userId, label) {
     const { data } = await axios.post(`${BASE}/categories`, { userId, label })
     return data?.category

@@ -24,6 +24,8 @@ import TaskActions from './subcomponents/TaskActions'
 import ConfirmationDialog from '../../../components/confirmationDialog/ConfirmationDialog'
 import SubTaskHierarchy from './subcomponents/subTaskHierarchy/SubTaskHierarchy'
 import useTaskStateTracker from '../../../store/useTaskStateTracker'
+import { handleKnowledgeDescriptionClick } from '../../knowledgeBase/openKnowledgeLink'
+import { enhanceKnowledgeLinksInHtml } from '../../knowledgeBase/knowledgeLinkUtils'
 import './Task.scss'
 
 const Task = forwardRef(({ task, provided, actionIcon, column }, ref) => {
@@ -416,7 +418,13 @@ const Task = forwardRef(({ task, provided, actionIcon, column }, ref) => {
         <div className="task-details">
           <span className="task-time-reminder">Создано: {formatDate(createdAt)}</span>
           <span className="task-title">{title}</span>
-          <div className="task-description" dangerouslySetInnerHTML={{ __html: description }} />
+          <div
+            className="task-description"
+            onClick={(e) => handleKnowledgeDescriptionClick(e, userId)}
+            dangerouslySetInnerHTML={{
+              __html: enhanceKnowledgeLinksInHtml(description),
+            }}
+          />
         </div>
         {links && links.length > 0 && (
           <div className="links">
