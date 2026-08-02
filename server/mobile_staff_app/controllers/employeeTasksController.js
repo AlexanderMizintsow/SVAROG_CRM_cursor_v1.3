@@ -8,6 +8,7 @@ const {
   safeNotify,
   uniqueUserIds,
 } = require('../services/staffNotifyHelpers')
+const { resolveProjectTitles } = require('../services/projectTitleCache')
 
 /**
  * ПРИ СОЗДАНИИ НОВЫХ СОБЫТИЙ: после успешной мутации вызывайте
@@ -113,6 +114,25 @@ const enrichTask = (task, usersMap, currentUserId) => {
   }
 }
 
+const stripHtmlPlain = (value, maxLen = 280) =>
+  String(value || '')
+    .replace(/<[^>]+>/g, ' ')
+    .replace(/&nbsp;/gi, ' ')
+    .replace(/&amp;/gi, '&')
+    .replace(/&lt;/gi, '<')
+    .replace(/&gt;/gi, '>')
+    .replace(/\s+/g, ' ')
+    .trim()
+    .slice(0, maxLen)
+
+/** Облегчённая карточка для списка (меньше JSON на телефоне). */
+const slimTaskForList = (task) => ({
+  ...task,
+  description: stripHtmlPlain(task.description),
+  attachments: [],
+  comments_redo: [],
+})
+
 const filterByScope = (tasks, scope, currentUserId) => {
   if (scope === 'archive') {
     return tasks.filter((t) => t.isCompleted)
@@ -165,29 +185,23 @@ const listTasks = () => async (req, res) => {
     )
     const filtered = filterByScope(enriched, scope, userId)
 
-    // Подтянуть названия проектов пакетно
+    // Подтянуть названия проектов (с коротким серверным кэшем)
     const projectIds = [
       ...new Set(filtered.map((t) => t.global_task_id).filter(Boolean)),
     ]
-    const titleByProject = {}
-    await Promise.all(
-      projectIds.map(async (pid) => {
-        try {
-          const row = await registerFetch(`/api/global-tasks/${pid}/title`)
-          titleByProject[String(pid)] =
-            typeof row === 'string' ? row : row?.title || null
-        } catch {
-          titleByProject[String(pid)] = null
-        }
+    const titleByProject = await resolveProjectTitles(projectIds, async (pid) => {
+      const row = await registerFetch(`/api/global-tasks/${pid}/title`)
+      return typeof row === 'string' ? row : row?.title || null
+    })
+
+    const withProjects = filtered.map((t) =>
+      slimTaskForList({
+        ...t,
+        projectTitle: t.global_task_id
+          ? titleByProject[String(t.global_task_id)]
+          : null,
       })
     )
-
-    const withProjects = filtered.map((t) => ({
-      ...t,
-      projectTitle: t.global_task_id
-        ? titleByProject[String(t.global_task_id)]
-        : null,
-    }))
 
     return res.json({ tasks: withProjects })
   } catch (error) {

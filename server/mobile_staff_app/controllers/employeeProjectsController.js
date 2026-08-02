@@ -78,6 +78,27 @@ const enrichProject = (project, currentUserId) => {
   }
 }
 
+const stripHtmlPlain = (value, maxLen = 280) =>
+  String(value || '')
+    .replace(/<[^>]+>/g, ' ')
+    .replace(/&nbsp;/gi, ' ')
+    .replace(/&amp;/gi, '&')
+    .replace(/&lt;/gi, '<')
+    .replace(/&gt;/gi, '>')
+    .replace(/\s+/g, ' ')
+    .trim()
+    .slice(0, maxLen)
+
+const slimProjectForList = (project) => ({
+  ...project,
+  description: stripHtmlPlain(project.description),
+  additional_info: {},
+  goals: Array.isArray(project.goals) ? project.goals.slice(0, 3) : [],
+  user_task_titles: Array.isArray(project.user_task_titles)
+    ? project.user_task_titles.slice(0, 5)
+    : [],
+})
+
 const listProjects = () => async (req, res) => {
   try {
     const userId = req.user.userId
@@ -94,7 +115,7 @@ const listProjects = () => async (req, res) => {
     }
 
     const projects = (Array.isArray(raw) ? raw : []).map((p) =>
-      enrichProject(p, userId)
+      slimProjectForList(enrichProject(p, userId))
     )
     return res.json({ projects })
   } catch (error) {
