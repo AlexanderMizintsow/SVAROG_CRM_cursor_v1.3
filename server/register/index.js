@@ -248,6 +248,12 @@ const {
 
 const { submitAppIdea, getAppIdeas, applyAppIdea } = require('./appIdeasController/appIdeasController')
 const {
+  getAndroidApkStatus,
+  downloadAndroidApk,
+  uploadAndroidApk,
+  deleteAndroidApk,
+} = require('./mobileAppDistributionController/mobileAppDistributionController')
+const {
   getMyManager: getManagerRequestManager,
   listMine: listManagerRequestsMine,
   listInbox: listManagerRequestsInbox,
@@ -326,6 +332,30 @@ const storageFile = multer.diskStorage({
   },
 })
 const uploadFile = multer({ storage: storageFile })
+
+const mobileAppUploadsDir = path.join(uploadsDir, 'mobile-app')
+if (!fs.existsSync(mobileAppUploadsDir)) {
+  fs.mkdirSync(mobileAppUploadsDir, { recursive: true })
+}
+const storageMobileApk = multer.diskStorage({
+  destination: (req, file, cb) => {
+    cb(null, mobileAppUploadsDir)
+  },
+  filename: (req, file, cb) => {
+    cb(null, `upload-${Date.now()}.apk.tmp`)
+  },
+})
+const uploadMobileApk = multer({
+  storage: storageMobileApk,
+  limits: { fileSize: 120 * 1024 * 1024 }, // 120 MB
+  fileFilter: (req, file, cb) => {
+    const name = String(file.originalname || '').toLowerCase()
+    if (!name.endsWith('.apk')) {
+      return cb(new Error('Разрешены только файлы .apk'))
+    }
+    cb(null, true)
+  },
+})
 
 const knowledgeUploadsDir = path.join(uploadsDir, 'knowledge')
 if (!fs.existsSync(knowledgeUploadsDir)) {
@@ -573,6 +603,23 @@ app.get('/api/reviews', getAllReviews(dbPool))
 app.post('/api/app-ideas', uploadFile.single('file'), submitAppIdea(dbPool))
 app.get('/api/app-ideas', getAppIdeas(dbPool))
 app.patch('/api/app-ideas/:id', applyAppIdea(dbPool))
+
+// Раздача мобильного APK (файл на диске uploads/mobile-app, не в git)
+app.get('/api/mobile-app/android', getAndroidApkStatus(dbPool, uploadsDir))
+app.get('/api/mobile-app/android/download', downloadAndroidApk(dbPool, uploadsDir))
+app.post(
+  '/api/mobile-app/android/upload',
+  (req, res, next) => {
+    uploadMobileApk.single('file')(req, res, (err) => {
+      if (err) {
+        return res.status(400).json({ error: err.message || 'Ошибка загрузки файла' })
+      }
+      next()
+    })
+  },
+  uploadAndroidApk(dbPool, uploadsDir)
+)
+app.delete('/api/mobile-app/android', deleteAndroidApk(dbPool, uploadsDir))
 
 // Обращения к руководителю
 app.get('/api/manager-requests/manager', getManagerRequestManager(dbPool))

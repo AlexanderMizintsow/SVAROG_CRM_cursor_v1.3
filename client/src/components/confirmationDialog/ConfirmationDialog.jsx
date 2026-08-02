@@ -73,7 +73,12 @@ const ConfirmationDialog = ({
     >
       <DialogTitle id="alert-dialog-title">{title}</DialogTitle>
       <DialogContent>
-        <DialogContentText id="alert-dialog-description" className="dialogDescription">
+        <DialogContentText
+          id="alert-dialog-description"
+          className="dialogDescription"
+          component="div"
+          sx={{ whiteSpace: 'pre-line' }}
+        >
           {message}
         </DialogContentText>
         {comment && (

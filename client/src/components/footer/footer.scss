@@ -10,6 +10,9 @@
 
   .owner-info {
     color: indianred;
+    font-size: 14px;
+    text-align: left;
+    margin-left: 30px;
   }
 
   .feedback {
@@ -37,13 +40,17 @@
         width: 24px;
         height: 24px;
       }
-    }
-  }
 
-  .owner-info {
-    font-size: 14px;
-    text-align: left;
-    margin-left: 30px;
+      &.android-download {
+        background-color: #3ddc8433;
+        color: #3ddc84;
+
+        &:hover {
+          background-color: #3ddc8466;
+          color: #2bb673;
+        }
+      }
+    }
   }
 
   // New Version
@@ -82,6 +89,20 @@
     100% {
       transform: translate(-50%, -50%) scale(1);
       opacity: 1;
+    }
+  }
+}
+
+.dark .footermenu {
+  .feedback {
+    span.android-download {
+      background-color: #3ddc8428;
+      color: #3ddc84;
+
+      &:hover {
+        background-color: #3ddc8450;
+        color: #6ee7b7;
+      }
     }
   }
 }

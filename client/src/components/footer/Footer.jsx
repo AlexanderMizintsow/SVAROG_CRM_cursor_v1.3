@@ -6,7 +6,8 @@ import useUserStore from '../../store/userStore'
 import useVersionInfo from '../../store/useVersionInfo'
 import RatingModal from './ratingModal/RatingModal'
 import IdeasModal from './ideasModal/IdeasModal'
-import { FaStar, FaLightbulb } from 'react-icons/fa'
+import AndroidAppModal from './androidAppModal/AndroidAppModal'
+import { FaStar, FaLightbulb, FaAndroid } from 'react-icons/fa'
 import { BsJournalCode } from 'react-icons/bs'
 import dextopSvarog from '../../assets/img/dextop.ico'
 import './footer.scss'
@@ -20,6 +21,7 @@ const Footer = () => {
   const { versions } = useVersionInfo()
   const currentYear = new Date().getFullYear() // Получаем текущий год
   const [isDialogOpen, setDialogOpen] = useState(false)
+  const [isAndroidDialogOpen, setAndroidDialogOpen] = useState(false)
   const [isIdeasModalOpen, setIdeasModalOpen] = useState(false)
 
   useEffect(() => {
@@ -78,6 +80,22 @@ const Footer = () => {
           style={{ width: '40px', height: '40px', cursor: 'pointer' }}
         />
 
+        <span
+          className="android-download"
+          title="Скачать мобильное приложение для Android"
+          onClick={() => setAndroidDialogOpen(true)}
+          role="button"
+          tabIndex={0}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter' || e.key === ' ') {
+              e.preventDefault()
+              setAndroidDialogOpen(true)
+            }
+          }}
+        >
+          <FaAndroid aria-hidden />
+        </span>
+
         <span title="Поставить оценку" onClick={() => setModalOpen(true)}>
           <FaStar />
         </span>
@@ -113,6 +131,11 @@ const Footer = () => {
         message="Хотите скачать декстопную версию приложения?"
         btn1="Нет"
         btn2="Да"
+      />
+      <AndroidAppModal
+        open={isAndroidDialogOpen}
+        onClose={() => setAndroidDialogOpen(false)}
+        user={user}
       />
     </footer>
   )
