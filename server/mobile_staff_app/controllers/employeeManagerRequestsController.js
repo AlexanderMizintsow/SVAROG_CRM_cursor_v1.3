@@ -201,9 +201,23 @@ const getMyManager = (pool) => async (req, res) => {
 const listMine = (pool) => async (req, res) => {
   try {
     const userId = Number(req.user.userId)
+    const status = String(req.query.status || 'all').trim()
+    const params = [userId]
+    let statusSql = ''
+    if (status === 'active' || status === 'open') {
+      statusSql = ` AND r.status IN ('open', 'answered')`
+    } else if (status === 'closed' || status === 'closed_group') {
+      statusSql = ` AND r.status IN ('closed', 'converted_to_task')`
+    } else if (status && status !== 'all') {
+      params.push(status)
+      statusSql = ` AND r.status = $${params.length}`
+    }
     const { rows } = await pool.query(
-      `${SELECT_BASE} WHERE r.from_user_id = $1 ORDER BY r.created_at DESC LIMIT 200`,
-      [userId]
+      `${SELECT_BASE}
+       WHERE r.from_user_id = $1 ${statusSql}
+       ORDER BY r.updated_at DESC NULLS LAST, r.created_at DESC
+       LIMIT 200`,
+      params
     )
     return res.json({ requests: rows.map(mapRow) })
   } catch (error) {
@@ -222,6 +236,8 @@ const listInbox = (pool) => async (req, res) => {
       statusSql = ''
     } else if (status === 'active' || status === 'open') {
       statusSql = ` AND r.status IN ('open', 'answered')`
+    } else if (status === 'closed' || status === 'closed_group') {
+      statusSql = ` AND r.status IN ('closed', 'converted_to_task')`
     } else if (status) {
       params.push(status)
       statusSql = ` AND r.status = $${params.length}`
@@ -356,17 +372,6 @@ const answerRequest = (pool) => async (req, res) => {
       [answerText, userId, id]
     )
 
-    try {
-      await pool.query(
-        `INSERT INTO staff_manager_request_messages (request_id, author_id, body) VALUES ($1, $2, $3)`,
-        [id, userId, answerText]
-      )
-    } catch (chatErr) {
-      if (!tableMissing(chatErr)) {
-        console.warn('[mobile_staff_app][manager-requests][answer][chat]', chatErr.message || chatErr)
-      }
-    }
-
     const full = await pool.query(`${SELECT_BASE} WHERE r.id = $1`, [id])
     const mapped = mapRow(full.rows[0])
 
@@ -491,7 +496,7 @@ const listMessages = (pool) => async (req, res) => {
       FROM staff_manager_request_messages m
       LEFT JOIN users u ON u.id = m.author_id
       WHERE m.request_id = $1
-      ORDER BY m.created_at ASC, m.id ASC
+      ORDER BY m.id ASC
       `,
       [id]
     )
@@ -561,13 +566,58 @@ const postMessage = (pool) => async (req, res) => {
     const message = mapMessage(msgRows.rows[0])
 
     const notifyUserId = isAuthor ? Number(row.to_user_id) : Number(row.from_user_id)
+    const preview = `Уточнение по «${row.title}»: ${body.slice(0, 120)}`
     await notifyBoth(pool, {
       userIds: [notifyUserId],
       title: 'Сообщение по обращению',
-      body: `Уточнение по «${row.title}»: ${body.slice(0, 120)}`,
+      body: preview,
       requestId: id,
       eventType: 'manager_request_chat',
     })
+
+    try {
+      const io = req.app?.get?.('io')
+      if (io) {
+        io.to(String(notifyUserId)).emit('managerRequestChat', {
+          requestId: id,
+          notifyUserId,
+          userIds: [notifyUserId],
+          fromUserId: userId,
+          title: row.title,
+          preview,
+          message,
+        })
+        io.to(String(notifyUserId)).emit('notification', {
+          type: 'manager_request_chat',
+          userId: notifyUserId,
+          requestId: id,
+          message: preview,
+          title: row.title,
+        })
+      }
+    } catch (socketErr) {
+      console.warn('[mobile_staff_app][manager-requests][socket]', socketErr.message || socketErr)
+    }
+
+    try {
+      const { registerFetch } = require('../services/registerClient')
+      await registerFetch('/api/manager-requests/broadcast-chat', {
+        method: 'POST',
+        body: {
+          requestId: id,
+          notifyUserId,
+          fromUserId: userId,
+          title: row.title,
+          preview,
+          message,
+        },
+      })
+    } catch (broadcastErr) {
+      console.warn(
+        '[mobile_staff_app][manager-requests][broadcast]',
+        broadcastErr.message || broadcastErr
+      )
+    }
 
     return res.status(201).json({ message })
   } catch (error) {

@@ -24,9 +24,9 @@ export const managerRequestsApi = {
     }
   },
 
-  async listMine(userId) {
+  async listMine(userId, status = 'all') {
     const { data } = await axios.get(`${BASE}/mine`, {
-      params: withUser(userId),
+      params: withUser(userId, status && status !== 'all' ? { status } : {}),
     })
     return data?.requests || []
   },

@@ -217,8 +217,47 @@ const useWebSocket = (userId, stableSetMessages, currentTaskId, onChatMessageUpd
         }
       })
 
+      // Чат обращений к директору — как чат задач, но отдельный тип (синий в баннере)
+      socket.current.on('managerRequestChat', (payload) => {
+        if (!payload) return
+        const notifyId = Number(payload.notifyUserId)
+        const recipients = Array.isArray(payload.userIds)
+          ? payload.userIds.map(Number)
+          : notifyId
+            ? [notifyId]
+            : []
+        if (!recipients.includes(Number(userId))) return
+        if (Number(payload.fromUserId) === Number(userId)) return
+
+        useTaskStateTracker.getState().setManagerRequestChat(payload.requestId, userId, {
+          title: payload.title,
+          preview: payload.preview,
+        })
+        fetchUnreadNotifications(userId)
+        if (electronAPI && typeof electronAPI.sendNotification === 'function') {
+          electronAPI.sendNotification(
+            'Обращение / сообщение',
+            payload.preview || payload.title || 'Новое сообщение по обращению'
+          )
+        }
+      })
+
       // Новый обработчик для уведомлений касательно задач
       socket.current.on('notification', (notification) => {
+        if (
+          notification?.type &&
+          String(notification.type).startsWith('manager_request') &&
+          Number(notification.userId) === Number(userId)
+        ) {
+          if (notification.type === 'manager_request_chat' && notification.requestId) {
+            useTaskStateTracker.getState().setManagerRequestChat(notification.requestId, userId, {
+              title: notification.title,
+              preview: notification.message,
+            })
+          }
+          fetchUnreadNotifications(userId)
+        }
+
         // Отказ в увелечении срока исполнения *******************************************************************
         if (notification.type === 'extension_request_rejected' && notification.userId === userId) {
           sendNotification(`Задачи/ОТКАЗ в продлении срока.`, notification.message)
@@ -387,6 +426,7 @@ const useWebSocket = (userId, stableSetMessages, currentTaskId, onChatMessageUpd
         socket.current.off('updateDescriptionTasks')
         socket.current.off('extendDeadline')
         socket.current.off('notification')
+        socket.current.off('managerRequestChat')
         socket.current.disconnect()
         socket.current = null // Сбрасываем сокет
       }

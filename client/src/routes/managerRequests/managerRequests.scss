@@ -161,6 +161,36 @@
       border-color: #f59e0b;
       background: #fffbeb;
     }
+
+    &.is-closed {
+      opacity: 0.78;
+      border-style: dashed;
+    }
+  }
+
+  &__status-pill {
+    display: inline-block;
+    margin-left: 8px;
+    padding: 2px 8px;
+    border-radius: 999px;
+    font-size: 11px;
+    font-weight: 700;
+    vertical-align: middle;
+
+    &--closed {
+      background: #e2e8f0;
+      color: #475569;
+    }
+
+    &--answered {
+      background: #dbeafe;
+      color: #1d4ed8;
+    }
+
+    &--open {
+      background: #dcfce7;
+      color: #166534;
+    }
   }
 
   &__unread-dot {
@@ -223,7 +253,7 @@
   }
 
   &__chat-list {
-    max-height: 280px;
+    max-height: 320px;
     overflow: auto;
     margin: 10px 0;
     display: flex;
@@ -231,21 +261,29 @@
     gap: 8px;
   }
 
+  &__chat-row {
+    display: flex;
+    width: 100%;
+    justify-content: flex-start;
+
+    &.is-mine {
+      justify-content: flex-end;
+    }
+  }
+
   &__chat-bubble {
-    max-width: 90%;
+    max-width: 85%;
     padding: 8px 12px;
     border-radius: 10px;
     font-size: 14px;
     line-height: 1.45;
 
     &.is-mine {
-      align-self: flex-end;
       background: #ccfbf1;
       color: #134e4a;
     }
 
     &.is-theirs {
-      align-self: flex-start;
       background: #f1f5f9;
       color: #1e293b;
     }

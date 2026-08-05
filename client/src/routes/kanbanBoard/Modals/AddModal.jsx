@@ -48,6 +48,7 @@ import {
   managerRequestsApi,
   readManagerRequestTaskDraft,
 } from "../../managerRequests/managerRequestsApi";
+import useTaskStateTracker from "../../../store/useTaskStateTracker";
 
 const formatDateRuLocal = (dateStr) => {
   const normalized = normalizeDateOnly(dateStr);
@@ -602,11 +603,25 @@ const AddModal = ({
               );
               clearManagerRequestTaskDraft();
               Toastify({
-                text: `Задача №${taskIds[0]} связана с обращением. Откройте её во вкладке «Созданные». Обращение не закрыто — закройте вручную в разделе «Обращения».`,
-                duration: 6000,
+                text: `Задача №${taskIds[0]} связана с обращением. У исполнителя — на Канбане; у вас — «Менеджер задач» → «Созданные». Обращение закройте вручную.`,
+                duration: 7000,
                 close: true,
                 backgroundColor: "linear-gradient(to right, #0f766e, #14b8a6)",
               }).showToast();
+              try {
+                const { setTaskDecisionNavigate, setTaskCardBlinkYellow } =
+                  useTaskStateTracker.getState();
+                setTaskCardBlinkYellow(taskIds[0]);
+                setTaskDecisionNavigate({ type: "taskList", initialTab: "created" });
+                window.dispatchEvent(new CustomEvent("task-decision-navigate"));
+              } catch (_) {}
+              // Директор видит задачу как наблюдатель (Канбан — у исполнителя)
+              try {
+                await axios.post(`${API_BASE_URL}5000/api/tasks/visibility/add`, {
+                  task_id: taskIds[0],
+                  user_id: userId,
+                });
+              } catch (_) {}
             } catch (linkError) {
               console.warn(
                 "Не удалось связать задачу с обращением:",

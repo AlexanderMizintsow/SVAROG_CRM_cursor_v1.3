@@ -627,6 +627,42 @@ app.delete('/api/mobile-app/android', deleteAndroidApk(dbPool, uploadsDir))
 app.get('/api/manager-requests/manager', getManagerRequestManager(dbPool))
 app.get('/api/manager-requests/mine', listManagerRequestsMine(dbPool))
 app.get('/api/manager-requests/inbox', listManagerRequestsInbox(dbPool))
+app.post('/api/manager-requests/broadcast-chat', (req, res) => {
+  try {
+    const requestId = Number(req.body?.requestId)
+    const notifyUserId = Number(req.body?.notifyUserId)
+    const title = String(req.body?.title || '')
+    const preview = String(req.body?.preview || req.body?.body || '')
+    const fromUserId = Number(req.body?.fromUserId) || null
+    const message = req.body?.message || null
+    if (!Number.isFinite(notifyUserId) || notifyUserId <= 0) {
+      return res.status(400).json({ error: 'notifyUserId обязателен' })
+    }
+    const io = app.get('io')
+    if (io) {
+      io.emit('managerRequestChat', {
+        requestId,
+        notifyUserId,
+        userIds: [notifyUserId],
+        fromUserId,
+        title,
+        preview,
+        message,
+      })
+      io.emit('notification', {
+        type: 'manager_request_chat',
+        userId: notifyUserId,
+        requestId,
+        message: preview,
+        title,
+      })
+    }
+    return res.json({ ok: true })
+  } catch (err) {
+    console.error('[manager-requests][broadcast-chat]', err)
+    return res.status(500).json({ error: 'Не удалось отправить событие' })
+  }
+})
 app.get('/api/manager-requests/:id/messages', listManagerRequestMessages(dbPool))
 app.post('/api/manager-requests/:id/messages', postManagerRequestMessage(dbPool))
 app.get('/api/manager-requests/:id', getManagerRequestOne(dbPool))

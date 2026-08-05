@@ -233,9 +233,23 @@ const listMine = (dbPool) => async (req, res) => {
   try {
     const userId = resolveUserId(req)
     if (!userId) return res.status(400).json({ error: 'Укажите userId' })
+    const status = String(req.query.status || 'all').trim()
+    const params = [userId]
+    let statusSql = ''
+    if (status === 'active' || status === 'open') {
+      statusSql = ` AND r.status IN ('open', 'answered')`
+    } else if (status === 'closed' || status === 'closed_group') {
+      statusSql = ` AND r.status IN ('closed', 'converted_to_task')`
+    } else if (status && status !== 'all') {
+      params.push(status)
+      statusSql = ` AND r.status = $${params.length}`
+    }
     const { rows } = await dbPool.query(
-      `${SELECT_BASE} WHERE r.from_user_id = $1 ORDER BY r.created_at DESC LIMIT 200`,
-      [userId]
+      `${SELECT_BASE}
+       WHERE r.from_user_id = $1 ${statusSql}
+       ORDER BY r.updated_at DESC NULLS LAST, r.created_at DESC
+       LIMIT 200`,
+      params
     )
     return res.json({ requests: rows.map(mapRow) })
   } catch (error) {
@@ -259,8 +273,9 @@ const listInbox = (dbPool) => async (req, res) => {
     if (status === 'all') {
       statusSql = ''
     } else if (status === 'active' || status === 'open') {
-      // open в query оставляем как «в работе»: open + answered
       statusSql = ` AND r.status IN ('open', 'answered')`
+    } else if (status === 'closed' || status === 'closed_group') {
+      statusSql = ` AND r.status IN ('closed', 'converted_to_task')`
     } else if (status) {
       params.push(status)
       statusSql = ` AND r.status = $${params.length}`
@@ -406,20 +421,7 @@ const answerRequest = (dbPool) => async (req, res) => {
       [answerText, userId, id]
     )
 
-    // Дублируем официальный ответ в чат уточнений
-    try {
-      await dbPool.query(
-        `
-        INSERT INTO staff_manager_request_messages (request_id, author_id, body)
-        VALUES ($1, $2, $3)
-        `,
-        [id, userId, answerText]
-      )
-    } catch (chatErr) {
-      if (!tableMissing(chatErr)) {
-        console.warn('[manager-requests][answer][chat]', chatErr.message || chatErr)
-      }
-    }
+    // Официальный ответ хранится в answer_text; в чат не дублируем (иначе ломается хронология)
 
     const full = await dbPool.query(`${SELECT_BASE} WHERE r.id = $1`, [id])
     const mapped = mapRow(full.rows[0])
@@ -554,7 +556,7 @@ const listMessages = (dbPool) => async (req, res) => {
       FROM staff_manager_request_messages m
       LEFT JOIN users u ON u.id = m.author_id
       WHERE m.request_id = $1
-      ORDER BY m.created_at ASC, m.id ASC
+      ORDER BY m.id ASC
       `,
       [id]
     )
@@ -633,13 +635,38 @@ const postMessage = (dbPool) => async (req, res) => {
     const message = mapMessage(msgRows.rows[0])
 
     const notifyUserId = isAuthor ? Number(row.to_user_id) : Number(row.from_user_id)
+    const preview = `Уточнение по «${row.title}»: ${body.slice(0, 120)}`
     await notifyBoth(dbPool, {
       userIds: [notifyUserId],
       title: 'Сообщение по обращению',
-      body: `Уточнение по «${row.title}»: ${body.slice(0, 120)}`,
+      body: preview,
       requestId: id,
       eventType: 'manager_request_chat',
     })
+
+    try {
+      const io = req.app?.get?.('io')
+      if (io) {
+        io.emit('managerRequestChat', {
+          requestId: id,
+          notifyUserId,
+          userIds: [notifyUserId],
+          fromUserId: userId,
+          title: row.title,
+          preview,
+          message,
+        })
+        io.emit('notification', {
+          type: 'manager_request_chat',
+          userId: notifyUserId,
+          requestId: id,
+          message: preview,
+          title: row.title,
+        })
+      }
+    } catch (socketErr) {
+      console.warn('[manager-requests][messages][socket]', socketErr.message || socketErr)
+    }
 
     return res.status(201).json({ message })
   } catch (error) {

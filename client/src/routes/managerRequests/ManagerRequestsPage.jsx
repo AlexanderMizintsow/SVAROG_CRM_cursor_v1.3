@@ -73,7 +73,8 @@ const ManagerRequestsPage = () => {
   })
   const [selectedId, setSelectedId] = useState(null)
   const [selected, setSelected] = useState(null)
-  const [inboxFilter, setInboxFilter] = useState('active')
+  const [inboxFilter, setInboxFilter] = useState('active') // active | closed
+  const [mineFilter, setMineFilter] = useState('active') // active | closed
 
   const [formType, setFormType] = useState('question')
   const [formTitle, setFormTitle] = useState('')
@@ -89,8 +90,11 @@ const ManagerRequestsPage = () => {
     try {
       const [{ manager: mgr, access: acc }, mineList, inboxList] = await Promise.all([
         managerRequestsApi.getMyManager(userId),
-        managerRequestsApi.listMine(userId),
-        managerRequestsApi.listInbox(userId, inboxFilter === 'all' ? 'all' : 'active'),
+        managerRequestsApi.listMine(userId, mineFilter === 'closed' ? 'closed' : 'active'),
+        managerRequestsApi.listInbox(
+          userId,
+          inboxFilter === 'closed' ? 'closed' : 'active'
+        ),
       ])
       setManager(mgr)
       setAccess(acc || { canAccess: false, canCreate: false })
@@ -104,7 +108,7 @@ const ManagerRequestsPage = () => {
         err?.response?.data?.error || err.message || 'Не удалось загрузить обращения'
       setError(message)
     }
-  }, [userId, inboxFilter])
+  }, [userId, inboxFilter, mineFilter])
 
   useEffect(() => {
     let active = true
@@ -266,7 +270,9 @@ const ManagerRequestsPage = () => {
       description: selected.body,
       userId,
     })
-    toast('Откроется создание задачи. После сохранения она останется связанной с обращением.')
+    toast(
+      'Создайте задачу и назначьте исполнителя. На Канбане задача появится у исполнителя; у вас — во вкладке «Созданные».'
+    )
     navigate('/task-manager')
   }
 
@@ -277,6 +283,7 @@ const ManagerRequestsPage = () => {
     setTaskCardBlinkYellow(selected.relatedTaskId)
     setTaskDecisionNavigate({ type: 'taskList', initialTab: 'created' })
     window.dispatchEvent(new CustomEvent('task-decision-navigate'))
+    toast(`Задача №${selected.relatedTaskId} — вкладка «Созданные» в менеджере задач`)
     navigate('/task-manager')
   }
 
@@ -307,10 +314,10 @@ const ManagerRequestsPage = () => {
         <div>
           <h1>Обращения к директору</h1>
           <p>
-            Канал к директору: вопрос, предложение или эскалация. Задачу на Директора
-            ставить нельзя — пишите сюда. Ответ не закрывает обращение: директор
-            закрывает его вручную после ответа или создания задачи. По каждому обращению
-            доступен чат уточнений.
+            Пишите директору вопрос, предложение или эскалацию — задачу на директора ставить
+            нельзя. Ответ и создание задачи не закрывают обращение: директор закрывает его
+            вручную. Уточнения — в чате карточки. Созданную задачу смотрите в «Менеджере задач»
+            → вкладка «Созданные» (на Канбане видит исполнитель).
           </p>
         </div>
         {tab === 'mine' && access.canCreate ? (
@@ -355,6 +362,25 @@ const ManagerRequestsPage = () => {
         )}
       </div>
 
+      {tab === 'mine' ? (
+        <div className="mgr-req__filters">
+          <button
+            type="button"
+            className={mineFilter === 'active' ? 'is-active' : ''}
+            onClick={() => setMineFilter('active')}
+          >
+            Открытые
+          </button>
+          <button
+            type="button"
+            className={mineFilter === 'closed' ? 'is-active' : ''}
+            onClick={() => setMineFilter('closed')}
+          >
+            Закрытые
+          </button>
+        </div>
+      ) : null}
+
       {tab === 'inbox' ? (
         <div className="mgr-req__filters">
           <button
@@ -362,14 +388,14 @@ const ManagerRequestsPage = () => {
             className={inboxFilter === 'active' ? 'is-active' : ''}
             onClick={() => setInboxFilter('active')}
           >
-            В работе (открыто + отвечено)
+            Открытые
           </button>
           <button
             type="button"
-            className={inboxFilter === 'all' ? 'is-active' : ''}
-            onClick={() => setInboxFilter('all')}
+            className={inboxFilter === 'closed' ? 'is-active' : ''}
+            onClick={() => setInboxFilter('closed')}
           >
-            Все
+            Закрытые
           </button>
         </div>
       ) : null}
@@ -448,13 +474,24 @@ const ManagerRequestsPage = () => {
               {tab === 'mine' ? 'Вы ещё не писали директору' : 'Входящих обращений нет'}
             </div>
           ) : (
-            list.map((item) => (
+            list.map((item) => {
+              const closed =
+                item.status === 'closed' || item.status === 'converted_to_task'
+              const statusClass =
+                item.status === 'closed' || item.status === 'converted_to_task'
+                  ? 'mgr-req__status-pill--closed'
+                  : item.status === 'answered'
+                    ? 'mgr-req__status-pill--answered'
+                    : 'mgr-req__status-pill--open'
+              return (
               <button
                 key={item.id}
                 type="button"
                 className={`mgr-req__row ${
                   selectedId === item.id ? 'is-selected' : ''
-                } ${hasUnreadForUser(item, userId, tab) ? 'is-unread' : ''}`}
+                } ${hasUnreadForUser(item, userId, tab) ? 'is-unread' : ''} ${
+                  closed ? 'is-closed' : ''
+                }`}
                 onClick={() => selectRequest(item.id)}
               >
                 <div className="mgr-req__row-title">
@@ -462,11 +499,13 @@ const ManagerRequestsPage = () => {
                     <span className="mgr-req__unread-dot" title="Есть обновление" />
                   ) : null}
                   {item.title}
+                  <span className={`mgr-req__status-pill ${statusClass}`}>
+                    {closed ? 'Закрыто' : item.statusLabel}
+                  </span>
                 </div>
                 <div className="mgr-req__row-meta">
                   {[
                     item.typeLabel,
-                    item.statusLabel,
                     tab === 'inbox' ? item.fromUserName : item.toUserName,
                     formatDate(item.createdAt),
                   ]
@@ -474,7 +513,8 @@ const ManagerRequestsPage = () => {
                     .join(' · ')}
                 </div>
               </button>
-            ))
+              )
+            })
           )}
         </section>
 

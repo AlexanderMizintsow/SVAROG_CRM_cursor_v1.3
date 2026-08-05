@@ -33,6 +33,7 @@ const loadState = () => {
     projectBlinkGreen: {},
     projectBlinkYellow: {},
     projectDeadlineNotified: {},
+    managerRequestChats: {},
   }
 }
 
@@ -64,8 +65,39 @@ const useTaskStateTracker = create((set, get) => {
     taskCardBlinkYellow: {},
     notificationsTask: {},
     extensionRequests: {},
+    managerRequestChats: initialState.managerRequestChats || {},
 
     setNotificationsTask: (notifications) => set({ notificationsTask: notifications }),
+
+    setManagerRequestChat: (requestId, userId, meta = {}) => {
+      set((state) => {
+        const rid = String(requestId)
+        const uid = String(userId)
+        const next = {
+          ...state.managerRequestChats,
+          [rid]: {
+            ...(state.managerRequestChats[rid] || {}),
+            [uid]: true,
+            title: meta.title || state.managerRequestChats[rid]?.title || '',
+            preview: meta.preview || state.managerRequestChats[rid]?.preview || '',
+          },
+        }
+        const newState = { ...state, managerRequestChats: next }
+        saveState(newState)
+        return newState
+      })
+    },
+
+    clearManagerRequestChat: (requestId) => {
+      set((state) => {
+        const rid = String(requestId)
+        const next = { ...state.managerRequestChats }
+        delete next[rid]
+        const newState = { ...state, managerRequestChats: next }
+        saveState(newState)
+        return newState
+      })
+    },
 
     fetchUnreadNotifications: async (userId) => {
       try {

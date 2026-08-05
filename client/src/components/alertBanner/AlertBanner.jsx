@@ -138,6 +138,8 @@ const AlertBanner = () => {
   const fetchExtensionRequests = useTaskStateTracker((state) => state.fetchExtensionRequests)
   const assigneeMessages = useTaskStateTracker((state) => state.assigneeMessages)
   const authorMessages = useTaskStateTracker((state) => state.authorMessages)
+  const managerRequestChats = useTaskStateTracker((state) => state.managerRequestChats)
+  const clearManagerRequestChat = useTaskStateTracker((state) => state.clearManagerRequestChat)
   const approvals = useTaskStateTracker((state) => state.approvals)
   const tasks = useTaskStateTracker((state) => state.tasks)
   const globalNotifications = useTaskStateTracker((state) => state.globalNotifications)
@@ -328,6 +330,28 @@ const AlertBanner = () => {
           taskId: taskId,
         })
       }
+    })
+  }
+
+  // Сообщения чата обращений к директору (синий акцент)
+  if (currentUserId != null && managerRequestChats) {
+    Object.entries(managerRequestChats).forEach(([requestId, entry]) => {
+      if (!entry || !entry[currentUserId]) return
+      notifications.push({
+        key: `managerRequestChat-${requestId}`,
+        text: entry.preview
+          ? `Обращение: ${entry.preview}`
+          : `Новое сообщение по обращению${entry.title ? ` «${entry.title}»` : ''}`,
+        icon: (
+          <FaEnvelope
+            className="icon-manager-request-chat"
+            style={{ cursor: 'pointer', fontSize: '16px', color: '#2563eb' }}
+          />
+        ),
+        iconClass: 'icon-manager-request-chat',
+        type: 'manager_request_chat',
+        managerRequestId: Number(requestId),
+      })
     })
   }
   // Использование функции в AlertBanner
@@ -784,13 +808,22 @@ const AlertBanner = () => {
                     key === 'approval' ||
                     type === 'knowledge_document_new' ||
                     type === 'knowledge_document_updated' ||
-                    String(type || '').startsWith('manager_request_')
+                    String(type || '').startsWith('manager_request_') ||
+                    key.startsWith('managerRequestChat-')
                       ? 'pointer'
                       : undefined,
                 }}
                 onClick={() => {
                   if (key.startsWith('global-')) {
                     handleGlobalNotificationClick({ taskId, title })
+                  } else if (key.startsWith('managerRequestChat-')) {
+                    const rid =
+                      managerRequestId ||
+                      Number(String(key).replace('managerRequestChat-', ''))
+                    if (rid) {
+                      clearManagerRequestChat(rid)
+                      window.location.assign(`/manager-requests?id=${rid}`)
+                    }
                   } else if (key.startsWith('project-msg-')) {
                     const projectClickTypes = [
                       'progress_100',

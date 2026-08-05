@@ -78,7 +78,8 @@ app.use('/api/mobile/employee/director', employeeDirectorTeamRoutes(pool))
 app.use('/api/mobile/employee/manager-requests', employeeManagerRequestsRoutes(pool))
 app.use('/api/mobile/employee/knowledge', employeeKnowledgeRoutes(pool))
 
-setupSocketBridge(httpServer)
+const io = setupSocketBridge(httpServer)
+app.set('io', io)
 startWorkGroupReminderScheduler(pool)
 startDirectorDigestScheduler(pool)
 

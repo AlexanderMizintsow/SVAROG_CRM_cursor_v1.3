@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { managerRequestsApi } from './managerRequestsApi'
 
 const formatDate = (value) => {
@@ -15,8 +15,17 @@ const formatDate = (value) => {
   }
 }
 
+const sortMessages = (list) =>
+  [...(list || [])].sort((a, b) => {
+    const idA = Number(a?.id) || 0
+    const idB = Number(b?.id) || 0
+    if (idA !== idB) return idA - idB
+    return new Date(a?.createdAt || 0).getTime() - new Date(b?.createdAt || 0).getTime()
+  })
+
 /**
  * Чат уточнений по обращению (автор ↔ директор).
+ * Сообщения строго по времени/id, без группировки по автору.
  */
 const ManagerRequestChat = ({ userId, requestId, canWrite, onError }) => {
   const [messages, setMessages] = useState([])
@@ -30,7 +39,7 @@ const ManagerRequestChat = ({ userId, requestId, canWrite, onError }) => {
     setLoading(true)
     try {
       const list = await managerRequestsApi.listMessages(userId, requestId)
-      setMessages(list)
+      setMessages(sortMessages(list))
     } catch (err) {
       if (onError) onError(err?.response?.data?.error || 'Не удалось загрузить чат')
     } finally {
@@ -40,7 +49,7 @@ const ManagerRequestChat = ({ userId, requestId, canWrite, onError }) => {
 
   useEffect(() => {
     load()
-    const timer = setInterval(load, 15000)
+    const timer = setInterval(load, 12000)
     return () => clearInterval(timer)
   }, [load])
 
@@ -54,7 +63,7 @@ const ManagerRequestChat = ({ userId, requestId, canWrite, onError }) => {
     setSending(true)
     try {
       const created = await managerRequestsApi.postMessage(userId, requestId, text.trim())
-      setMessages((prev) => [...prev, created])
+      setMessages((prev) => sortMessages([...prev.filter((m) => m.id !== created.id), created]))
       setText('')
     } catch (err) {
       if (onError) onError(err?.response?.data?.error || 'Не удалось отправить')
@@ -78,13 +87,15 @@ const ManagerRequestChat = ({ userId, requestId, canWrite, onError }) => {
           return (
             <div
               key={msg.id}
-              className={`mgr-req__chat-bubble ${mine ? 'is-mine' : 'is-theirs'}`}
+              className={`mgr-req__chat-row ${mine ? 'is-mine' : 'is-theirs'}`}
             >
-              <div className="mgr-req__chat-meta">
-                {msg.authorName || (mine ? 'Вы' : 'Собеседник')}
-                {msg.createdAt ? ` · ${formatDate(msg.createdAt)}` : ''}
+              <div className={`mgr-req__chat-bubble ${mine ? 'is-mine' : 'is-theirs'}`}>
+                <div className="mgr-req__chat-meta">
+                  {msg.authorName || (mine ? 'Вы' : 'Собеседник')}
+                  {msg.createdAt ? ` · ${formatDate(msg.createdAt)}` : ''}
+                </div>
+                <div className="mgr-req__chat-body">{msg.body}</div>
               </div>
-              <div className="mgr-req__chat-body">{msg.body}</div>
             </div>
           )
         })}
