@@ -771,6 +771,7 @@ const AlertBanner = () => {
                 projectNotificationType,
                 type,
                 notificationId,
+                managerRequestId,
               }) => (
               <div
                 className="alert-banner-content"
@@ -782,7 +783,8 @@ const AlertBanner = () => {
                     key.startsWith('task-decision-') ||
                     key === 'approval' ||
                     type === 'knowledge_document_new' ||
-                    type === 'knowledge_document_updated'
+                    type === 'knowledge_document_updated' ||
+                    String(type || '').startsWith('manager_request_')
                       ? 'pointer'
                       : undefined,
                 }}
@@ -822,6 +824,17 @@ const AlertBanner = () => {
                   ) {
                     // AlertBanner вне <Router> — без useNavigate
                     window.location.assign('/knowledge-base')
+                    if (notificationId && typeof handleMarkAsRead === 'function') {
+                      handleMarkAsRead(notificationId)
+                    }
+                  } else if (
+                    key.startsWith('task-notification-') &&
+                    String(type || '').startsWith('manager_request_')
+                  ) {
+                    const rid = managerRequestId
+                    window.location.assign(
+                      rid ? `/manager-requests?id=${rid}` : '/manager-requests'
+                    )
                     if (notificationId && typeof handleMarkAsRead === 'function') {
                       handleMarkAsRead(notificationId)
                     }

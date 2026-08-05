@@ -262,6 +262,8 @@ const {
   answerRequest: answerManagerRequest,
   closeRequest: closeManagerRequest,
   markConverted: markManagerRequestConverted,
+  listMessages: listManagerRequestMessages,
+  postMessage: postManagerRequestMessage,
 } = require('./managerRequestsController/managerRequestsController')
 const {
   getPermissions: getKnowledgePermissions,
@@ -621,10 +623,12 @@ app.post(
 )
 app.delete('/api/mobile-app/android', deleteAndroidApk(dbPool, uploadsDir))
 
-// Обращения к руководителю
+// Обращения к Директору
 app.get('/api/manager-requests/manager', getManagerRequestManager(dbPool))
 app.get('/api/manager-requests/mine', listManagerRequestsMine(dbPool))
 app.get('/api/manager-requests/inbox', listManagerRequestsInbox(dbPool))
+app.get('/api/manager-requests/:id/messages', listManagerRequestMessages(dbPool))
+app.post('/api/manager-requests/:id/messages', postManagerRequestMessage(dbPool))
 app.get('/api/manager-requests/:id', getManagerRequestOne(dbPool))
 app.post('/api/manager-requests', createManagerRequest(dbPool))
 app.post('/api/manager-requests/:id/answer', answerManagerRequest(dbPool))

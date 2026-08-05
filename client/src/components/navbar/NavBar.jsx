@@ -1,7 +1,9 @@
+import { useEffect, useState } from 'react'
 import Menu from './Menu'
 import useUserStore from '../../store/userStore'
 import useCallNotifications from '../../hooks/useCallNotifications'
 import CallStatusIndicator from '../CallStatusIndicator/CallStatusIndicator'
+import { managerRequestsApi } from '../../routes/managerRequests/managerRequestsApi'
 import { MdWork } from 'react-icons/md'
 import { FaKey, FaUserFriends } from 'react-icons/fa'
 import { FaRegMessage } from 'react-icons/fa6'
@@ -35,6 +37,32 @@ const NavBar = () => {
     user && ['Администратор', 'Директор'].includes(user?.role_name)
   const roleConfirm =
     user && ['Администратор', 'Директор', 'Руководитель отдела'].includes(user?.role_name)
+  const [canSeeManagerRequests, setCanSeeManagerRequests] = useState(
+    Boolean(roleAdministrator || user?.role_name === 'Директор')
+  )
+
+  useEffect(() => {
+    let active = true
+    ;(async () => {
+      if (!user?.id) {
+        if (active) setCanSeeManagerRequests(false)
+        return
+      }
+      if (roleAdministrator || user?.role_name === 'Директор') {
+        if (active) setCanSeeManagerRequests(true)
+        return
+      }
+      try {
+        const { access } = await managerRequestsApi.getMyManager(user.id)
+        if (active) setCanSeeManagerRequests(Boolean(access?.canAccess))
+      } catch (_) {
+        if (active) setCanSeeManagerRequests(false)
+      }
+    })()
+    return () => {
+      active = false
+    }
+  }, [user?.id, user?.role_name, roleAdministrator])
 
   const mainPortal = [
     {
@@ -49,8 +77,7 @@ const NavBar = () => {
       icon: FaTasks,
       link: '/task-manager',
     },
-    // Временно только для Администратора (тестирование). Потом открыть всем.
-    ...(roleAdministrator
+    ...(canSeeManagerRequests
       ? [
           {
             name: 'Обращения',

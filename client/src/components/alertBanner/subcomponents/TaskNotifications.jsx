@@ -1,12 +1,16 @@
 // components/alertBanner/subcomponents/TaskNotifications.js Тут все из таблици notifications
 import React from 'react'
-import { FaClock, FaEnvelope, FaLightbulb, FaBookOpen, FaFileAlt } from 'react-icons/fa'
+import { FaClock, FaEnvelope, FaLightbulb, FaBookOpen, FaFileAlt, FaUserTie } from 'react-icons/fa'
 import useTaskStateTracker from '../../../store/useTaskStateTracker'
 import { FcLeave } from 'react-icons/fc'
 import { FcPlanner } from 'react-icons/fc'
 import { API_BASE_URL } from '../../../../config'
 import axios from 'axios'
 import './TaskNotifications.scss'
+import {
+  parseManagerRequestIdFromMessage,
+  stripManagerRequestMessagePrefix,
+} from '../../../routes/managerRequests/managerRequestsApi'
 
 const useTaskNotifications = ({ currentUserId }) => {
   const notificationsTask = useTaskStateTracker((state) => state.notificationsTask)
@@ -94,6 +98,41 @@ const useTaskNotifications = ({ currentUserId }) => {
           confirmLabel: 'Ок',
           iconClass: 'icon-knowledge',
         },
+        manager_request_new: {
+          icon: <FaUserTie color="#0f766e" />,
+          className: 'extension-notification-manager-request',
+          statusText: 'Новое обращение к директору',
+          showDetails: true,
+          confirmLabel: 'Открыть',
+        },
+        manager_request_answered: {
+          icon: <FaUserTie color="#0f766e" />,
+          className: 'extension-notification-manager-request',
+          statusText: 'Ответ директора на обращение',
+          showDetails: true,
+          confirmLabel: 'Открыть',
+        },
+        manager_request_chat: {
+          icon: <FaEnvelope color="#0f766e" />,
+          className: 'extension-notification-manager-request',
+          statusText: 'Сообщение по обращению',
+          showDetails: true,
+          confirmLabel: 'Открыть',
+        },
+        manager_request_closed: {
+          icon: <FaUserTie color="#64748b" />,
+          className: 'extension-notification-manager-request',
+          statusText: 'Обращение закрыто',
+          showDetails: true,
+          confirmLabel: 'Ок',
+        },
+        manager_request_task_linked: {
+          icon: <FaUserTie color="#0f766e" />,
+          className: 'extension-notification-manager-request',
+          statusText: 'По обращению создана задача',
+          showDetails: true,
+          confirmLabel: 'Открыть',
+        },
         default: {
           icon: <FaEnvelope />,
           className: '',
@@ -103,6 +142,8 @@ const useTaskNotifications = ({ currentUserId }) => {
       }
 
       const config = notificationConfig[notification.type] || notificationConfig.default
+      const displayMessage = stripManagerRequestMessagePrefix(notification.message)
+      const managerRequestId = parseManagerRequestIdFromMessage(notification.message)
 
       notifications.push({
         key: `task-notification-${id}`,
@@ -121,7 +162,7 @@ const useTaskNotifications = ({ currentUserId }) => {
                 <div className="extension-notification-title">{notification.taskTitle}</div>
               )}
 
-              <div className="extension-notification-message">{notification.message}</div>
+              <div className="extension-notification-message">{displayMessage}</div>
 
               {!notification.isRead && (
                 <button
@@ -144,6 +185,7 @@ const useTaskNotifications = ({ currentUserId }) => {
         createdAt: notification.createdAt,
         taskTitle: notification.taskTitle,
         taskId: notification.taskId,
+        managerRequestId,
         userId: notification.userId,
         eventType: notification.eventType,
         isRead: notification.isRead,

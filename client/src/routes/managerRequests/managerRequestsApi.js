@@ -13,7 +13,15 @@ export const managerRequestsApi = {
     const { data } = await axios.get(`${BASE}/manager`, {
       params: withUser(userId),
     })
-    return data?.manager || null
+    return {
+      manager: data?.manager || null,
+      access: data?.access || {
+        canAccess: false,
+        canCreate: false,
+        isDirector: false,
+        isAdmin: false,
+      },
+    }
   },
 
   async listMine(userId) {
@@ -23,7 +31,7 @@ export const managerRequestsApi = {
     return data?.requests || []
   },
 
-  async listInbox(userId, status = 'all') {
+  async listInbox(userId, status = 'active') {
     const { data } = await axios.get(`${BASE}/inbox`, {
       params: withUser(userId, { status }),
     })
@@ -65,6 +73,21 @@ export const managerRequestsApi = {
     })
     return data?.request
   },
+
+  async listMessages(userId, id) {
+    const { data } = await axios.get(`${BASE}/${id}/messages`, {
+      params: withUser(userId),
+    })
+    return data?.messages || []
+  },
+
+  async postMessage(userId, id, body) {
+    const { data } = await axios.post(`${BASE}/${id}/messages`, {
+      userId,
+      body,
+    })
+    return data?.message
+  },
 }
 
 export const MANAGER_REQUEST_DRAFT_KEY = 'svarog_manager_request_task_draft'
@@ -90,3 +113,12 @@ export const clearManagerRequestTaskDraft = () => {
     sessionStorage.removeItem(MANAGER_REQUEST_DRAFT_KEY)
   } catch (_) {}
 }
+
+/** Из текста CRM-уведомления [[mr:123]]… */
+export const parseManagerRequestIdFromMessage = (message) => {
+  const m = String(message || '').match(/^\[\[mr:(\d+)\]\]/)
+  return m ? Number(m[1]) : null
+}
+
+export const stripManagerRequestMessagePrefix = (message) =>
+  String(message || '').replace(/^\[\[mr:\d+\]\]/, '')

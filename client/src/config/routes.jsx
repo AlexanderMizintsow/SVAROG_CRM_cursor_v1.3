@@ -75,7 +75,7 @@ const routes = (bgSeason, roleAdministrator, roleAdminOrDirector, isConnectBD) =
         ),
       },
       { path: 'work-groups', element: <WorkGroup /> },
-      { path: 'manager-requests', element: roleAdministrator ? <ManagerRequestsPage /> : <NotFound /> },
+      { path: 'manager-requests', element: <ManagerRequestsPage /> },
       {
         path: 'business-processes',
         element: (

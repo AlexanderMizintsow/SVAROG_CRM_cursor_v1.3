@@ -1,11 +1,13 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, useSearchParams } from 'react-router-dom'
 import Toastify from 'toastify-js'
 import useUserStore from '../../store/userStore'
+import useTaskStateTracker from '../../store/useTaskStateTracker'
 import {
   managerRequestsApi,
   saveManagerRequestTaskDraft,
 } from './managerRequestsApi'
+import ManagerRequestChat from './ManagerRequestChat'
 import './managerRequests.scss'
 
 const TYPES = [
@@ -17,7 +19,7 @@ const TYPES = [
 const toast = (text, ok = true) => {
   Toastify({
     text,
-    duration: 3000,
+    duration: 3500,
     close: true,
     gravity: 'top',
     position: 'right',
@@ -42,9 +44,19 @@ const formatDate = (value) => {
   }
 }
 
+const hasUnreadForUser = (item, userId, tab) => {
+  if (!item || !userId) return false
+  if (tab === 'mine') return Boolean(item.authorHasUnread)
+  if (tab === 'inbox') return Boolean(item.recipientHasUnread)
+  if (Number(item.fromUserId) === Number(userId)) return Boolean(item.authorHasUnread)
+  if (Number(item.toUserId) === Number(userId)) return Boolean(item.recipientHasUnread)
+  return false
+}
+
 const ManagerRequestsPage = () => {
   const { user } = useUserStore()
   const navigate = useNavigate()
+  const [searchParams, setSearchParams] = useSearchParams()
   const userId = user?.id
 
   const [tab, setTab] = useState('mine')
@@ -54,8 +66,14 @@ const ManagerRequestsPage = () => {
   const [mine, setMine] = useState([])
   const [inbox, setInbox] = useState([])
   const [manager, setManager] = useState(null)
+  const [access, setAccess] = useState({
+    canAccess: false,
+    canCreate: false,
+    isDirector: false,
+  })
   const [selectedId, setSelectedId] = useState(null)
   const [selected, setSelected] = useState(null)
+  const [inboxFilter, setInboxFilter] = useState('active')
 
   const [formType, setFormType] = useState('question')
   const [formTitle, setFormTitle] = useState('')
@@ -69,20 +87,24 @@ const ManagerRequestsPage = () => {
     if (!userId) return
     setError('')
     try {
-      const [mineList, inboxList, mgr] = await Promise.all([
-        managerRequestsApi.listMine(userId),
-        managerRequestsApi.listInbox(userId, 'all'),
+      const [{ manager: mgr, access: acc }, mineList, inboxList] = await Promise.all([
         managerRequestsApi.getMyManager(userId),
+        managerRequestsApi.listMine(userId),
+        managerRequestsApi.listInbox(userId, inboxFilter === 'all' ? 'all' : 'active'),
       ])
+      setManager(mgr)
+      setAccess(acc || { canAccess: false, canCreate: false })
       setMine(mineList)
       setInbox(inboxList)
-      setManager(mgr)
+      if (acc?.isDirector) {
+        setTab((prev) => (prev === 'mine' && !acc.canCreate ? 'inbox' : prev))
+      }
     } catch (err) {
       const message =
         err?.response?.data?.error || err.message || 'Не удалось загрузить обращения'
       setError(message)
     }
-  }, [userId])
+  }, [userId, inboxFilter])
 
   useEffect(() => {
     let active = true
@@ -100,6 +122,13 @@ const ManagerRequestsPage = () => {
   }, [loadLists])
 
   useEffect(() => {
+    const qId = Number(searchParams.get('id'))
+    if (Number.isFinite(qId) && qId > 0) {
+      setSelectedId(qId)
+    }
+  }, [searchParams])
+
+  useEffect(() => {
     if (!selectedId || !userId) {
       setSelected(null)
       setAnswerText('')
@@ -112,6 +141,19 @@ const ManagerRequestsPage = () => {
         if (!active) return
         setSelected(item)
         setAnswerText(item?.answerText || '')
+        if (Number(item?.toUserId) === Number(userId)) setTab('inbox')
+        else if (Number(item?.fromUserId) === Number(userId)) setTab('mine')
+        // Сброс непрочитанного локально после открытия
+        setMine((prev) =>
+          prev.map((r) =>
+            r.id === item.id ? { ...r, authorHasUnread: false } : r
+          )
+        )
+        setInbox((prev) =>
+          prev.map((r) =>
+            r.id === item.id ? { ...r, recipientHasUnread: false } : r
+          )
+        )
       } catch (err) {
         if (active) {
           toast(err?.response?.data?.error || 'Не удалось открыть обращение', false)
@@ -127,10 +169,29 @@ const ManagerRequestsPage = () => {
     () => inbox.filter((x) => x.status === 'open').length,
     [inbox]
   )
+  const answeredInboxCount = useMemo(
+    () => inbox.filter((x) => x.status === 'answered').length,
+    [inbox]
+  )
+  const unreadMineCount = useMemo(
+    () => mine.filter((x) => x.authorHasUnread).length,
+    [mine]
+  )
+  const unreadInboxCount = useMemo(
+    () => inbox.filter((x) => x.recipientHasUnread).length,
+    [inbox]
+  )
 
-  const isManagerView =
-    selected && Number(selected.toUserId) === Number(userId)
-  const canAct = isManagerView && selected?.status === 'open'
+  const isManagerView = selected && Number(selected.toUserId) === Number(userId)
+  const isActiveStatus =
+    selected && (selected.status === 'open' || selected.status === 'answered')
+  const canDirectorAct = isManagerView && isActiveStatus
+  const canChat = Boolean(selected && isActiveStatus)
+
+  const selectRequest = (id) => {
+    setSelectedId(id)
+    setSearchParams(id ? { id: String(id) } : {})
+  }
 
   const handleCreate = async (e) => {
     e.preventDefault()
@@ -151,8 +212,8 @@ const ManagerRequestsPage = () => {
       setShowCreateForm(false)
       await loadLists()
       setTab('mine')
-      setSelectedId(created.id)
-      toast('Обращение отправлено')
+      selectRequest(created.id)
+      toast('Обращение отправлено директору')
     } catch (err) {
       toast(err?.response?.data?.error || 'Не удалось отправить', false)
     } finally {
@@ -174,7 +235,7 @@ const ManagerRequestsPage = () => {
       )
       setSelected(updated)
       await loadLists()
-      toast('Ответ отправлен')
+      toast('Ответ отправлен. Закройте обращение вручную, когда всё будет сделано.')
     } catch (err) {
       toast(err?.response?.data?.error || 'Не удалось ответить', false)
     } finally {
@@ -183,6 +244,7 @@ const ManagerRequestsPage = () => {
   }
 
   const handleClose = async () => {
+    if (!window.confirm('Закрыть обращение? После закрытия чат будет недоступен.')) return
     setSaving(true)
     try {
       const updated = await managerRequestsApi.close(userId, selected.id)
@@ -204,6 +266,17 @@ const ManagerRequestsPage = () => {
       description: selected.body,
       userId,
     })
+    toast('Откроется создание задачи. После сохранения она останется связанной с обращением.')
+    navigate('/task-manager')
+  }
+
+  const openRelatedTask = () => {
+    if (!selected?.relatedTaskId) return
+    const { setTaskDecisionNavigate, setTaskCardBlinkYellow } =
+      useTaskStateTracker.getState()
+    setTaskCardBlinkYellow(selected.relatedTaskId)
+    setTaskDecisionNavigate({ type: 'taskList', initialTab: 'created' })
+    window.dispatchEvent(new CustomEvent('task-decision-navigate'))
     navigate('/task-manager')
   }
 
@@ -211,53 +284,99 @@ const ManagerRequestsPage = () => {
     return <div className="mgr-req">Войдите в систему</div>
   }
 
+  if (!loading && access && access.canAccess === false) {
+    return (
+      <div className="mgr-req">
+        <header className="mgr-req__header">
+          <div>
+            <h1>Обращения</h1>
+            <p>
+              Раздел доступен директору, администратору и сотрудникам, у которых
+              прямой руководитель — Директор.
+            </p>
+          </div>
+        </header>
+        <div className="mgr-req__error">Недостаточно прав для просмотра обращений</div>
+      </div>
+    )
+  }
+
   return (
     <div className="mgr-req">
       <header className="mgr-req__header">
         <div>
-          <h1>Обращения</h1>
+          <h1>Обращения к директору</h1>
           <p>
-            Канал к непосредственному руководителю: вопрос, предложение или
-            эскалация. Задачу на Директора ставить нельзя — пишите сюда.
+            Канал к директору: вопрос, предложение или эскалация. Задачу на Директора
+            ставить нельзя — пишите сюда. Ответ не закрывает обращение: директор
+            закрывает его вручную после ответа или создания задачи. По каждому обращению
+            доступен чат уточнений.
           </p>
         </div>
-        {tab === 'mine' ? (
+        {tab === 'mine' && access.canCreate ? (
           <button
             type="button"
             className="mgr-req__btn mgr-req__btn--primary"
             onClick={() => setShowCreateForm((v) => !v)}
           >
-            {showCreateForm ? 'Скрыть форму' : 'Написать руководителю'}
+            {showCreateForm ? 'Скрыть форму' : 'Написать директору'}
           </button>
         ) : null}
       </header>
 
       <div className="mgr-req__tabs">
-        <button
-          type="button"
-          className={tab === 'mine' ? 'is-active' : ''}
-          onClick={() => {
-            setTab('mine')
-            setSelectedId(null)
-          }}
-        >
-          Мои обращения
-        </button>
-        <button
-          type="button"
-          className={tab === 'inbox' ? 'is-active' : ''}
-          onClick={() => {
-            setTab('inbox')
-            setSelectedId(null)
-          }}
-        >
-          Входящие{openInboxCount > 0 ? ` (${openInboxCount})` : ''}
-        </button>
+        {access.canCreate || !access.isDirector ? (
+          <button
+            type="button"
+            className={tab === 'mine' ? 'is-active' : ''}
+            onClick={() => {
+              setTab('mine')
+              selectRequest(null)
+            }}
+          >
+            Мои обращения
+            {unreadMineCount > 0 ? ` · ${unreadMineCount} новых` : ''}
+          </button>
+        ) : null}
+        {(access.isDirector || access.isAdmin || inbox.length > 0) && (
+          <button
+            type="button"
+            className={tab === 'inbox' ? 'is-active' : ''}
+            onClick={() => {
+              setTab('inbox')
+              selectRequest(null)
+            }}
+          >
+            Входящие
+            {openInboxCount > 0 ? ` · ${openInboxCount} откр.` : ''}
+            {answeredInboxCount > 0 ? ` · ${answeredInboxCount} ответ.` : ''}
+            {unreadInboxCount > 0 ? ` · ${unreadInboxCount} новых` : ''}
+          </button>
+        )}
       </div>
+
+      {tab === 'inbox' ? (
+        <div className="mgr-req__filters">
+          <button
+            type="button"
+            className={inboxFilter === 'active' ? 'is-active' : ''}
+            onClick={() => setInboxFilter('active')}
+          >
+            В работе (открыто + отвечено)
+          </button>
+          <button
+            type="button"
+            className={inboxFilter === 'all' ? 'is-active' : ''}
+            onClick={() => setInboxFilter('all')}
+          >
+            Все
+          </button>
+        </div>
+      ) : null}
 
       {error ? <div className="mgr-req__error">{error}</div> : null}
 
-      {tab === 'mine' && showCreateForm ? (
+      {tab === 'mine' && showCreateForm && access.canCreate ? (
         <form className="mgr-req__create" onSubmit={handleCreate}>
           <div className="mgr-req__manager">
             <span className="mgr-req__label">Кому</span>
@@ -265,10 +384,11 @@ const ManagerRequestsPage = () => {
               <strong>
                 {manager.name}
                 {manager.positionName ? ` · ${manager.positionName}` : ''}
+                {' · Директор'}
               </strong>
             ) : (
               <span className="mgr-req__warn">
-                Руководитель не назначен в иерархии
+                В системе не найден пользователь с ролью «Директор»
               </span>
             )}
           </div>
@@ -325,9 +445,7 @@ const ManagerRequestsPage = () => {
             <div className="mgr-req__empty">Загрузка…</div>
           ) : list.length === 0 ? (
             <div className="mgr-req__empty">
-              {tab === 'mine'
-                ? 'Вы ещё не писали руководителю'
-                : 'Входящих обращений нет'}
+              {tab === 'mine' ? 'Вы ещё не писали директору' : 'Входящих обращений нет'}
             </div>
           ) : (
             list.map((item) => (
@@ -336,10 +454,15 @@ const ManagerRequestsPage = () => {
                 type="button"
                 className={`mgr-req__row ${
                   selectedId === item.id ? 'is-selected' : ''
-                }`}
-                onClick={() => setSelectedId(item.id)}
+                } ${hasUnreadForUser(item, userId, tab) ? 'is-unread' : ''}`}
+                onClick={() => selectRequest(item.id)}
               >
-                <div className="mgr-req__row-title">{item.title}</div>
+                <div className="mgr-req__row-title">
+                  {hasUnreadForUser(item, userId, tab) ? (
+                    <span className="mgr-req__unread-dot" title="Есть обновление" />
+                  ) : null}
+                  {item.title}
+                </div>
                 <div className="mgr-req__row-meta">
                   {[
                     item.typeLabel,
@@ -376,28 +499,43 @@ const ManagerRequestsPage = () => {
 
               {selected.answerText ? (
                 <div className="mgr-req__answer-block">
-                  <div className="mgr-req__label">Ответ руководителя</div>
+                  <div className="mgr-req__label">Ответ директора</div>
                   <p className="mgr-req__body">{selected.answerText}</p>
                 </div>
               ) : null}
 
               {selected.relatedTaskId ? (
-                <div className="mgr-req__row-meta">
-                  Связанная задача №{selected.relatedTaskId}
+                <div className="mgr-req__task-link">
+                  <div className="mgr-req__label">Связанная задача</div>
+                  <p>
+                    №{selected.relatedTaskId}
+                    {selected.relatedTaskTitle ? ` — ${selected.relatedTaskTitle}` : ''}
+                  </p>
+                  <button
+                    type="button"
+                    className="mgr-req__btn mgr-req__btn--primary"
+                    onClick={openRelatedTask}
+                  >
+                    Открыть в менеджере задач
+                  </button>
+                  <p className="mgr-req__muted">
+                    Задача создаётся в «Менеджере задач» (вкладка «Созданные»). Обращение
+                    при этом не закрывается автоматически.
+                  </p>
                 </div>
               ) : null}
 
-              {canAct ? (
+              {canDirectorAct ? (
                 <div className="mgr-req__actions">
                   <label className="mgr-req__label" htmlFor="mgr-answer">
-                    Ваш ответ
+                    Официальный ответ
                   </label>
                   <textarea
                     id="mgr-answer"
                     value={answerText}
                     onChange={(e) => setAnswerText(e.target.value)}
                     rows={4}
-                    placeholder="Текст ответа"
+                    placeholder="Текст ответа автору"
                   />
                   <div className="mgr-req__actions-row">
                     <button
@@ -422,31 +560,23 @@ const ManagerRequestsPage = () => {
                       onClick={handleClose}
                       disabled={saving}
                     >
-                      Закрыть
+                      Закрыть обращение
                     </button>
                   </div>
+                  <p className="mgr-req__muted">
+                    После ответа обращение остаётся «в работе», пока вы не нажмёте
+                    «Закрыть». Можно сначала создать задачу, затем закрыть.
+                  </p>
                 </div>
               ) : null}
 
-              {isManagerView && selected.status === 'answered' ? (
-                <div className="mgr-req__actions-row">
-                  <button
-                    type="button"
-                    className="mgr-req__btn"
-                    onClick={handleCreateTask}
-                    disabled={saving}
-                  >
-                    Создать задачу
-                  </button>
-                  <button
-                    type="button"
-                    className="mgr-req__btn"
-                    onClick={handleClose}
-                    disabled={saving}
-                  >
-                    Закрыть
-                  </button>
-                </div>
+              {selected ? (
+                <ManagerRequestChat
+                  userId={userId}
+                  requestId={selected.id}
+                  canWrite={canChat}
+                  onError={(msg) => toast(msg, false)}
+                />
               ) : null}
             </>
           )}

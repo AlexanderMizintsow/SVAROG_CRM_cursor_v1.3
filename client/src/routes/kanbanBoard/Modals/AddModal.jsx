@@ -601,6 +601,12 @@ const AddModal = ({
                 taskIds[0]
               );
               clearManagerRequestTaskDraft();
+              Toastify({
+                text: `Задача №${taskIds[0]} связана с обращением. Откройте её во вкладке «Созданные». Обращение не закрыто — закройте вручную в разделе «Обращения».`,
+                duration: 6000,
+                close: true,
+                backgroundColor: "linear-gradient(to right, #0f766e, #14b8a6)",
+              }).showToast();
             } catch (linkError) {
               console.warn(
                 "Не удалось связать задачу с обращением:",
