@@ -45,6 +45,8 @@ const ChatTaskModal = ({
 }) => {
   const { user } = useUserStore()
   const messagesContainerRef = useRef(null)
+  const composerTextareaRef = useRef(null)
+  const pendingComposerCaretRef = useRef(null)
   const [messages, setMessages] = useState([])
   const [newMessage, setNewMessage] = useState('')
   const [kbLinkPickerOpen, setKbLinkPickerOpen] = useState(false)
@@ -283,6 +285,30 @@ const ChatTaskModal = ({
       messagesContainerRef.current.scrollTop = messagesContainerRef.current.scrollHeight
     }
   }, [messages])
+
+  // После Ctrl/Alt+Enter React обновляет value, но не прокручивает textarea к курсору
+  const insertNewlineInComposer = useCallback(() => {
+    const el = composerTextareaRef.current
+    const value = newMessage
+    const start =
+      el && typeof el.selectionStart === 'number' ? el.selectionStart : value.length
+    const end =
+      el && typeof el.selectionEnd === 'number' ? el.selectionEnd : start
+    const next = `${value.slice(0, start)}\n${value.slice(end)}`
+    pendingComposerCaretRef.current = start + 1
+    setNewMessage(next)
+  }, [newMessage])
+
+  useEffect(() => {
+    const caret = pendingComposerCaretRef.current
+    if (caret == null) return
+    pendingComposerCaretRef.current = null
+    const ta = composerTextareaRef.current
+    if (!ta) return
+    ta.focus()
+    ta.setSelectionRange(caret, caret)
+    ta.scrollTop = ta.scrollHeight
+  }, [newMessage])
 
   const fetchMessages = useCallback(async () => {
     try {
@@ -1045,13 +1071,14 @@ const ChatTaskModal = ({
             />
 
             <textarea
+              ref={composerTextareaRef}
               value={newMessage}
               onChange={(e) => setNewMessage(e.target.value)}
               onKeyDown={(e) => {
                 if (e.key === 'Enter') {
-                  if (e.ctrlKey) {
+                  if (e.ctrlKey || e.altKey) {
                     e.preventDefault()
-                    setNewMessage((prev) => prev + '\n')
+                    insertNewlineInComposer()
                     return
                   } else if (e.shiftKey) {
                     return

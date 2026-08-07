@@ -134,6 +134,25 @@ const GlobalTaskPage = ({
           onRefresh={onRefresh}
           authorId={typeof currentTask.created_by === 'object' ? currentTask.created_by?.id : currentTask.created_by}
           isReadOnly={isReadOnly}
+          participants={[
+            ...(typeof currentTask.created_by === 'object' && currentTask.created_by?.id != null
+              ? [
+                  {
+                    id: currentTask.created_by.id,
+                    name:
+                      currentTask.created_by.name ||
+                      `Автор #${currentTask.created_by.id}`,
+                  },
+                ]
+              : currentTask.created_by != null
+                ? [{ id: currentTask.created_by, name: `Автор #${currentTask.created_by}` }]
+                : []),
+            ...((currentTask.responsibles || []).map((r) => ({
+              id: r.id,
+              name: r.name,
+            })) || []),
+          ]}
+          reworks={currentTask.reworks || []}
         />
         <GlobalTaskCard
           key={currentTask.id}

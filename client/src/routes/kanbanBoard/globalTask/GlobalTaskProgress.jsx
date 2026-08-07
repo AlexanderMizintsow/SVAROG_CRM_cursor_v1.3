@@ -15,9 +15,11 @@ import {
   FaSync,
   FaPlay,
   FaCalendarAlt,
+  FaTools,
 } from 'react-icons/fa'
 import Toastify from 'toastify-js'
 import { getRemainingDays, formatDeadlineDateTime } from './utils/globalTaskUtils'
+import ProjectReworkModal from './subcomponents/ProjectReworkModal'
 import 'react-datepicker/dist/react-datepicker.css'
 import './styles/GlobalTaskProgress.scss'
 
@@ -29,6 +31,8 @@ const GlobalTaskProgress = ({
   onRefresh,
   authorId,
   isReadOnly,
+  participants = [],
+  reworks = [],
 }) => {
   const { user } = useUserStore()
   const [dialogOpen, setDialogOpen] = useState(false)
@@ -40,8 +44,34 @@ const GlobalTaskProgress = ({
   const [newDeadline, setNewDeadline] = useState(null)
   const [deadlineSaving, setDeadlineSaving] = useState(false)
   const [minDeadlineForProject, setMinDeadlineForProject] = useState(null)
-  const userId = user.id
+  const [reworkModalOpen, setReworkModalOpen] = useState(false)
+  const userId = user?.id
   const isAuthor = authorId != null && String(authorId) === String(userId)
+  const pctValue = Number.parseFloat(completionPercentage)
+  const isAtHundred = Number.isFinite(pctValue) && pctValue >= 100
+  const hasOpenReworks = (reworks || []).some((r) => !r.isCompleted)
+  const canCreateRework = isAuthor && !isReadOnly && (isAtHundred || hasOpenReworks)
+
+  const handleOpenReworkModal = () => {
+    if (isReadOnly) return
+    if (!isAuthor) {
+      Toastify({
+        text: 'Доработку может создать только автор проекта',
+        close: true,
+        backgroundColor: 'linear-gradient(to right, #8B0000, #ff0000)',
+      }).showToast()
+      return
+    }
+    if (!isAtHundred && !hasOpenReworks) {
+      Toastify({
+        text: 'Доработка доступна при 100% или пока есть незакрытые доработки',
+        close: true,
+        backgroundColor: 'linear-gradient(to right, #8B0000, #ff0000)',
+      }).showToast()
+      return
+    }
+    setReworkModalOpen(true)
+  }
 
   useEffect(() => {
     if (!isEditingDeadline || !taskId) return
@@ -313,6 +343,22 @@ const GlobalTaskProgress = ({
             Отметить выполненной
           </button>
 
+          <button
+            type="button"
+            className="global-task-progress__controller-button global-task-progress__controller-button--rework"
+            onClick={handleOpenReworkModal}
+            title={
+              !isAuthor
+                ? 'Доступно только автору проекта'
+                : !canCreateRework
+                  ? 'Доступно при 100% или пока есть незакрытые доработки'
+                  : 'Создать доработку'
+            }
+          >
+            <FaTools className="global-task-progress__controller-icon" />
+            Доработка
+          </button>
+
           {status === 'Пауза' ? (
             <button
               disabled={!isAuthor}
@@ -405,6 +451,21 @@ const GlobalTaskProgress = ({
         message="Вы уверены, что хотите отметить проект как выполненный?"
         btn1="Отмена"
         btn2="Подтвердить"
+      />
+      <ProjectReworkModal
+        open={reworkModalOpen}
+        onClose={() => setReworkModalOpen(false)}
+        taskId={taskId}
+        userId={userId}
+        participants={participants}
+        onCreated={() => {
+          Toastify({
+            text: 'Доработка создана, процент пересчитан',
+            close: true,
+            backgroundColor: 'linear-gradient(to right, #0f766e, #14b8a6)',
+          }).showToast()
+          onRefresh(taskId)
+        }}
       />
     </div>
   )

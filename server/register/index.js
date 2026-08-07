@@ -97,6 +97,9 @@ const {
   updateEmailThreadContent,
   setProjectApproval,
   updateGoals,
+  toggleGoalCheck,
+  createProjectRework,
+  completeProjectRework,
   updateAdditionalInfo,
   getChatMessages,
   sendChatMessage,
@@ -291,6 +294,10 @@ const {
   deleteTag: deleteKnowledgeTag,
   addFavoriteDocument: addKnowledgeFavoriteDocument,
   removeFavoriteDocument: removeKnowledgeFavoriteDocument,
+  listErrorMarks: listKnowledgeErrorMarks,
+  createErrorMark: createKnowledgeErrorMark,
+  updateErrorMark: updateKnowledgeErrorMark,
+  deleteErrorMark: deleteKnowledgeErrorMark,
 } = require('./knowledgeBaseController/knowledgeBaseController')
 const { getCorsOrigins } = require('./config')
 
@@ -732,6 +739,16 @@ app.get(
 app.get('/api/knowledge/documents/:id/events', listKnowledgeEvents(dbPool))
 app.post('/api/knowledge/documents/:id/favorite', addKnowledgeFavoriteDocument(dbPool))
 app.delete('/api/knowledge/documents/:id/favorite', removeKnowledgeFavoriteDocument(dbPool))
+app.get('/api/knowledge/documents/:id/error-marks', listKnowledgeErrorMarks(dbPool))
+app.post('/api/knowledge/documents/:id/error-marks', createKnowledgeErrorMark(dbPool))
+app.put(
+  '/api/knowledge/documents/:id/error-marks/:markId',
+  updateKnowledgeErrorMark(dbPool)
+)
+app.delete(
+  '/api/knowledge/documents/:id/error-marks/:markId',
+  deleteKnowledgeErrorMark(dbPool)
+)
 app.post(
   '/api/knowledge/reindex',
   reindexKnowledgeDocuments(dbPool, uploadsDir)
@@ -836,6 +853,12 @@ app.post('/api/global-tasks/:taskId/first-sent-email', createFirstSentEmailSolut
 app.post('/api/project-sent-emails', saveProjectSentEmail(dbPool))
 app.post('/api/project-reply-to-final-solution', createFinalSolutionFromEmailReply(dbPool))
 app.put('/api/tasks/:id/update-goals', updateGoals(dbPool, io))
+app.put('/api/tasks/:id/goal-checks', toggleGoalCheck(dbPool, io))
+app.post('/api/global-tasks/:taskId/reworks', createProjectRework(dbPool, io))
+app.put(
+  '/api/global-tasks/:taskId/reworks/:reworkId/complete',
+  completeProjectRework(dbPool, io)
+)
 app.put('/api/tasks/:id/update-additional-info', updateAdditionalInfo(dbPool, io))
 app.get('/api/global-tasks/chat/:globalTaskId', getChatMessages(dbPool))
 app.post('/api/global-tasks/chat', sendChatMessage(dbPool, io))

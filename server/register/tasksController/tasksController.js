@@ -10,6 +10,9 @@ const {
   notifyStaffDevicesSafe,
   notifyStaffProjectEvent,
 } = require('../staffMobilePush')
+const {
+  GLOBAL_TASK_COMPLETION_PCT_SELECT_SQL,
+} = require('../globalTaskCompletionSql')
 
 let _warnedMissingBpeUrl = false
 
@@ -58,6 +61,213 @@ async function getGlobalTaskParticipantUserIds(db, globalTaskId) {
   return Array.from(ids)
 }
 
+const tableMissing = (error) => error && error.code === '42P01'
+
+function formatGoalCheckerName(row) {
+  const last = String(row.last_name || '').trim()
+  const first = String(row.first_name || '').trim()
+  const middle = String(row.middle_name || '').trim()
+  const initials =
+    (first ? `${first[0].toUpperCase()}.` : '') +
+    (middle ? `${middle[0].toUpperCase()}.` : '')
+  const name = `${last}${initials ? ` ${initials}` : ''}`.trim()
+  return name || 'Участник'
+}
+
+function mapGoalCheckRow(row) {
+  return {
+    goalIndex: Number(row.goal_index),
+    checked: row.is_checked === true || row.is_checked === 1,
+    updatedBy: row.updated_by != null ? Number(row.updated_by) : null,
+    updatedByName: formatGoalCheckerName(row),
+    updatedAt: row.updated_at || null,
+  }
+}
+
+/** Подтянуть общие галочки целей (не влияет на %). Если таблицы нет — пусто. */
+async function attachGoalChecksToTasks(dbPool, tasks) {
+  if (!Array.isArray(tasks) || !tasks.length) return tasks
+  const ids = tasks
+    .map((t) => Number(t.id))
+    .filter((id) => Number.isFinite(id) && id > 0)
+  if (!ids.length) {
+    tasks.forEach((t) => {
+      if (!t.goal_checks) t.goal_checks = {}
+    })
+    return tasks
+  }
+  try {
+    const { rows } = await dbPool.query(
+      `SELECT c.global_task_id, c.goal_index, c.is_checked, c.updated_by, c.updated_at,
+              u.last_name, u.first_name, u.middle_name
+       FROM global_task_goal_checks c
+       LEFT JOIN users u ON u.id = c.updated_by
+       WHERE c.global_task_id = ANY($1::int[])`,
+      [ids]
+    )
+    const byTask = {}
+    rows.forEach((row) => {
+      const tid = Number(row.global_task_id)
+      if (!byTask[tid]) byTask[tid] = {}
+      const mapped = mapGoalCheckRow(row)
+      byTask[tid][String(mapped.goalIndex)] = mapped
+    })
+    tasks.forEach((t) => {
+      t.goal_checks = byTask[Number(t.id)] || {}
+    })
+  } catch (error) {
+    if (!tableMissing(error)) throw error
+    tasks.forEach((t) => {
+      t.goal_checks = {}
+    })
+  }
+  return tasks
+}
+
+function formatUserShortName(row, prefix = '') {
+  const last = String(row[`${prefix}last_name`] || row.last_name || '').trim()
+  const first = String(row[`${prefix}first_name`] || row.first_name || '').trim()
+  const middle = String(row[`${prefix}middle_name`] || row.middle_name || '').trim()
+  const initials =
+    (first ? `${first[0].toUpperCase()}.` : '') +
+    (middle ? `${middle[0].toUpperCase()}.` : '')
+  const name = `${last}${initials ? ` ${initials}` : ''}`.trim()
+  return name || 'Участник'
+}
+
+function mapReworkRow(row) {
+  return {
+    id: Number(row.id),
+    globalTaskId: Number(row.global_task_id),
+    comment: String(row.comment || '').trim(),
+    assigneeUserId: Number(row.assignee_user_id),
+    assigneeName: formatUserShortName(row, 'a_'),
+    createdBy: Number(row.created_by),
+    createdByName: formatUserShortName(row, 'c_'),
+    isCompleted: row.is_completed === true || row.is_completed === 1,
+    completedAt: row.completed_at || null,
+    completedBy: row.completed_by != null ? Number(row.completed_by) : null,
+    createdAt: row.created_at,
+    updatedAt: row.updated_at,
+  }
+}
+
+async function attachReworksToTasks(dbPool, tasks) {
+  if (!Array.isArray(tasks) || !tasks.length) return tasks
+  const ids = tasks
+    .map((t) => Number(t.id))
+    .filter((id) => Number.isFinite(id) && id > 0)
+  if (!ids.length) {
+    tasks.forEach((t) => {
+      if (!t.reworks) t.reworks = []
+    })
+    return tasks
+  }
+  try {
+    const { rows } = await dbPool.query(
+      `SELECT r.*,
+              au.last_name AS a_last_name, au.first_name AS a_first_name, au.middle_name AS a_middle_name,
+              cu.last_name AS c_last_name, cu.first_name AS c_first_name, cu.middle_name AS c_middle_name
+       FROM global_task_reworks r
+       LEFT JOIN users au ON au.id = r.assignee_user_id
+       LEFT JOIN users cu ON cu.id = r.created_by
+       WHERE r.global_task_id = ANY($1::int[])
+       ORDER BY r.created_at ASC, r.id ASC`,
+      [ids]
+    )
+    const byTask = {}
+    rows.forEach((row) => {
+      const tid = Number(row.global_task_id)
+      if (!byTask[tid]) byTask[tid] = []
+      byTask[tid].push(mapReworkRow(row))
+    })
+    tasks.forEach((t) => {
+      t.reworks = byTask[Number(t.id)] || []
+    })
+  } catch (error) {
+    if (!tableMissing(error)) throw error
+    tasks.forEach((t) => {
+      t.reworks = []
+    })
+  }
+  return tasks
+}
+
+async function getProjectCompletionPct(dbPool, globalTaskId) {
+  const { rows } = await dbPool.query(
+    `SELECT ${GLOBAL_TASK_COMPLETION_PCT_SELECT_SQL} AS pct
+     FROM global_tasks gt WHERE gt.id = $1`,
+    [globalTaskId]
+  )
+  return rows[0] != null ? Number(rows[0].pct) || 0 : 0
+}
+
+async function rematchGoalChecksAfterGoalsUpdate(dbPool, globalTaskId, oldGoals, newGoals) {
+  const oldList = Array.isArray(oldGoals) ? oldGoals : []
+  const newList = Array.isArray(newGoals) ? newGoals : []
+  let existing = []
+  try {
+    const { rows } = await dbPool.query(
+      `SELECT goal_index, is_checked, updated_by, updated_at
+       FROM global_task_goal_checks
+       WHERE global_task_id = $1`,
+      [globalTaskId]
+    )
+    existing = rows
+  } catch (error) {
+    if (tableMissing(error)) return
+    throw error
+  }
+
+  const byOldIndex = {}
+  existing.forEach((r) => {
+    byOldIndex[Number(r.goal_index)] = r
+  })
+
+  const usedOld = new Set()
+  const nextRows = []
+  newList.forEach((goal, newIndex) => {
+    const text = String(goal || '').trim()
+    if (!text) return
+    let oldIndex = -1
+    for (let i = 0; i < oldList.length; i++) {
+      if (usedOld.has(i)) continue
+      if (String(oldList[i] || '').trim() === text) {
+        oldIndex = i
+        break
+      }
+    }
+    if (oldIndex < 0) return
+    usedOld.add(oldIndex)
+    const prev = byOldIndex[oldIndex]
+    if (!prev) return
+    nextRows.push({
+      goal_index: newIndex,
+      is_checked: prev.is_checked,
+      updated_by: prev.updated_by,
+      updated_at: prev.updated_at,
+    })
+  })
+
+  await dbPool.query(`DELETE FROM global_task_goal_checks WHERE global_task_id = $1`, [
+    globalTaskId,
+  ])
+  for (const row of nextRows) {
+    await dbPool.query(
+      `INSERT INTO global_task_goal_checks
+         (global_task_id, goal_index, is_checked, updated_by, updated_at)
+       VALUES ($1, $2, $3, $4, COALESCE($5, CURRENT_TIMESTAMP))`,
+      [
+        globalTaskId,
+        row.goal_index,
+        row.is_checked,
+        row.updated_by,
+        row.updated_at,
+      ]
+    )
+  }
+}
+
 function emitGlobalTaskChanged(dbPool, io, userIds, globalTaskId, reason, payload = {}) {
   if (!userIds || userIds.length === 0 || !globalTaskId) return
   const message = {
@@ -69,6 +279,7 @@ function emitGlobalTaskChanged(dbPool, io, userIds, globalTaskId, reason, payloa
     ...(payload.isEmailReply === true && { isEmailReply: true, senderUserIds: payload.senderUserIds || [] }),
     ...(payload.isUnpublishedEmailChange === true && { isUnpublishedEmailChange: true }),
     ...(payload.performedByUserId != null && { performedByUserId: Number(payload.performedByUserId) }),
+    ...(payload.assigneeUserId != null && { assigneeUserId: Number(payload.assigneeUserId) }),
   }
   if (io) {
     for (const uid of userIds) {
@@ -89,18 +300,7 @@ async function checkAndEmitProgress100(dbPool, io, globalTaskId) {
       `SELECT
         gt.title,
         gt.created_by as author_id,
-        COALESCE(
-          (SELECT ROUND(100.0 * (
-            (SELECT COALESCE(SUM(CASE WHEN t.is_completed THEN 1 ELSE 0 END), 0) FROM tasks t WHERE t.global_task_id = gt.id)
-            + (SELECT COUNT(*) FROM global_task_responsibles gtra WHERE gtra.global_task_id = gt.id AND gtra.requires_approval = true AND gtra.approval_status = 'approved')
-            + (SELECT COUNT(*) FROM global_task_final_solutions WHERE global_task_id = gt.id AND (NOT COALESCE(is_from_supplier_reply, false) OR COALESCE(is_published, false)))
-          ) / NULLIF(
-            (SELECT COUNT(*) FROM tasks t WHERE t.global_task_id = gt.id)
-            + (SELECT COUNT(*) FROM global_task_responsibles gtra WHERE gtra.global_task_id = gt.id AND gtra.requires_approval = true)
-            + (SELECT COUNT(*) FROM global_task_final_solutions WHERE global_task_id = gt.id AND (NOT COALESCE(is_from_supplier_reply, false) OR COALESCE(is_published, false))),
-            0
-          ), 2))
-        , 0) as pct
+        ${GLOBAL_TASK_COMPLETION_PCT_SELECT_SQL} as pct
       FROM global_tasks gt WHERE gt.id = $1`,
       [globalTaskId]
     )
@@ -1858,18 +2058,7 @@ function getGlobalTasks(dbPool) {
         'approval_comment', gtr.approval_comment,
         'approval_at', gtr.approval_at
     )) FILTER (WHERE u.id IS NOT NULL)::jsonb, '[]'::jsonb) as responsibles,
-    COALESCE(
-        (SELECT ROUND(100.0 * (
-            (SELECT COALESCE(SUM(CASE WHEN t.is_completed THEN 1 ELSE 0 END), 0) FROM tasks t WHERE t.global_task_id = gt.id)
-            + (SELECT COUNT(*) FROM global_task_responsibles gtra WHERE gtra.global_task_id = gt.id AND gtra.requires_approval = true AND gtra.approval_status = 'approved')
-            + (SELECT COUNT(*) FROM global_task_final_solutions WHERE global_task_id = gt.id AND (NOT COALESCE(is_from_supplier_reply, false) OR COALESCE(is_published, false)))
-        ) / NULLIF(
-            (SELECT COUNT(*) FROM tasks t WHERE t.global_task_id = gt.id)
-            + (SELECT COUNT(*) FROM global_task_responsibles gtra WHERE gtra.global_task_id = gt.id AND gtra.requires_approval = true)
-            + (SELECT COUNT(*) FROM global_task_final_solutions WHERE global_task_id = gt.id AND (NOT COALESCE(is_from_supplier_reply, false) OR COALESCE(is_published, false))),
-            0
-        ), 2)
-        ), 0) as completion_percentage,
+    ${GLOBAL_TASK_COMPLETION_PCT_SELECT_SQL} as completion_percentage,
     (SELECT COUNT(DISTINCT t.id) FROM tasks t
      JOIN task_assignments ta ON t.id = ta.task_id
      WHERE t.global_task_id = gt.id AND ta.user_id = $1) AS user_tasks_count,
@@ -1934,6 +2123,8 @@ ORDER BY
       )*/
 
       const globalTasks = result.rows
+      await attachGoalChecksToTasks(dbPool, globalTasks)
+      await attachReworksToTasks(dbPool, globalTasks)
 
       res.status(200).json(globalTasks)
     } catch (error) {
@@ -2525,18 +2716,7 @@ function getGlobalTaskById(dbPool) {
             'approval_comment', gtr.approval_comment,
             'approval_at', gtr.approval_at
         )) FILTER (WHERE u.id IS NOT NULL)::jsonb, '[]'::jsonb) as responsibles,
-        COALESCE(
-            (SELECT ROUND(100.0 * (
-                (SELECT COALESCE(SUM(CASE WHEN t.is_completed THEN 1 ELSE 0 END), 0) FROM tasks t WHERE t.global_task_id = gt.id)
-                + (SELECT COUNT(*) FROM global_task_responsibles gtra WHERE gtra.global_task_id = gt.id AND gtra.requires_approval = true AND gtra.approval_status = 'approved')
-                + (SELECT COUNT(*) FROM global_task_final_solutions WHERE global_task_id = gt.id AND (NOT COALESCE(is_from_supplier_reply, false) OR COALESCE(is_published, false)))
-            ) / NULLIF(
-                (SELECT COUNT(*) FROM tasks t WHERE t.global_task_id = gt.id)
-                + (SELECT COUNT(*) FROM global_task_responsibles gtra WHERE gtra.global_task_id = gt.id AND gtra.requires_approval = true)
-                + (SELECT COUNT(*) FROM global_task_final_solutions WHERE global_task_id = gt.id AND (NOT COALESCE(is_from_supplier_reply, false) OR COALESCE(is_published, false))),
-                0
-            ), 2)
-            ), 0) as completion_percentage,
+        ${GLOBAL_TASK_COMPLETION_PCT_SELECT_SQL} as completion_percentage,
         (SELECT COALESCE(json_agg(json_build_object(
             'id', fs.id,
             'content', fs.content,
@@ -2570,6 +2750,8 @@ function getGlobalTaskById(dbPool) {
       }
 
       const task = result.rows[0]
+      await attachGoalChecksToTasks(dbPool, [task])
+      await attachReworksToTasks(dbPool, [task])
 
       // Можно дополнительно запросить подзадачи или другие связанные данные
       // например, getSubtasksForGlobalTask(dbPool)(req, res) — если нужно
@@ -3307,18 +3489,7 @@ function getGlobalTasksCompleted(dbPool) {
         'approval_comment', gtr.approval_comment,
         'approval_at', gtr.approval_at
     )) FILTER (WHERE u.id IS NOT NULL)::jsonb, '[]'::jsonb) as responsibles,
-    COALESCE(
-        (SELECT ROUND(100.0 * (
-            (SELECT COALESCE(SUM(CASE WHEN t.is_completed THEN 1 ELSE 0 END), 0) FROM tasks t WHERE t.global_task_id = gt.id)
-            + (SELECT COUNT(*) FROM global_task_responsibles gtra WHERE gtra.global_task_id = gt.id AND gtra.requires_approval = true AND gtra.approval_status = 'approved')
-            + (SELECT COUNT(*) FROM global_task_final_solutions WHERE global_task_id = gt.id AND (NOT COALESCE(is_from_supplier_reply, false) OR COALESCE(is_published, false)))
-        ) / NULLIF(
-            (SELECT COUNT(*) FROM tasks t WHERE t.global_task_id = gt.id)
-            + (SELECT COUNT(*) FROM global_task_responsibles gtra WHERE gtra.global_task_id = gt.id AND gtra.requires_approval = true)
-            + (SELECT COUNT(*) FROM global_task_final_solutions WHERE global_task_id = gt.id AND (NOT COALESCE(is_from_supplier_reply, false) OR COALESCE(is_published, false))),
-            0
-        ), 2)
-        ), 0) as completion_percentage,
+    ${GLOBAL_TASK_COMPLETION_PCT_SELECT_SQL} as completion_percentage,
     (SELECT COALESCE(json_agg(json_build_object('id', fs.id, 'content', fs.content, 'user_id', fs.user_id, 'author_name', COALESCE(fs.author_display_name, TRIM(CONCAT(fsu.first_name, ' ', fsu.last_name))), 'author_display_name', fs.author_display_name, 'is_from_supplier_reply', COALESCE(fs.is_from_supplier_reply, false), 'is_published', COALESCE(fs.is_published, false), 'thread_messages', COALESCE(fs.thread_messages, '[]'::jsonb), 'created_at', fs.created_at, 'updated_at', fs.updated_at, 'sender_user_ids', COALESCE((SELECT to_jsonb(array_agg(DISTINCT pse.user_id)) FROM project_sent_emails pse WHERE pse.final_solution_id = fs.id), '[]'::jsonb)) ORDER BY fs.created_at), '[]'::json)
      FROM global_task_final_solutions fs
      LEFT JOIN users fsu ON fsu.id = fs.user_id
@@ -3345,7 +3516,10 @@ WHERE ${statusFilter}
         [userId]
       )
 
-      res.status(200).json(result.rows)
+      const completed = result.rows
+      await attachGoalChecksToTasks(dbPool, completed)
+      await attachReworksToTasks(dbPool, completed)
+      res.status(200).json(completed)
     } catch (error) {
       console.error('Ошибка при получении завершённых проектов:', error)
       res.status(500).json({ error: 'Внутренняя ошибка сервера' })
@@ -3712,10 +3886,26 @@ function updateGoals(dbPool, io) {
     const { goals, userId } = req.body
 
     try {
+      const oldRes = await dbPool.query(
+        `SELECT COALESCE(goals, '[]'::jsonb) AS goals FROM global_tasks WHERE id = $1`,
+        [id]
+      )
+      if (!oldRes.rows.length) {
+        return res.status(404).json({ error: 'Проект не найден' })
+      }
+      const oldGoals = oldRes.rows[0].goals
+
       await dbPool.query(
         `UPDATE global_tasks SET goals = $1 WHERE id = $2`,
         [JSON.stringify(goals), id]
       )
+
+      try {
+        await rematchGoalChecksAfterGoalsUpdate(dbPool, id, oldGoals, goals)
+      } catch (remapErr) {
+        console.warn('goal checks rematch:', remapErr.message)
+      }
+
       const participantIds = await getGlobalTaskParticipantUserIds(dbPool, id)
       const titleRes = await dbPool.query('SELECT title FROM global_tasks WHERE id = $1', [id])
       const projectTitle = titleRes.rows[0]?.title || null
@@ -3726,6 +3916,279 @@ function updateGoals(dbPool, io) {
     } catch (err) {
       console.error('Ошибка при обновлении целей:', err)
       res.status(500).json({ error: 'Ошибка обновления целей' })
+    }
+  }
+}
+
+/** Общая галочка цели проекта (визуально, без влияния на процент) */
+function toggleGoalCheck(dbPool, io) {
+  return async function (req, res) {
+    const { id } = req.params
+    const userId = req.body?.userId != null ? Number(req.body.userId) : null
+    const goalIndex = Number(req.body?.goalIndex)
+    const checked = Boolean(req.body?.checked)
+
+    if (!userId || !Number.isFinite(userId) || userId <= 0) {
+      return res.status(400).json({ error: 'Укажите userId' })
+    }
+    if (!Number.isFinite(goalIndex) || goalIndex < 0) {
+      return res.status(400).json({ error: 'Некорректный goalIndex' })
+    }
+
+    try {
+      const participantIds = await getGlobalTaskParticipantUserIds(dbPool, id)
+      if (!participantIds.includes(String(userId))) {
+        return res.status(403).json({ error: 'Нет доступа к проекту' })
+      }
+
+      const goalsRes = await dbPool.query(
+        `SELECT COALESCE(goals, '[]'::jsonb) AS goals, title FROM global_tasks WHERE id = $1`,
+        [id]
+      )
+      if (!goalsRes.rows.length) {
+        return res.status(404).json({ error: 'Проект не найден' })
+      }
+      const goals = Array.isArray(goalsRes.rows[0].goals) ? goalsRes.rows[0].goals : []
+      const goalText = String(goals[goalIndex] || '').trim()
+      if (!goalText) {
+        return res.status(400).json({ error: 'Цель не найдена' })
+      }
+
+      if (checked) {
+        await dbPool.query(
+          `INSERT INTO global_task_goal_checks
+             (global_task_id, goal_index, is_checked, updated_by, updated_at)
+           VALUES ($1, $2, TRUE, $3, CURRENT_TIMESTAMP)
+           ON CONFLICT (global_task_id, goal_index)
+           DO UPDATE SET
+             is_checked = TRUE,
+             updated_by = EXCLUDED.updated_by,
+             updated_at = CURRENT_TIMESTAMP`,
+          [id, goalIndex, userId]
+        )
+      } else {
+        await dbPool.query(
+          `INSERT INTO global_task_goal_checks
+             (global_task_id, goal_index, is_checked, updated_by, updated_at)
+           VALUES ($1, $2, FALSE, $3, CURRENT_TIMESTAMP)
+           ON CONFLICT (global_task_id, goal_index)
+           DO UPDATE SET
+             is_checked = FALSE,
+             updated_by = EXCLUDED.updated_by,
+             updated_at = CURRENT_TIMESTAMP`,
+          [id, goalIndex, userId]
+        )
+      }
+
+      const checkRes = await dbPool.query(
+        `SELECT c.goal_index, c.is_checked, c.updated_by, c.updated_at,
+                u.last_name, u.first_name, u.middle_name
+         FROM global_task_goal_checks c
+         LEFT JOIN users u ON u.id = c.updated_by
+         WHERE c.global_task_id = $1 AND c.goal_index = $2`,
+        [id, goalIndex]
+      )
+      const check = checkRes.rows[0] ? mapGoalCheckRow(checkRes.rows[0]) : null
+
+      if (io && participantIds.length) {
+        emitGlobalTaskChanged(dbPool, io, participantIds, id, 'goal_checks', {
+          title: goalsRes.rows[0].title || null,
+          performedByUserId: userId,
+        })
+      }
+
+      return res.json({ check })
+    } catch (err) {
+      if (tableMissing(err)) {
+        return res.status(503).json({
+          error: 'Выполните миграцию add_global_task_goal_checks.sql',
+        })
+      }
+      console.error('toggleGoalCheck:', err)
+      return res.status(500).json({ error: 'Ошибка обновления отметки цели' })
+    }
+  }
+}
+
+/** Создать доработку (автор, проект на 100%, комментарий + исполнитель обязательны) */
+function createProjectRework(dbPool, io) {
+  return async function (req, res) {
+    const { taskId } = req.params
+    const userId = req.body?.userId != null ? Number(req.body.userId) : null
+    const assigneeUserId =
+      req.body?.assigneeUserId != null ? Number(req.body.assigneeUserId) : null
+    const comment = String(req.body?.comment || '').trim()
+
+    if (!userId || !Number.isFinite(userId)) {
+      return res.status(400).json({ error: 'Укажите userId' })
+    }
+    if (!comment) {
+      return res.status(400).json({ error: 'Комментарий обязателен' })
+    }
+    if (comment.length > 4000) {
+      return res.status(400).json({ error: 'Комментарий слишком длинный' })
+    }
+    if (!assigneeUserId || !Number.isFinite(assigneeUserId)) {
+      return res.status(400).json({ error: 'Укажите участника для доработки' })
+    }
+
+    try {
+      const gtRes = await dbPool.query(
+        `SELECT id, title, created_by FROM global_tasks WHERE id = $1`,
+        [taskId]
+      )
+      if (!gtRes.rows.length) {
+        return res.status(404).json({ error: 'Проект не найден' })
+      }
+      const project = gtRes.rows[0]
+      if (Number(project.created_by) !== userId) {
+        return res.status(403).json({ error: 'Доработку может создать только автор проекта' })
+      }
+
+      const participantIds = await getGlobalTaskParticipantUserIds(dbPool, taskId)
+      if (!participantIds.includes(String(assigneeUserId))) {
+        return res.status(400).json({
+          error: 'Исполнитель должен быть участником проекта',
+        })
+      }
+
+      const pct = await getProjectCompletionPct(dbPool, taskId)
+      let openReworksCount = 0
+      try {
+        const openRes = await dbPool.query(
+          `SELECT COUNT(*)::int AS cnt FROM global_task_reworks
+           WHERE global_task_id = $1 AND is_completed = FALSE`,
+          [taskId]
+        )
+        openReworksCount = Number(openRes.rows[0]?.cnt) || 0
+      } catch (countErr) {
+        if (!tableMissing(countErr)) throw countErr
+      }
+      if (pct < 100 && openReworksCount === 0) {
+        return res.status(400).json({
+          error:
+            'Доработку можно создать при 100% или пока есть незакрытые доработки',
+        })
+      }
+
+      const ins = await dbPool.query(
+        `INSERT INTO global_task_reworks
+           (global_task_id, comment, assignee_user_id, created_by)
+         VALUES ($1, $2, $3, $4)
+         RETURNING id`,
+        [taskId, comment, assigneeUserId, userId]
+      )
+
+      const checkRes = await dbPool.query(
+        `SELECT r.*,
+                au.last_name AS a_last_name, au.first_name AS a_first_name, au.middle_name AS a_middle_name,
+                cu.last_name AS c_last_name, cu.first_name AS c_first_name, cu.middle_name AS c_middle_name
+         FROM global_task_reworks r
+         LEFT JOIN users au ON au.id = r.assignee_user_id
+         LEFT JOIN users cu ON cu.id = r.created_by
+         WHERE r.id = $1`,
+        [ins.rows[0].id]
+      )
+      const rework = mapReworkRow(checkRes.rows[0])
+
+      if (io && participantIds.length) {
+        emitGlobalTaskChanged(dbPool, io, participantIds, taskId, 'rework', {
+          title: project.title || null,
+          authorId: Number(project.created_by),
+          performedByUserId: userId,
+          assigneeUserId,
+        })
+      }
+
+      const newPct = await getProjectCompletionPct(dbPool, taskId)
+      return res.status(201).json({ rework, completion_percentage: newPct })
+    } catch (err) {
+      if (tableMissing(err)) {
+        return res.status(503).json({
+          error: 'Выполните миграцию add_global_task_reworks.sql',
+        })
+      }
+      console.error('createProjectRework:', err)
+      return res.status(500).json({ error: 'Ошибка создания доработки' })
+    }
+  }
+}
+
+/** Автор отмечает доработку выполненной (без снятия) */
+function completeProjectRework(dbPool, io) {
+  return async function (req, res) {
+    const { taskId, reworkId } = req.params
+    const userId = req.body?.userId != null ? Number(req.body.userId) : null
+    if (!userId || !Number.isFinite(userId)) {
+      return res.status(400).json({ error: 'Укажите userId' })
+    }
+
+    try {
+      const gtRes = await dbPool.query(
+        `SELECT id, title, created_by FROM global_tasks WHERE id = $1`,
+        [taskId]
+      )
+      if (!gtRes.rows.length) {
+        return res.status(404).json({ error: 'Проект не найден' })
+      }
+      if (Number(gtRes.rows[0].created_by) !== userId) {
+        return res.status(403).json({
+          error: 'Отметить доработку может только автор проекта',
+        })
+      }
+
+      const upd = await dbPool.query(
+        `UPDATE global_task_reworks
+         SET is_completed = TRUE,
+             completed_at = COALESCE(completed_at, CURRENT_TIMESTAMP),
+             completed_by = COALESCE(completed_by, $3),
+             updated_at = CURRENT_TIMESTAMP
+         WHERE id = $1 AND global_task_id = $2 AND is_completed = FALSE
+         RETURNING id`,
+        [reworkId, taskId, userId]
+      )
+      if (!upd.rows.length) {
+        const exists = await dbPool.query(
+          `SELECT id, is_completed FROM global_task_reworks
+           WHERE id = $1 AND global_task_id = $2`,
+          [reworkId, taskId]
+        )
+        if (!exists.rows.length) {
+          return res.status(404).json({ error: 'Доработка не найдена' })
+        }
+        // уже выполнена — идемпотентно вернём
+      }
+
+      const checkRes = await dbPool.query(
+        `SELECT r.*,
+                au.last_name AS a_last_name, au.first_name AS a_first_name, au.middle_name AS a_middle_name,
+                cu.last_name AS c_last_name, cu.first_name AS c_first_name, cu.middle_name AS c_middle_name
+         FROM global_task_reworks r
+         LEFT JOIN users au ON au.id = r.assignee_user_id
+         LEFT JOIN users cu ON cu.id = r.created_by
+         WHERE r.id = $1`,
+        [reworkId]
+      )
+      const rework = mapReworkRow(checkRes.rows[0])
+      const participantIds = await getGlobalTaskParticipantUserIds(dbPool, taskId)
+      if (io && participantIds.length) {
+        emitGlobalTaskChanged(dbPool, io, participantIds, taskId, 'rework_completed', {
+          title: gtRes.rows[0].title || null,
+          authorId: Number(gtRes.rows[0].created_by),
+          performedByUserId: userId,
+        })
+      }
+      await checkAndEmitProgress100(dbPool, io, taskId)
+      const newPct = await getProjectCompletionPct(dbPool, taskId)
+      return res.json({ rework, completion_percentage: newPct })
+    } catch (err) {
+      if (tableMissing(err)) {
+        return res.status(503).json({
+          error: 'Выполните миграцию add_global_task_reworks.sql',
+        })
+      }
+      console.error('completeProjectRework:', err)
+      return res.status(500).json({ error: 'Ошибка обновления доработки' })
     }
   }
 }
@@ -5410,6 +5873,9 @@ module.exports = {
   addResponsiblesToGlobalTask,
   setProjectApproval,
   updateGoals,
+  toggleGoalCheck,
+  createProjectRework,
+  completeProjectRework,
   updateAdditionalInfo,
   getChatMessages,
   sendChatMessage,

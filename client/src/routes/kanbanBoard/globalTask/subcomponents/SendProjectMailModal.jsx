@@ -29,6 +29,19 @@ const CATEGORY_SUPPLIERS = 'suppliers'
 const CATEGORY_EMPLOYEES = 'employees'
 const CATEGORY_DEALERS = 'dealers'
 
+function sortRecipientsByName(list) {
+  return [...(list || [])].sort((a, b) => {
+    const nameCmp = String(a.name || '').localeCompare(String(b.name || ''), 'ru', {
+      sensitivity: 'base',
+      numeric: true,
+    })
+    if (nameCmp !== 0) return nameCmp
+    return String(a.email || '').localeCompare(String(b.email || ''), 'ru', {
+      sensitivity: 'base',
+    })
+  })
+}
+
 // Восстановление имени файла из mojibake (UTF-8, ошибочно прочитанный как Latin-1)
 function decodeUtf8FileName(name) {
   if (!name || typeof name !== 'string') return name
@@ -44,7 +57,7 @@ function decodeUtf8FileName(name) {
 
 function buildBody(task, includeAdditionalInfo = false) {
   const parts = []
-  if (task.description) parts.push('Добрый день!\n\n' + task.description)
+  if (task.description) parts.push(task.description)
   if (includeAdditionalInfo && task.additional_info && Object.keys(task.additional_info).length > 0) {
     parts.push(
       'Доп. информация:\n' +
@@ -132,41 +145,57 @@ function SendProjectMailModal({ open, onClose, task, attachments: attachmentsPro
           const res = await axios.get(`${API_BASE_URL}5003/api/suppliers`)
           const list = Array.isArray(res.data) ? res.data : []
           setRecipients(
-            list.flatMap((s) => {
-              const emails = Array.isArray(s.emails) ? s.emails : []
-              return emails.filter((e) => String(e).trim()).map((email) => ({ id: `s-${s.id}-${email}`, name: s.name, email, category: CATEGORY_SUPPLIERS }))
-            })
+            sortRecipientsByName(
+              list.flatMap((s) => {
+                const emails = Array.isArray(s.emails) ? s.emails : []
+                return emails
+                  .filter((e) => String(e).trim())
+                  .map((email) => ({
+                    id: `s-${s.id}-${email}`,
+                    name: s.name,
+                    email,
+                    category: CATEGORY_SUPPLIERS,
+                  }))
+              })
+            )
           )
         } else if (category === CATEGORY_EMPLOYEES) {
           const res = await axios.get(`${API_BASE_URL}5000/api/users`)
           const list = Array.isArray(res.data) ? res.data : []
           setRecipients(
-            list
-              .filter((u) => u.email)
-              .map((u) => ({
-                id: `u-${u.id}`,
-                name: `${u.last_name || ''} ${u.first_name || ''}`.trim() || u.username,
-                email: u.email,
-                category: CATEGORY_EMPLOYEES,
-              }))
+            sortRecipientsByName(
+              list
+                .filter((u) => u.email)
+                .map((u) => ({
+                  id: `u-${u.id}`,
+                  name: `${u.last_name || ''} ${u.first_name || ''}`.trim() || u.username,
+                  email: u.email,
+                  category: CATEGORY_EMPLOYEES,
+                }))
+            )
           )
         } else {
           const res = await axios.get(`${API_BASE_URL}5003/api/companies`)
           const list = Array.isArray(res.data) ? res.data : []
           setRecipients(
-            list
-              .filter((c) => c.email)
-              .flatMap((c) => {
-                const name = c.company_name || c.name_companies || c.name || ''
-                const emails = typeof c.email === 'string' ? c.email.split(',').map((e) => e.trim()).filter(Boolean) : []
-                const cid = c.company_id != null ? c.company_id : c.id
-                return emails.map((email, i) => ({
-                  id: `c-${cid}-${i}-${email}`,
-                  name,
-                  email,
-                  category: CATEGORY_DEALERS,
-                }))
-              })
+            sortRecipientsByName(
+              list
+                .filter((c) => c.email)
+                .flatMap((c) => {
+                  const name = c.company_name || c.name_companies || c.name || ''
+                  const emails =
+                    typeof c.email === 'string'
+                      ? c.email.split(',').map((e) => e.trim()).filter(Boolean)
+                      : []
+                  const cid = c.company_id != null ? c.company_id : c.id
+                  return emails.map((email, i) => ({
+                    id: `c-${cid}-${i}-${email}`,
+                    name,
+                    email,
+                    category: CATEGORY_DEALERS,
+                  }))
+                })
+            )
           )
         }
       } catch (err) {
@@ -273,7 +302,7 @@ function SendProjectMailModal({ open, onClose, task, attachments: attachmentsPro
   if (!open) return null
 
   return (
-    <div className="send-project-mail-overlay" onClick={onClose}>
+    <div className="send-project-mail-overlay">
       <div className="send-project-mail-modal" onClick={(e) => e.stopPropagation()}>
         <div className="send-project-mail-modal__header">
           <h3>Отправить описание проекта на почту</h3>

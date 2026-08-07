@@ -35,6 +35,10 @@ import KnowledgeDocumentForm from './KnowledgeDocumentForm'
 import KnowledgeSidebar from './KnowledgeSidebar'
 import HelpModalKnowledge from './HelpModalKnowledge'
 import KnowledgeTaxonomyAdmin from './KnowledgeTaxonomyAdmin'
+import KnowledgeErrorMarks, {
+  KnowledgeErrorMarkAddButton,
+  hasMyErrorMark,
+} from './KnowledgeErrorMarks'
 import './knowledgeBase.scss'
 
 const toast = (text, ok = true) => {
@@ -289,6 +293,67 @@ const KnowledgeBasePage = () => {
       })
     } catch (err) {
       toast(err.response?.data?.error || 'Не удалось обновить избранное', false)
+    }
+  }
+
+  const upsertLocalErrorMark = (documentId, mark) => {
+    const id = Number(documentId)
+    const merge = (item) => {
+      if (Number(item.id) !== id) return item
+      const prev = Array.isArray(item.errorMarks) ? item.errorMarks : []
+      const without = prev.filter((m) => Number(m.id) !== Number(mark.id))
+      return { ...item, errorMarks: [mark, ...without] }
+    }
+    setDocuments((prev) => prev.map(merge))
+    setTreeDocuments((prev) => prev.map(merge))
+    setFolderDoc((prev) => (prev && Number(prev.id) === id ? merge(prev) : prev))
+  }
+
+  const removeLocalErrorMark = (documentId, markId) => {
+    const id = Number(documentId)
+    const mid = Number(markId)
+    const apply = (item) => {
+      if (Number(item.id) !== id) return item
+      return {
+        ...item,
+        errorMarks: (item.errorMarks || []).filter((m) => Number(m.id) !== mid),
+      }
+    }
+    setDocuments((prev) => prev.map(apply))
+    setTreeDocuments((prev) => prev.map(apply))
+    setFolderDoc((prev) => (prev && Number(prev.id) === id ? apply(prev) : prev))
+  }
+
+  const handleCreateErrorMark = async (documentId, comment, fileId = null) => {
+    const mark = await knowledgeBaseApi.createErrorMark(userId, documentId, {
+      comment,
+      fileId,
+    })
+    upsertLocalErrorMark(documentId, mark)
+    toast('Отметка об ошибке сохранена')
+    return mark
+  }
+
+  const handleUpdateErrorMark = async (documentId, markId, comment) => {
+    const mark = await knowledgeBaseApi.updateErrorMark(
+      userId,
+      documentId,
+      markId,
+      comment
+    )
+    upsertLocalErrorMark(documentId, mark)
+    toast('Комментарий обновлён')
+    return mark
+  }
+
+  const handleDeleteErrorMark = async (documentId, markId) => {
+    try {
+      await knowledgeBaseApi.deleteErrorMark(userId, documentId, markId)
+      removeLocalErrorMark(documentId, markId)
+      toast('Отметка удалена')
+    } catch (err) {
+      toast(err.response?.data?.error || 'Не удалось удалить отметку', false)
+      throw err
     }
   }
 
@@ -1008,6 +1073,18 @@ const KnowledgeBasePage = () => {
                     {!isFolder && doc.fileName ? (
                       <div className="kb__filename">{doc.fileName}</div>
                     ) : null}
+                    <KnowledgeErrorMarks
+                      marks={doc.errorMarks || []}
+                      currentUserId={userId}
+                      fileId={isFolder ? undefined : null}
+                      busy={loading}
+                      onUpdate={(markId, comment) =>
+                        handleUpdateErrorMark(doc.id, markId, comment)
+                      }
+                      onDelete={(markId) =>
+                        handleDeleteErrorMark(doc.id, markId)
+                      }
+                    />
                   </div>
                   <div className="kb__card-actions">
                     {isFolder ? (
@@ -1053,6 +1130,15 @@ const KnowledgeBasePage = () => {
                     >
                       <FaHistory />
                     </button>
+                    ) : null}
+                    {!isFolder &&
+                    !hasMyErrorMark(doc.errorMarks, userId, null) ? (
+                      <KnowledgeErrorMarkAddButton
+                        busy={loading}
+                        onCreate={(comment) =>
+                          handleCreateErrorMark(doc.id, comment, null)
+                        }
+                      />
                     ) : null}
                     {doc.canManage ? (
                       <>
@@ -1259,6 +1345,24 @@ const KnowledgeBasePage = () => {
                                   .filter(Boolean)
                                   .join(' · ')}
                               </span>
+                              {file.id ? (
+                                <KnowledgeErrorMarks
+                                  marks={folderDoc.errorMarks || []}
+                                  currentUserId={userId}
+                                  fileId={file.id}
+                                  busy={folderLoading}
+                                  onUpdate={(markId, comment) =>
+                                    handleUpdateErrorMark(
+                                      folderDoc.id,
+                                      markId,
+                                      comment
+                                    )
+                                  }
+                                  onDelete={(markId) =>
+                                    handleDeleteErrorMark(folderDoc.id, markId)
+                                  }
+                                />
+                              ) : null}
                             </div>
                             <div className="kb-folder-files__actions">
                               {(isPdf(file.fileType, file.fileName) ||
@@ -1288,6 +1392,24 @@ const KnowledgeBasePage = () => {
                               >
                                 <FaHistory />
                               </button>
+                              {file.id &&
+                              !hasMyErrorMark(
+                                folderDoc.errorMarks,
+                                userId,
+                                file.id
+                              ) ? (
+                                <KnowledgeErrorMarkAddButton
+                                  fileId={file.id}
+                                  busy={folderLoading}
+                                  onCreate={(comment, fid) =>
+                                    handleCreateErrorMark(
+                                      folderDoc.id,
+                                      comment,
+                                      fid
+                                    )
+                                  }
+                                />
+                              ) : null}
                               {folderDoc.canManage && file.id ? (
                                 <>
                                   <button

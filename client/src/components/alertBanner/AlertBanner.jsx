@@ -450,6 +450,7 @@ const AlertBanner = () => {
     status: 'Изменён статус проекта',
     deleted: 'Проект удалён',
     progress_100: 'Прогресс проекта 100%',
+    rework: 'Вам назначена доработка по проекту',
     final_solution_added: 'Добавлено итоговое решение по проекту',
     final_solution_updated: 'Изменено итоговое решение по проекту',
     final_solution_deleted: 'Удалено итоговое решение по проекту',
@@ -827,6 +828,7 @@ const AlertBanner = () => {
                   } else if (key.startsWith('project-msg-')) {
                     const projectClickTypes = [
                       'progress_100',
+                      'rework',
                       'created',
                       'participant_added',
                       'status',

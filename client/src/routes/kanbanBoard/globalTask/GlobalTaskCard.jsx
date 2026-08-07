@@ -11,6 +11,8 @@ import {
   FaEllipsisH,
   FaChevronLeft,
   FaChevronRight,
+  FaCheck,
+  FaTools,
 } from 'react-icons/fa'
 import { MdEmail, MdSettings } from 'react-icons/md'
 import { MdCalendarMonth, MdAccessTime } from 'react-icons/md'
@@ -146,10 +148,110 @@ const GlobalTaskCard = ({
     priority,
     deadline,
     goals,
+    goal_checks: goalChecksFromTask,
+    reworks: reworksFromTask,
     additional_info,
     responsibles,
     final_solutions,
   } = task
+  const [goalChecks, setGoalChecks] = useState(goalChecksFromTask || {})
+  const [togglingGoalIndex, setTogglingGoalIndex] = useState(null)
+  const [completingReworkId, setCompletingReworkId] = useState(null)
+  const reworks = Array.isArray(reworksFromTask) ? reworksFromTask : []
+
+  useEffect(() => {
+    setGoalChecks(goalChecksFromTask || {})
+  }, [goalChecksFromTask, id])
+
+  const formatGoalCheckMeta = (check) => {
+    if (!check?.updatedByName) return ''
+    let when = ''
+    if (check.updatedAt) {
+      try {
+        when = new Date(check.updatedAt).toLocaleString('ru-RU', {
+          day: '2-digit',
+          month: '2-digit',
+          year: 'numeric',
+          hour: '2-digit',
+          minute: '2-digit',
+        })
+      } catch {
+        when = ''
+      }
+    }
+    return when ? `${check.updatedByName} · ${when}` : check.updatedByName
+  }
+
+  const handleToggleGoalCheck = async (goalIndex) => {
+    if (isReadOnly || togglingGoalIndex != null) return
+    const key = String(goalIndex)
+    const prev = goalChecks[key]
+    const nextChecked = !(prev && prev.checked)
+    setTogglingGoalIndex(goalIndex)
+    setGoalChecks((state) => ({
+      ...state,
+      [key]: {
+        ...(prev || {}),
+        goalIndex,
+        checked: nextChecked,
+        updatedBy: userId,
+        updatedByName: 'Вы',
+        updatedAt: new Date().toISOString(),
+      },
+    }))
+    try {
+      const { data } = await axios.put(
+        `${API_BASE_URL}5000/api/tasks/${id}/goal-checks`,
+        { userId, goalIndex, checked: nextChecked }
+      )
+      if (data?.check) {
+        setGoalChecks((state) => ({
+          ...state,
+          [key]: data.check,
+        }))
+      }
+      if (typeof onRefresh === 'function') onRefresh(id)
+    } catch (err) {
+      setGoalChecks(goalChecksFromTask || {})
+      console.error('Ошибка отметки цели:', err)
+      alert(err.response?.data?.error || 'Не удалось обновить отметку цели')
+    } finally {
+      setTogglingGoalIndex(null)
+    }
+  }
+
+  const formatReworkDate = (value) => {
+    if (!value) return ''
+    try {
+      return new Date(value).toLocaleString('ru-RU', {
+        day: '2-digit',
+        month: '2-digit',
+        year: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit',
+      })
+    } catch {
+      return ''
+    }
+  }
+
+  const handleCompleteRework = async (reworkId) => {
+    if (!isAuthor || isReadOnly || completingReworkId != null) return
+    setCompletingReworkId(reworkId)
+    try {
+      await axios.put(
+        `${API_BASE_URL}5000/api/global-tasks/${id}/reworks/${reworkId}/complete`,
+        { userId }
+      )
+      if (typeof onRefresh === 'function') onRefresh(id)
+    } catch (err) {
+      console.error('Ошибка завершения доработки:', err)
+      alert(err.response?.data?.error || 'Не удалось отметить доработку')
+    } finally {
+      setCompletingReworkId(null)
+    }
+  }
+
   const solutionsList = Array.isArray(final_solutions) ? final_solutions : []
   const responsiblesRef = useRef(null)
   const goalsRef = useRef(null)
@@ -429,6 +531,58 @@ const GlobalTaskCard = ({
             )}
           </div>
 
+          {reworks.length > 0 ? (
+            <div className="global-task-card__reworks">
+              <h3 className="global-task-card__section-title">
+                <FaTools className="global-task-card__section-icon global-task-card__section-icon--orange" />{' '}
+                Доработки
+              </h3>
+              <ul className="global-task-card__reworks-list">
+                {reworks.map((rw) => (
+                  <li
+                    key={rw.id}
+                    className={`global-task-card__rework-item ${
+                      rw.isCompleted ? 'is-done' : ''
+                    }`}
+                  >
+                    <div className="global-task-card__rework-main">
+                      <p className="global-task-card__rework-comment">
+                        {rw.comment}
+                      </p>
+                      <div className="global-task-card__rework-meta">
+                        <span>{formatReworkDate(rw.createdAt)}</span>
+                        {rw.assigneeName ? (
+                          <span> · Кому: {rw.assigneeName}</span>
+                        ) : null}
+                        {rw.isCompleted ? (
+                          <span className="global-task-card__rework-badge">
+                            {' '}
+                            · Выполнено
+                            {rw.completedAt
+                              ? ` (${formatReworkDate(rw.completedAt)})`
+                              : ''}
+                          </span>
+                        ) : null}
+                      </div>
+                    </div>
+                    {isAuthor && !isReadOnly && !rw.isCompleted ? (
+                      <button
+                        type="button"
+                        className="global-task-card__rework-complete"
+                        disabled={completingReworkId === rw.id}
+                        onClick={() => handleCompleteRework(rw.id)}
+                      >
+                        {completingReworkId === rw.id
+                          ? '…'
+                          : 'Выполнено'}
+                      </button>
+                    ) : null}
+                  </li>
+                ))}
+              </ul>
+            </div>
+          ) : null}
+
           {/* Итоговые решения */}
           {solutionsList.length > 0 && (
             <FinalSolutionsBlock
@@ -451,21 +605,49 @@ const GlobalTaskCard = ({
                 </h3>
                 <div className="global-task-card__section-content">
                   <ul>
-                    {goals
-                      .filter((goal) => goal.trim() !== '')
-                      .map(
-                        (
-                          goal,
-                          index // Фильтруем и отображаем только непустые цели
-                        ) => (
-                          <li
-                            key={index}
-                            className="global-task-card__goal-item"
+                    {goals.map((goal, index) => {
+                      if (!String(goal || '').trim()) return null
+                      const check = goalChecks[String(index)]
+                      const isChecked = Boolean(check?.checked)
+                      const meta = formatGoalCheckMeta(check)
+                      return (
+                        <li
+                          key={index}
+                          className={`global-task-card__goal-item ${
+                            isChecked ? 'is-checked' : ''
+                          }`}
+                        >
+                          <button
+                            type="button"
+                            className={`global-task-card__goal-check ${
+                              isChecked ? 'is-on' : ''
+                            }`}
+                            title={
+                              meta
+                                ? `${isChecked ? 'Снять отметку' : 'Отметить'} (${meta})`
+                                : isChecked
+                                  ? 'Снять отметку'
+                                  : 'Отметить цель'
+                            }
+                            disabled={isReadOnly || togglingGoalIndex === index}
+                            onClick={() => handleToggleGoalCheck(index)}
+                            aria-pressed={isChecked}
                           >
-                            {goal}
-                          </li>
-                        )
-                      )}
+                            {isChecked ? <FaCheck /> : null}
+                          </button>
+                          <div className="global-task-card__goal-body">
+                            <span className="global-task-card__goal-text">
+                              {goal}
+                            </span>
+                            {meta ? (
+                              <span className="global-task-card__goal-meta">
+                                {meta}
+                              </span>
+                            ) : null}
+                          </div>
+                        </li>
+                      )
+                    })}
                   </ul>
                 </div>
               </>

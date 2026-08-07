@@ -30,6 +30,10 @@ const {
   collectUploadFiles,
   archiveFileVersion,
 } = require('./knowledgeFolderFiles')
+const {
+  loadErrorMarksMap,
+  createErrorMarksHandlers,
+} = require('./knowledgeErrorMarks')
 
 const hashFile = (filePath) => {
   const buf = fs.readFileSync(filePath)
@@ -336,6 +340,7 @@ const mapDoc = (row, segments = [], canManage = false, extra = {}) => {
         .map((s) => String(s.segment_value)),
     },
     canManage: Boolean(canManage),
+    errorMarks: Array.isArray(extra.errorMarks) ? extra.errorMarks : [],
   }
 }
 
@@ -662,6 +667,7 @@ const listDocuments = (dbPool) => async (req, res) => {
     const segmentsMap = await loadSegmentsMap(dbPool, ids)
     const favoriteIds = await loadFavoriteIds(dbPool, userId)
     const filesCounts = await loadFilesCounts(dbPool, ids)
+    const errorMarksMap = await loadErrorMarksMap(dbPool, ids)
 
     const visible = rows
       .filter((row) =>
@@ -683,7 +689,10 @@ const listDocuments = (dbPool) => async (req, res) => {
           },
           segmentsMap[id] || [],
           canManage,
-          { filesCount: filesCounts[id] || (row.file_url ? 1 : 0) }
+          {
+            filesCount: filesCounts[id] || (row.file_url ? 1 : 0),
+            errorMarks: errorMarksMap[id] || [],
+          }
         )
       })
 
@@ -744,6 +753,7 @@ const getDocument = (dbPool) => async (req, res) => {
     const canManage = canManageDocumentSync(perms, rows[0].owner_department_id)
     const favoriteIds = await loadFavoriteIds(dbPool, userId)
     const filesMap = await loadFilesMap(dbPool, [id])
+    const errorMarksMap = await loadErrorMarksMap(dbPool, [id])
     let files = filesMap[id] || []
     // Совместимость: старый документ без строк в knowledge_document_files
     if (!files.length && rows[0].file_url) {
@@ -772,7 +782,11 @@ const getDocument = (dbPool) => async (req, res) => {
         },
         segments,
         canManage,
-        { files, filesCount: files.length }
+        {
+          files,
+          filesCount: files.length,
+          errorMarks: errorMarksMap[id] || [],
+        }
       ),
     })
   } catch (error) {
@@ -2992,6 +3006,18 @@ const downloadFileVersion = (dbPool, uploadsRoot) => async (req, res) => {
   }
 }
 
+const {
+  listErrorMarks,
+  createErrorMark,
+  updateErrorMark,
+  deleteErrorMark,
+} = createErrorMarksHandlers({
+  resolveUserId,
+  getKnowledgePermissions,
+  loadSegmentsMap,
+  isVisibleToUser,
+})
+
 module.exports = {
   getPermissions,
   listDocuments,
@@ -3018,6 +3044,10 @@ module.exports = {
   deleteTag,
   addFavoriteDocument,
   removeFavoriteDocument,
+  listErrorMarks,
+  createErrorMark,
+  updateErrorMark,
+  deleteErrorMark,
   CATEGORY_LABELS,
   VISIBILITY_LABELS,
 }

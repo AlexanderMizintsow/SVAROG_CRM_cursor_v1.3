@@ -220,6 +220,15 @@
       }
     }
 
+    &--rework {
+      background-color: #ffedd5;
+      color: #9a3412;
+      cursor: pointer;
+      &:hover {
+        background-color: #fed7aa;
+      }
+    }
+
     &--sync {
       background-color: #bbeef7; // bg-green-100
       color: #0066ff; // text-green-800

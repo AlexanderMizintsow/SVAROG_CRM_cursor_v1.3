@@ -222,6 +222,8 @@ async function initializeSmtpTransport(userEmail, userEmailToken) {
     host: 'smtp.mail.ru',
     port: 465,
     secure: true,
+    // На сервере IPv6 до Mail.ru часто недоступен (ENETUNREACH) — только IPv4
+    family: 4,
     auth: {
       user: userEmail,
       pass: userEmailToken,

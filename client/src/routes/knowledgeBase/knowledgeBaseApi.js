@@ -108,6 +108,38 @@ export const knowledgeBaseApi = {
     return data
   },
 
+  async listErrorMarks(userId, id) {
+    const { data } = await axios.get(`${BASE}/documents/${id}/error-marks`, {
+      params: withUser(userId),
+    })
+    return data?.marks || []
+  },
+
+  async createErrorMark(userId, id, payload) {
+    const { data } = await axios.post(`${BASE}/documents/${id}/error-marks`, {
+      userId,
+      comment: payload.comment,
+      fileId: payload.fileId != null ? payload.fileId : undefined,
+    })
+    return data?.mark
+  },
+
+  async updateErrorMark(userId, id, markId, comment) {
+    const { data } = await axios.put(
+      `${BASE}/documents/${id}/error-marks/${markId}`,
+      { userId, comment }
+    )
+    return data?.mark
+  },
+
+  async deleteErrorMark(userId, id, markId) {
+    const { data } = await axios.delete(
+      `${BASE}/documents/${id}/error-marks/${markId}`,
+      { params: withUser(userId) }
+    )
+    return data
+  },
+
   async addFiles(userId, id, fileList, options = {}) {
     const fd = new FormData()
     fd.append('userId', String(userId))

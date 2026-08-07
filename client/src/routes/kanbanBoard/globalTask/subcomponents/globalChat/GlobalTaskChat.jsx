@@ -39,6 +39,7 @@ const GlobalTaskChat = ({
   const [messagePendingDelete, setMessagePendingDelete] = useState(null)
   const [deletingMessage, setDeletingMessage] = useState(false)
   const messageRefs = useRef({})
+  const pendingComposerCaretRef = useRef(null)
 
   const userId = user ? user.id : null
   const renderKbText = useCallback(makeChatKnowledgeRenderer(userId), [userId])
@@ -221,6 +222,30 @@ const GlobalTaskChat = ({
   useEffect(() => {
     scrollToBottom()
   }, [messages])
+
+  // После Ctrl/Alt+Enter React обновляет value, но не прокручивает textarea к курсору
+  const insertNewlineInComposer = useCallback(() => {
+    const el = textareaRef.current
+    const value = inputText
+    const start =
+      el && typeof el.selectionStart === 'number' ? el.selectionStart : value.length
+    const end =
+      el && typeof el.selectionEnd === 'number' ? el.selectionEnd : start
+    const next = `${value.slice(0, start)}\n${value.slice(end)}`
+    pendingComposerCaretRef.current = start + 1
+    setInputText(next)
+  }, [inputText])
+
+  useEffect(() => {
+    const caret = pendingComposerCaretRef.current
+    if (caret == null) return
+    pendingComposerCaretRef.current = null
+    const ta = textareaRef.current
+    if (!ta) return
+    ta.focus()
+    ta.setSelectionRange(caret, caret)
+    ta.scrollTop = ta.scrollHeight
+  }, [inputText])
 
   const handleSendMessage = async () => {
     const trimmedText = inputText.trim()
@@ -515,10 +540,10 @@ const GlobalTaskChat = ({
                 onChange={(e) => setInputText(e.target.value)}
                 onKeyDown={(e) => {
                   if (e.key === 'Enter') {
-                    if (e.ctrlKey) {
+                    if (e.ctrlKey || e.altKey) {
                       e.preventDefault()
-                      setInputText((prev) => prev + '\n')
-                    } else if (!e.ctrlKey && !e.shiftKey) {
+                      insertNewlineInComposer()
+                    } else if (!e.shiftKey) {
                       e.preventDefault()
                       handleSendMessage()
                     }

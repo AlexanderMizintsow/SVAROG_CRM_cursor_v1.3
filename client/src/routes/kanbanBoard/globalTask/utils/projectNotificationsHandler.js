@@ -66,8 +66,26 @@ export function handleGlobalTaskChangedPayload(payload, currentUserId) {
     case 'responsibleRemoved':
     case 'approval':
     case 'goals':
+    case 'goal_checks':
     case 'additionalInfo':
     case 'attachment':
+      store.setProjectBlinkYellow(id)
+      break
+    case 'rework': {
+      const assigneeId =
+        payload?.assigneeUserId != null ? Number(payload.assigneeUserId) : null
+      store.setProjectBlinkYellow(id)
+      if (
+        title &&
+        assigneeId != null &&
+        currentUserId != null &&
+        Number(currentUserId) === assigneeId
+      ) {
+        store.addProjectNotification(id, title, 'rework')
+      }
+      break
+    }
+    case 'rework_completed':
       store.setProjectBlinkYellow(id)
       break
     case 'subtask_added':
