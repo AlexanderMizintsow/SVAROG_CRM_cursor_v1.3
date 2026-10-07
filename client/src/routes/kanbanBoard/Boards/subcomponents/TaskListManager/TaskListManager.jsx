@@ -395,6 +395,9 @@ const TaskListManager = ({ onClose, onOpenProject, stripRefreshKey, initialActiv
   )
 
   const resolvedActiveTab = useMemo(() => {
+    // «Завершённые» открываются и при нуле за текущий месяц: период можно сменить
+    // и посмотреть выполненные за прошлые месяцы.
+    if (activeTaskListTab === 'completed') return 'completed'
     const countForTab = (id) => tabCounts[id] ?? 0
     if (countForTab(activeTaskListTab) > 0) return activeTaskListTab
     const firstWithTasks = TASK_LIST_TABS.find((t) => countForTab(t.id) > 0)
@@ -619,7 +622,9 @@ const TaskListManager = ({ onClose, onOpenProject, stripRefreshKey, initialActiv
                   </Typography>
                 )
               ) : (
-                <Typography className={styles.tabEmpty}>Нет завершённых задач</Typography>
+                <Typography className={styles.tabEmpty}>
+                  Нет завершённых задач за выбранный период
+                </Typography>
               )}
             </Box>
           )}

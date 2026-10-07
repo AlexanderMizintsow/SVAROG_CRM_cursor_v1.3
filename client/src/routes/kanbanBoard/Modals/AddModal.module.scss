@@ -299,6 +299,359 @@
     }
   }
 
+  .content {
+    .templateLayer {
+      position: absolute;
+      inset: 0;
+      z-index: 10002;
+      pointer-events: none;
+    }
+
+    .templateLayer > * {
+      pointer-events: auto;
+    }
+
+    .templateEditBanner {
+      grid-column: 1 / -1;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 10px 12px;
+      border-radius: 10px;
+      background: #eef6ff;
+      border: 1px solid #c9ddff;
+      color: #1e3a5f;
+    }
+
+    .templateEditLabel {
+      font-size: 13px;
+      font-weight: 700;
+      white-space: nowrap;
+    }
+
+    .templateEditName {
+      flex: 1;
+      margin: 0 !important;
+      min-width: 0;
+    }
+
+    .templateEditCancel {
+      height: 36px !important;
+      padding: 0 12px;
+      border-radius: 8px;
+      background: #fff;
+      color: #334155 !important;
+      border: 1px solid #cbd5e1 !important;
+      text-transform: none !important;
+      letter-spacing: normal !important;
+      font-weight: 600;
+      white-space: nowrap;
+    }
+
+    .templateRail {
+      position: absolute;
+      top: 36px;
+      right: -22px;
+      z-index: 8;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+
+    .templateRailBtn {
+      position: relative;
+      width: 48px;
+      height: 48px !important;
+      padding: 0;
+      border: none;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: #fff !important;
+      background: linear-gradient(135deg, #07c7e9, #4c49e6);
+      box-shadow: 0 8px 18px rgba(76, 73, 230, 0.35);
+      text-transform: none !important;
+      letter-spacing: normal !important;
+      font-size: 22px;
+
+      svg {
+        width: 22px;
+        height: 22px;
+      }
+
+      &:hover {
+        opacity: 1;
+        transform: translateX(-2px);
+      }
+    }
+
+    .templateRailBtnAlt {
+      background: #fff;
+      color: #4c49e6 !important;
+      border: 1px solid #d9def8 !important;
+      box-shadow: 0 8px 18px rgba(15, 23, 42, 0.12);
+    }
+
+    .templateRailBtnActive {
+      background: #eef0ff;
+    }
+
+    .templateRailTip {
+      position: absolute;
+      right: calc(100% + 10px);
+      top: 50%;
+      transform: translateY(-50%);
+      padding: 6px 10px;
+      border-radius: 8px;
+      background: #1e293b;
+      color: #fff;
+      font-size: 12px;
+      font-weight: 600;
+      line-height: 1.2;
+      white-space: nowrap;
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 0.15s ease;
+    }
+
+    .templateRailBtn:hover .templateRailTip,
+    .templateRailBtn:focus-visible .templateRailTip {
+      opacity: 1;
+    }
+
+    .templatePanel {
+      position: absolute;
+      top: 16px;
+      right: 16px;
+      bottom: 16px;
+      width: min(400px, calc(100% - 32px));
+      z-index: 9;
+      display: flex;
+      flex-direction: column;
+      background: #fff;
+      border-radius: 16px;
+      border: 1px solid #e6eaf2;
+      box-shadow: 0 16px 40px rgba(15, 23, 42, 0.18);
+      padding: 16px;
+      text-align: left;
+    }
+
+    .templatePanelHeader {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+
+      h3 {
+        margin: 0;
+        font-size: 18px;
+        color: #0f172a;
+      }
+    }
+
+    .templatePanelClose {
+      width: 32px;
+      height: 32px !important;
+      border-radius: 50%;
+      background: #f1f5f9;
+      color: #334155 !important;
+      text-transform: none !important;
+      letter-spacing: normal !important;
+      font-size: 20px;
+      line-height: 1;
+    }
+
+    .templatePanelHint {
+      margin: 8px 0 10px;
+      font-size: 12px;
+      line-height: 1.4;
+      color: #64748b;
+    }
+
+    .templateSearch {
+      margin-bottom: 10px !important;
+    }
+
+    .templateList {
+      overflow: auto;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      padding-right: 2px;
+    }
+
+    .templateEmpty {
+      margin: 12px 0;
+      color: #64748b;
+      font-size: 14px;
+      line-height: 1.45;
+    }
+
+    .templateCard {
+      border: 1px solid #e6eaf2;
+      border-radius: 12px;
+      background: #f8fafc;
+      overflow: hidden;
+    }
+
+    .templateCardMain {
+      width: 100%;
+      height: auto !important;
+      min-height: 0;
+      padding: 12px;
+      display: flex;
+      flex-direction: column;
+      align-items: flex-start;
+      gap: 4px;
+      background: transparent;
+      color: #0f172a !important;
+      text-transform: none !important;
+      letter-spacing: normal !important;
+      font-weight: 500;
+      text-align: left;
+      border-radius: 0;
+
+      &:hover {
+        opacity: 1;
+        background: #eef2ff;
+      }
+    }
+
+    .templateCardName {
+      font-size: 15px;
+      font-weight: 700;
+      color: #312e81;
+    }
+
+    .templateCardTitle {
+      font-size: 13px;
+      color: #0f172a;
+    }
+
+    .templateCardMeta,
+    .templateCardPeople {
+      font-size: 12px;
+      color: #64748b;
+    }
+
+    .templateCardMeta {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+    }
+
+    .templatePriority {
+      text-transform: capitalize;
+      color: #4c49e6;
+      font-weight: 700;
+    }
+
+    .templateCardText {
+      font-size: 13px;
+      line-height: 1.4;
+      color: #334155;
+      display: -webkit-box;
+      -webkit-line-clamp: 3;
+      -webkit-box-orient: vertical;
+      overflow: hidden;
+    }
+
+    .templateCardActions,
+    .templateCardConfirm {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 0 12px 10px;
+    }
+
+    .templateCardConfirm {
+      font-size: 13px;
+      color: #7f1d1d;
+    }
+
+    .templateCardActions button,
+    .templateCardConfirm button,
+    .templateDialogActions button {
+      height: 32px !important;
+      padding: 0 10px;
+      border-radius: 8px;
+      background: #fff;
+      color: #334155 !important;
+      border: 1px solid #dbe1ea !important;
+      text-transform: none !important;
+      letter-spacing: normal !important;
+      font-weight: 600;
+      font-size: 13px;
+    }
+
+    .templateCardActions button:last-child {
+      color: #b91c1c !important;
+    }
+
+    .templateDialogBackdrop {
+      position: absolute;
+      inset: 0;
+      z-index: 12;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: rgba(15, 23, 42, 0.28);
+      border-radius: 12px;
+      padding: 16px;
+    }
+
+    .templateDialog {
+      width: min(420px, 100%);
+      background: #fff;
+      border-radius: 14px;
+      padding: 18px;
+      box-shadow: 0 16px 40px rgba(15, 23, 42, 0.2);
+      text-align: left;
+
+      h3 {
+        margin: 0 0 8px;
+        color: #0f172a;
+        font-size: 18px;
+      }
+
+      p {
+        margin: 0 0 12px;
+        color: #475569;
+        font-size: 14px;
+        line-height: 1.45;
+      }
+
+      input {
+        margin-bottom: 12px;
+      }
+    }
+
+    .templateDialogActions {
+      display: flex;
+      gap: 8px;
+      justify-content: flex-end;
+    }
+
+    .templateDialogSave {
+      background: linear-gradient(135deg, #07c7e9, #4c49e6) !important;
+      color: #fff !important;
+      border: none !important;
+
+      &:disabled {
+        opacity: 0.55;
+        cursor: default;
+      }
+    }
+  }
+
+  @media (max-width: 720px) {
+    .content .templateRail {
+      right: 10px;
+      top: 10px;
+    }
+  }
+
   @keyframes fadeInScale {
     from {
       opacity: 0;
@@ -723,6 +1076,69 @@
   :global(.ql-snow .ql-picker-options) {
     background: #1f2430 !important;
     border-color: #3a4254 !important;
+  }
+}
+
+:global(.dark) .modal .content {
+  .templateEditBanner {
+    background: #243044;
+    border-color: #3a4d6b;
+    color: #d5dbe6;
+  }
+
+  .templateEditCancel,
+  .templatePanelClose,
+  .templateCardActions button,
+  .templateCardConfirm button,
+  .templateDialogActions button {
+    background: #2a3142;
+    color: #d5dbe6 !important;
+    border-color: #3a4254 !important;
+  }
+
+  .templateRailBtnAlt {
+    background: #252b38;
+    color: #9db0ff !important;
+    border-color: #3a4254 !important;
+  }
+
+  .templatePanel,
+  .templateDialog {
+    background: #1f2430;
+    border-color: #3a4254;
+    color: #c4ccd8;
+  }
+
+  .templatePanelHeader h3,
+  .templateDialog h3,
+  .templateCardTitle,
+  .templateCardName {
+    color: #e8edf5;
+  }
+
+  .templateCard {
+    background: #252b38;
+    border-color: #3a4254;
+  }
+
+  .templateCardMain {
+    color: #e8edf5 !important;
+
+    &:hover {
+      background: #2c3548;
+    }
+  }
+
+  .templatePanelHint,
+  .templateEmpty,
+  .templateCardMeta,
+  .templateCardPeople,
+  .templateDialog p {
+    color: #aeb6c4;
+  }
+
+  .templateCardText {
+    color: #c4ccd8;
   }
 }
 

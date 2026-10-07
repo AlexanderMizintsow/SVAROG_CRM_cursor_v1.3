@@ -242,6 +242,18 @@ const useWebSocket = (userId, stableSetMessages, currentTaskId, onChatMessageUpd
         }
       })
 
+      // Обновление обращения (ответ / закрытие / новое) — без перезагрузки страницы
+      socket.current.on('managerRequestUpdated', (payload) => {
+        if (!payload?.requestId) return
+        const recipients = Array.isArray(payload.userIds)
+          ? payload.userIds.map(Number)
+          : []
+        if (recipients.length && !recipients.includes(Number(userId))) return
+        window.dispatchEvent(
+          new CustomEvent('manager-request-updated', { detail: payload })
+        )
+      })
+
       // Новый обработчик для уведомлений касательно задач
       socket.current.on('notification', (notification) => {
         if (
@@ -256,6 +268,22 @@ const useWebSocket = (userId, stableSetMessages, currentTaskId, onChatMessageUpd
             })
           }
           fetchUnreadNotifications(userId)
+          if (
+            electronAPI &&
+            typeof electronAPI.sendNotification === 'function' &&
+            notification.type !== 'manager_request_chat'
+          ) {
+            const titles = {
+              manager_request_new: 'Новое обращение',
+              manager_request_answered: 'Ответ на обращение',
+              manager_request_closed: 'Обращение закрыто',
+              manager_request_task_linked: 'Задача по обращению',
+            }
+            electronAPI.sendNotification(
+              titles[notification.type] || 'Обращение',
+              notification.message || notification.title || ''
+            )
+          }
         }
 
         // Отказ в увелечении срока исполнения *******************************************************************
@@ -427,6 +455,7 @@ const useWebSocket = (userId, stableSetMessages, currentTaskId, onChatMessageUpd
         socket.current.off('extendDeadline')
         socket.current.off('notification')
         socket.current.off('managerRequestChat')
+        socket.current.off('managerRequestUpdated')
         socket.current.disconnect()
         socket.current = null // Сбрасываем сокет
       }

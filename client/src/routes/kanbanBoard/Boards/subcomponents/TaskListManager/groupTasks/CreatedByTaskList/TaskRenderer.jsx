@@ -21,17 +21,81 @@ import { Person, Schedule, Assignment, CheckCircle, Error } from '@mui/icons-mat
 import { IoCalendarOutline } from 'react-icons/io5'
 import { FcInspection, FcRedo, FcMindMap, FcApproval, FcCancel } from 'react-icons/fc'
 import { IoIosChatboxes } from 'react-icons/io'
-import { FaEdit } from 'react-icons/fa'
+import { FaCopy, FaEdit } from 'react-icons/fa'
 import { LiaUserCogSolid } from 'react-icons/lia'
 import { TbSubtask } from 'react-icons/tb'
 import { getStatusLabel } from '../../../taskUtils'
 import styles from '../../taskListManager.module.scss'
 import { getUserNames } from '../../../../../Task/utils/taskUtils'
 import ChatTaskModal from '../../../../../Task/subcomponents/chatTaskModal/chatTaskModal'
+import AddModal from '../../../../../Modals/AddModal'
 import Attachments from '../../../../../Task/subcomponents/Attachments'
 import TaskCardParticipants from './TaskCardParticipants'
 import { handleKnowledgeDescriptionClick } from '../../../../../../knowledgeBase/openKnowledgeLink'
 import { enhanceKnowledgeLinksInHtml } from '../../../../../../knowledgeBase/knowledgeLinkUtils'
+
+function idList(value) {
+  if (!Array.isArray(value)) return []
+  const ids = []
+  const seen = new Set()
+  value.forEach((item) => {
+    const raw =
+      item && typeof item === 'object'
+        ? item.approver_id ?? item.user_id ?? item.id
+        : item
+    const id = Number(raw)
+    if (!Number.isInteger(id) || id <= 0 || seen.has(id)) return
+    seen.add(id)
+    ids.push(id)
+  })
+  return ids
+}
+
+function tagsToFormString(tags) {
+  if (!tags) return ''
+  if (typeof tags === 'string') {
+    const trimmed = tags.trim()
+    if (!trimmed || trimmed === 'null') return ''
+    try {
+      const parsed = JSON.parse(trimmed)
+      return Array.isArray(parsed) && parsed.length ? JSON.stringify(parsed) : ''
+    } catch {
+      return ''
+    }
+  }
+  if (Array.isArray(tags)) return tags.length ? JSON.stringify(tags) : ''
+  return ''
+}
+
+function deadlineToFormValue(value) {
+  if (!value) return ''
+  const date = new Date(value)
+  if (Number.isNaN(date.getTime())) return ''
+  const y = date.getFullYear()
+  const m = String(date.getMonth() + 1).padStart(2, '0')
+  const d = String(date.getDate()).padStart(2, '0')
+  const h = String(date.getHours()).padStart(2, '0')
+  const min = String(date.getMinutes()).padStart(2, '0')
+  return `${y}-${m}-${d}T${h}:${min}`
+}
+
+function buildDuplicateInitialTaskData(task, currentUserId) {
+  const projectId = Number(task.global_task_id)
+  return {
+    title: task.title || '',
+    description: task.description || '',
+    deadline: deadlineToFormValue(task.deadline),
+    priority: task.priority || 'низкий',
+    tags: tagsToFormString(task.tags),
+    created_by: currentUserId,
+    implementers: idList(task.assigned_user_ids),
+    approvers: idList(task.approver_user_ids),
+    viewers: idList(task.visibility_user_ids),
+    global_task_id: Number.isInteger(projectId) && projectId > 0 ? projectId : null,
+    parentTaskId: null,
+    rootTaskId: null,
+  }
+}
 
 const kbDescSx = {
   '& a.kb-link, & a[href*="knowledge-base"]': {
@@ -76,6 +140,7 @@ const TaskRenderer = ({
   const clearTaskCardBlinkYellow = useTaskStateTracker((s) => s.clearTaskCardBlinkYellow)
   const cardRefs = useRef({})
   const [descriptionModalTask, setDescriptionModalTask] = useState(null)
+  const [duplicateTask, setDuplicateTask] = useState(null)
 
   useEffect(() => {
     if (!descriptionModalTask) return
@@ -193,6 +258,14 @@ const TaskRenderer = ({
         color={unreadMessages.has(taskId) ? 'error' : 'default'}
       >
         <IoIosChatboxes size={size} />
+      </IconButton>
+    </Tooltip>
+  )
+
+  const renderDuplicateButton = (task) => (
+    <Tooltip title="Дублировать задачу">
+      <IconButton size="small" onClick={() => setDuplicateTask(task)} aria-label="Дублировать задачу">
+        <FaCopy size={16} />
       </IconButton>
     </Tooltip>
   )
@@ -432,6 +505,7 @@ const TaskRenderer = ({
           {isArchive ? (
             <Box className={styles.taskCardArchiveActions}>
               {renderChatButton(task.task_id)}
+              {renderDuplicateButton(task)}
               <Typography variant="caption" color="text.secondary">
                 Переписка и история согласования
               </Typography>
@@ -440,6 +514,7 @@ const TaskRenderer = ({
             <CardActions sx={{ pt: 0, px: 2, pb: 2 }}>
               <Box display="flex" alignItems="center" gap={1}>
                 {renderChatButton(task.task_id)}
+                {renderDuplicateButton(task)}
                 <Typography variant="caption" color="text.secondary">
                   Чат задачи
                 </Typography>
@@ -468,6 +543,7 @@ const TaskRenderer = ({
                   </Tooltip>
 
                   {renderChatButton(task.task_id)}
+                  {renderDuplicateButton(task)}
                 </Box>
 
                 {task.status === 'done' && (
@@ -733,6 +809,7 @@ const TaskRenderer = ({
                     )}
 
                     {renderChatButton(task.task_id)}
+                    {renderDuplicateButton(task)}
 
                     {unreadMessages.has(task.task_id) && (
                       <Typography variant="caption" color="error.main" fontWeight={600}>
@@ -840,6 +917,21 @@ const TaskRenderer = ({
 
   return (
     <>
+      {duplicateTask && (
+        <AddModal
+          isOpen
+          skipDraft
+          onClose={() => setDuplicateTask(null)}
+          setOpen={(open) => {
+            if (!open) setDuplicateTask(null)
+          }}
+          userId={userId || user?.id}
+          globalTaskId={
+            Number(duplicateTask.global_task_id) > 0 ? Number(duplicateTask.global_task_id) : null
+          }
+          initialTaskData={buildDuplicateInitialTaskData(duplicateTask, userId || user?.id)}
+        />
+      )}
       {descriptionModal}
       {viewMode === 'cards' ? (
         <Grid container spacing={3}>

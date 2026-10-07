@@ -30,8 +30,20 @@ function Layout({ isConnectBD }) {
         navigate('/task-manager')
       }
     }
+    const onManagerRequestNavigate = (event) => {
+      const rid = event?.detail?.id
+      const target =
+        rid != null && Number(rid) > 0
+          ? `/manager-requests?id=${Number(rid)}`
+          : '/manager-requests'
+      navigate(target)
+    }
     window.addEventListener('task-decision-navigate', onTaskDecisionNavigate)
-    return () => window.removeEventListener('task-decision-navigate', onTaskDecisionNavigate)
+    window.addEventListener('manager-request-navigate', onManagerRequestNavigate)
+    return () => {
+      window.removeEventListener('task-decision-navigate', onTaskDecisionNavigate)
+      window.removeEventListener('manager-request-navigate', onManagerRequestNavigate)
+    }
   }, [navigate, location.pathname])
 
   const getSeasonalBackground = () => {

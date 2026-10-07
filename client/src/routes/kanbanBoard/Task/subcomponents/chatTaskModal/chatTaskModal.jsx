@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
 import axios from 'axios'
 import EmojiPicker from 'emoji-picker-react'
-import { FaFolder, FaPen, FaTrash } from 'react-icons/fa'
+import { FaAlignLeft, FaFolder, FaPen, FaTrash } from 'react-icons/fa'
 import { IoArrowUndoOutline } from 'react-icons/io5'
 import { API_BASE_URL } from '../../../../../../config'
 import useWebSocket from '../../../Boards/subcomponents/useWebSocket'
@@ -10,7 +10,8 @@ import ChatFileUploader from './ChatFileUploader'
 import ChatFileViewer from './ChatFileViewer'
 import ChatFileManager from './ChatFileManager'
 import KnowledgeLinkPicker from '../../../../knowledgeBase/KnowledgeLinkPicker'
-import { buildKnowledgePlainMarker } from '../../../../knowledgeBase/knowledgeLinkUtils'
+import { buildKnowledgePlainMarker, enhanceKnowledgeLinksInHtml } from '../../../../knowledgeBase/knowledgeLinkUtils'
+import { handleKnowledgeDescriptionClick } from '../../../../knowledgeBase/openKnowledgeLink'
 import { makeChatKnowledgeRenderer } from '../../../../knowledgeBase/chatKnowledgeText'
 import './chatTaskModal.scss'
 
@@ -34,6 +35,17 @@ async function fingerprintArrayBuffer(arrayBuffer) {
     h = Math.imul(h, 16777619) >>> 0
   }
   return `fnv${(h >>> 0).toString(16).padStart(8, '0')}${u8.length.toString(16).padStart(8, '0')}`
+}
+
+function descriptionHasContent(html) {
+  const raw = String(html || '')
+  if (/<img\b/i.test(raw)) return true
+  const text = raw
+    .replace(/<[^>]*>/g, ' ')
+    .replace(/&nbsp;/gi, ' ')
+    .replace(/\s+/g, ' ')
+    .trim()
+  return text.length > 0
 }
 
 const ChatTaskModal = ({
@@ -66,9 +78,79 @@ const ChatTaskModal = ({
   const [savingEdit, setSavingEdit] = useState(false)
   const [messagePendingDelete, setMessagePendingDelete] = useState(null)
   const [deletingMessage, setDeletingMessage] = useState(false)
+  const [descriptionOpen, setDescriptionOpen] = useState(false)
+  const descriptionRootRef = useRef(null)
+  const descriptionCloseTimerRef = useRef(null)
+  const descriptionSelectingRef = useRef(false)
 
   const userId = user ? user.id : null
   const taskId = task.id || task.task_id
+  const taskDescriptionHtml = enhanceKnowledgeLinksInHtml(task.description || '')
+  const taskDescriptionVisible = descriptionHasContent(task.description)
+
+  const selectionInsideDescription = useCallback(() => {
+    const root = descriptionRootRef.current
+    const selection = window.getSelection()
+    if (!root || !selection || selection.isCollapsed || selection.rangeCount === 0) {
+      return false
+    }
+    const node = selection.anchorNode
+    return Boolean(node && root.contains(node))
+  }, [])
+
+  const openTaskDescription = useCallback(() => {
+    if (descriptionCloseTimerRef.current) {
+      clearTimeout(descriptionCloseTimerRef.current)
+      descriptionCloseTimerRef.current = null
+    }
+    setDescriptionOpen(true)
+  }, [])
+
+  const closeTaskDescription = useCallback(() => {
+    if (descriptionCloseTimerRef.current) {
+      clearTimeout(descriptionCloseTimerRef.current)
+    }
+    descriptionCloseTimerRef.current = setTimeout(() => {
+      descriptionCloseTimerRef.current = null
+      if (descriptionSelectingRef.current || selectionInsideDescription()) return
+      setDescriptionOpen(false)
+    }, 350)
+  }, [selectionInsideDescription])
+
+  useEffect(() => {
+    if (!isOpen) setDescriptionOpen(false)
+  }, [isOpen])
+
+  useEffect(() => {
+    const finishSelection = () => {
+      if (!descriptionSelectingRef.current) return
+      descriptionSelectingRef.current = false
+      const root = descriptionRootRef.current
+      if (root && !root.matches(':hover')) {
+        closeTaskDescription()
+      }
+    }
+    const closeOnOutsidePointer = (event) => {
+      const root = descriptionRootRef.current
+      if (!root || root.contains(event.target)) return
+      descriptionSelectingRef.current = false
+      setDescriptionOpen(false)
+    }
+    const closeOnEscape = (event) => {
+      if (event.key === 'Escape') setDescriptionOpen(false)
+    }
+    document.addEventListener('mouseup', finishSelection)
+    document.addEventListener('mousedown', closeOnOutsidePointer)
+    document.addEventListener('keydown', closeOnEscape)
+    return () => {
+      document.removeEventListener('mouseup', finishSelection)
+      document.removeEventListener('mousedown', closeOnOutsidePointer)
+      document.removeEventListener('keydown', closeOnEscape)
+      if (descriptionCloseTimerRef.current) {
+        clearTimeout(descriptionCloseTimerRef.current)
+      }
+    }
+  }, [closeTaskDescription])
 
   const applyChatMessageUpdate = useCallback((updated) => {
     if (!updated?.id) return
@@ -864,6 +946,56 @@ const ChatTaskModal = ({
             <h3>Чат задачи по теме: &quot;{task.title}&quot;</h3>
             <div className="header-tips">
               <span className="paste-tip">Ctrl+V для скриншота</span>
+              <div
+                className={`chat-task-desc ${descriptionOpen ? 'is-open' : ''}`}
+                ref={descriptionRootRef}
+                onMouseEnter={openTaskDescription}
+                onMouseLeave={closeTaskDescription}
+                onFocus={openTaskDescription}
+                onBlur={(e) => {
+                  if (!descriptionRootRef.current?.contains(e.relatedTarget)) {
+                    closeTaskDescription()
+                  }
+                }}
+                onKeyDown={(e) => {
+                  if (e.key === 'Escape') setDescriptionOpen(false)
+                }}
+              >
+                <button
+                  type="button"
+                  className="chat-task-desc__btn"
+                  aria-label="Описание задачи"
+                  aria-expanded={descriptionOpen}
+                >
+                  <FaAlignLeft />
+                </button>
+                <div
+                  className="chat-task-desc__panel"
+                  role="region"
+                  aria-label="Описание задачи"
+                  aria-hidden={!descriptionOpen}
+                  onMouseDown={(e) => {
+                    e.stopPropagation()
+                    descriptionSelectingRef.current = true
+                    openTaskDescription()
+                  }}
+                >
+                  <div className="chat-task-desc__card">
+                    <div className="chat-task-desc__label">Описание задачи</div>
+                    {taskDescriptionVisible ? (
+                      <div
+                        className="chat-task-desc__body"
+                        onClick={(e) =>
+                          handleKnowledgeDescriptionClick(e, userId || currentUser)
+                        }
+                        dangerouslySetInnerHTML={{ __html: taskDescriptionHtml }}
+                      />
+                    ) : (
+                      <div className="chat-task-desc__empty">Описание не указано</div>
+                    )}
+                  </div>
+                </div>
+              </div>
               <button
                 className="file-manager-btn"
                 onClick={() => setShowFileManager(true)}

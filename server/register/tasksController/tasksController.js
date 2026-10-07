@@ -1666,6 +1666,16 @@ function sendTaskMessage(dbPool, io) {
 
       const assignedUser = assignmentResult.rows[0]?.user_id || null
 
+      let senderName = null
+      try {
+        const nameRes = await dbPool.query(
+          `SELECT CONCAT(LEFT(first_name, 1), '. ', last_name) AS sender_name
+             FROM users WHERE id = $1`,
+          [senderId]
+        )
+        senderName = nameRes.rows[0]?.sender_name || null
+      } catch (_) {}
+
       const responseMessage = {
         ...message,
         is_deleted: false,
@@ -1673,11 +1683,39 @@ function sendTaskMessage(dbPool, io) {
         deleted_at: null,
         replied_message: repliedMessage,
         assigned_user: assignedUser,
+        task_id: message.task_id ?? Number(taskId),
         task_ids: taskId,
         title,
+        sender_name: senderName,
       }
 
       io.emit('newMessage', responseMessage)
+
+      // Push участникам (веб-чат раньше не слал — мобилка узнавала только после обновления)
+      try {
+        const parts = await dbPool.query(
+          `
+          SELECT created_by AS uid FROM tasks WHERE id = $1
+          UNION
+          SELECT user_id FROM task_assignments WHERE task_id = $1
+          UNION
+          SELECT approver_id FROM task_approvals WHERE task_id = $1
+          UNION
+          SELECT user_id FROM task_visibility WHERE task_id = $1
+          `,
+          [taskId]
+        )
+        notifyStaffDevicesSafe(dbPool, {
+          userIds: parts.rows.map((r) => r.uid),
+          excludeUserId: Number(senderId),
+          title: 'Сообщение в задаче',
+          body: `${title}: ${String(text).trim().slice(0, 120)}`,
+          data: { type: 'task_message', taskId: Number(taskId) },
+        })
+      } catch (pushErr) {
+        console.warn('[sendTaskMessage][push]', pushErr.message || pushErr)
+      }
+
       res.status(201).json(responseMessage)
     } catch (error) {
       console.error('Ошибка при отправке сообщения:', error)

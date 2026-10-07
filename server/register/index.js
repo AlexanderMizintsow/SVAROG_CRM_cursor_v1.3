@@ -251,6 +251,18 @@ const {
 
 const { submitAppIdea, getAppIdeas, applyAppIdea } = require('./appIdeasController/appIdeasController')
 const {
+  listUserTaskTemplates,
+  createUserTaskTemplate,
+  updateUserTaskTemplate,
+  deleteUserTaskTemplate,
+} = require('./userTaskTemplatesController/userTaskTemplatesController')
+const {
+  listUserProjectTemplates,
+  createUserProjectTemplate,
+  updateUserProjectTemplate,
+  deleteUserProjectTemplate,
+} = require('./userProjectTemplatesController/userProjectTemplatesController')
+const {
   getAndroidApkStatus,
   downloadAndroidApk,
   uploadAndroidApk,
@@ -608,6 +620,16 @@ app.post('/api/employees/rating', addOrUpdateReview(dbPool))
 app.get('/api/employees/rating/:userId', getReview(dbPool))
 app.get('/api/reviews/average', getAverageRating(dbPool))
 app.get('/api/reviews', getAllReviews(dbPool))
+
+app.get('/api/user-task-templates', listUserTaskTemplates(dbPool))
+app.post('/api/user-task-templates', createUserTaskTemplate(dbPool))
+app.put('/api/user-task-templates/:id', updateUserTaskTemplate(dbPool))
+app.delete('/api/user-task-templates/:id', deleteUserTaskTemplate(dbPool))
+
+app.get('/api/user-project-templates', listUserProjectTemplates(dbPool))
+app.post('/api/user-project-templates', createUserProjectTemplate(dbPool))
+app.put('/api/user-project-templates/:id', updateUserProjectTemplate(dbPool))
+app.delete('/api/user-project-templates/:id', deleteUserProjectTemplate(dbPool))
 
 app.post('/api/app-ideas', uploadFile.single('file'), submitAppIdea(dbPool))
 app.get('/api/app-ideas', getAppIdeas(dbPool))

@@ -169,6 +169,44 @@ const ManagerRequestsPage = () => {
     }
   }, [selectedId, userId])
 
+  useEffect(() => {
+    const onManagerRequestUpdated = (event) => {
+      const payload = event?.detail
+      const updated = payload?.request
+      const rid = Number(payload?.requestId || updated?.id)
+      if (!updated || !rid) return
+
+      const patchList = (prev) => {
+        const idx = prev.findIndex((r) => Number(r.id) === rid)
+        if (idx === -1) {
+          // новое обращение в чужой inbox — перезагрузим списки
+          return prev
+        }
+        const next = [...prev]
+        next[idx] = { ...next[idx], ...updated }
+        return next
+      }
+      setMine(patchList)
+      setInbox(patchList)
+
+      if (Number(selectedId) === rid) {
+        setSelected((prev) => ({ ...(prev || {}), ...updated }))
+        if (updated.answerText != null) setAnswerText(updated.answerText || '')
+      }
+
+      // списки могли не содержать карточку (фильтр / новое) — мягко обновим
+      if (
+        payload?.eventType === 'manager_request_new' ||
+        payload?.eventType === 'manager_request_answered' ||
+        payload?.eventType === 'manager_request_closed'
+      ) {
+        loadLists()
+      }
+    }
+    window.addEventListener('manager-request-updated', onManagerRequestUpdated)
+    return () => window.removeEventListener('manager-request-updated', onManagerRequestUpdated)
+  }, [selectedId, loadLists])
+
   const openInboxCount = useMemo(
     () => inbox.filter((x) => x.status === 'open').length,
     [inbox]

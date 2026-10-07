@@ -25,6 +25,14 @@ import {
 import AbsenceAssigneeChoiceModal from '../../../components/absenceAssigneeChoice/AbsenceAssigneeChoiceModal'
 import KnowledgeLinkPicker from '../../knowledgeBase/KnowledgeLinkPicker'
 import useUserStore from '../../../store/userStore'
+import Toastify from 'toastify-js'
+import ProjectTemplateTools from './projectTemplates/ProjectTemplateTools'
+import {
+  formToTemplateBody,
+  keepKnownResponsibles,
+  templatePartsToDeadline,
+} from './projectTemplates/projectTemplateFields'
+import { updateUserProjectTemplate } from './projectTemplates/projectTemplateApi'
 import './styles/CreateGlobalTaskForm.scss'
 
 // Значение для input type="datetime-local": YYYY-MM-DDTHH:mm в локальной зоне
@@ -73,6 +81,10 @@ const CreateGlobalTaskForm = ({ onSave, onCancel, initialData }) => {
   const choiceDecisionsRef = useRef({})
   const choiceEntriesRef = useRef([])
   const { absencesMap } = useActiveAbsences(true)
+  const [editingTemplate, setEditingTemplate] = useState(null)
+  const [savingTemplate, setSavingTemplate] = useState(false)
+  const [templatesVersion, setTemplatesVersion] = useState(0)
+  const editSnapshotRef = useRef(null)
 
   useEffect(() => {
     const fetchUsers = async () => {
@@ -313,8 +325,139 @@ const CreateGlobalTaskForm = ({ onSave, onCancel, initialData }) => {
     [formData, absenceMeta, users, attachmentsFiles, onSave]
   )
 
+  const snapshotForm = useCallback(
+    () => ({
+      formData: {
+        ...formData,
+        goals: [...(formData.goals || [])],
+        responsibles: (formData.responsibles || []).map((item) => ({ ...item })),
+        additionalInfo: { ...(formData.additionalInfo || {}) },
+      },
+      additionalInfoFields: (additionalInfoFields || []).map((field) => ({ ...field })),
+    }),
+    [formData, additionalInfoFields]
+  )
+
+  const writeProjectForm = useCallback((snapshot) => {
+    if (!snapshot) return
+    setFormData(snapshot.formData)
+    setAdditionalInfoFields(
+      snapshot.additionalInfoFields?.length
+        ? snapshot.additionalInfoFields
+        : [{ key: '', value: '' }]
+    )
+    setInitialDataApplied(true)
+  }, [])
+
+  const applyProjectTemplate = useCallback(
+    (template, options = {}) => {
+      const { kept, dropped } = keepKnownResponsibles(template?.responsibles, users)
+      const roleOptions = Array.isArray(responsibleRoles) ? responsibleRoles : responsibleRolesList
+      const responsibles = kept
+        .map((item) => {
+          const user = users.find((entry) => String(entry.id) === String(item.userId))
+          if (!user) return null
+          const entry = buildResponsibleEntry(user)
+          const role = roleOptions.includes(item.role) ? item.role : entry.role
+          return {
+            ...entry,
+            role,
+            requires_approval: item.requiresApproval === true,
+          }
+        })
+        .filter(Boolean)
+      const goals = Array.isArray(template?.goals) && template.goals.length ? template.goals : ['']
+      const additionalInfo =
+        template?.additionalInfo && typeof template.additionalInfo === 'object'
+          ? template.additionalInfo
+          : {}
+      const entries = Object.entries(additionalInfo)
+      setFormData({
+        title: template?.title || '',
+        description: template?.description || '',
+        goals,
+        deadline: templatePartsToDeadline(template?.deadlineOffsetDays, template?.deadlineTime),
+        priority: ['low', 'medium', 'high'].includes(template?.priority) ? template.priority : 'medium',
+        additionalInfo,
+        responsibles,
+      })
+      setAdditionalInfoFields(
+        entries.length
+          ? entries.map(([key, value]) => ({ key, value: String(value ?? '') }))
+          : [{ key: '', value: '' }]
+      )
+      setInitialDataApplied(true)
+      if (!options.keepEditing) {
+        setEditingTemplate(null)
+        editSnapshotRef.current = null
+      }
+      if (dropped > 0) {
+        Toastify({
+          text: 'Часть сотрудников из шаблона уже недоступна и не подставлена.',
+          close: true,
+          backgroundColor: 'linear-gradient(to right, #b45309, #f59e0b)',
+        }).showToast()
+      }
+    },
+    [users, responsibleRoles]
+  )
+
+  const startTemplateEdit = useCallback(
+    (template) => {
+      editSnapshotRef.current = snapshotForm()
+      applyProjectTemplate(template, { keepEditing: true })
+      setEditingTemplate({ id: template.id, name: template.name || '' })
+    },
+    [snapshotForm, applyProjectTemplate]
+  )
+
+  const cancelTemplateEdit = useCallback(() => {
+    const snapshot = editSnapshotRef.current
+    editSnapshotRef.current = null
+    setEditingTemplate(null)
+    if (snapshot) writeProjectForm(snapshot)
+  }, [writeProjectForm])
+
+  const saveEditingTemplate = useCallback(async () => {
+    if (!editingTemplate || !userId) return
+    const name = String(editingTemplate.name || '').trim()
+    if (!name) {
+      Toastify({
+        text: 'Укажите название шаблона',
+        close: true,
+        backgroundColor: 'linear-gradient(to right, #8B0000, #ff0000)',
+      }).showToast()
+      return
+    }
+    setSavingTemplate(true)
+    try {
+      await updateUserProjectTemplate(userId, editingTemplate.id, formToTemplateBody(formData, name))
+      setEditingTemplate(null)
+      editSnapshotRef.current = null
+      setTemplatesVersion((version) => version + 1)
+      Toastify({
+        text: 'Шаблон обновлён',
+        close: true,
+        backgroundColor: 'linear-gradient(to right, #0f766e, #14b8a6)',
+      }).showToast()
+    } catch (error) {
+      Toastify({
+        text: error?.response?.data?.error || 'Не удалось обновить шаблон',
+        close: true,
+        backgroundColor: 'linear-gradient(to right, #8B0000, #ff0000)',
+      }).showToast()
+    } finally {
+      setSavingTemplate(false)
+    }
+  }, [editingTemplate, userId, formData])
+
   const handleSubmit = (e) => {
     e.preventDefault()
+
+    if (editingTemplate) {
+      saveEditingTemplate()
+      return
+    }
 
     if (!formData.responsibles.length) {
       showAbsenceMessage('Необходимо указать хотя бы одного ответственного', true)
@@ -415,6 +558,16 @@ const CreateGlobalTaskForm = ({ onSave, onCancel, initialData }) => {
 
   return (
     <div className="create-global-task-form-overlay">
+      <div className="create-global-task-form-shell">
+      <ProjectTemplateTools
+        userId={userId}
+        users={users}
+        getFormData={() => formData}
+        formToBody={formToTemplateBody}
+        onApply={applyProjectTemplate}
+        onStartEdit={startTemplateEdit}
+        templatesVersion={templatesVersion}
+      />
       <div className="create-global-task-form">
         <div className="create-global-task-form__header">
           <h2 className="create-global-task-form__title">Создать проект</h2>
@@ -428,7 +581,24 @@ const CreateGlobalTaskForm = ({ onSave, onCancel, initialData }) => {
             </button>
           }
         </div>
-        <form onSubmit={handleSubmit}>
+        {editingTemplate && (
+          <div className="project-template-edit">
+            <span className="project-template-edit__label">Редактирование шаблона</span>
+            <input
+              type="text"
+              className="project-template-edit__name"
+              value={editingTemplate.name}
+              onChange={(e) =>
+                setEditingTemplate((prev) => (prev ? { ...prev, name: e.target.value } : prev))
+              }
+              placeholder="Название шаблона"
+            />
+            <button type="button" className="project-template-edit__cancel" onClick={cancelTemplateEdit}>
+              К созданию проекта
+            </button>
+          </div>
+        )}
+        <form onSubmit={handleSubmit} noValidate={Boolean(editingTemplate)}>
           <div className="create-global-task-form__section">
             <label htmlFor="title" className="create-global-task-form__label">
               Заголовок <span className="required">*</span>
@@ -741,11 +911,19 @@ const CreateGlobalTaskForm = ({ onSave, onCancel, initialData }) => {
             <button
               type="submit"
               className="create-global-task-form__button create-global-task-form__button--save"
+              disabled={savingTemplate}
             >
-              <FaPlus /> Создать проект
+              {editingTemplate ? (
+                savingTemplate ? 'Сохранение…' : 'Сохранить шаблон'
+              ) : (
+                <>
+                  <FaPlus /> Создать проект
+                </>
+              )}
             </button>
           </div>
         </form>
+      </div>
       </div>
 
       <KnowledgeLinkPicker

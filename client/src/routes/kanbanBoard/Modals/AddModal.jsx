@@ -49,6 +49,14 @@ import {
   readManagerRequestTaskDraft,
 } from "../../managerRequests/managerRequestsApi";
 import useTaskStateTracker from "../../../store/useTaskStateTracker";
+import TaskTemplateTools from "./taskTemplates/TaskTemplateTools";
+import {
+  clampDeadlineToProject,
+  formToTemplateBody,
+  keepKnownUserIds,
+  templatePartsToDeadline,
+} from "./taskTemplates/taskTemplateFields";
+import { updateUserTaskTemplate } from "./taskTemplates/taskTemplateApi";
 
 const formatDateRuLocal = (dateStr) => {
   const normalized = normalizeDateOnly(dateStr);
@@ -94,6 +102,7 @@ const AddModal = ({
   rootTaskId,
   initialTaskData: externalInitialTaskData,
   businessProcessInstanceId,
+  skipDraft = false,
 }) => {
   const initialTaskData = useMemo(
     () => ({
@@ -126,6 +135,7 @@ const AddModal = ({
   );
 
   const resolveInitialTaskData = useCallback(() => {
+    if (skipDraft) return initialTaskData;
     const saved = loadAddModalDraft(draftKey);
     if (saved?.taskData && hasAddModalDraftContent(saved.taskData)) {
       return {
@@ -138,7 +148,7 @@ const AddModal = ({
       };
     }
     return initialTaskData;
-  }, [draftKey, userId, globalTaskId, parentTaskId, rootTaskId, initialTaskData]);
+  }, [draftKey, userId, globalTaskId, parentTaskId, rootTaskId, initialTaskData, skipDraft]);
 
   const [taskData, setTaskData] = useState(() => resolveInitialTaskData());
   const [users, setUsers] = useState([]);
@@ -152,6 +162,7 @@ const AddModal = ({
   const [selectedFiles, setSelectedFiles] = useState([]);
   const [hasDangerousFiles, setHasDangerousFiles] = useState(false);
   const [checkedComment, setCheckedComment] = useState(() => {
+    if (skipDraft) return false;
     const saved = loadAddModalDraft(
       getAddModalDraftKey(userId, globalTaskId, parentTaskId, rootTaskId)
     );
@@ -164,6 +175,7 @@ const AddModal = ({
   const [showCommentModal, setShowCommentModal] = useState(false);
   const [currentFileIndex, setCurrentFileIndex] = useState(0);
   const [fileComments, setFileComments] = useState(() => {
+    if (skipDraft) return {};
     const saved = loadAddModalDraft(
       getAddModalDraftKey(userId, globalTaskId, parentTaskId, rootTaskId)
     );
@@ -175,6 +187,9 @@ const AddModal = ({
   const [absenceMeta, setAbsenceMeta] = useState([]);
   const [choiceQueue, setChoiceQueue] = useState([]);
   const [currentChoice, setCurrentChoice] = useState(null);
+  const [editingTemplate, setEditingTemplate] = useState(null);
+  const [savingTemplate, setSavingTemplate] = useState(false);
+  const [templatesVersion, setTemplatesVersion] = useState(0);
   const { absencesMap } = useActiveAbsences(isOpen);
 
   const quillRef = useRef(null);
@@ -184,6 +199,7 @@ const AddModal = ({
   const prevDraftKeyRef = useRef(draftKey);
   const choiceDecisionsRef = useRef({});
   const choiceEntriesRef = useRef([]);
+  const editSnapshotRef = useRef(null);
 
   const {
     handleFileChange,
@@ -240,6 +256,7 @@ const AddModal = ({
 
   // Подгрузка черновика при смене контекста (доска / проект / подзадача)
   useEffect(() => {
+    if (skipDraft) return;
     if (prevDraftKeyRef.current === draftKey) return;
     prevDraftKeyRef.current = draftKey;
     const saved = loadAddModalDraft(draftKey);
@@ -274,11 +291,17 @@ const AddModal = ({
     initialTaskData,
     externalInitialTaskData,
     quillInstance,
+    skipDraft,
   ]);
 
   // Шаблон из BPE — только если нет сохранённого черновика
   useEffect(() => {
     if (!isOpen || !externalInitialTaskData || initialDataAppliedRef.current) return;
+    if (skipDraft) {
+      setTaskData(initialTaskData);
+      initialDataAppliedRef.current = true;
+      return;
+    }
     const saved = loadAddModalDraft(draftKey);
     if (saved?.taskData && hasAddModalDraftContent(saved.taskData)) {
       initialDataAppliedRef.current = true;
@@ -286,7 +309,7 @@ const AddModal = ({
     }
     setTaskData(initialTaskData);
     initialDataAppliedRef.current = true;
-  }, [isOpen, externalInitialTaskData, draftKey, initialTaskData]);
+  }, [isOpen, externalInitialTaskData, draftKey, initialTaskData, skipDraft]);
 
   // Принудительная активация Quill редактора при открытии модального окна
   useEffect(() => {
@@ -306,7 +329,7 @@ const AddModal = ({
     prevIsOpenRef.current = isOpen;
     if (!justOpened || !quillInstance) return;
 
-    const saved = loadAddModalDraft(draftKey);
+    const saved = skipDraft ? null : loadAddModalDraft(draftKey);
     const html =
       taskData.description ||
       saved?.taskData?.description ||
@@ -327,11 +350,11 @@ const AddModal = ({
     }
 
     quillInitialSetRef.current = true;
-  }, [isOpen, quillInstance, taskData.description, draftKey]);
+  }, [isOpen, quillInstance, taskData.description, draftKey, skipDraft]);
 
   // Автосохранение черновика в sessionStorage пока форма открыта
   useEffect(() => {
-    if (!isOpen) return undefined;
+    if (!isOpen || skipDraft) return undefined;
     const timer = setTimeout(() => {
       saveAddModalDraft(draftKey, {
         taskData: getTaskDataForDraft(),
@@ -348,6 +371,7 @@ const AddModal = ({
     fileComments,
     quillInstance,
     getTaskDataForDraft,
+    skipDraft,
   ]);
 
   useEffect(() => {
@@ -425,14 +449,131 @@ const AddModal = ({
     return dataForDraft;
   }, [draftKey, getTaskDataForDraft, checkedComment, fileComments]);
 
+  const writeForm = useCallback(
+    (next) => {
+      setTaskData(next);
+      if (quillInstance?.root) {
+        const html = next.description || "";
+        if (quillInstance.root.innerHTML !== html) {
+          quillInstance.root.innerHTML = html;
+        }
+      }
+    },
+    [quillInstance]
+  );
+
+  const applyTaskTemplate = useCallback(
+    (template, options = {}) => {
+      const implementers = keepKnownUserIds(template.implementerIds, users);
+      const approvers = keepKnownUserIds(template.approverIds, users);
+      const viewers = keepKnownUserIds(template.viewerIds, users);
+      const dropped = implementers.dropped + approvers.dropped + viewers.dropped;
+      let deadline = templatePartsToDeadline(
+        template.deadlineOffsetDays,
+        template.deadlineTime
+      );
+      const clamped = clampDeadlineToProject(deadline, projectDeadline);
+      deadline = clamped.value;
+      writeForm({
+        ...buildEmptyTaskData(userId, globalTaskId, parentTaskId, rootTaskId),
+        title: template.title || "",
+        description: template.description || "",
+        priority: template.priority || "низкий",
+        tags: template.tags || "",
+        deadline,
+        implementers: implementers.kept,
+        approvers: approvers.kept,
+        viewers: viewers.kept,
+        created_by: userId,
+        global_task_id: globalTaskId,
+        parentTaskId,
+        rootTaskId,
+      });
+      if (!options.keepEditing) {
+        setEditingTemplate(null);
+        editSnapshotRef.current = null;
+      }
+      if (dropped > 0) {
+        Toastify({
+          text: "Часть сотрудников из шаблона больше не в списке и не подставлена.",
+          close: true,
+          backgroundColor: "linear-gradient(to right, #b45309, #f59e0b)",
+        }).showToast();
+      }
+      if (clamped.clamped) {
+        Toastify({
+          text: "Срок из шаблона ограничен сроком проекта.",
+          close: true,
+          backgroundColor: "linear-gradient(to right, #b45309, #f59e0b)",
+        }).showToast();
+      }
+    },
+    [users, projectDeadline, writeForm, userId, globalTaskId, parentTaskId, rootTaskId]
+  );
+
+  const startTemplateEdit = useCallback(
+    (template) => {
+      editSnapshotRef.current = getTaskDataForDraft();
+      applyTaskTemplate(template, { keepEditing: true });
+      setEditingTemplate({ id: template.id, name: template.name || "" });
+    },
+    [getTaskDataForDraft, applyTaskTemplate]
+  );
+
+  const cancelTemplateEdit = useCallback(() => {
+    const snapshot = editSnapshotRef.current;
+    editSnapshotRef.current = null;
+    setEditingTemplate(null);
+    if (snapshot) writeForm(snapshot);
+  }, [writeForm]);
+
+  const saveEditingTemplate = useCallback(async () => {
+    if (!editingTemplate || !userId) return;
+    const name = String(editingTemplate.name || "").trim();
+    if (!name) {
+      Toastify({
+        text: "Укажите название шаблона",
+        close: true,
+        backgroundColor: "linear-gradient(to right, #8B0000, #ff0000)",
+      }).showToast();
+      return;
+    }
+    setSavingTemplate(true);
+    try {
+      await updateUserTaskTemplate(
+        userId,
+        editingTemplate.id,
+        formToTemplateBody(getTaskDataForDraft(), name)
+      );
+      setEditingTemplate(null);
+      editSnapshotRef.current = null;
+      setTemplatesVersion((version) => version + 1);
+      Toastify({
+        text: "Шаблон обновлён",
+        close: true,
+        backgroundColor: "linear-gradient(to right, #0f766e, #14b8a6)",
+      }).showToast();
+    } catch (error) {
+      Toastify({
+        text: error?.response?.data?.error || "Не удалось обновить шаблон",
+        close: true,
+        backgroundColor: "linear-gradient(to right, #8B0000, #ff0000)",
+      }).showToast();
+    } finally {
+      setSavingTemplate(false);
+    }
+  }, [editingTemplate, userId, getTaskDataForDraft]);
+
   /** После успешного создания задачи — пустая форма и удаление черновика. */
   const resetFormAfterSuccessfulCreate = useCallback(() => {
-    clearAddModalDraft(draftKey);
+    if (!skipDraft) clearAddModalDraft(draftKey);
     setTaskData(buildEmptyTaskData(userId, globalTaskId, parentTaskId, rootTaskId));
     resetAuxiliaryFormState();
     if (quillInstance?.root) {
       quillInstance.root.innerHTML = "";
     }
+    setEditingTemplate(null);
+    editSnapshotRef.current = null;
     quillInitialSetRef.current = false;
     initialDataAppliedRef.current = false;
   }, [
@@ -443,16 +584,41 @@ const AddModal = ({
     rootTaskId,
     quillInstance,
     resetAuxiliaryFormState,
+    skipDraft,
   ]);
 
   /** Закрытие без создания — данные формы и черновик сохраняются. */
   const closeModal = useCallback(() => {
-    persistDraft();
+    if (!skipDraft) {
+      if (editingTemplate && editSnapshotRef.current) {
+        const snapshot = editSnapshotRef.current;
+        editSnapshotRef.current = null;
+        setEditingTemplate(null);
+        writeForm(snapshot);
+        saveAddModalDraft(draftKey, {
+          taskData: snapshot,
+          checkedComment,
+          fileComments,
+        });
+      } else {
+        persistDraft();
+      }
+    }
     setOpen(false);
     if (typeof onClose === "function") {
       onClose();
     }
-  }, [persistDraft, setOpen, onClose]);
+  }, [
+    editingTemplate,
+    writeForm,
+    draftKey,
+    checkedComment,
+    fileComments,
+    persistDraft,
+    setOpen,
+    onClose,
+    skipDraft,
+  ]);
 
   const createTasksWithPlan = useCallback(
     async (assignmentPlan) => {
@@ -885,6 +1051,35 @@ const AddModal = ({
     <div className={`${styles.modal} ${isOpen ? "" : styles.hidden} `}>
       <div className={styles.overlay} onClick={closeModal}></div>
       <div className={styles.content}>
+        {editingTemplate && (
+          <div className={styles.templateEditBanner}>
+            <span className={styles.templateEditLabel}>Редактирование шаблона</span>
+            <input
+              type="text"
+              className={styles.templateEditName}
+              value={editingTemplate.name}
+              onChange={(e) =>
+                setEditingTemplate((prev) =>
+                  prev ? { ...prev, name: e.target.value } : prev
+                )
+              }
+              placeholder="Название шаблона"
+            />
+            <button type="button" className={styles.templateEditCancel} onClick={cancelTemplateEdit}>
+              К созданию задачи
+            </button>
+          </div>
+        )}
+        <TaskTemplateTools
+          userId={userId}
+          users={users}
+          isOpen={isOpen}
+          getFormData={getTaskDataForDraft}
+          formToBody={formToTemplateBody}
+          onApply={applyTaskTemplate}
+          onStartEdit={startTemplateEdit}
+          templatesVersion={templatesVersion}
+        />
         <div className={styles.left}>
           <input
             type="text"
@@ -989,6 +1184,10 @@ const AddModal = ({
                 : ""
             } ${styles["button-add-task"]}`}
             onClick={() => {
+              if (editingTemplate) {
+                saveEditingTemplate();
+                return;
+              }
               if (checkedComment && selectedFiles.length > 0) {
                 setShowCommentModal(true);
                 setCurrentFileIndex(0);
@@ -997,9 +1196,13 @@ const AddModal = ({
                 handleSubmitWithComments();
               }
             }}
-            disabled={hasDangerousFiles || isLoading}
+            disabled={editingTemplate ? savingTemplate : hasDangerousFiles || isLoading}
           >
-            {hasDangerousFiles
+            {editingTemplate
+              ? savingTemplate
+                ? "Сохранение..."
+                : "Сохранить шаблон"
+              : hasDangerousFiles
               ? "В целях безопасности исполняемый файл отправить невозможно"
               : isLoading
               ? "Отправка задачи..."

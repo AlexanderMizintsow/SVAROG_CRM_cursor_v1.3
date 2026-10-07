@@ -177,6 +177,34 @@ const notifyBoth = async (dbPool, { userIds, title, body, requestId, eventType }
   )
 }
 
+/** Live-уведомление в AlertBanner (как у чата обращений). */
+const emitManagerRequestSocket = (req, { userIds, title, body, requestId, eventType, request }) => {
+  try {
+    const io = req.app?.get?.('io')
+    if (!io) return
+    const ids = [...new Set((userIds || []).map(Number).filter((id) => id > 0))]
+    ids.forEach((uid) => {
+      io.emit('notification', {
+        type: eventType,
+        userId: uid,
+        requestId,
+        message: body,
+        title,
+      })
+    })
+    if (request) {
+      io.emit('managerRequestUpdated', {
+        requestId,
+        request,
+        eventType,
+        userIds: ids,
+      })
+    }
+  } catch (socketErr) {
+    console.warn('[manager-requests][socket]', socketErr.message || socketErr)
+  }
+}
+
 const clearUnreadForViewer = async (dbPool, row, userId) => {
   if (Number(row.from_user_id) === userId && row.author_has_unread) {
     await dbPool.query(
@@ -367,13 +395,15 @@ const createRequest = (dbPool) => async (req, res) => {
     const full = await dbPool.query(`${SELECT_BASE} WHERE r.id = $1`, [id])
     const mapped = mapRow(full.rows[0])
 
-    await notifyBoth(dbPool, {
+    const notifyPayload = {
       userIds: [toUserId],
       title: 'Новое обращение',
       body: `${TYPE_LABELS[type]}: ${title}`,
       requestId: id,
       eventType: 'manager_request_new',
-    })
+    }
+    await notifyBoth(dbPool, notifyPayload)
+    emitManagerRequestSocket(req, { ...notifyPayload, request: mapped })
 
     return res.status(201).json({ request: mapped })
   } catch (error) {
@@ -426,13 +456,15 @@ const answerRequest = (dbPool) => async (req, res) => {
     const full = await dbPool.query(`${SELECT_BASE} WHERE r.id = $1`, [id])
     const mapped = mapRow(full.rows[0])
 
-    await notifyBoth(dbPool, {
+    const notifyPayload = {
       userIds: [Number(row.from_user_id)],
       title: 'Ответ на обращение',
       body: `Директор ответил на «${row.title}»`,
       requestId: id,
       eventType: 'manager_request_answered',
-    })
+    }
+    await notifyBoth(dbPool, notifyPayload)
+    emitManagerRequestSocket(req, { ...notifyPayload, request: mapped })
 
     return res.json({ request: mapped })
   } catch (error) {
@@ -468,13 +500,15 @@ const closeRequest = (dbPool) => async (req, res) => {
     const full = await dbPool.query(`${SELECT_BASE} WHERE r.id = $1`, [id])
     const mapped = mapRow(full.rows[0])
 
-    await notifyBoth(dbPool, {
+    const notifyPayload = {
       userIds: [Number(row.from_user_id)],
       title: 'Обращение закрыто',
       body: `Обращение «${row.title}» закрыто директором`,
       requestId: id,
       eventType: 'manager_request_closed',
-    })
+    }
+    await notifyBoth(dbPool, notifyPayload)
+    emitManagerRequestSocket(req, { ...notifyPayload, request: mapped })
 
     return res.json({ request: mapped })
   } catch (error) {

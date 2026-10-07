@@ -823,7 +823,11 @@ const AlertBanner = () => {
                       Number(String(key).replace('managerRequestChat-', ''))
                     if (rid) {
                       clearManagerRequestChat(rid)
-                      window.location.assign(`/manager-requests?id=${rid}`)
+                      window.dispatchEvent(
+                        new CustomEvent('manager-request-navigate', {
+                          detail: { id: rid },
+                        })
+                      )
                     }
                   } else if (key.startsWith('project-msg-')) {
                     const projectClickTypes = [
@@ -866,9 +870,10 @@ const AlertBanner = () => {
                     key.startsWith('task-notification-') &&
                     String(type || '').startsWith('manager_request_')
                   ) {
-                    const rid = managerRequestId
-                    window.location.assign(
-                      rid ? `/manager-requests?id=${rid}` : '/manager-requests'
+                    window.dispatchEvent(
+                      new CustomEvent('manager-request-navigate', {
+                        detail: { id: managerRequestId || null },
+                      })
                     )
                     if (notificationId && typeof handleMarkAsRead === 'function') {
                       handleMarkAsRead(notificationId)
