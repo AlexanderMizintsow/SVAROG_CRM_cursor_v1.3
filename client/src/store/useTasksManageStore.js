@@ -9,6 +9,7 @@ const defaultCompletedTasksRange = getLocalMonthDateRangeYyyyMmDd()
 const useTasksManageStore = create((set, get) => ({
   tasksManager: [],
   completedTasks: [], // Новое состояние для завершенных задач
+  rejectedTasks: [],
   /** Диапазон дат последней загрузки завершённых (для refetch по WebSocket и т.п.) */
   lastCompletedTasksRange: defaultCompletedTasksRange,
   unreadMessages: new Set(),
@@ -78,6 +79,18 @@ const useTasksManageStore = create((set, get) => ({
     } catch (error) {
       console.error('Ошибка при загрузке завершенных задач:', error)
       set({ isLoading: false })
+    }
+  },
+
+  fetchRejectedTasks: async (userId) => {
+    if (!userId) return
+    try {
+      const response = await axios.get(
+        `${API_BASE_URL}5000/api/tasks/user/${userId}?filter=rejected_tasks`
+      )
+      set({ rejectedTasks: Array.isArray(response.data) ? response.data : [] })
+    } catch (error) {
+      console.error('Ошибка при загрузке отклонённых задач:', error)
     }
   },
 

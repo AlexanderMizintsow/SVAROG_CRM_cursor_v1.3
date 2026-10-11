@@ -25,6 +25,8 @@ const CreatedByTaskList = ({
   approverMode = false,
   approvalStatus = {},
   onApproval,
+  onReject,
+  rejectedMode = false,
 }) => {
   const { user, users } = useUserStore()
   const [updatedTasks] = useState(tasks)
@@ -502,6 +504,8 @@ const CreatedByTaskList = ({
           approverMode={approverMode}
           approvalStatus={approvalStatus}
           onApproval={onApproval}
+          onReject={onReject}
+          rejectedMode={rejectedMode}
         />
       </Box>
 

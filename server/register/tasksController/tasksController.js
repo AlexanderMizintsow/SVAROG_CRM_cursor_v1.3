@@ -1014,7 +1014,7 @@ function getUserTasks(dbPool) {
     const { filter, is_completed, created_from, created_to } = req.query
 
     // Разрешенные значения для filter
-    const allowedFilters = ['my_tasks', 'tasks_manager', 'completed_tasks']
+    const allowedFilters = ['my_tasks', 'tasks_manager', 'completed_tasks', 'rejected_tasks']
     if (!allowedFilters.includes(filter)) {
       return res.status(400).json({ error: 'Недопустимое значение filter' })
     }
@@ -1041,11 +1041,16 @@ function getUserTasks(dbPool) {
         whereClause = `
           (tv.user_id = $1 OR t.created_by = $1 OR ua.approver_id = $1 OR ta.user_id =  $1) 
           AND t.is_completed = true
-          AND COALESCE(t.status, '') <> 'cancelled'`
+          AND COALESCE(t.status, '') <> 'cancelled'
+          AND COALESCE(t.status, '') <> 'rejected'`
+      } else if (filter === 'rejected_tasks') {
+        whereClause = `
+          (tv.user_id = $1 OR t.created_by = $1 OR ua.approver_id = $1 OR ta.user_id = $1)
+          AND COALESCE(t.status, '') = 'rejected'`
       }
 
       // Добавляем условие по is_completed, если оно необходимо
-      if (filter !== 'completed_tasks') {
+      if (filter !== 'completed_tasks' && filter !== 'rejected_tasks') {
         whereClause += ` AND t.is_completed = ${isCompleted}`
       }
 
@@ -1063,7 +1068,7 @@ function getUserTasks(dbPool) {
       }
 
       const orderByClause =
-        filter === 'completed_tasks'
+        filter === 'completed_tasks' || filter === 'rejected_tasks'
           ? ' ORDER BY t.completed_at DESC NULLS LAST, t.created_at DESC'
           : ''
 
@@ -1072,7 +1077,10 @@ function getUserTasks(dbPool) {
           SELECT DISTINCT 
               tap.task_id,
               tap.approver_id,
-              tap.is_approved
+              tap.is_approved,
+              tap.decision,
+              tap.rejection_comment,
+              tap.responded_at
           FROM task_approvals tap
         ), unique_attachments AS (
           SELECT DISTINCT 
@@ -1108,7 +1116,13 @@ unique_comments AS (
           t.root_id,   
           ARRAY_AGG(DISTINCT ta.user_id) AS assigned_user_ids,
           -- Используем подзапросы для агрегации approvals
-          (SELECT JSON_AGG(JSON_BUILD_OBJECT('approver_id', a.approver_id, 'is_approved', a.is_approved))
+          (SELECT JSON_AGG(JSON_BUILD_OBJECT(
+              'approver_id', a.approver_id,
+              'is_approved', a.is_approved,
+              'decision', a.decision,
+              'rejection_comment', a.rejection_comment,
+              'responded_at', a.responded_at
+            ))
            FROM unique_approvals a WHERE a.task_id = t.id
           ) AS approver_user_ids,
           ARRAY_AGG(DISTINCT tv.user_id) AS visibility_user_ids,
@@ -1235,6 +1249,14 @@ function updateTaskStatus(dbPool, io) {
     const { status } = req.body // Новый статус
 
     try {
+      const current = await dbPool.query('SELECT status FROM tasks WHERE id = $1', [id])
+      if (!current.rows[0]) {
+        return res.status(404).json({ message: 'Задача не найдена' })
+      }
+      if (current.rows[0].status === 'rejected') {
+        return res.status(400).json({ message: 'Отклонённую задачу нельзя перенести' })
+      }
+
       const query = `
         UPDATE tasks
         SET status = $1,
@@ -1289,27 +1311,178 @@ function updateTaskApproval(dbPool, io) {
     const { taskId, userId, approv } = req.params
     const isApproved = approv === 'true' || approv === true
 
+    if (!isApproved) {
+      return res.status(400).json({
+        error: 'Снять утверждение нельзя. Чтобы закрыть задачу, отклоните её с указанием причины.',
+      })
+    }
+
     try {
-      await dbPool.query(
+      const taskRes = await dbPool.query('SELECT status, is_completed FROM tasks WHERE id = $1', [taskId])
+      if (!taskRes.rows[0]) {
+        return res.status(404).json({ error: 'Задача не найдена' })
+      }
+      const task = taskRes.rows[0]
+      if (task.status === 'rejected' || task.status === 'cancelled' || task.is_completed) {
+        return res.status(400).json({ error: 'Эту задачу уже нельзя утвердить' })
+      }
+
+      const updated = await dbPool.query(
         `
         UPDATE task_approvals
-        SET is_approved = $1, responded_at = CURRENT_TIMESTAMP
-        WHERE task_id = $2 AND approver_id = $3
+        SET is_approved = true,
+            decision = 'approved',
+            rejection_comment = NULL,
+            responded_at = CURRENT_TIMESTAMP
+        WHERE task_id = $1 AND approver_id = $2
+          AND COALESCE(decision, '') <> 'rejected'
+        RETURNING approver_id
       `,
-        [isApproved, taskId, userId]
+        [taskId, userId]
       )
+      if (!updated.rows[0]) {
+        return res.status(403).json({ error: 'Вы не утверждающий этой задачи' })
+      }
 
-      await insertTaskHistoryForTask(
-        dbPool,
-        taskId,
-        parseInt(userId, 10),
-        isApproved ? 'Одобрено автором' : 'Отправка на доработку'
-      )
+      await insertTaskHistoryForTask(dbPool, taskId, parseInt(userId, 10), 'Одобрено автором')
 
       io.emit('taskApproval')
+      res.json({ success: true, approved: true })
     } catch (error) {
       console.error('Ошибка при обновлении утверждения задачи:', error)
       res.status(500).json({ error: 'Внутренняя ошибка сервера' })
+    }
+  }
+}
+
+function rejectTaskByApprover(dbPool, io) {
+  return async function (req, res) {
+    const { taskId, userId } = req.params
+    const comment = String(req.body?.comment || '').trim()
+    if (!comment) {
+      return res.status(400).json({ error: 'Укажите причину отклонения' })
+    }
+    if (comment.length > 2000) {
+      return res.status(400).json({ error: 'Причина слишком длинная' })
+    }
+
+    const client = await dbPool.connect()
+    try {
+      await client.query('BEGIN')
+      const taskRes = await client.query(
+        `SELECT id, title, status, is_completed, created_by, global_task_id
+         FROM tasks WHERE id = $1 FOR UPDATE`,
+        [taskId]
+      )
+      if (!taskRes.rows[0]) {
+        await client.query('ROLLBACK')
+        return res.status(404).json({ error: 'Задача не найдена' })
+      }
+      const task = taskRes.rows[0]
+      if (task.is_completed || task.status === 'cancelled' || task.status === 'rejected') {
+        await client.query('ROLLBACK')
+        return res.status(400).json({ error: 'Эту задачу уже нельзя отклонить' })
+      }
+
+      const approverRes = await client.query(
+        `SELECT is_approved, decision FROM task_approvals
+         WHERE task_id = $1 AND approver_id = $2`,
+        [taskId, userId]
+      )
+      if (!approverRes.rows[0]) {
+        await client.query('ROLLBACK')
+        return res.status(403).json({ error: 'Вы не утверждающий этой задачи' })
+      }
+      if (approverRes.rows[0].is_approved || approverRes.rows[0].decision === 'approved') {
+        await client.query('ROLLBACK')
+        return res.status(400).json({ error: 'Вы уже утвердили задачу' })
+      }
+
+      await client.query(
+        `UPDATE task_approvals
+         SET decision = 'rejected',
+             rejection_comment = $1,
+             is_approved = false,
+             responded_at = CURRENT_TIMESTAMP
+         WHERE task_id = $2 AND approver_id = $3`,
+        [comment, taskId, userId]
+      )
+      await client.query(
+        `UPDATE tasks
+         SET status = 'rejected',
+             is_completed = true,
+             completed_at = CASE WHEN completed_at IS NULL THEN CURRENT_TIMESTAMP ELSE completed_at END
+         WHERE id = $1`,
+        [taskId]
+      )
+      const historyText = `Отклонено утверждающим: ${comment.slice(0, 500)}`
+      await client.query(
+        `INSERT INTO task_history (task_id, changed_by, change_description) VALUES ($1, $2, $3)`,
+        [taskId, parseInt(userId, 10), historyText]
+      )
+
+      const people = await client.query(
+        `SELECT created_by AS user_id FROM tasks WHERE id = $1
+         UNION
+         SELECT user_id FROM task_assignments WHERE task_id = $1 AND user_id IS NOT NULL`,
+        [taskId]
+      )
+      const recipientIds = [
+        ...new Set(people.rows.map((row) => Number(row.user_id)).filter((id) => Number.isFinite(id))),
+      ]
+      const shortComment = comment.length > 300 ? `${comment.slice(0, 300)}…` : comment
+      const message = `Задача «${task.title || 'Без названия'}» отклонена. Причина: ${shortComment}`
+
+      for (const recipientId of recipientIds) {
+        await client.query(
+          `INSERT INTO notifications (user_id, task_id, message, event_type, is_sent)
+           VALUES ($1, $2, $3, 'task_rejected_by_approver', false)`,
+          [recipientId, taskId, message]
+        )
+      }
+
+      await client.query('COMMIT')
+
+      notifyBpeTaskUpdated(Number(taskId))
+      if (task.global_task_id) {
+        notifyBpeProjectUpdated(Number(task.global_task_id))
+        await checkAndEmitProgress100(dbPool, io, task.global_task_id)
+      }
+
+      io.emit('taskApproval', { taskId: Number(taskId), rejected: true })
+      recipientIds.forEach((recipientId) => {
+        io.emit('notification', {
+          type: 'task_rejected_by_approver',
+          userId: recipientId,
+          taskId: Number(taskId),
+          title: task.title,
+          message,
+        })
+        notifyStaffDevicesSafe(dbPool, {
+          userIds: [recipientId],
+          title: 'Задача отклонена',
+          body: message,
+          data: {
+            type: 'task',
+            taskId: Number(taskId),
+            event_type: 'task_rejected_by_approver',
+          },
+        })
+      })
+
+      res.json({ success: true, status: 'rejected' })
+    } catch (error) {
+      try {
+        await client.query('ROLLBACK')
+      } catch (_) {
+        /* транзакция уже закрыта */
+      }
+      console.error('Ошибка при отклонении задачи:', error)
+      if (!res.headersSent) {
+        res.status(500).json({ error: 'Не удалось отклонить задачу' })
+      }
+    } finally {
+      client.release()
     }
   }
 }
@@ -1321,6 +1494,11 @@ function updateTaskAccept(dbPool, io) {
     const { comment } = req.body
 
     try {
+      const currentTask = await dbPool.query('SELECT status FROM tasks WHERE id = $1', [taskId])
+      if (currentTask.rows[0]?.status === 'rejected') {
+        return res.status(400).json({ error: 'Отклонённую задачу нельзя принять или вернуть на доработку' })
+      }
+
       let globalTaskIdForEmit = null
       if (isDone === 'false') {
         const tagsRedo = '[{"title":"ДОРАБОТКА ЗАДАЧИ","bg":"#ffb3b3","text":"#000000"}]'
@@ -5888,6 +6066,7 @@ module.exports = {
   notifyTaskCreated,
   updateTaskStatus,
   updateTaskApproval,
+  rejectTaskByApprover,
   updateTaskAccept,
   getTaskComments,
   addTaskComment,

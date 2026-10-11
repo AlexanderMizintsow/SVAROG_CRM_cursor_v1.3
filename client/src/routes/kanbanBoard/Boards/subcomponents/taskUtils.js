@@ -238,6 +238,8 @@ export const getStatusLabel = (statusId) => {
       return 'В процессе'
     case 'done':
       return 'Выполнено, ожидается подтверждение от автора задачи'
+    case 'rejected':
+      return 'Отклонено'
     default:
       return 'Неизвестный статус'
   }
@@ -303,6 +305,8 @@ export const getStatusClass = (status) => {
       return 'global-task-subtasks__status--cancelled'
     case 'pause':
       return 'global-task-subtasks__status--cancelled'
+    case 'rejected':
+      return 'global-task-subtasks__status--cancelled'
     default:
       return ''
   }
@@ -349,6 +353,8 @@ export const getStatusLabelTask = (status) => {
       return 'На паузе'
     case 'done':
       return 'Ожидает подтверждение автора'
+    case 'rejected':
+      return 'Отклонено'
     case 'final':
       return 'Завершено'
     default:

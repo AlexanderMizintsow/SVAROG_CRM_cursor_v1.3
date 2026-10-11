@@ -10,8 +10,11 @@ const TaskCardParticipants = ({ task, users }) => {
 
   if (viewers.length === 0 && approvers.length === 0) return null
 
-  const pendingIds = approvers.filter((a) => !a.is_approved).map((a) => a.approver_id)
+  const pendingIds = approvers
+    .filter((a) => !a.is_approved && a.decision !== 'rejected')
+    .map((a) => a.approver_id)
   const approvedIds = approvers.filter((a) => a.is_approved).map((a) => a.approver_id)
+  const rejectedIds = approvers.filter((a) => a.decision === 'rejected').map((a) => a.approver_id)
 
   return (
     <Box className={styles.taskCardParticipants} mb={1.5}>
@@ -37,7 +40,9 @@ const TaskCardParticipants = ({ task, users }) => {
               <Tooltip
                 key={approver.approver_id}
                 title={
-                  approver.is_approved
+                  approver.decision === 'rejected'
+                    ? `${getUserNames([approver.approver_id], users)} — отклонил`
+                    : approver.is_approved
                     ? `${getUserNames([approver.approver_id], users)} — утвердил`
                     : `${getUserNames([approver.approver_id], users)} — ожидает утверждения`
                 }
@@ -47,7 +52,14 @@ const TaskCardParticipants = ({ task, users }) => {
                 <span className={styles.taskCardParticipantsApproverItem}>
                   <TbUserCheck
                     className={styles.taskCardParticipantsIcon}
-                    style={{ color: approver.is_approved ? '#2e7d32' : '#d32f2f' }}
+                    style={{
+                      color:
+                        approver.decision === 'rejected'
+                          ? '#b71c1c'
+                          : approver.is_approved
+                          ? '#2e7d32'
+                          : '#d32f2f',
+                    }}
                     aria-hidden
                   />
                   <Typography variant="caption" component="span">
@@ -67,7 +79,12 @@ const TaskCardParticipants = ({ task, users }) => {
               Утвердили: {getUserNames(approvedIds, users)}
             </Typography>
           )}
-          {pendingIds.length === 0 && approvers.length > 0 && (
+          {rejectedIds.length > 0 && (
+            <Typography variant="caption" className={styles.taskCardParticipantsPending}>
+              Отклонил: {getUserNames(rejectedIds, users)}
+            </Typography>
+          )}
+          {pendingIds.length === 0 && rejectedIds.length === 0 && approvers.length > 0 && (
             <Typography variant="caption" className={styles.taskCardParticipantsAllDone}>
               Все утверждающие подтвердили
             </Typography>

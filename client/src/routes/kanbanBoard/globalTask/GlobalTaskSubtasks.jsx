@@ -210,7 +210,9 @@ const GlobalTaskSubtasks = ({ taskId, refreshSubTask, isReadOnly, userId, onRefr
                         subtask.status
                       )}`}
                     >
-                      {!subtask.is_completed
+                      {subtask.status === 'rejected'
+                        ? getStatusLabelTask('rejected')
+                        : !subtask.is_completed
                         ? getStatusLabelTask(subtask.status)
                         : getStatusLabelTask('final')}
                     </span>

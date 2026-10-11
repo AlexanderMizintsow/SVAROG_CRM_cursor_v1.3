@@ -68,6 +68,14 @@ const useTaskNotifications = ({ currentUserId }) => {
           statusText: 'Срок исполнения задачи был изменен!',
           showDetails: true,
         },
+        task_rejected_by_approver: {
+          icon: <FaEnvelope color="#c62828" />,
+          className: 'extension-notification-cancelled-task',
+          statusText: 'Задача отклонена утверждающим',
+          showDetails: true,
+          confirmLabel: 'Ок',
+          requiresAck: true,
+        },
         task_cancelled_by_project: {
           icon: <FaEnvelope color="#ff7043" />,
           className: 'extension-notification-cancelled-task',

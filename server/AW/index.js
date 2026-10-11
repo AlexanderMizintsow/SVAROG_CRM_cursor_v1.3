@@ -273,6 +273,91 @@ app.get('/app/statistics/stuff-types/:year?', async (req, res) => {
   }
 })
 
+const { loadCatalogs, searchOrders, withDb, attach, assertPeriod, normalizeBody } = require('./controllers/orderSampleController')
+
+const SEARCH_COOLDOWN_MS = 10000
+const searchFinishedAt = new Map()
+const searchInFlight = new Set()
+
+const searchUserKey = (req) => {
+  const userId = Number(req.body?.userId)
+  if (Number.isInteger(userId) && userId > 0) return `user:${userId}`
+  return `ip:${req.ip || 'unknown'}`
+}
+
+// Выборка заказов по параметрам изделия
+app.get('/app/order-sample/catalogs/:year?', async (req, res) => {
+  try {
+    const options = getDbOptions(req.params.year)
+    const result = await withDb(options, (db) => loadCatalogs(db))
+    res.json({ result })
+  } catch (error) {
+    console.error('Order sample catalogs error:', error)
+    res.status(500).json({ message: 'Не удалось прочитать справочники Альтавин' })
+  }
+})
+
+app.post('/app/order-sample/search', async (req, res) => {
+  const key = searchUserKey(req)
+  try {
+    assertPeriod(normalizeBody(req.body || {}))
+  } catch (error) {
+    return res.status(error.status || 400).json({ message: error.message })
+  }
+
+  if (searchInFlight.has(key)) {
+    return res.status(429).json({ message: 'Поиск уже выполняется' })
+  }
+  const waitMs = SEARCH_COOLDOWN_MS - (Date.now() - (searchFinishedAt.get(key) || 0))
+  if (waitMs > 0) {
+    return res.status(429).json({
+      message: `Следующий поиск можно запустить через ${Math.ceil(waitMs / 1000)} с`,
+    })
+  }
+
+  let db = null
+  let closed = false
+  const stop = () => {
+    if (closed) return
+    closed = true
+    if (!db) return
+    try {
+      db.detach()
+    } catch (error) {
+      console.error('Order sample detach error:', error)
+    }
+  }
+  req.on('close', () => {
+    if (!res.writableEnded) stop()
+  })
+
+  searchInFlight.add(key)
+  try {
+    db = await attach(getDbOptions(req.body?.year))
+    if (closed) {
+      try {
+        db.detach()
+      } catch (error) {
+        console.error('Order sample detach error:', error)
+      }
+      return
+    }
+    const result = await searchOrders(db, req.body || {}, () => closed)
+    if (closed || res.writableEnded) return
+    res.json({ result })
+  } catch (error) {
+    if (closed || error.cancelled) return
+    console.error('Order sample search error:', error)
+    if (!res.headersSent) {
+      res.status(error.status || 500).json({ message: error.message || 'Ошибка выборки' })
+    }
+  } finally {
+    stop()
+    searchInFlight.delete(key)
+    searchFinishedAt.set(key, Date.now())
+  }
+})
+
 // Запуск сервера
 app.listen(port, () => {
   console.log(`Server running at http://localhost:${port}`)

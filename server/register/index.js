@@ -60,6 +60,7 @@ const {
   notifyTaskCreated,
   updateTaskStatus,
   updateTaskApproval,
+  rejectTaskByApprover,
   updateTaskAccept,
   getTaskComments,
   addTaskComment,
@@ -841,6 +842,7 @@ app.patch('/api/notifications/:notificationId/read', markNotificationAsRead(dbPo
 
 //*** */
 app.patch('/api/task/approv/:taskId/:userId/:approv', updateTaskApproval(dbPool, io))
+app.post('/api/task/reject/:taskId/:userId', rejectTaskByApprover(dbPool, io))
 app.patch('/api/task/accept/:taskId/:userId/:isDone', updateTaskAccept(dbPool, io))
 
 // Сообщения в уведомлениях отправленные дилеру

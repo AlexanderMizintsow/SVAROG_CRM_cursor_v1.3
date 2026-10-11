@@ -5,7 +5,7 @@
 
 const ACTIVE_TASK_FILTER = `
   COALESCE(t.is_completed, false) = false
-  AND COALESCE(t.status, '') NOT IN ('done', 'cancelled')
+  AND COALESCE(t.status, '') NOT IN ('done', 'cancelled', 'rejected')
 `
 
 const ACTIVE_PROJECT_FILTER = `

@@ -605,7 +605,7 @@ const AlertBanner = () => {
         notificationsTask && typeof notificationsTask === 'object'
           ? Object.keys(notificationsTask).filter((id) => {
               const n = notificationsTask[id]
-              return n?.type !== 'task_cancelled_by_project'
+              return n?.type !== 'task_cancelled_by_project' && n?.type !== 'task_rejected_by_approver'
             })
           : []
       await Promise.all(

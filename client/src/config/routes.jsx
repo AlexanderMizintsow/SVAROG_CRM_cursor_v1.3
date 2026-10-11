@@ -33,6 +33,7 @@ import MobileAppNewsManagement from '../routes/adminMenu/mobileAppNews/MobileApp
 import StaffNewsManagement from '../routes/adminMenu/staffNews/StaffNewsManagement.jsx'
 import ManagerRequestsPage from '../routes/managerRequests/ManagerRequestsPage.jsx'
 import KnowledgeBasePage from '../routes/knowledgeBase/KnowledgeBasePage.jsx'
+import OrderSamplePage from '../routes/orderSample/OrderSamplePage.jsx'
 
 const routes = (bgSeason, roleAdministrator, roleAdminOrDirector, isConnectBD) => [
   {
@@ -146,6 +147,10 @@ const routes = (bgSeason, roleAdministrator, roleAdminOrDirector, isConnectBD) =
       {
         path: 'knowledge-base',
         element: <KnowledgeBasePage />,
+      },
+      {
+        path: 'order-sample',
+        element: <OrderSamplePage />,
       },
       // карта дилеров
       {

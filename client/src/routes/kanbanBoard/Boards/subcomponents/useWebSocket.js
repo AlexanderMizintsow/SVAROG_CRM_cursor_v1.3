@@ -16,7 +16,7 @@ const useWebSocket = (userId, stableSetMessages, currentTaskId, onChatMessageUpd
   const { fetchTasks } = useTasksStore()
   const { addOrUpdateTask, fetchExtensionRequests, fetchUnreadNotifications } =
     useTaskStateTracker()
-  const { fetchTasksManager, fetchCompletedTasks, addUnreadMessage, fetchMessages } =
+  const { fetchTasksManager, fetchCompletedTasks, fetchRejectedTasks, addUnreadMessage, fetchMessages } =
     useTasksManageStore()
   const electronAPI = window.electronAPI || null
 
@@ -137,7 +137,8 @@ const useWebSocket = (userId, stableSetMessages, currentTaskId, onChatMessageUpd
 
       // Слушаем событие 'taskApproval' при подтверждении на выполнение задачи
       socket.current.on('taskApproval', () => {
-        // fetchTasksManager(userId)
+        fetchTasksManager(userId)
+        fetchRejectedTasks(userId)
         fetchTasks(userId)
       })
 
@@ -416,6 +417,14 @@ const useWebSocket = (userId, stableSetMessages, currentTaskId, onChatMessageUpd
         }
 
         // Задача отменена из-за провала/удаления проекта **********************************************************
+        if (notification.type === 'task_rejected_by_approver' && notification.userId === userId) {
+          sendNotification('Задачи/Задача отклонена', notification.message)
+          fetchTasks(userId)
+          fetchTasksManager(userId)
+          fetchRejectedTasks(userId)
+          fetchUnreadNotifications(userId)
+        }
+
         if (notification.type === 'task_cancelled_by_project' && notification.userId === userId) {
           sendNotification('Задачи/Задача отменена', notification.message)
           fetchTasks(userId)
@@ -469,6 +478,7 @@ const useWebSocket = (userId, stableSetMessages, currentTaskId, onChatMessageUpd
     currentTaskId,
     onChatMessageUpdated,
     fetchCompletedTasks,
+    fetchRejectedTasks,
     addUnreadMessage,
     addOrUpdateTask,
     fetchMessages,

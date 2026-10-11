@@ -28,6 +28,7 @@ function normalizeTaskStatus(raw) {
   if (v === 'completed') return 'done'
   if (v === 'on_hold') return 'pause'
   if (v === 'cancelled') return 'cancelled'
+  if (v === 'rejected') return 'rejected'
   if (v === 'backlog' || v === 'todo' || v === 'wait' || v === 'doing' || v === 'done' || v === 'pause') return v
   return v
 }
@@ -213,20 +214,20 @@ function matchOneCondition(requiredValue, current) {
     }
     // Одобрение / выполнение
     if (r === 'task_completed' && status === 'done' && isCompleted) return true
-    if (r === 'task_not_completed' && status !== 'done') return true
+    if (r === 'task_not_completed' && status !== 'done' && status !== 'rejected') return true
     if (r === 'returned_for_rework' && status === 'todo') return true
     if (r === 'rejected_by_customer' && status === 'done' && !isCompleted) return true
     if (r === 'approval_pending' && status === 'done' && !isCompleted) return true
     if (r === 'done_and_approved' && status === 'done' && isCompleted) return true
     if (r === 'done_not_approved' && status === 'done' && !isCompleted) return true
     // Дедлайн
-    if (r === 'task_overdue' && isOverdue) return true
+    if (r === 'task_overdue' && isOverdue && status !== 'rejected') return true
     if (r === 'task_in_time' && hasDeadline && !isOverdue) return true
     if (r === 'task_no_deadline' && !hasDeadline) return true
     if (r === 'deadline_today' && hasDeadline && task && task.deadline && isSameDay(task.deadline, now)) return true
     if (r === 'deadline_tomorrow' && hasDeadline && task && task.deadline && isTomorrow(task.deadline, now)) return true
     if (r === 'overdue_and_doing' && isOverdue && status === 'doing') return true
-    if (r === 'overdue_not_done' && isOverdue && status !== 'done') return true
+    if (r === 'overdue_not_done' && isOverdue && status !== 'done' && status !== 'rejected') return true
     // Приоритет
     if (r === 'priority_high' && (priority === 'высокий' || priority === 'high')) return true
     if (r === 'priority_medium' && (priority === 'средний' || priority === 'medium' || priority === 'нормальный' || priority === 'normal')) return true

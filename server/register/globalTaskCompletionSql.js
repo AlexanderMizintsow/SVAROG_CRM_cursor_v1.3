@@ -7,7 +7,9 @@
 
 const GLOBAL_TASK_COMPLETION_BASE_DONE_SQL = `(
   (SELECT COALESCE(SUM(CASE WHEN t.is_completed THEN 1 ELSE 0 END), 0)
-   FROM tasks t WHERE t.global_task_id = gt.id)
+   FROM tasks t
+   WHERE t.global_task_id = gt.id
+     AND COALESCE(t.status, '') <> 'rejected')
   + (SELECT COUNT(*) FROM global_task_responsibles gtra
      WHERE gtra.global_task_id = gt.id
        AND gtra.requires_approval = true
@@ -18,7 +20,9 @@ const GLOBAL_TASK_COMPLETION_BASE_DONE_SQL = `(
 )`
 
 const GLOBAL_TASK_COMPLETION_BASE_TOTAL_SQL = `(
-  (SELECT COUNT(*) FROM tasks t WHERE t.global_task_id = gt.id)
+  (SELECT COUNT(*) FROM tasks t
+   WHERE t.global_task_id = gt.id
+     AND COALESCE(t.status, '') <> 'rejected')
   + (SELECT COUNT(*) FROM global_task_responsibles gtra
      WHERE gtra.global_task_id = gt.id AND gtra.requires_approval = true)
   + (SELECT COUNT(*) FROM global_task_final_solutions

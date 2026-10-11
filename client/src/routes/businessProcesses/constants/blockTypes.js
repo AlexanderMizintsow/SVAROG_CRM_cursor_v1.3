@@ -76,6 +76,7 @@ export const TASK_STATUSES = [
   { value: 'done', label: 'Выполнено (completed)' },
   { value: 'pause', label: 'Приостановлена (on_hold)' },
   { value: 'cancelled', label: 'Отменена (cancelled)' },
+  { value: 'rejected', label: 'Отклонена утверждающим' },
 ]
 
 /** Условия по задаче для блока «Развилка-Слияние» (аналог GATEWAY_CONDITIONS для задач) */
@@ -88,6 +89,7 @@ export const GATEWAY_JOIN_TASK_CONDITIONS = [
   { value: 'status_done', label: 'Статус: Выполнено (done / completed)' },
   { value: 'status_pause', label: 'Статус: Приостановлена (pause / on_hold)' },
   { value: 'status_cancelled', label: 'Статус: Отменена (cancelled)' },
+  { value: 'status_rejected', label: 'Отклонена утверждающим' },
   { value: 'task_completed', label: 'Задача выполнена (одобрена)' },
   { value: 'task_not_completed', label: 'Задача не выполнена' },
   { value: 'returned_for_rework', label: 'Возвращена на доработку' },
@@ -156,6 +158,7 @@ export const GATEWAY_CONDITIONS = [
   { value: 'status_done', label: 'Статус: Выполнено (done / completed)' },
   { value: 'status_pause', label: 'Статус: Приостановлена (pause / on_hold)' },
   { value: 'status_cancelled', label: 'Статус: Отменена (cancelled)' },
+  { value: 'status_rejected', label: 'Отклонена утверждающим' },
   { value: 'task_completed', label: 'Задача выполнена (одобрена)' },
   { value: 'task_not_completed', label: 'Задача не выполнена' },
   { value: 'returned_for_rework', label: 'Возвращена на доработку' },
@@ -210,7 +213,7 @@ export const GATEWAY_CONDITIONS_GROUPED = [
     groupKey: 'task',
     groupLabel: 'Задача (блоки «Создать задачу», «Назначить задачу»)',
     conditions: [
-      'status_backlog', 'status_wait', 'status_doing', 'status_todo', 'status_done', 'status_pause', 'status_cancelled',
+      'status_backlog', 'status_wait', 'status_doing', 'status_todo', 'status_done', 'status_pause', 'status_cancelled', 'status_rejected',
       'task_completed', 'task_not_completed', 'returned_for_rework', 'rejected_by_customer', 'approval_pending',
       'assignee_contains_user', 'task_overdue', 'task_in_time', 'task_no_deadline', 'deadline_today', 'deadline_tomorrow',
       'priority_high', 'priority_medium', 'priority_low',

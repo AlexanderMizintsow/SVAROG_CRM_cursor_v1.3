@@ -25,7 +25,7 @@ import { PiTelegramLogoLight } from 'react-icons/pi'
 import { IoStarSharp } from 'react-icons/io5'
 import { PiLockKeyOpenFill } from 'react-icons/pi'
 import { TbApps } from 'react-icons/tb'
-import { MdAssessment, MdSearch, MdEdit, MdCampaign } from 'react-icons/md'
+import { MdAssessment, MdSearch, MdEdit, MdCampaign, MdManageSearch } from 'react-icons/md'
 import { FcFlowChart } from 'react-icons/fc'
 import { HiOutlineMail } from 'react-icons/hi'
 
@@ -238,6 +238,11 @@ const NavBar = () => {
       link: '/knowledge-base',
     },
     {
+      name: 'Выборка заказов',
+      icon: MdManageSearch,
+      link: '/order-sample',
+    },
+    {
       name: 'Иерархия сотрудников',
       icon: VscTypeHierarchySub,
       link: '/hierarchy-tree-employee',
@@ -247,6 +252,7 @@ const NavBar = () => {
       icon: MdEdit,
       link: '/editor-handle',
     },
+    
    
     /* {
       name: 'Карта',

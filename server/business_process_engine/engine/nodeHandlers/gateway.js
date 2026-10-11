@@ -87,6 +87,7 @@ function normalizeTaskStatus(raw) {
   if (v === 'completed') return 'done'
   if (v === 'on_hold') return 'pause'
   if (v === 'cancelled') return 'cancelled'
+  if (v === 'rejected') return 'rejected'
   // канбан-статусы
   if (v === 'backlog' || v === 'todo' || v === 'wait' || v === 'doing' || v === 'done' || v === 'pause') return v
   return v
@@ -339,24 +340,25 @@ async function handle(instance, node, scheme, integrations, dbPool) {
     if (cond === 'status_done' && status === 'done') return true
     if (cond === 'status_pause' && status === 'pause') return true
     if (cond === 'status_cancelled' && status === 'cancelled') return true
+    if (cond === 'status_rejected' && status === 'rejected') return true
 
     // Backward compatibility: старые статусы/условия из прежних версий
     if (cond === 'status_новая' && (statusRaw === 'новая' || statusRaw === 'new')) return true
     if (cond === 'task_completed' && status === 'done' && isCompleted) return true
-    if (cond === 'task_not_completed' && status !== 'done') return true
+    if (cond === 'task_not_completed' && status !== 'done' && status !== 'rejected') return true
     if (cond === 'returned_for_rework' && status === 'todo') return true
     if (cond === 'rejected_by_customer' && status === 'done' && !isCompleted) return true
     if (cond === 'approval_pending' && status === 'done' && !isCompleted) return true
     if (cond === 'done_and_approved' && status === 'done' && isCompleted) return true
     if (cond === 'done_not_approved' && status === 'done' && !isCompleted) return true
     // Дедлайн
-    if (cond === 'task_overdue' && isOverdue) return true
+    if (cond === 'task_overdue' && isOverdue && status !== 'rejected') return true
     if (cond === 'task_in_time' && hasDeadline && !isOverdue) return true
     if (cond === 'task_no_deadline' && !hasDeadline) return true
     if (cond === 'deadline_today' && hasDeadline && isSameDay(task.deadline, now)) return true
     if (cond === 'deadline_tomorrow' && hasDeadline && isTomorrow(task.deadline, now)) return true
     if (cond === 'overdue_and_doing' && isOverdue && status === 'doing') return true
-    if (cond === 'overdue_not_done' && isOverdue && status !== 'done') return true
+    if (cond === 'overdue_not_done' && isOverdue && status !== 'done' && status !== 'rejected') return true
     // Приоритет (низкий/средний/высокий и low/medium/high)
     if (cond === 'priority_high' && (priority === 'высокий' || priority === 'high')) return true
     if (cond === 'priority_medium' && (priority === 'средний' || priority === 'medium' || priority === 'нормальный' || priority === 'normal')) return true

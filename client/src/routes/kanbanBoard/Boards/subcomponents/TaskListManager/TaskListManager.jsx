@@ -28,6 +28,7 @@ function parseLocalDayEndMs(yyyyMmDd) {
 const TASK_LIST_TABS = [
   { id: 'created', label: 'Созданные' },
   { id: 'completed', label: 'Завершённые' },
+  { id: 'rejected', label: 'Отклонено' },
   { id: 'approver', label: 'На утверждение' },
   { id: 'visible', label: 'Видимые' },
 ]
@@ -99,8 +100,15 @@ const TaskListManager = ({ onClose, onOpenProject, stripRefreshKey, initialActiv
     () => getLocalMonthDateRangeYyyyMmDd().to
   )
   const [completedSearch, setCompletedSearch] = useState('')
-  const { fetchTasksManager, tasksManager, fetchCompletedTasks, completedTasks, isLoading } =
-    useTasksManageStore()
+  const {
+    fetchTasksManager,
+    tasksManager,
+    fetchCompletedTasks,
+    completedTasks,
+    fetchRejectedTasks,
+    rejectedTasks,
+    isLoading,
+  } = useTasksManageStore()
   const [approvalStatus, setApprovalStatus] = useState({})
   const [activeTaskListTab, setActiveTaskListTab] = useState(initialActiveTab || 'created')
   const [completedSubTab, setCompletedSubTab] = useState('mine')
@@ -119,8 +127,16 @@ const TaskListManager = ({ onClose, onOpenProject, stripRefreshKey, initialActiv
         createdFrom: completedDateFrom,
         createdTo: completedDateTo,
       })
+      fetchRejectedTasks(userId)
     }
-  }, [userId, fetchTasksManager, fetchCompletedTasks, completedDateFrom, completedDateTo])
+  }, [
+    userId,
+    fetchTasksManager,
+    fetchCompletedTasks,
+    fetchRejectedTasks,
+    completedDateFrom,
+    completedDateTo,
+  ])
 
   useEffect(() => {
     const savedSubTab = localStorage.getItem('completedSubTab')
@@ -389,15 +405,17 @@ const TaskListManager = ({ onClose, onOpenProject, stripRefreshKey, initialActiv
       approver: groupedTasks.approver.length,
       created: groupedTasks.created_by.length,
       completed: completedTabCount,
+      rejected: (rejectedTasks || []).length,
       visible: groupedTasks.visible.length,
     }),
-    [groupedTasks, completedTabCount]
+    [groupedTasks, completedTabCount, rejectedTasks]
   )
 
   const resolvedActiveTab = useMemo(() => {
     // «Завершённые» открываются и при нуле за текущий месяц: период можно сменить
     // и посмотреть выполненные за прошлые месяцы.
     if (activeTaskListTab === 'completed') return 'completed'
+    if (activeTaskListTab === 'rejected') return 'rejected'
     const countForTab = (id) => tabCounts[id] ?? 0
     if (countForTab(activeTaskListTab) > 0) return activeTaskListTab
     const firstWithTasks = TASK_LIST_TABS.find((t) => countForTab(t.id) > 0)
@@ -411,7 +429,13 @@ const TaskListManager = ({ onClose, onOpenProject, stripRefreshKey, initialActiv
         createdFrom: completedDateFrom,
         createdTo: completedDateTo,
       })
+      await fetchRejectedTasks(userId)
     }
+  }
+
+  const rejectTask = async (taskId, comment) => {
+    await axios.post(`${API_BASE_URL}5000/api/task/reject/${taskId}/${userId}`, { comment })
+    await refreshTasks()
   }
 
   if (isLoading) {
@@ -454,6 +478,7 @@ const TaskListManager = ({ onClose, onOpenProject, stripRefreshKey, initialActiv
                   approverMode
                   approvalStatus={approvalStatus}
                   onApproval={approval}
+                  onReject={rejectTask}
                 />
               ) : (
                 <Typography className={styles.tabEmpty}>Нет задач на утверждение</Typography>
@@ -625,6 +650,23 @@ const TaskListManager = ({ onClose, onOpenProject, stripRefreshKey, initialActiv
                 <Typography className={styles.tabEmpty}>
                   Нет завершённых задач за выбранный период
                 </Typography>
+              )}
+            </Box>
+          )}
+
+          {resolvedActiveTab === 'rejected' && (
+            <Box className={styles.tabPanel} role="tabpanel">
+              {(rejectedTasks || []).length > 0 ? (
+                <CreatedByTaskList
+                  tasks={rejectedTasks}
+                  userId={userId}
+                  handleTaskAccept={handleTaskAccept}
+                  refreshTasks={refreshTasks}
+                  onOpenProject={onOpenProject}
+                  rejectedMode
+                />
+              ) : (
+                <Typography className={styles.tabEmpty}>Нет отклонённых задач</Typography>
               )}
             </Box>
           )}

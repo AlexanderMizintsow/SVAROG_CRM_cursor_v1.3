@@ -902,6 +902,108 @@
   }
 }
 
+.approverActions {
+  display: inline-flex;
+  gap: 8px;
+  margin-left: 6px;
+  vertical-align: middle;
+}
+
+.approverApprove,
+.approverReject,
+.rejectDialogActions button {
+  height: 32px;
+  padding: 0 12px;
+  border-radius: 8px;
+  border: 1px solid transparent;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.approverApprove {
+  background: #e8f5e9;
+  color: #1b5e20;
+  border-color: #a5d6a7;
+}
+
+.approverReject,
+.rejectDialogSave {
+  background: #ffebee;
+  color: #b71c1c;
+  border-color: #ef9a9a;
+}
+
+.rejectionNote {
+  margin: 0 0 12px;
+  padding: 10px 12px;
+  border-radius: 10px;
+  background: #fff5f5;
+  border: 1px solid #ffcdd2;
+  color: #7f1d1d;
+  font-size: 13px;
+  line-height: 1.4;
+}
+
+.rejectionNoteTitle {
+  font-weight: 700;
+  margin-bottom: 4px;
+}
+
+.rejectionNoteReason {
+  margin-top: 4px;
+  white-space: pre-wrap;
+}
+
+.rejectBackdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 1400;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(15, 23, 42, 0.35);
+  padding: 16px;
+}
+
+.rejectDialog {
+  width: min(440px, 100%);
+  background: #fff;
+  border-radius: 14px;
+  padding: 18px;
+  box-shadow: 0 16px 40px rgba(15, 23, 42, 0.2);
+
+  h3 {
+    margin: 0 0 8px;
+    font-size: 18px;
+    color: #0f172a;
+  }
+
+  p {
+    margin: 0 0 12px;
+    color: #475569;
+    font-size: 14px;
+    line-height: 1.45;
+  }
+
+  textarea {
+    width: 100%;
+    min-height: 96px;
+    margin: 0 0 12px;
+    padding: 10px;
+    border: 1px solid #dbe1ea;
+    border-radius: 8px;
+    font: inherit;
+    resize: vertical;
+  }
+}
+
+.rejectDialogActions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
 @keyframes cardBlinkYellowDark {
   0%,
   100% {

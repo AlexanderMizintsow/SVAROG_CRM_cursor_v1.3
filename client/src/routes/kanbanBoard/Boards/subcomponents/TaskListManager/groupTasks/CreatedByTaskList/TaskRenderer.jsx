@@ -19,7 +19,7 @@ import {
 } from '@mui/material'
 import { Person, Schedule, Assignment, CheckCircle, Error } from '@mui/icons-material'
 import { IoCalendarOutline } from 'react-icons/io5'
-import { FcInspection, FcRedo, FcMindMap, FcApproval, FcCancel } from 'react-icons/fc'
+import { FcInspection, FcRedo, FcMindMap, FcApproval } from 'react-icons/fc'
 import { IoIosChatboxes } from 'react-icons/io'
 import { FaCopy, FaEdit } from 'react-icons/fa'
 import { LiaUserCogSolid } from 'react-icons/lia'
@@ -33,6 +33,12 @@ import Attachments from '../../../../../Task/subcomponents/Attachments'
 import TaskCardParticipants from './TaskCardParticipants'
 import { handleKnowledgeDescriptionClick } from '../../../../../../knowledgeBase/openKnowledgeLink'
 import { enhanceKnowledgeLinksInHtml } from '../../../../../../knowledgeBase/knowledgeLinkUtils'
+import Toastify from 'toastify-js'
+
+function rejectionInfo(task) {
+  const list = Array.isArray(task?.approver_user_ids) ? task.approver_user_ids : []
+  return list.find((item) => item?.decision === 'rejected' && item?.rejection_comment) || null
+}
 
 function idList(value) {
   if (!Array.isArray(value)) return []
@@ -135,12 +141,17 @@ const TaskRenderer = ({
   approverMode = false,
   approvalStatus = {},
   onApproval,
+  onReject,
+  rejectedMode = false,
 }) => {
   const taskCardBlinkYellow = useTaskStateTracker((s) => s.taskCardBlinkYellow)
   const clearTaskCardBlinkYellow = useTaskStateTracker((s) => s.clearTaskCardBlinkYellow)
   const cardRefs = useRef({})
   const [descriptionModalTask, setDescriptionModalTask] = useState(null)
   const [duplicateTask, setDuplicateTask] = useState(null)
+  const [rejectTask, setRejectTask] = useState(null)
+  const [rejectComment, setRejectComment] = useState('')
+  const [rejectSaving, setRejectSaving] = useState(false)
 
   useEffect(() => {
     if (!descriptionModalTask) return
@@ -205,44 +216,74 @@ const TaskRenderer = ({
     task.attachments.length > 0 &&
     (approverMode || !task.global_task_id)
 
+  const approveCurrentTask = (task) => {
+    if (typeof onApproval !== 'function') return
+    useTaskStateTracker.getState().setApproval(task.task_id, userId, true)
+    onApproval(task.task_id, userId, approvalStatus[task.task_id])
+  }
+
+  const submitReject = async () => {
+    const comment = rejectComment.trim()
+    if (!rejectTask || !comment || typeof onReject !== 'function') return
+    setRejectSaving(true)
+    try {
+      await onReject(rejectTask.task_id, comment)
+      setRejectTask(null)
+      setRejectComment('')
+    } catch (error) {
+      Toastify({
+        text: error?.response?.data?.error || 'Не удалось отклонить задачу',
+        close: true,
+        backgroundColor: 'linear-gradient(to right, #8B0000, #ff0000)',
+      }).showToast()
+    } finally {
+      setRejectSaving(false)
+    }
+  }
+
+  const renderRejectionNote = (task) => {
+    if (task.status !== 'rejected' && !rejectedMode) return null
+    const info = rejectionInfo(task)
+    if (!info) return null
+    const when = info.responded_at ? new Date(info.responded_at).toLocaleString() : ''
+    return (
+      <div className={styles.rejectionNote}>
+        <div className={styles.rejectionNoteTitle}>Отклонено</div>
+        <div>
+          {getUserNames([info.approver_id], users)}
+          {when ? ` · ${when}` : ''}
+        </div>
+        <div className={styles.rejectionNoteReason}>{info.rejection_comment}</div>
+      </div>
+    )
+  }
+
   const renderApproverStatus = (task) => {
     if (!approverMode) return null
     const isApproved = !!approvalStatus[task.task_id]
     return (
       <Box mt={1} mb={1}>
-        <Typography variant="body2" component="span">
+        <Typography variant="body2" component="div">
           Утверждение:{' '}
           {isApproved ? (
             <span style={{ color: 'green' }}>
               Утверждено <FcApproval style={{ fontSize: 20, verticalAlign: 'middle' }} />
             </span>
           ) : (
-            <span style={{ color: '#c62828' }}>
-              Не утверждено{' '}
-              <Tooltip title="Нажмите, чтобы утвердить задачу" arrow placement="top">
-                <span
-                  role="button"
-                  tabIndex={0}
-                  style={{ cursor: 'pointer', verticalAlign: 'middle' }}
-                  onClick={(e) => {
-                    e.stopPropagation()
-                    if (typeof onApproval !== 'function') return
-                    useTaskStateTracker.getState().setApproval(task.task_id, userId, true)
-                    onApproval(task.task_id, userId, approvalStatus[task.task_id])
-                  }}
-                  onKeyDown={(e) => {
-                    if (e.key === 'Enter' || e.key === ' ') {
-                      e.preventDefault()
-                      e.stopPropagation()
-                      if (typeof onApproval !== 'function') return
-                      useTaskStateTracker.getState().setApproval(task.task_id, userId, true)
-                      onApproval(task.task_id, userId, approvalStatus[task.task_id])
-                    }
-                  }}
-                >
-                  <FcCancel className={`${styles.icon} ${styles.neonPulse}`} style={{ fontSize: 22 }} />
-                </span>
-              </Tooltip>
+            <span className={styles.approverActions}>
+              <button type="button" className={styles.approverApprove} onClick={() => approveCurrentTask(task)}>
+                Утвердить
+              </button>
+              <button
+                type="button"
+                className={styles.approverReject}
+                onClick={() => {
+                  setRejectComment('')
+                  setRejectTask(task)
+                }}
+              >
+                Отклонить
+              </button>
             </span>
           )}
         </Typography>
@@ -273,9 +314,10 @@ const TaskRenderer = ({
   // Рендер карточки задачи
   const renderTaskCard = (task) => {
     const isArchive = completedArchiveMode
-    const allowDescDblClick = openFullDescriptionOnDoubleClick || isArchive
-    const isOverdue = !isArchive && isTaskOverdue(task.deadline, task.status)
-    const hasConfirmButtons = !isArchive && task.status === 'done'
+    const isRejected = rejectedMode || task.status === 'rejected'
+    const allowDescDblClick = openFullDescriptionOnDoubleClick || isArchive || isRejected
+    const isOverdue = !isArchive && !isRejected && isTaskOverdue(task.deadline, task.status)
+    const hasConfirmButtons = !isArchive && !isRejected && task.status === 'done'
     const canBeHighlighted = approverMode || hasConfirmButtons
     const isHighlighted = canBeHighlighted && taskCardBlinkYellow[String(task.task_id)]
 
@@ -323,7 +365,7 @@ const TaskRenderer = ({
               </Typography>
               <Chip
                 icon={getStatusIcon(isArchive ? 'done' : task.status)}
-                label={isArchive ? 'Завершено' : getStatusLabel(task.status)}
+                label={isRejected ? 'Отклонено' : isArchive ? 'Завершено' : getStatusLabel(task.status)}
                 size="small"
                 color={
                   isArchive || task.status === 'done'
@@ -352,6 +394,8 @@ const TaskRenderer = ({
                 __html: enhanceKnowledgeLinksInHtml(task.description || ''),
               }}
             />
+
+            {renderRejectionNote(task)}
 
             {/* Приоритет */}
             <Box mb={2}>
@@ -502,7 +546,7 @@ const TaskRenderer = ({
             )}
           </CardContent>
 
-          {isArchive ? (
+          {isArchive || isRejected ? (
             <Box className={styles.taskCardArchiveActions}>
               {renderChatButton(task.task_id)}
               {renderDuplicateButton(task)}
@@ -587,9 +631,10 @@ const TaskRenderer = ({
   // Рендер строки таблицы
   const renderTaskListItem = (task) => {
     const isArchive = completedArchiveMode
-    const allowDescDblClick = openFullDescriptionOnDoubleClick || isArchive
-    const isOverdue = !isArchive && isTaskOverdue(task.deadline, task.status)
-    const hasConfirmButtons = !isArchive && task.status === 'done'
+    const isRejected = rejectedMode || task.status === 'rejected'
+    const allowDescDblClick = openFullDescriptionOnDoubleClick || isArchive || isRejected
+    const isOverdue = !isArchive && !isRejected && isTaskOverdue(task.deadline, task.status)
+    const hasConfirmButtons = !isArchive && !isRejected && task.status === 'done'
     const canBeHighlighted = approverMode || hasConfirmButtons
     const isHighlighted = canBeHighlighted && taskCardBlinkYellow[String(task.task_id)]
 
@@ -628,7 +673,7 @@ const TaskRenderer = ({
                 <Box display="flex" gap={1} alignItems="center">
                   <Chip
                     icon={getStatusIcon(isArchive ? 'done' : task.status)}
-                    label={isArchive ? 'Завершено' : getStatusLabel(task.status)}
+                    label={isRejected ? 'Отклонено' : isArchive ? 'Завершено' : getStatusLabel(task.status)}
                     size="small"
                     color={
                       isArchive || task.status === 'done'
@@ -653,7 +698,7 @@ const TaskRenderer = ({
             secondary={
               <>
                 <Box display="flex" alignItems="flex-start" mb={1}>
-                  {!isArchive && !approverMode && (
+                  {!isArchive && !isRejected && !approverMode && (
                     <IconButton
                       size="small"
                       onClick={() => handleEditDescription(task)}
@@ -683,9 +728,11 @@ const TaskRenderer = ({
                   />
                 </Box>
 
+                {renderRejectionNote(task)}
+
                 {!isArchive ? (
                   <Box display="flex" alignItems="center" mb={1}>
-                    {!approverMode && (
+                    {!approverMode && !isRejected && (
                       <IconButton
                         size="small"
                         onClick={() => handleOpenDeadlineDialog(task)}
@@ -719,7 +766,7 @@ const TaskRenderer = ({
                 )}
 
                 <Box display="flex" alignItems="center" mb={2}>
-                  {!isArchive && !approverMode && (
+                  {!isArchive && !isRejected && !approverMode && (
                     <IconButton
                       size="small"
                       onClick={() => handleOpenReplaceUserModal(task)}
@@ -818,7 +865,7 @@ const TaskRenderer = ({
                     )}
                   </Box>
 
-                  {!isArchive && !approverMode && task.status === 'done' && (
+                  {!isArchive && !isRejected && !approverMode && task.status === 'done' && (
                     <Box display="flex" gap={1}>
                       <Tooltip title="Подтвердить выполнение задачи">
                         <IconButton
@@ -931,6 +978,33 @@ const TaskRenderer = ({
           }
           initialTaskData={buildDuplicateInitialTaskData(duplicateTask, userId || user?.id)}
         />
+      )}
+      {rejectTask && (
+        <div className={styles.rejectBackdrop} onMouseDown={(event) => event.stopPropagation()}>
+          <div className={styles.rejectDialog}>
+            <h3>Отклонить задачу</h3>
+            <p>Укажите причину. После отказа задача закроется, снять отказ будет нельзя.</p>
+            <textarea
+              value={rejectComment}
+              onChange={(event) => setRejectComment(event.target.value)}
+              placeholder="Причина отклонения"
+              rows={4}
+            />
+            <div className={styles.rejectDialogActions}>
+              <button type="button" onClick={() => setRejectTask(null)} disabled={rejectSaving}>
+                Отмена
+              </button>
+              <button
+                type="button"
+                className={styles.rejectDialogSave}
+                onClick={submitReject}
+                disabled={rejectSaving || !rejectComment.trim()}
+              >
+                {rejectSaving ? 'Сохранение…' : 'Отклонить'}
+              </button>
+            </div>
+          </div>
+        </div>
       )}
       {descriptionModal}
       {viewMode === 'cards' ? (
