@@ -476,7 +476,6 @@ const OrderSamplePage = () => {
                       <span>№ {order.orderNumber}</span>
                     </span>
                     <span className={styles.party}>Менеджер: {order.managerName || '—'}</span>
-                    <span className={styles.party}>Дилер: {order.dealerName || '—'}</span>
                     <span>{formatDate(order.dateCreated)}</span>
                     <span className={styles.status}>{order.statusLabel}</span>
                     <span className={styles.count}>{order.items.length} изд.</span>

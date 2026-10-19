@@ -327,7 +327,7 @@ app.post('/app/order-sample/search', async (req, res) => {
       console.error('Order sample detach error:', error)
     }
   }
-  req.on('close', () => {
+  res.on('close', () => {
     if (!res.writableEnded) stop()
   })
 
