@@ -92,6 +92,16 @@ const getBottleneckParticipants = () => async (req, res) => {
   }
 }
 
+const getApprovals = () => async (req, res) => {
+  try {
+    const data = await registerFetch(`/api/approvals/stats${buildQuery(req.query)}`)
+    return res.json(data || { summary: {}, templates: [] })
+  } catch (error) {
+    console.error('[mobile_staff_app][analytics][approvals]', error)
+    return res.status(error.status || 500).json({ message: error.message || 'Ошибка' })
+  }
+}
+
 const getBottleneckDepartments = () => async (req, res) => {
   try {
     const data = await registerFetch(
@@ -111,6 +121,7 @@ module.exports = {
   getDetail,
   listBusinessProcesses,
   getBusinessProcessNodes,
+  getApprovals,
   getBottleneckParticipants,
   getBottleneckDepartments,
 }

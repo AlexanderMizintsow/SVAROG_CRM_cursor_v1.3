@@ -31,6 +31,7 @@ import ChatTaskModal from '../../../../../Task/subcomponents/chatTaskModal/chatT
 import AddModal from '../../../../../Modals/AddModal'
 import Attachments from '../../../../../Task/subcomponents/Attachments'
 import TaskCardParticipants from './TaskCardParticipants'
+import ApprovalSourceMark from '../../../../../../approvals/ApprovalSourceMark'
 import { handleKnowledgeDescriptionClick } from '../../../../../../knowledgeBase/openKnowledgeLink'
 import { enhanceKnowledgeLinksInHtml } from '../../../../../../knowledgeBase/knowledgeLinkUtils'
 import Toastify from 'toastify-js'
@@ -498,6 +499,7 @@ const TaskRenderer = ({
             )}
 
             <TaskCardParticipants task={task} users={users} />
+            <ApprovalSourceMark userId={userId || user?.id} taskId={task.task_id} />
 
             {renderApproverStatus(task)}
 
@@ -797,6 +799,7 @@ const TaskRenderer = ({
                 </Box>
 
                 <TaskCardParticipants task={task} users={users} />
+            <ApprovalSourceMark userId={userId || user?.id} taskId={task.task_id} />
 
                 {renderApproverStatus(task)}
 

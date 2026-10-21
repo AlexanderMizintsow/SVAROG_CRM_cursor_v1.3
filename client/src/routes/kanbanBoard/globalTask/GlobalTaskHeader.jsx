@@ -3,11 +3,14 @@ import { useState } from 'react'
 import { FaRegComments, FaUserEdit } from 'react-icons/fa'
 import { MdCalendarMonth } from 'react-icons/md'
 import useTaskStateTracker from '../../../store/useTaskStateTracker'
+import UserStore from '../../../store/userStore'
+import ApprovalSourceMark from '../../approvals/ApprovalSourceMark'
 import GlobalTaskChat from './subcomponents/globalChat/GlobalTaskChat'
 import './styles/GlobalTaskHeader.scss'
 
 const GlobalTaskHeader = ({ taskId, status, title, createdAt, author }) => {
   const [isChatOpen, setIsChatOpen] = useState(false)
+  const { user } = UserStore()
   const projectChatUnread = useTaskStateTracker((s) => s.projectChatUnread)
   const hasUnreadChat = taskId && projectChatUnread[taskId]
 
@@ -23,6 +26,7 @@ const GlobalTaskHeader = ({ taskId, status, title, createdAt, author }) => {
           {status === 'Пауза' ? 'ПРОЕКТ ПРИОСТАНОВЛЕН' : null}
         </h2>
         <h1 className="global-task-header__title">Проект: {title} </h1>
+        <ApprovalSourceMark userId={user?.id} globalTaskId={taskId} />
         <div className="global-task-header__meta">
           <span>
             <MdCalendarMonth className="global-task-header__icon" /> Создана:{' '}

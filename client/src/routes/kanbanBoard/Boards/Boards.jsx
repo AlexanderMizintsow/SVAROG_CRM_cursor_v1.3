@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, Suspense } from 'react'
+import React, { useState, useEffect, useCallback, useRef, Suspense } from 'react'
 import axios from 'axios'
 import { API_BASE_URL } from '../../../../config'
 import useTaskStateTracker from '../../../store/useTaskStateTracker'
@@ -37,6 +37,8 @@ const BoardSidebar = React.lazy(() => import('../sidebar/BoardSidebar'))
 const AddModal = React.lazy(() => import('../Modals/AddModal'))
 import TaskListManager from './subcomponents/TaskListManager/TaskListManager'
 import MiniProjectStrip from './subcomponents/TaskListManager/MiniProjectStrip'
+import ApprovalPanel from '../../approvals/ApprovalPanel'
+import { approvalApi } from '../../approvals/approvalApi'
 import './Boards.scss'
 import GlobalTasksContainer from '../globalTask/GlobalTasksContainer'
 import { IoMdNotificationsOff } from 'react-icons/io'
@@ -65,6 +67,9 @@ const Boards = () => {
   const [contextMenuOpen, setContextMenuOpen] = useState(false)
   const [modalOpen, setModalOpen] = useState(false)
   const [managerRequestInitialTask, setManagerRequestInitialTask] = useState(null)
+  const [approvalTaskSeed, setApprovalTaskSeed] = useState(null)
+  const [approvalProjectSeed, setApprovalProjectSeed] = useState(null)
+  const approvalTaskCardIdRef = useRef(null)
   const [isTaskListManagerOpen, setTaskListManagerOpen] = useState(false)
   const [isGlobalProjectOpen, setGlobalProjectOpen] = useState(false)
   const [selectedProjectToOpen, setSelectedProjectToOpen] = useState(null)
@@ -247,9 +252,54 @@ const Boards = () => {
     setModalOpen(true)
   }, [])
 
-  const closeModal = useCallback(() => {
+  const closeModal = useCallback((createdTaskId) => {
+    const cardId = approvalTaskCardIdRef.current
+    approvalTaskCardIdRef.current = null
     setModalOpen(false)
     setManagerRequestInitialTask(null)
+    setApprovalTaskSeed(null)
+    if (cardId && createdTaskId) {
+      approvalApi.link(cardId, userId, { taskId: createdTaskId }).then(() => {
+        window.dispatchEvent(new CustomEvent('approval-linked', { detail: { cardId } }))
+      }).catch(() => {})
+    }
+  }, [userId])
+
+  useEffect(() => {
+    const htmlText = (value) => {
+      const text = String(value || '')
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/\n/g, '<br/>')
+      return text ? `<p>${text}</p>` : ''
+    }
+    const onTask = (event) => {
+      const detail = event.detail || {}
+      if (!detail.cardId) return
+      approvalTaskCardIdRef.current = detail.cardId
+      setApprovalTaskSeed({
+        title: detail.title || '',
+        description: htmlText(detail.description),
+      })
+      setModalOpen(true)
+    }
+    const onProject = (event) => {
+      const detail = event.detail || {}
+      if (!detail.cardId) return
+      setApprovalProjectSeed({
+        cardId: detail.cardId,
+        title: detail.title || '',
+        description: detail.description || '',
+      })
+      setGlobalProjectOpen(true)
+    }
+    window.addEventListener('approval-create-task', onTask)
+    window.addEventListener('approval-create-project', onProject)
+    return () => {
+      window.removeEventListener('approval-create-task', onTask)
+      window.removeEventListener('approval-create-project', onProject)
+    }
   }, [])
 
   // Обработчик подтверждения в диалоге
@@ -278,6 +328,7 @@ const Boards = () => {
     clearSubtaskBlinkYellow()
     setSelectedProjectToOpen(null)
     setGlobalProjectOpen(false)
+    setApprovalProjectSeed(null)
     setStripRefreshKey((k) => k + 1)
   }
 
@@ -352,6 +403,7 @@ const Boards = () => {
         }
       >
         <div className="home-container">
+          <div className="board-main">
           <div className="home-container__columns">
           {/* Колонка Уведомления */}
           <div className="column-container notifications-column" key="notifications">
@@ -429,7 +481,8 @@ const Boards = () => {
               </div>
             ))}
           </div>
-        
+          {userId && <ApprovalPanel userId={userId} dark={isDarkTheme} />}
+          </div>
         </div>
       </DragDropContext>
       <Suspense fallback={null}>
@@ -439,7 +492,8 @@ const Boards = () => {
           setOpen={setModalOpen}
           userId={userId}
           globalTaskId={null}
-          initialTaskData={managerRequestInitialTask || undefined}
+          initialTaskData={approvalTaskSeed || managerRequestInitialTask || undefined}
+          skipDraft={Boolean(approvalTaskSeed)}
         />{' '}
       </Suspense>
       {/* Боковое меню */}
@@ -522,6 +576,8 @@ const Boards = () => {
             initialTask={selectedProjectToOpen}
             initialTaskId={selectedProjectToOpen?.id}
             onProjectUpdated={() => setStripRefreshKey((k) => k + 1)}
+            createFromApproval={approvalProjectSeed}
+            onApprovalCreateDone={() => setApprovalProjectSeed(null)}
           />
         </Box>
       </Modal>

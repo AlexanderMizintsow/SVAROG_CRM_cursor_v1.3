@@ -252,6 +252,11 @@ const {
 
 const { submitAppIdea, getAppIdeas, applyAppIdea } = require('./appIdeasController/appIdeasController')
 const {
+  registerApprovalRoutes,
+  ensureApprovalTables,
+  scheduleApprovalPoll,
+} = require('./approvals/approvalsController')
+const {
   listUserTaskTemplates,
   createUserTaskTemplate,
   updateUserTaskTemplate,
@@ -553,6 +558,7 @@ app.delete('/api/user-statuses/:id', deleteUserAbsenceStatus(dbPool))
 
 server.listen(port, '0.0.0.0', () => {
   console.log(`Server running at http://localhost:${port}`)
+  ensureApprovalTables(dbPool).catch((error) => console.error('approval tables', error.message))
 })
 
 /*************Маршруты для работы с РАБОЧЕЙ ГРУППОЙ *************************************/
@@ -819,6 +825,7 @@ cron.schedule('*/30 * * * 1-6', () => {
   checkOverdueTasks(dbPool, io)
   // console.log('Cron работает! Проверка каждую минуту.')
 })
+scheduleApprovalPoll(cron, dbPool)
 
 // таблица уведомлений
 app.get('/api/notifications/unread/:userId', getUnreadNotifications(dbPool))
@@ -1176,6 +1183,8 @@ app.post('/api/editor-handle/permissions', setEditorPermissions(dbPool))
 app.delete('/api/editor-handle/permissions/:id', deleteEditorPermissions(dbPool))
 
 // ==================== КОНЕЦ EDITOR HANDLE ====================
+
+registerApprovalRoutes(app, dbPool)
 
 // Комнаты соккет
 io.on('connection', (socket) => {

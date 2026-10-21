@@ -35,7 +35,12 @@ const useTaskNotifications = ({ currentUserId }) => {
   }, [currentUserId, fetchUnreadNotifications])
 
   if (notificationsTask && Object.keys(notificationsTask).length > 0) {
-    Object.entries(notificationsTask).forEach(([id, notification]) => {
+    const taskRows = Object.entries(notificationsTask).sort((left, right) => {
+      const leftTime = new Date(left[1]?.createdAt || 0).getTime() || 0
+      const rightTime = new Date(right[1]?.createdAt || 0).getTime() || 0
+      return rightTime - leftTime || Number(right[0]) - Number(left[0])
+    })
+    taskRows.forEach(([id, notification]) => {
       if (!notification) return
       const notificationConfig = {
         extension_request_rejected: {
@@ -141,6 +146,55 @@ const useTaskNotifications = ({ currentUserId }) => {
           showDetails: true,
           confirmLabel: 'Открыть',
         },
+        approval_step: {
+          icon: <FaFileAlt color="#007bff" />,
+          className: 'extension-notification-new-task',
+          statusText: 'Согласование — шаг',
+          showDetails: true,
+          confirmLabel: 'Открыть',
+        },
+        approval_chat: {
+          icon: <FaEnvelope color="#007bff" />,
+          className: 'extension-notification-new-task',
+          statusText: 'Согласование — сообщение',
+          showDetails: true,
+          confirmLabel: 'Открыть',
+        },
+        approval_file: {
+          icon: <FaFileAlt color="#007bff" />,
+          className: 'extension-notification-new-task',
+          statusText: 'Согласование — файл',
+          showDetails: true,
+          confirmLabel: 'Открыть',
+        },
+        approval_done: {
+          icon: <FaFileAlt color="#2e7d32" />,
+          className: 'extension-notification-approved',
+          statusText: 'Согласование завершено',
+          showDetails: true,
+          confirmLabel: 'Открыть',
+        },
+        approval_rejected: {
+          icon: <FaEnvelope color="#c62828" />,
+          className: 'extension-notification-rejected',
+          statusText: 'Согласование отклонено',
+          showDetails: true,
+          confirmLabel: 'Открыть',
+        },
+        approval_deadline: {
+          icon: <FaClock color="#ff5e5e" />,
+          className: 'extension-notification-overdue',
+          statusText: 'Срок шага согласования',
+          showDetails: true,
+          confirmLabel: 'Открыть',
+        },
+        approval_cancelled: {
+          icon: <FaFileAlt color="#64748b" />,
+          className: 'extension-notification-cancelled-task',
+          statusText: 'Согласование отменено',
+          showDetails: true,
+          confirmLabel: 'Открыть',
+        },
         default: {
           icon: <FaEnvelope />,
           className: '',
@@ -150,7 +204,10 @@ const useTaskNotifications = ({ currentUserId }) => {
       }
 
       const config = notificationConfig[notification.type] || notificationConfig.default
-      const displayMessage = stripManagerRequestMessagePrefix(notification.message)
+      const approvalCardId = Number(String(notification.message || '').match(/\[approval:(\d+)\]/)?.[1]) || null
+      const displayMessage = stripManagerRequestMessagePrefix(
+        String(notification.message || '').replace(/\s*\[approval:\d+\]\s*$/, '')
+      )
       const managerRequestId = parseManagerRequestIdFromMessage(notification.message)
 
       notifications.push({
@@ -177,6 +234,9 @@ const useTaskNotifications = ({ currentUserId }) => {
                   className="extension-notification-confirm"
                   onClick={(e) => {
                     e.stopPropagation()
+                    if (String(notification.type || '').startsWith('approval_') && approvalCardId) {
+                      window.dispatchEvent(new CustomEvent('approval-open', { detail: { cardId: approvalCardId } }))
+                    }
                     handleMarkAsRead(id)
                   }}
                 >
@@ -194,6 +254,7 @@ const useTaskNotifications = ({ currentUserId }) => {
         taskTitle: notification.taskTitle,
         taskId: notification.taskId,
         managerRequestId,
+        approvalCardId,
         userId: notification.userId,
         eventType: notification.eventType,
         isRead: notification.isRead,

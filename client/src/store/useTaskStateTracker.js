@@ -80,6 +80,7 @@ const useTaskStateTracker = create((set, get) => {
             [uid]: true,
             title: meta.title || state.managerRequestChats[rid]?.title || '',
             preview: meta.preview || state.managerRequestChats[rid]?.preview || '',
+            at: state.managerRequestChats[rid]?.at || Date.now(),
           },
         }
         const newState = { ...state, managerRequestChats: next }
@@ -133,7 +134,10 @@ const useTaskStateTracker = create((set, get) => {
       set((state) => {
         const newGlobalNotifications = {
           ...state.globalNotifications,
-          [globalTaskId]: { title },
+          [globalTaskId]: {
+            title,
+            at: state.globalNotifications[globalTaskId]?.at || Date.now(),
+          },
         }
         const newState = {
           ...state,
@@ -176,7 +180,11 @@ const useTaskStateTracker = create((set, get) => {
     addProjectNotification: (globalTaskId, title, type, extra = {}) => {
       set((state) => {
         const key = `project-${type}-${globalTaskId}`
-        const next = { ...state.projectNotifications, [key]: { globalTaskId, title, type, ...extra } }
+        const prev = state.projectNotifications[key]
+        const next = {
+          ...state.projectNotifications,
+          [key]: { globalTaskId, title, type, ...extra, at: prev?.at || Date.now() },
+        }
         const newState = { ...state, projectNotifications: next }
         saveState(newState)
         return newState
@@ -260,13 +268,17 @@ const useTaskStateTracker = create((set, get) => {
     // Автор задачи *************************************************************************************************
     setAuthorMessage: (taskId, userId, value) => {
       set((state) => {
+        const bucket = state.authorMessages[taskId] || {}
+        const show = Boolean(value)
+        const at = show && !bucket[userId] ? Date.now() : bucket.at
         const newState = {
           ...state,
           authorMessages: {
             ...state.authorMessages,
             [taskId]: {
-              ...state.authorMessages[taskId],
+              ...bucket,
               [userId]: value,
+              ...(at ? { at } : {}),
             },
           },
         }
@@ -295,13 +307,17 @@ const useTaskStateTracker = create((set, get) => {
     // Исполнитель *************************************************************************************************
     setAssigneeMessage: (taskId, userId, value) => {
       set((state) => {
+        const bucket = state.assigneeMessages[taskId] || {}
+        const show = Boolean(value)
+        const at = show && !bucket[userId] ? Date.now() : bucket.at
         const newState = {
           ...state,
           assigneeMessages: {
             ...state.assigneeMessages,
             [taskId]: {
-              ...state.assigneeMessages[taskId],
+              ...bucket,
               [userId]: value,
+              ...(at ? { at } : {}),
             },
           },
         }
@@ -331,13 +347,16 @@ const useTaskStateTracker = create((set, get) => {
     // Функция для установки согласования
     setApproval: (taskId, approverId, isApproved) => {
       set((state) => {
+        const bucket = state.approvals[taskId] || {}
+        const becamePending = isApproved === false && bucket[approverId] !== false
         const newState = {
           ...state,
           approvals: {
             ...state.approvals,
             [taskId]: {
-              ...state.approvals[taskId],
+              ...bucket,
               [approverId]: isApproved,
+              at: becamePending ? Date.now() : bucket.at,
             },
           },
         }
@@ -373,8 +392,9 @@ const useTaskStateTracker = create((set, get) => {
           tasks: {
             ...state.tasks,
             [task.id]: {
-              ...state.tasks[task.id], // Сохраняем существующие поля задачи
-              ...task, // Обновляем или добавляем новые поля, включая createdBy
+              ...state.tasks[task.id],
+              ...task,
+              bannerAt: state.tasks[task.id]?.bannerAt || Date.now(),
             },
           },
         }
@@ -402,11 +422,13 @@ const useTaskStateTracker = create((set, get) => {
 
     addDescriptionChangeNotification: (taskId, taskTitle) => {
       set((state) => {
+        const key = `description-change-${taskId}`
         const newNotifications = {
           ...state.notifications,
-          [`description-change-${taskId}`]: {
+          [key]: {
             title: taskTitle,
             taskId,
+            at: state.notifications[key]?.at || Date.now(),
           },
         }
         const newState = {

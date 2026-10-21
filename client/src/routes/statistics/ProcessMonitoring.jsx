@@ -6,6 +6,7 @@ import { FaChartPie, FaTable, FaUsers, FaBriefcase, FaTasks, FaExclamationTriang
 import { FcFlowChart } from 'react-icons/fc'
 import { FcDepartment  } from 'react-icons/fc'
 import HelpModalProcessMonitoring from './HelpModalProcessMonitoring'
+import ApprovalStats from './ApprovalStats'
 import './ProcessMonitoring.scss'
 
 /** Временно: в блоке «Просрочки» показывать все задачи с дедлайном и колонки «Дедлайн», «Сейчас», «Просрочен?» для отладки. */
@@ -154,6 +155,7 @@ const ProcessMonitoring = () => {
   const [generalStats, setGeneralStats] = useState(false)
   const [statusFilter, setStatusFilter] = useState('in_progress')
   const [isHelpOpen, setHelpOpen] = useState(false)
+  const [statsTick, setStatsTick] = useState(0)
 
   /** Как в карточке Задачи и Менеджере: просрочка = дедлайн прошёл, задача не завершена. */
   const isOverdue = useCallback((task) =>
@@ -330,6 +332,7 @@ const ProcessMonitoring = () => {
 
   const refreshAll = useCallback(async () => {
     setRefreshing(true)
+    setStatsTick((value) => value + 1)
     try {
       await loadDepartments()
       await loadEmployees(filters.departmentId || undefined)
@@ -1140,6 +1143,8 @@ const ProcessMonitoring = () => {
           </section>
         </>
       )}
+
+      <ApprovalStats filters={filters} reloadTick={statsTick} />
 
       <HelpModalProcessMonitoring open={isHelpOpen} onClose={() => setHelpOpen(false)} />
 

@@ -195,6 +195,7 @@ const AddModal = ({
   const quillRef = useRef(null);
   const initialDataAppliedRef = useRef(false);
   const quillInitialSetRef = useRef(false);
+  const approvalQuillSetRef = useRef(false);
   const prevIsOpenRef = useRef(false);
   const prevDraftKeyRef = useRef(draftKey);
   const choiceDecisionsRef = useRef({});
@@ -330,10 +331,9 @@ const AddModal = ({
     if (!justOpened || !quillInstance) return;
 
     const saved = skipDraft ? null : loadAddModalDraft(draftKey);
-    const html =
-      taskData.description ||
-      saved?.taskData?.description ||
-      "";
+    const html = skipDraft
+      ? (initialTaskData.description || taskData.description || "")
+      : (taskData.description || saved?.taskData?.description || "");
     const quillPlain = (quillInstance.root.innerHTML || "")
       .replace(/<[^>]+>/g, "")
       .trim();
@@ -350,7 +350,22 @@ const AddModal = ({
     }
 
     quillInitialSetRef.current = true;
-  }, [isOpen, quillInstance, taskData.description, draftKey, skipDraft]);
+  }, [isOpen, quillInstance, taskData.description, initialTaskData.description, draftKey, skipDraft]);
+
+  useEffect(() => {
+    if (!isOpen) initialDataAppliedRef.current = false;
+  }, [isOpen]);
+
+  useEffect(() => {
+    if (!isOpen) {
+      approvalQuillSetRef.current = false;
+      return;
+    }
+    if (!skipDraft || !quillInstance?.root || approvalQuillSetRef.current) return;
+    const html = initialTaskData.description || "";
+    if (html) quillInstance.root.innerHTML = html;
+    approvalQuillSetRef.current = true;
+  }, [isOpen, skipDraft, quillInstance, initialTaskData.description]);
 
   // Автосохранение черновика в sessionStorage пока форма открыта
   useEffect(() => {

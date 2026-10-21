@@ -14,6 +14,7 @@ import useTaskStateTracker from '../../../store/useTaskStateTracker'
 import './styles/GlobalTasksContainer.scss'
 import './styles/globalTaskDark.scss'
 import axios from 'axios'
+import { approvalApi } from '../../approvals/approvalApi'
 
 const TERMINAL_STATUSES = ['Завершено', 'Провал', 'Удален']
 
@@ -30,7 +31,14 @@ function parseLocalDayEndMs(yyyyMmDd) {
   return new Date(y, m - 1, d, 23, 59, 59, 999).getTime()
 }
 
-const GlobalTasksContainer = ({ onClose, initialTask, initialTaskId, onProjectUpdated }) => {
+const GlobalTasksContainer = ({
+  onClose,
+  initialTask,
+  initialTaskId,
+  onProjectUpdated,
+  createFromApproval,
+  onApprovalCreateDone,
+}) => {
   const { user } = UserStore()
   const [tasks, setTasks] = useState([])
   const [selectedTask, setSelectedTask] = useState(null)
@@ -267,7 +275,12 @@ const GlobalTasksContainer = ({ onClose, initialTask, initialTaskId, onProjectUp
   // Функция для закрытия формы создания задачи
   const handleCloseCreateForm = useCallback(() => {
     setIsCreateFormVisible(false)
-  }, [])
+    onApprovalCreateDone?.()
+  }, [onApprovalCreateDone])
+
+  useEffect(() => {
+    if (createFromApproval?.cardId) setIsCreateFormVisible(true)
+  }, [createFromApproval])
 
   // *** Функция для сохранения новой задачи (будет вызвана из формы) ***
   // *** Функция для сохранения новой задачи (будет вызвана из формы) ***
@@ -290,6 +303,16 @@ const GlobalTasksContainer = ({ onClose, initialTask, initialTaskId, onProjectUp
         })
 
         const createdTaskId = createRes?.data?.taskId
+
+        if (createdTaskId && createFromApproval?.cardId) {
+          try {
+            await approvalApi.link(createFromApproval.cardId, userId, { globalTaskId: createdTaskId })
+            window.dispatchEvent(new CustomEvent('approval-linked', { detail: { cardId: createFromApproval.cardId } }))
+          } catch (linkError) {
+            console.error('Не удалось прикрепить согласование к проекту:', linkError)
+            alert('Проект создан, но ссылка на согласование не сохранилась.')
+          }
+        }
 
         // Если пользователь прикрепил файлы при создании — загружаем их и привязываем к проекту
         if (createdTaskId && attachmentsFiles && Array.isArray(attachmentsFiles) && attachmentsFiles.length > 0) {
@@ -346,7 +369,7 @@ const GlobalTasksContainer = ({ onClose, initialTask, initialTaskId, onProjectUp
         }
       }
     },
-    [userId, fetchGlobalTasks, handleCloseCreateForm, onProjectUpdated]
+    [userId, fetchGlobalTasks, handleCloseCreateForm, onProjectUpdated, createFromApproval]
   )
 
   // *** Функция для обновления существующей задачи ***
@@ -457,7 +480,11 @@ const GlobalTasksContainer = ({ onClose, initialTask, initialTaskId, onProjectUp
         </div>
         {/* Форма создания может быть доступна даже при ошибке загрузки списка */}
         {isCreateFormVisible && (
-          <CreateGlobalTaskForm onSave={handleSaveNewTask} onCancel={handleCloseCreateForm} />
+          <CreateGlobalTaskForm
+            onSave={handleSaveNewTask}
+            onCancel={handleCloseCreateForm}
+            initialData={createFromApproval || undefined}
+          />
         )}
       </div>
     )
@@ -662,7 +689,11 @@ const GlobalTasksContainer = ({ onClose, initialTask, initialTaskId, onProjectUp
 
       {/* Рендерим форму создания задачи, если isCreateFormVisible равно true */}
       {isCreateFormVisible && (
-        <CreateGlobalTaskForm onSave={handleSaveNewTask} onCancel={handleCloseCreateForm} />
+        <CreateGlobalTaskForm
+          onSave={handleSaveNewTask}
+          onCancel={handleCloseCreateForm}
+          initialData={createFromApproval || undefined}
+        />
       )}
 
       {/* Рендерим справку, если isHelpModalOpen равно true */}

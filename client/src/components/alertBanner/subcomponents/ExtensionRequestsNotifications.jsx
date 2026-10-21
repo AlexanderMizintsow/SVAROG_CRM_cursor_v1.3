@@ -97,6 +97,7 @@ const useExtensionRequestsNotifications = ({ extensionRequests, currentUserId, o
 
   const notifications = Object.values(extensionRequests).map((request) => ({
     key: `extension-request-${request.id}`,
+    at: request.request_date || request.created_at,
     text: (
       <div className="extension-request-container">
         <div className="extension-request-border" />

@@ -27,6 +27,7 @@ import useTaskStateTracker from '../../../store/useTaskStateTracker'
 import { handleKnowledgeDescriptionClick } from '../../knowledgeBase/openKnowledgeLink'
 import { enhanceKnowledgeLinksInHtml } from '../../knowledgeBase/knowledgeLinkUtils'
 import './Task.scss'
+import ApprovalSourceMark from '../../approvals/ApprovalSourceMark'
 
 const Task = forwardRef(({ task, provided, actionIcon, column }, ref) => {
   const {
@@ -550,6 +551,8 @@ const Task = forwardRef(({ task, provided, actionIcon, column }, ref) => {
               </div>
             </Tooltip>
           )}
+
+          <ApprovalSourceMark userId={userId} taskId={id} />
 
           {global_task_id && (
             <Tooltip

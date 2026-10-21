@@ -1,0 +1,244 @@
+.approval-stats {
+  margin-top: 1.75rem;
+  padding: 1.25rem;
+  border: 1px solid #e2e8f0;
+  border-radius: 16px;
+  background: #fff;
+  box-shadow: 0 8px 24px rgba(15, 23, 42, 0.04);
+  font-family: Lato, sans-serif;
+  color: #1e293b;
+}
+
+.approval-stats__head h2 {
+  margin: 0 0 0.35rem;
+  font-size: 1.25rem;
+}
+
+.approval-stats__head p,
+.approval-stats__state,
+.approval-stats__detail p {
+  margin: 0;
+  color: #64748b;
+  font-size: 0.92rem;
+  line-height: 1.45;
+}
+
+.approval-stats__state {
+  margin-top: 1rem;
+  padding: 1rem;
+  border-radius: 12px;
+  background: #f8fafc;
+}
+
+.approval-stats__metrics {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 0.75rem;
+  margin-top: 1rem;
+}
+
+.approval-stats__metric {
+  display: grid;
+  gap: 0.2rem;
+  padding: 0.85rem 0.9rem;
+  border-radius: 12px;
+  background: #f8fafc;
+}
+
+.approval-stats__metric span {
+  color: #64748b;
+  font-size: 0.78rem;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+}
+
+.approval-stats__metric strong {
+  font-size: 1.35rem;
+}
+
+.approval-stats__metric.is-ok strong,
+.approval-stats__counts .is-ok {
+  color: #047857;
+}
+
+.approval-stats__metric.is-no strong,
+.approval-stats__counts .is-no {
+  color: #b91c1c;
+}
+
+.approval-stats__list {
+  display: grid;
+  gap: 0.75rem;
+  margin-top: 1rem;
+}
+
+.approval-stats__card {
+  border: 1px solid #e2e8f0;
+  border-radius: 14px;
+  overflow: hidden;
+  background: #fff;
+}
+
+.approval-stats__card.is-slow {
+  border-color: #f5c16c;
+  box-shadow: inset 3px 0 0 #d97706;
+}
+
+.approval-stats__toggle {
+  display: grid;
+  grid-template-columns: minmax(160px, 1.3fr) minmax(180px, 1fr) 140px minmax(180px, 1.2fr) auto;
+  gap: 0.75rem;
+  align-items: center;
+  width: 100%;
+  padding: 0.9rem 1rem;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
+  font: inherit;
+}
+
+.approval-stats__toggle:hover {
+  background: #f8fafc;
+}
+
+.approval-stats__title {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.4rem;
+}
+
+.approval-stats__title em,
+.approval-stats__more {
+  font-style: normal;
+  font-size: 0.75rem;
+  font-weight: 700;
+  color: #b45309;
+  background: #fff7ed;
+  border-radius: 999px;
+  padding: 0.15rem 0.45rem;
+}
+
+.approval-stats__title em.is-free {
+  color: #1d4ed8;
+  background: #eff6ff;
+}
+
+.approval-stats__counts,
+.approval-stats__why {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem 0.7rem;
+  color: #475569;
+  font-size: 0.86rem;
+}
+
+.approval-stats__time {
+  display: grid;
+  gap: 0.35rem;
+}
+
+.approval-stats__time b {
+  font-size: 0.95rem;
+}
+
+.approval-stats__time i {
+  display: block;
+  height: 6px;
+  border-radius: 999px;
+  background: #6366f1;
+}
+
+.approval-stats__card.is-slow .approval-stats__time i {
+  background: #d97706;
+}
+
+.approval-stats__more {
+  color: #4f46e5;
+  background: #eef2ff;
+}
+
+.approval-stats__detail {
+  display: grid;
+  gap: 0.55rem;
+  padding: 0 1rem 1rem;
+}
+
+.approval-stats__detail h3 {
+  margin: 0.4rem 0 0;
+  font-size: 0.95rem;
+}
+
+.approval-stats table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.88rem;
+}
+
+.approval-stats th,
+.approval-stats td {
+  padding: 0.55rem 0.45rem;
+  border-bottom: 1px solid #e2e8f0;
+  text-align: left;
+  vertical-align: top;
+}
+
+.approval-stats th {
+  color: #64748b;
+  font-size: 0.75rem;
+  font-weight: 700;
+  text-transform: uppercase;
+}
+
+.approval-stats tr.is-slow td {
+  background: #fff7ed;
+}
+
+.dark .approval-stats {
+  background: #1c2330;
+  border-color: rgba(255, 255, 255, 0.08);
+  color: #e8edf5;
+  box-shadow: none;
+}
+
+.dark .approval-stats__head p,
+.dark .approval-stats__state,
+.dark .approval-stats__detail p,
+.dark .approval-stats__counts,
+.dark .approval-stats__why,
+.dark .approval-stats th {
+  color: #aeb6c4;
+}
+
+.dark .approval-stats__state,
+.dark .approval-stats__metric,
+.dark .approval-stats__card {
+  background: #242b3a;
+  border-color: rgba(255, 255, 255, 0.08);
+}
+
+.dark .approval-stats__toggle:hover {
+  background: #2a3344;
+}
+
+.dark .approval-stats th,
+.dark .approval-stats td {
+  border-bottom-color: rgba(255, 255, 255, 0.08);
+}
+
+.dark .approval-stats tr.is-slow td {
+  background: rgba(217, 119, 6, 0.16);
+}
+
+@media (max-width: 1100px) {
+  .approval-stats__metrics {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .approval-stats__toggle {
+    grid-template-columns: 1fr;
+  }
+}

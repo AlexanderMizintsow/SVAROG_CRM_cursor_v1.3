@@ -255,8 +255,36 @@ const useWebSocket = (userId, stableSetMessages, currentTaskId, onChatMessageUpd
         )
       })
 
+      socket.current.on('approvalTemplates', () => {
+        window.dispatchEvent(new CustomEvent('approval-templates'))
+      })
+
+      socket.current.on('approvalUpdated', (payload) => {
+        if (!payload?.cardId) return
+        const recipients = Array.isArray(payload.userIds) ? payload.userIds.map(Number) : []
+        if (recipients.length && !recipients.includes(Number(userId))) return
+        window.dispatchEvent(new CustomEvent('approval-updated', { detail: payload }))
+      })
+
       // Новый обработчик для уведомлений касательно задач
       socket.current.on('notification', (notification) => {
+        if (String(notification?.type || '').startsWith('approval_') && Number(notification.userId) === Number(userId)) {
+          fetchUnreadNotifications(userId)
+          const titles = {
+            approval_step: 'Согласование / шаг',
+            approval_chat: 'Согласование / сообщение',
+            approval_file: 'Согласование / файл',
+            approval_done: 'Согласование завершено',
+            approval_rejected: 'Согласование отклонено',
+            approval_deadline: 'Согласование / срок',
+            approval_cancelled: 'Согласование отменено',
+          }
+          sendNotification(
+            titles[notification.type] || 'Согласование',
+            String(notification.message || '').replace(/\s*\[approval:\d+\]\s*$/, '')
+          )
+        }
+
         if (
           notification?.type &&
           String(notification.type).startsWith('manager_request') &&
@@ -463,6 +491,8 @@ const useWebSocket = (userId, stableSetMessages, currentTaskId, onChatMessageUpd
         socket.current.off('updateDescriptionTasks')
         socket.current.off('extendDeadline')
         socket.current.off('notification')
+        socket.current.off('approvalUpdated')
+        socket.current.off('approvalTemplates')
         socket.current.off('managerRequestChat')
         socket.current.off('managerRequestUpdated')
         socket.current.disconnect()

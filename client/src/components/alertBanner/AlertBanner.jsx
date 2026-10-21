@@ -83,6 +83,7 @@ const AlertBanner = () => {
           </div>
         ),
         icon: <FcFlowChart style={{ fontSize: '16px' }} />,
+        at: dr.created_at,
       })
     })
   }
@@ -109,6 +110,7 @@ const AlertBanner = () => {
           />
         ),
         icon: <FcFlowChart style={{ fontSize: '16px' }} />,
+        at: r.created_at,
       })
     })
   }
@@ -126,6 +128,7 @@ const AlertBanner = () => {
           </span>
         ),
         icon: <FcFlowChart style={{ fontSize: '16px' }} />,
+        at: n.created_at,
       })
     })
   }
@@ -302,6 +305,7 @@ const AlertBanner = () => {
           text: `Новое сообщение в задачах от Автора для задачи `,
           icon: <FaEnvelope style={{ fontSize: '16px' }} />,
           taskId: taskId,
+          at: messages.at,
         })
       }
     })
@@ -328,6 +332,7 @@ const AlertBanner = () => {
           text: `Новое сообщение в задачах от Исполнителя задачи`,
           icon: <FaEnvelope style={{ cursor: 'pointer', fontSize: '16px' }} />,
           taskId: taskId,
+          at: messages.at,
         })
       }
     })
@@ -351,6 +356,7 @@ const AlertBanner = () => {
         iconClass: 'icon-manager-request-chat',
         type: 'manager_request_chat',
         managerRequestId: Number(requestId),
+        at: entry.at,
       })
     })
   }
@@ -362,10 +368,15 @@ const AlertBanner = () => {
     Object.values(approvals).some((approverData) => approverData[currentUserId] === false)
 
   if (hasPendingApproval) {
+    const approvalAt = Object.values(approvals).reduce((latest, bucket) => {
+      if (!bucket || bucket[currentUserId] !== false) return latest
+      return Math.max(latest, Number(bucket.at) || 0)
+    }, 0)
     notifications.push({
       key: 'approval',
       text: 'Есть задачи, требующие вашего согласования',
       icon: <AiOutlineFileDone style={{ fontSize: '16px' }} />,
+      at: approvalAt || undefined,
     })
   }
 
@@ -424,6 +435,7 @@ const AlertBanner = () => {
         ),
         icon: <MdDoneOutline style={{ color: '#00FF00', fontSize: '16px' }} />,
         taskId: taskId,
+        at: task.bannerAt,
       })
     })
   }
@@ -439,6 +451,7 @@ const AlertBanner = () => {
       icon: <FaEnvelope style={{ fontSize: '16px' }} />,
       taskId,
       title,
+      at: globalNotifications[taskId]?.at,
     })
   })
 
@@ -473,24 +486,31 @@ const AlertBanner = () => {
       title: title || 'Проект',
       projectNotificationKey: key,
       projectNotificationType: type,
+      at: projectNotifications[key]?.at,
     })
   })
 
   // Отобразить уведомления, если есть
-  Object.entries(descriptionChangeNotifications).forEach(([key, { title, taskId }]) => {
+  Object.entries(descriptionChangeNotifications).forEach(([key, { title, taskId, at }]) => {
     notifications.push({
       key,
       text: `Изменение описания задачи: ${title}`,
       icon: <MdHistoryEdu style={{ fontSize: '16px', color: 'orange' }} />,
       taskId,
+      at,
     })
   })
 
-  const allNotifications = [
-    ...notifications,
-    ...taskNotifications,
-    ...extensionNotifications,
-  ]
+  const notificationTime = (value) => {
+    const time = new Date(value || 0).getTime()
+    return Number.isFinite(time) && time > 0 ? time : 0
+  }
+
+  const notificationId = (item) => Number(item.notificationId || item.id || 0) || 0
+
+  const allNotifications = [...notifications, ...taskNotifications, ...extensionNotifications]
+    .map((item) => ({ ...item, at: notificationTime(item.at || item.createdAt) }))
+    .sort((a, b) => b.at - a.at || notificationId(b) - notificationId(a))
 
   const handleBpNotificationClick = async (key) => {
     const id = Number(String(key).replace('bp-', ''))
@@ -572,6 +592,18 @@ const AlertBanner = () => {
   const toggleCollapse = () => {
     setIsCollapsed((prev) => !prev)
   }
+
+  useEffect(() => {
+    const collapseForApprovals = () => {
+      if (document.body.classList.contains('approval-panel-open')) {
+        setIsCollapsed(true)
+      }
+    }
+    collapseForApprovals()
+    const observer = new MutationObserver(collapseForApprovals)
+    observer.observe(document.body, { attributes: true, attributeFilter: ['class'] })
+    return () => observer.disconnect()
+  }, [])
 
   // Обработчик клика по глобальному уведомлению
   const handleGlobalNotificationClick = ({ taskId, title }) => {
@@ -797,6 +829,7 @@ const AlertBanner = () => {
                 type,
                 notificationId,
                 managerRequestId,
+                approvalCardId,
               }) => (
               <div
                 className="alert-banner-content"
@@ -810,6 +843,7 @@ const AlertBanner = () => {
                     type === 'knowledge_document_new' ||
                     type === 'knowledge_document_updated' ||
                     String(type || '').startsWith('manager_request_') ||
+                    String(type || '').startsWith('approval_') ||
                     key.startsWith('managerRequestChat-')
                       ? 'pointer'
                       : undefined,
@@ -863,6 +897,15 @@ const AlertBanner = () => {
                   ) {
                     // AlertBanner вне <Router> — без useNavigate
                     window.location.assign('/knowledge-base')
+                    if (notificationId && typeof handleMarkAsRead === 'function') {
+                      handleMarkAsRead(notificationId)
+                    }
+                  } else if (
+                    key.startsWith('task-notification-') &&
+                    String(type || '').startsWith('approval_') &&
+                    approvalCardId
+                  ) {
+                    window.dispatchEvent(new CustomEvent('approval-open', { detail: { cardId: approvalCardId } }))
                     if (notificationId && typeof handleMarkAsRead === 'function') {
                       handleMarkAsRead(notificationId)
                     }

@@ -50,10 +50,19 @@
   flex: 1;
 }
 
+.board-main {
+  display: flex;
+  flex: 1;
+  min-height: 0;
+  gap: 10px;
+  align-items: stretch;
+}
+
 .home-container__columns {
   display: flex;
   gap: 10px;
   flex: 1;
+  min-width: 0;
   min-height: 0;
   overflow: auto;
 }

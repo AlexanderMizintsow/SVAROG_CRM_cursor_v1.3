@@ -3,7 +3,7 @@
   top: 20px;
   right: 470px;
   z-index: 1000;
-  transition: all 0.3s ease;
+  transition: right 0.35s ease, background-color 0.3s ease;
 
   &.connected {
     background-color: #4caf50;
@@ -42,4 +42,9 @@
   .MuiChip-icon {
     color: inherit;
   }
+}
+
+body.approval-panel-open .call-status-indicator {
+  right: 620px;
+  z-index: 30;
 }

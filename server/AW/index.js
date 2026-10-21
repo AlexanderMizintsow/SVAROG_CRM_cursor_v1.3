@@ -3,6 +3,7 @@ const express = require('express')
 const Firebird = require('node-firebird')
 const cors = require('cors')
 const StatisticsController = require('./controllers/statisticsController_new')
+const { registerApprovalOrderCheck } = require('./approvalOrderCheck')
 const app = express()
 const port = process.env.PORT || 5005
 
@@ -357,6 +358,8 @@ app.post('/app/order-sample/search', async (req, res) => {
     searchFinishedAt.set(key, Date.now())
   }
 })
+
+registerApprovalOrderCheck(app, getDbOptions)
 
 // Запуск сервера
 app.listen(port, () => {

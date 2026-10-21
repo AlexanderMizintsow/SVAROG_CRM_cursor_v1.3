@@ -12,6 +12,7 @@ module.exports = () => {
   router.get('/detail', ctrl.getDetail())
   router.get('/business-processes', ctrl.listBusinessProcesses())
   router.get('/business-processes/:processId/nodes', ctrl.getBusinessProcessNodes())
+  router.get('/approvals', ctrl.getApprovals())
   router.get('/bottlenecks/participants', ctrl.getBottleneckParticipants())
   router.get('/bottlenecks/departments', ctrl.getBottleneckDepartments())
 
