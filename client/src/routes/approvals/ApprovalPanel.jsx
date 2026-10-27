@@ -74,8 +74,6 @@ const emptyStep = () => ({
   minAmount: '',
   onReject: 'stop',
   checks: [],
-  stateName: 'В производстве',
-  status: 4,
   orderEvent: '',
   orderFieldKey: 'order',
   externalMatch: 'all',
@@ -320,8 +318,8 @@ function orderStateText(step) {
   if (snap.found === 'many') return 'Найдено несколько заказов'
   const order = snap.order || {}
   const wait = (snap.checks || []).filter((item) => !item.passed).map((item) => item.detail).join('; ')
-  const now = `Сейчас у заказа: ${order.orderStatusLabel || '—'}`
-  return wait ? `Событие ещё не наступило: ${wait}. ${now}` : `Событие наступило. ${now}`
+  const name = order.orderNo ? `Заказ «${order.orderNo}»` : 'Заказ найден'
+  return wait ? `Событие ещё не наступило: ${wait}. ${name}` : `Событие наступило. ${name}`
 }
 
 function idList(value) {
@@ -348,7 +346,7 @@ function routeEvent(step) {
 }
 
 function searchLabel(id) {
-  return SEARCH_BY.find((item) => item.id === id)?.label || 'Номер заказа'
+  return SEARCH_BY.find((item) => item.id === id)?.label || 'Наименование заказа'
 }
 
 function stepFromStored(step) {

@@ -318,6 +318,13 @@ function orderChecks(step) {
   return []
 }
 
+function checksForOrder(step) {
+  const checks = orderChecks(step).filter((item) => (item.check_code || item.code) !== 'order_status_eq')
+  if (checks.length) return checks
+  if (orderChecks(step).length) return [{ code: 'order_exists', params: {} }]
+  return []
+}
+
 function waitsOrder(step) {
   return step.step_kind === 'decision' && orderChecks(step).length > 0
 }
@@ -349,11 +356,8 @@ function matchExternal(step, checks) {
 }
 
 const SEARCH_LABEL = {
-  orderno: 'номер заказа',
-  factory_orderno: 'номер в производстве',
-  agreementno: 'номер договора',
-  origin_orderno: 'номер заказа дилера',
-  item_name: 'наименование изделия',
+  orderno: 'наименование заказа',
+  agreementno: 'номер договора 1С',
 }
 
 function orderCheckReason(ref, payload) {
@@ -377,10 +381,9 @@ function orderCheckReason(ref, payload) {
     const failed = (payload.checks || []).filter((item) => !item.passed)
     if (!failed.length) return ''
     const order = payload.order || {}
-    const number = order.orderNo ? `Заказ ${order.orderNo}` : 'Заказ найден'
-    const now = order.orderStatusLabel ? `, сейчас статус «${order.orderStatusLabel}»` : ''
+    const number = order.orderNo ? `Заказ «${order.orderNo}»` : 'Заказ найден'
     const wait = failed.map((item) => item.detail).filter(Boolean).join('; ') || 'условие не выполнено'
-    return `${number}${now}. Событие ещё не наступило: ${wait}.`
+    return `${number}. Событие ещё не наступило: ${wait}.`
   }
   return 'Проверка заказа завершилась без понятного результата.'
 }
@@ -420,10 +423,10 @@ function snapshotText(payload) {
   if (payload.found === 'many') return 'найдено несколько заказов'
   const order = payload.order || {}
   const waiting = (payload.checks || []).filter((item) => !item.passed).map((item) => item.detail)
-  const now = `Сейчас: ${order.orderStatusLabel || '—'}${order.stateName ? `, ${order.stateName}` : ''}`
+  const name = order.orderNo ? `Заказ «${order.orderNo}»` : 'Заказ найден'
   const agreement = order.agreementNo ? `Договор: ${order.agreementNo}` : 'Договор ещё не заполнен'
   const wait = waiting.length ? `Ждём: ${waiting.join('; ')}` : 'Условие выполнено'
-  return `${now}. ${agreement}. ${wait}`
+  return `${name}. ${agreement}. ${wait}`
 }
 
 async function checkStep(db, card, step, actorId, manual) {
@@ -460,7 +463,7 @@ async function checkStep(db, card, step, actorId, manual) {
         body: JSON.stringify({
           searchBy: ref.searchBy,
           searchValue: ref.searchValue,
-          checks: orderChecks(step),
+          checks: checksForOrder(step),
         }),
         signal: AbortSignal.timeout(8000),
       })

@@ -51,14 +51,10 @@ export const approvalApi = {
 
 export const ORDER_EVENTS = [
   { id: 'created', code: 'order_exists', params: {}, label: 'Заказ создан' },
-  { id: 'production', code: 'order_status_eq', params: { status: 4 }, label: 'Заказ в производстве' },
   { id: 'agreement', code: 'agreement_no_filled', params: {}, label: 'Появился номер договора 1С' },
 ]
 
 export const SEARCH_BY = [
-  { id: 'orderno', label: 'Номер заказа' },
-  { id: 'factory_orderno', label: 'Номер в производстве' },
-  { id: 'agreementno', label: 'Номер договора' },
-  { id: 'origin_orderno', label: 'Номер заказа дилера' },
-  { id: 'item_name', label: 'Наименование изделия' },
+  { id: 'orderno', label: 'Наименование заказа' },
+  { id: 'agreementno', label: 'Номер договора 1С' },
 ]

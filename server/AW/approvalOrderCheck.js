@@ -42,21 +42,7 @@ const ORDER_SELECT = `
 
 function searchSql(searchBy) {
   if (searchBy === 'orderno') return `${ORDER_SELECT} WHERE o.DELETED = 0 AND o.ORDERNO = ?`
-  if (searchBy === 'factory_orderno') return `${ORDER_SELECT} WHERE o.DELETED = 0 AND o.FACTORY_ORDERNO = ?`
   if (searchBy === 'agreementno') return `${ORDER_SELECT} WHERE o.DELETED = 0 AND o.AGREEMENTNO = ?`
-  if (searchBy === 'origin_orderno') return `${ORDER_SELECT} WHERE o.DELETED = 0 AND o.ORIGIN_ORDERNO = ?`
-  if (searchBy === 'item_name') {
-    return `
-      SELECT FIRST 2
-        o.ORDERID, o.ORDERNO, o.AGREEMENTNO, o.FACTORY_ORDERNO, o.ORIGIN_ORDERNO,
-        o.ORDERSTATUS, o.ORDERSTATEID, os.NAME AS STATENAME,
-        o.ISRESERVED, o.VALID, o.STUFFS_REQUIREMENTS_COMPLETED, o.PRODDATE
-      FROM ORDERS o
-      JOIN ORDERITEMS oi ON oi.ORDERID = o.ORDERID
-      LEFT JOIN ORDERSTATES os ON os.ORDERSTATEID = o.ORDERSTATEID
-      WHERE o.DELETED = 0 AND oi.NAME CONTAINING ?
-    `
-  }
   return null
 }
 
@@ -121,11 +107,7 @@ function evaluate(order, check, extras) {
   const params = check.params || {}
   const code = check.check_code || check.code
   if (code === 'order_exists') {
-    return { passed: true, detail: `заказ ${order.orderNo || 'найден'}, статус: ${order.orderStatusLabel}` }
-  }
-  if (code === 'order_status_eq') {
-    const expected = Number(params.status)
-    return { passed: order.orderStatus === expected, detail: `статус: ${order.orderStatusLabel}` }
+    return { passed: true, detail: `заказ ${order.orderNo || 'найден'}` }
   }
   if (code === 'order_state_eq') {
     return {
