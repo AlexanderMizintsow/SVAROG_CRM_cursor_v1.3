@@ -1,0 +1,676 @@
+{
+  "startedAt": "2026-11-03T06:09:16.562Z",
+  "events": {
+    "FullyBooted": {
+      "count": 1,
+      "fields": {
+        "Event": 1,
+        "Privilege": 1,
+        "Status": 1
+      },
+      "example": {
+        "Event": "FullyBooted",
+        "Privilege": "system,all",
+        "Status": "Fully Booted"
+      }
+    },
+    "Registry": {
+      "count": 498,
+      "fields": {
+        "Event": 498,
+        "Privilege": 498,
+        "ChannelType": 498,
+        "Domain": 498,
+        "Status": 498
+      },
+      "example": {
+        "Event": "Registry",
+        "Privilege": "system,all",
+        "ChannelType": "SIP",
+        "Domain": "ip.beeline.ru",
+        "Status": "Registered"
+      }
+    },
+    "ExtensionStatus": {
+      "count": 831,
+      "fields": {
+        "Event": 831,
+        "Privilege": 831,
+        "Exten": 831,
+        "Context": 831,
+        "Hint": 831,
+        "Status": 831
+      },
+      "example": {
+        "Event": "ExtensionStatus",
+        "Privilege": "call,all",
+        "Exten": "109",
+        "Context": "ext-local",
+        "Hint": "SIP/109",
+        "Status": "1"
+      }
+    },
+    "Newchannel": {
+      "count": 566,
+      "fields": {
+        "Event": 566,
+        "Privilege": 566,
+        "Channel": 566,
+        "ChannelState": 566,
+        "ChannelStateDesc": 566,
+        "CallerIDNum": 566,
+        "CallerIDName": 566,
+        "AccountCode": 566,
+        "Exten": 566,
+        "Context": 566,
+        "Uniqueid": 566
+      },
+      "example": {
+        "Event": "Newchannel",
+        "Privilege": "call,all",
+        "Channel": "SIP/109-0000004d",
+        "ChannelState": "0",
+        "ChannelStateDesc": "Down",
+        "CallerIDNum": "109",
+        "CallerIDName": "device",
+        "AccountCode": "",
+        "Exten": "118",
+        "Context": "from-internal-crm",
+        "Uniqueid": "1793686207.95"
+      }
+    },
+    "VarSet": {
+      "count": 60420,
+      "fields": {
+        "Event": 60420,
+        "Privilege": 60420,
+        "Channel": 60420,
+        "Variable": 60420,
+        "Value": 60420,
+        "Uniqueid": 60372
+      },
+      "example": {
+        "Event": "VarSet",
+        "Privilege": "dialplan,all",
+        "Channel": "SIP/109-0000004d",
+        "Variable": "SIPURI",
+        "Value": "sip:109@192.168.57.116:5062",
+        "Uniqueid": "1793686207.95"
+      }
+    },
+    "Newstate": {
+      "count": 886,
+      "fields": {
+        "Event": 886,
+        "Privilege": 886,
+        "Channel": 886,
+        "ChannelState": 886,
+        "ChannelStateDesc": 886,
+        "CallerIDNum": 886,
+        "CallerIDName": 886,
+        "ConnectedLineNum": 886,
+        "ConnectedLineName": 886,
+        "Uniqueid": 886
+      },
+      "example": {
+        "Event": "Newstate",
+        "Privilege": "call,all",
+        "Channel": "SIP/109-0000004d",
+        "ChannelState": "4",
+        "ChannelStateDesc": "Ring",
+        "CallerIDNum": "109",
+        "CallerIDName": "device",
+        "ConnectedLineNum": "",
+        "ConnectedLineName": "",
+        "Uniqueid": "1793686207.95"
+      }
+    },
+    "Newexten": {
+      "count": 30481,
+      "fields": {
+        "Event": 30481,
+        "Privilege": 30481,
+        "Channel": 30481,
+        "Context": 30481,
+        "Extension": 30481,
+        "Priority": 30481,
+        "Application": 30481,
+        "AppData": 30481,
+        "Uniqueid": 30433
+      },
+      "example": {
+        "Event": "Newexten",
+        "Privilege": "dialplan,all",
+        "Channel": "SIP/109-0000004d",
+        "Context": "from-internal-crm",
+        "Extension": "118",
+        "Priority": "1",
+        "Application": "Set",
+        "AppData": "__PERVIYNUMBER=118",
+        "Uniqueid": "1793686207.95"
+      }
+    },
+    "NewAccountCode": {
+      "count": 443,
+      "fields": {
+        "Event": 443,
+        "Privilege": 443,
+        "Channel": 443,
+        "Uniqueid": 443,
+        "AccountCode": 443,
+        "OldAccountCode": 443
+      },
+      "example": {
+        "Event": "NewAccountCode",
+        "Privilege": "call,all",
+        "Channel": "SIP/109-0000004d",
+        "Uniqueid": "1793686207.95",
+        "AccountCode": "118-6207.95",
+        "OldAccountCode": ""
+      }
+    },
+    "NewCallerid": {
+      "count": 565,
+      "fields": {
+        "Event": 565,
+        "Privilege": 565,
+        "Channel": 565,
+        "CallerIDNum": 565,
+        "CallerIDName": 565,
+        "Uniqueid": 565,
+        "CID-CallingPres": 565
+      },
+      "example": {
+        "Event": "NewCallerid",
+        "Privilege": "call,all",
+        "Channel": "SIP/109-0000004d",
+        "CallerIDNum": "109",
+        "CallerIDName": "109",
+        "Uniqueid": "1793686207.95",
+        "CID-CallingPres": "0 (Presentation Allowed, Not Screened)"
+      }
+    },
+    "Dial": {
+      "count": 531,
+      "fields": {
+        "Event": 531,
+        "Privilege": 531,
+        "SubEvent": 531,
+        "Channel": 531,
+        "Destination": 267,
+        "CallerIDNum": 267,
+        "CallerIDName": 267,
+        "ConnectedLineNum": 267,
+        "ConnectedLineName": 267,
+        "UniqueID": 531,
+        "DestUniqueID": 267,
+        "Dialstring": 267,
+        "DialStatus": 264
+      },
+      "example": {
+        "Event": "Dial",
+        "Privilege": "call,all",
+        "SubEvent": "Begin",
+        "Channel": "SIP/109-0000004d",
+        "Destination": "SIP/118-0000004e",
+        "CallerIDNum": "109",
+        "CallerIDName": "109",
+        "ConnectedLineNum": "<unknown>",
+        "ConnectedLineName": "<unknown>",
+        "UniqueID": "1793686207.95",
+        "DestUniqueID": "1793686207.96",
+        "Dialstring": "118"
+      }
+    },
+    "Bridge": {
+      "count": 190,
+      "fields": {
+        "Event": 190,
+        "Privilege": 190,
+        "Bridgestate": 190,
+        "Bridgetype": 190,
+        "Channel1": 190,
+        "Channel2": 190,
+        "Uniqueid1": 190,
+        "Uniqueid2": 190,
+        "CallerID1": 190,
+        "CallerID2": 190
+      },
+      "example": {
+        "Event": "Bridge",
+        "Privilege": "call,all",
+        "Bridgestate": "Link",
+        "Bridgetype": "core",
+        "Channel1": "SIP/109-0000004d",
+        "Channel2": "SIP/118-0000004e",
+        "Uniqueid1": "1793686207.95",
+        "Uniqueid2": "1793686207.96",
+        "CallerID1": "109",
+        "CallerID2": "118"
+      }
+    },
+    "RTCPReceived": {
+      "count": 3221,
+      "fields": {
+        "Event": 3221,
+        "Privilege": 3221,
+        "From": 3221,
+        "PT": 3221,
+        "ReceptionReports": 3221,
+        "SenderSSRC": 3221,
+        "FractionLost": 3221,
+        "PacketsLost": 3221,
+        "HighestSequence": 3221,
+        "SequenceNumberCycles": 3221,
+        "IAJitter": 3221,
+        "LastSR": 3221,
+        "DLSR": 3221,
+        "RTT": 2962
+      },
+      "example": {
+        "Event": "RTCPReceived",
+        "Privilege": "reporting,all",
+        "From": "192.168.57.116:12365",
+        "PT": "200(Sender Report)",
+        "ReceptionReports": "1",
+        "SenderSSRC": "0",
+        "FractionLost": "0",
+        "PacketsLost": "0",
+        "HighestSequence": "64185",
+        "SequenceNumberCycles": "0",
+        "IAJitter": "0",
+        "LastSR": "0.0000000000",
+        "DLSR": "0.0000(sec)"
+      }
+    },
+    "RTCPSent": {
+      "count": 3900,
+      "fields": {
+        "Event": 3900,
+        "Privilege": 3900,
+        "To": 3900,
+        "OurSSRC": 3900,
+        "SentNTP": 3900,
+        "SentRTP": 3900,
+        "SentPackets": 3900,
+        "SentOctets": 3900,
+        "ReportBlock": 3900,
+        "FractionLost": 3900,
+        "CumulativeLoss": 3900,
+        "IAJitter": 3900,
+        "TheirLastSR": 3900,
+        "DLSR": 3900
+      },
+      "example": {
+        "Event": "RTCPSent",
+        "Privilege": "reporting,all",
+        "To": "192.168.57.116:12365",
+        "OurSSRC": "1344089830",
+        "SentNTP": "1793686222.2316853248",
+        "SentRTP": "90881120",
+        "SentPackets": "250",
+        "SentOctets": "40000",
+        "ReportBlock": "",
+        "FractionLost": "0",
+        "CumulativeLoss": "0",
+        "IAJitter": "0.0001",
+        "TheirLastSR": "4182574858",
+        "DLSR": "0.0200 (sec)"
+      }
+    },
+    "PeerStatus": {
+      "count": 326,
+      "fields": {
+        "Event": 326,
+        "Privilege": 326,
+        "ChannelType": 326,
+        "Peer": 326,
+        "PeerStatus": 326,
+        "Address": 326
+      },
+      "example": {
+        "Event": "PeerStatus",
+        "Privilege": "system,all",
+        "ChannelType": "SIP",
+        "Peer": "SIP/104",
+        "PeerStatus": "Registered",
+        "Address": "192.168.57.156:11930"
+      }
+    },
+    "Unlink": {
+      "count": 190,
+      "fields": {
+        "Event": 190,
+        "Privilege": 190,
+        "Channel1": 190,
+        "Channel2": 190,
+        "Uniqueid1": 190,
+        "Uniqueid2": 190,
+        "CallerID1": 190,
+        "CallerID2": 190
+      },
+      "example": {
+        "Event": "Unlink",
+        "Privilege": "call,all",
+        "Channel1": "SIP/109-0000004d",
+        "Channel2": "SIP/118-0000004e",
+        "Uniqueid1": "1793686207.95",
+        "Uniqueid2": "1793686207.96",
+        "CallerID1": "109",
+        "CallerID2": "118"
+      }
+    },
+    "Hangup": {
+      "count": 566,
+      "fields": {
+        "Event": 566,
+        "Privilege": 566,
+        "Channel": 566,
+        "Uniqueid": 566,
+        "CallerIDNum": 566,
+        "CallerIDName": 566,
+        "ConnectedLineNum": 566,
+        "ConnectedLineName": 566,
+        "Cause": 566,
+        "Cause-txt": 566
+      },
+      "example": {
+        "Event": "Hangup",
+        "Privilege": "call,all",
+        "Channel": "SIP/118-0000004e",
+        "Uniqueid": "1793686207.96",
+        "CallerIDNum": "118",
+        "CallerIDName": "device",
+        "ConnectedLineNum": "109",
+        "ConnectedLineName": "109",
+        "Cause": "16",
+        "Cause-txt": "Normal Clearing"
+      }
+    },
+    "Masquerade": {
+      "count": 32,
+      "fields": {
+        "Event": 32,
+        "Privilege": 32,
+        "Clone": 32,
+        "CloneState": 32,
+        "Original": 32,
+        "OriginalState": 32
+      },
+      "example": {
+        "Event": "Masquerade",
+        "Privilege": "call,all",
+        "Clone": "SIP/108-00000050",
+        "CloneState": "Up",
+        "Original": "Local/108@from-internal-00000009;1",
+        "OriginalState": "Up"
+      }
+    },
+    "Rename": {
+      "count": 96,
+      "fields": {
+        "Event": 96,
+        "Privilege": 96,
+        "Channel": 96,
+        "Newname": 96,
+        "Uniqueid": 96
+      },
+      "example": {
+        "Event": "Rename",
+        "Privilege": "call,all",
+        "Channel": "SIP/108-00000050",
+        "Newname": "SIP/108-00000050<MASQ>",
+        "Uniqueid": "1793686325.100"
+      }
+    },
+    "Join": {
+      "count": 7,
+      "fields": {
+        "Event": 7,
+        "Privilege": 7,
+        "Channel": 7,
+        "CallerIDNum": 7,
+        "CallerIDName": 7,
+        "ConnectedLineNum": 7,
+        "ConnectedLineName": 7,
+        "Queue": 7,
+        "Position": 7,
+        "Count": 7,
+        "Uniqueid": 7
+      },
+      "example": {
+        "Event": "Join",
+        "Privilege": "call,all",
+        "Channel": "SIP/beeline-00000055",
+        "CallerIDNum": "89656393030",
+        "CallerIDName": "Абдуллин Ахмет",
+        "ConnectedLineNum": "unknown",
+        "ConnectedLineName": "unknown",
+        "Queue": "1940",
+        "Position": "1",
+        "Count": "1",
+        "Uniqueid": "1793686455.105"
+      }
+    },
+    "QueueCallerAbandon": {
+      "count": 7,
+      "fields": {
+        "Event": 7,
+        "Privilege": 7,
+        "Queue": 7,
+        "Uniqueid": 7,
+        "Position": 7,
+        "OriginalPosition": 7,
+        "HoldTime": 7
+      },
+      "example": {
+        "Event": "QueueCallerAbandon",
+        "Privilege": "agent,all",
+        "Queue": "1940",
+        "Uniqueid": "1793686455.105",
+        "Position": "1",
+        "OriginalPosition": "1",
+        "HoldTime": "48"
+      }
+    },
+    "Leave": {
+      "count": 7,
+      "fields": {
+        "Event": 7,
+        "Privilege": 7,
+        "Channel": 7,
+        "Queue": 7,
+        "Count": 7,
+        "Position": 7,
+        "Uniqueid": 7
+      },
+      "example": {
+        "Event": "Leave",
+        "Privilege": "call,all",
+        "Channel": "SIP/beeline-00000055",
+        "Queue": "1940",
+        "Count": "0",
+        "Position": "1",
+        "Uniqueid": "1793686455.105"
+      }
+    },
+    "MusicOnHold": {
+      "count": 15,
+      "fields": {
+        "Event": 15,
+        "Privilege": 15,
+        "State": 15,
+        "Channel": 15,
+        "UniqueID": 15,
+        "Class": 9
+      },
+      "example": {
+        "Event": "MusicOnHold",
+        "Privilege": "call,all",
+        "State": "Start",
+        "Channel": "SIP/beeline-00000062",
+        "UniqueID": "1793687036.138",
+        "Class": "default"
+      }
+    }
+  },
+  "responses": {
+    "Success": {
+      "count": 2,
+      "fields": {
+        "Response": 2,
+        "Message": 1,
+        "ActionID": 1,
+        "WATShowSpans": 1,
+        "QueueReset": 1,
+        "QueueReload": 1,
+        "QueueRule": 1,
+        "QueuePenalty": 1,
+        "QueueLog": 1,
+        "QueuePause": 1,
+        "QueueRemove": 1,
+        "QueueAdd": 1,
+        "QueueSummary": 1,
+        "QueueStatus": 1,
+        "Queues": 1,
+        "MixMonitorMute": 1,
+        "VoicemailUsersList": 1,
+        "PlayDTMF": 1,
+        "DongleReload": 1,
+        "DongleRemove": 1,
+        "DongleStart": 1,
+        "DongleStop": 1,
+        "DongleRestart": 1,
+        "DongleReset": 1,
+        "DongleSetCCWA": 1,
+        "DongleSendPDU": 1,
+        "DongleSendSMS": 1,
+        "DongleSendUSSD": 1,
+        "DongleShowDevices": 1,
+        "MuteAudio": 1,
+        "MeetmeList": 1,
+        "MeetmeUnmute": 1,
+        "MeetmeMute": 1,
+        "IAXregistry": 1,
+        "IAXnetstats": 1,
+        "IAXpeerlist": 1,
+        "IAXpeers": 1,
+        "SIPnotify": 1,
+        "SIPshowregistry": 1,
+        "SIPqualifypeer": 1,
+        "SIPshowpeer": 1,
+        "SIPpeers": 1,
+        "WATShowSpan": 1,
+        "WATSendSms": 1,
+        "WaitEvent": 1,
+        "DAHDIRestart": 1,
+        "DAHDIShowChannels": 1,
+        "DAHDIDNDoff": 1,
+        "DAHDIDNDon": 1,
+        "DAHDIDialOffhook": 1,
+        "DAHDIHangup": 1,
+        "DAHDITransfer": 1,
+        "AgentLogoff": 1,
+        "Agents": 1,
+        "UnpauseMonitor": 1,
+        "PauseMonitor": 1,
+        "ChangeMonitor": 1,
+        "StopMonitor": 1,
+        "Monitor": 1,
+        "JabberSend": 1,
+        "DBDelTree": 1,
+        "DBDel": 1,
+        "DBPut": 1,
+        "DBGet": 1,
+        "Bridge": 1,
+        "Park": 1,
+        "ParkedCalls": 1,
+        "ShowDialPlan": 1,
+        "ModuleCheck": 1,
+        "ModuleLoad": 1,
+        "CoreShowChannels": 1,
+        "Reload": 1,
+        "CoreStatus": 1,
+        "CoreSettings": 1,
+        "UserEvent": 1,
+        "UpdateConfig": 1,
+        "SendText": 1,
+        "ListCommands": 1,
+        "MailboxCount": 1,
+        "MailboxStatus": 1,
+        "AbsoluteTimeout": 1,
+        "ExtensionState": 1,
+        "Command": 1,
+        "Originate": 1,
+        "Atxfer": 1,
+        "Redirect": 1,
+        "ListCategories": 1,
+        "CreateConfig": 1,
+        "Status": 1,
+        "GetConfigJSON": 1,
+        "GetConfig": 1,
+        "Getvar": 1,
+        "Setvar": 1,
+        "Ping": 1,
+        "Hangup": 1,
+        "Challenge": 1,
+        "Login": 1,
+        "Logoff": 1,
+        "Events": 1,
+        "LocalOptimizeAway": 1,
+        "DataGet": 1
+      },
+      "example": {
+        "Response": "Success",
+        "Message": "Authentication accepted"
+      }
+    },
+    "unknown": {
+      "count": 96,
+      "fields": {
+        "Uniqueid": 96
+      },
+      "example": {
+        "Uniqueid": "1793686314.97"
+      }
+    }
+  },
+  "traces": {
+    "logger_started": 1,
+    "ami_tcp_connected": 1,
+    "control_probe_sent": 1,
+    "ami_login_ok": 1,
+    "crm_socket_connected": 1,
+    "parser_receiver": 290,
+    "parser_newchannel": 181,
+    "parser_caller": 287,
+    "notify_skipped_internal": 480,
+    "parser_caller_duplicate": 2475,
+    "parser_newchannel_duplicate": 383,
+    "parser_receiver_duplicate": 1099,
+    "parser_answered": 187,
+    "db_call_inserted": 215,
+    "heartbeat": 374,
+    "parser_hangup": 273,
+    "db_call_updated": 129,
+    "lookup_user_phone": 194,
+    "notify_incoming_receiver_unknown": 44,
+    "notify_started_receiver_unknown": 46,
+    "notify_ended_receiver_unknown": 36,
+    "db_call_skipped": 82,
+    "lookup_dealer_phone": 34,
+    "notify_incoming": 26,
+    "notify_started": 3,
+    "notify_ended": 5
+  },
+  "updatedAt": "2026-11-03T12:24:07.071Z",
+  "counts": {
+    "chunks": 23685,
+    "messages": 103877,
+    "parseErrors": 0,
+    "bufferResets": 0
+  },
+  "dayBytes": 30306781,
+  "part": 1,
+  "stopped": false
+}

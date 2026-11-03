@@ -49,6 +49,23 @@
   gap: 30px;
 }
 
+.hierarchy-card .card-footer {
+  position: relative;
+}
+
+.hierarchy-presence {
+  position: absolute;
+  left: 12px;
+  top: 50%;
+  transform: translateY(-50%);
+  display: flex;
+  align-items: center;
+
+  .presence-dot {
+    box-shadow: 0 0 0 2px #ffffff;
+  }
+}
+
 .card-footer-icon {
   cursor: pointer;
   scale: 1.5;

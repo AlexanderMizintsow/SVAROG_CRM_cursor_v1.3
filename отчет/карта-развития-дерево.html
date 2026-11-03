@@ -1,0 +1,204 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8" />
+  <title>Дерево развития СВАРОГ</title>
+  <style>
+    * { box-sizing: border-box; }
+    body { margin: 0; color: #1c1c1c; background: #f6f3ee; font: 15px/1.4 "Segoe UI", sans-serif; }
+    header { padding: 16px 20px 8px; }
+    h1 { margin: 0 0 8px; font-size: 22px; }
+    .legend { display: flex; flex-wrap: wrap; gap: 8px; margin: 0; padding: 0; list-style: none; }
+    .legend li { display: flex; align-items: center; gap: 6px; }
+    .swatch { width: 14px; height: 14px; border-radius: 4px; border: 2px solid #8d8d8d; }
+    .swatch.done { background: #1b7a43; border-color: #1b7a43; }
+    .swatch.progress { background: #e2a30b; border-color: #c48c08; }
+    .swatch.plan { background: transparent; }
+    .swatch.broken { background: #b42318; border-color: #b42318; }
+    .swatch.hidden { background: #f7f7f7; border-style: dashed; }
+    .layout { display: grid; grid-template-columns: minmax(0, 1.25fr) minmax(260px, 0.75fr); gap: 16px; padding: 8px 20px 24px; align-items: start; }
+    .tree, .detail { background: #fffdf8; border: 1px solid #e4ddd2; border-radius: 12px; padding: 12px; }
+    .branch { margin-left: 18px; padding-left: 14px; border-left: 2px solid #ddd4c8; }
+    .row { display: flex; align-items: center; gap: 8px; margin: 4px 0; }
+    .node { border: 2px solid #c8bfb0; background: #f4f1ea; color: #1c1c1c; border-radius: 10px; padding: 7px 10px; font: inherit; text-align: left; cursor: pointer; }
+    .node.selected { outline: 3px solid #1d4e89; outline-offset: 1px; }
+    .node.s-готово { background: #1b7a43; border-color: #1b7a43; color: #fff; }
+    .node.s-план { background: transparent; border-color: #8d8d8d; color: #1c1c1c; }
+    .node.s-в-процессе { background: #e2a30b; border-color: #c48c08; color: #1c1400; }
+    .node.s-не-работает { background: #b42318; border-color: #b42318; color: #fff; }
+    .node.s-скрыто { background: #f7f7f7; border-style: dashed; border-color: #888; color: #333; }
+    .dots { display: flex; gap: 4px; }
+    .dot { width: 8px; height: 8px; border-radius: 50%; border: 1px solid #8d8d8d; }
+    .dot.done { background: #1b7a43; border-color: #1b7a43; }
+    .dot.progress { background: #e2a30b; border-color: #c48c08; }
+    .dot.plan { background: transparent; }
+    .dot.broken { background: #b42318; border-color: #b42318; }
+    .dot.hidden { background: #f7f7f7; }
+    .detail h2 { margin: 0 0 6px; font-size: 18px; }
+    .detail ul { margin: 8px 0 0; padding-left: 18px; }
+    .muted { color: #555; }
+    @media (max-width: 800px) {
+      .layout { grid-template-columns: minmax(0, 1fr); }
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>Дерево развития</h1>
+    <ul class="legend">
+      <li><span class="swatch done"></span>Сделано</li>
+      <li><span class="swatch progress"></span>В процессе</li>
+      <li><span class="swatch plan"></span>В планах</li>
+      <li><span class="swatch broken"></span>Не работает</li>
+      <li><span class="swatch hidden"></span>Скрыто в меню</li>
+    </ul>
+  </header>
+  <div class="layout">
+    <div class="tree" id="tree"></div>
+    <aside class="detail" id="detail" aria-live="polite"></aside>
+  </div>
+  <script id="tree-data" type="application/json">{"title":"СВАРОГ CRM. Карта развития","updated":"2026-11-02","nodes":[{"id":"p0","name":"Браузер","summary":"Основная CRM в браузере. Меню зависит от роли: администратор, директор, руководитель отдела.","status":"","mechanics":[],"plan":"","children":[{"id":"p0-g0","name":"Оболочка","summary":"","status":"","mechanics":[],"plan":"","children":[{"id":"p0-g0-i0","name":"Вход и сессия","status":"готово","mechanics":["Вход сотрудника и хранение сессии","Проверка связи с базой данных","Роли ограничивают пункты меню и часть экранов"],"plan":"","children":[]},{"id":"p0-g0-i1","name":"Уведомления","status":"готово","mechanics":["Запрос разрешения на уведомления браузера","Напоминания по сокету и повторное предупреждение о необработанных","В десктопной оболочке то же уведомление уходит в окно Electron","Баннер по задачам и запросам на продление срока"],"plan":"","children":[]},{"id":"p0-g0-i2","name":"Подвал","status":"готово","mechanics":["Оценка приложения","Идеи и предложения","Журнал изменений","Скачивание десктопной сборки","Скачивание Android APK; администратор может загрузить или удалить файл","Часы для администратора"],"plan":"","children":[]},{"id":"p0-g0-i3","name":"Карточка пользователя","status":"готово","mechanics":["Погода","Курс валют с обновлением","Калькулятор"],"plan":"","children":[]},{"id":"p0-g0-i4","name":"Присутствие","status":"готово","mechanics":["Статус сотрудника онлайн обновляется по сокету","Список подчинённых подгружается для текущего пользователя"],"plan":"","children":[]}]},{"id":"p0-g1","name":"Менеджер задач","summary":"","status":"","mechanics":[],"plan":"","children":[{"id":"p0-g1-i0","name":"Канбан","status":"готово","mechanics":["Колонки: Уведомления, Список задач, К выполнению, В ожидании, В процессе, Выполнено, Приостановлено","Карточку задачи перетаскивает исполнитель","Уведомления между колонками не переносятся, выполненное уходит в историю","Напоминания о звонках попадают в колонку «Уведомления»","Запросы дилеров из Telegram рассчитаны на ту же колонку, но бот дилеров сейчас не работает","Поиск и фильтр задач","Чат, комментарии, вложения и просмотр изображений у задачи","Иерархия подзадач","Продление срока: запрос, одобрение и отказ","Уведомления о просрочке и о смене исполнителя","Шаблоны задач"],"plan":"","children":[]},{"id":"p0-g1-i1","name":"Списки задач","status":"готово","mechanics":["Вкладки: Созданные, Завершённые, Отклонено, На утверждение, Видимые","У завершённых отдельные списки: мои, порученные, участие","Фильтр по периоду","Полоса проектов над доской: проекты, где сотрудник автор или ответственный"],"plan":"","children":[]},{"id":"p0-g1-i2","name":"Проекты","status":"готово","mechanics":["Проект с целями, сроком, приоритетом и прогрессом","Ответственные","Подзадачи","Документы и комментарии к файлам","Чат проекта","История изменений","Дополнительная информация и итоговое решение","Согласование проекта","Шаблоны проектов","Напоминание об истечении срока"],"plan":"","children":[]},{"id":"p0-g1-i3","name":"Согласования","status":"готово","mechanics":["Панель согласований в менеджере задач","Шаблоны маршрутов","Карточка: шаги согласования и шаги-события","Решение согласующего, комментарий, файлы и переписка","Списки: входящие, мои, завершённые","Связь карточки с задачей или проектом"],"plan":"","children":[]},{"id":"p0-g1-i4","name":"Назначение звонка из напоминания","status":"готово","mechanics":["Окно с датой и временем, сотрудником и комментарием","Создаёт задачу-напоминание по звонку"],"plan":"","children":[]}]},{"id":"p0-g2","name":"Обращения","summary":"","status":"","mechanics":[],"plan":"","children":[{"id":"p0-g2-i0","name":"Обращения к директору","status":"готово","mechanics":["Сотрудник с доступом пишет обращение","Вкладки «мои» и «входящие», отметка непрочитанного","Переписка по обращению","Директор отвечает и закрывает обращение","Из обращения создаётся задача в менеджере задач, само обращение закрывается вручную"],"plan":"","children":[]}]},{"id":"p0-g3","name":"Рабочие группы","summary":"","status":"","mechanics":[],"plan":"","children":[{"id":"p0-g3-i0","name":"Встречи рабочих групп","status":"готово","mechanics":["Создание группы: название, описание, участники, важность","Дата сразу согласована либо диапазон дат для голосования","Список согласованных встреч","Уведомления в Telegram задуманы на создание, перенос, отмену и завершение, но бот сотрудников сейчас не работает","Регистрация сотрудника в боте по фамилии и паролю есть в коде и сейчас тоже не работает"],"plan":"","children":[]}]},{"id":"p0-g4","name":"Бизнес-процессы","summary":"","status":"","mechanics":[],"plan":"","children":[{"id":"p0-g4-i0","name":"Конструктор процессов","status":"готово","mechanics":["Схема из блоков: старт, конец, дорожка, доп. информация","Блоки задачи: создать, назначить, статус, комментарий, вложение","Блоки проекта: создать, статус, комментарий, чат, ответственные, цели, доп. информация, вложение, статус подзадачи","Развилка, слияние, разделитель, таймер, уведомление, принятие решения","Условия по статусу, сроку, приоритету, роли инициатора и полям проекта","Исход конца: успех или неудача","Запуск по шаблону сразу или через окно создания","Список процессов и расписание"],"plan":"","children":[]},{"id":"p0-g4-i1","name":"Мониторинг процессов","status":"готово","mechanics":["Фильтр по периоду","Карточки проектов, задач, экземпляров процесса и просрочек","Диаграммы, разрез по отделам и сотрудникам","Кто тормозит выполнение"],"plan":"","children":[]}]},{"id":"p0-g5","name":"CRM","summary":"","status":"","mechanics":[],"plan":"","children":[{"id":"p0-g5-i0","name":"Дилеры","status":"готово","mechanics":["Компании и дилеры: создание, проверка, хранение","Поиск и фильтры","Карточка: дилер, представители, общая информация, история звонков","ИНН, код продавца, менеджеры и замещающие, телефоны, почта, статус, договоры","Адреса, доставка, конкуренты и партнёры на карточке"],"plan":"","children":[]},{"id":"p0-g5-i1","name":"Поставщики","status":"готово","mechanics":["Список и форма: название, контактное лицо, несколько телефонов и адресов почты","Создание и редактирование"],"plan":"","children":[]},{"id":"p0-g5-i2","name":"Конкуренты","status":"готово","mechanics":["Список и форма: название, отрасль, почта"],"plan":"","children":[]},{"id":"p0-g5-i3","name":"Пароли доступа","status":"готово","mechanics":["Доступно директору и администратору","Пароль в приложение ПОЗ-сотрудники","Пароль в Telegram-бот: экран выдачи работает, сам бот сейчас не работает","Пароль в приложение ПОЗ для дилеров","Выдача, копирование и удаление пароля"],"plan":"","children":[]},{"id":"p0-g5-i4","name":"Автоматизация маркетинга","status":"готово","mechanics":["Кампании: создание, редактирование, предпросмотр, получатели","Категории и теги","Права, кто может вести кампании","Журнал отправок","Статистика по категориям и локациям","Автоотправка по расписанию через бота дилеров заложена в коде, бот сейчас не работает"],"plan":"","children":[]},{"id":"p0-g5-i5","name":"Новости для дилерского приложения","status":"готово","mechanics":["Создание, правка и удаление новости","Картинки, рубрики, журнал изменений и отправок","Права на публикацию"],"plan":"","children":[]},{"id":"p0-g5-i6","name":"Новости для приложения сотрудников","status":"готово","mechanics":["Публикация и правка новостей","Оценка аудитории","Отчёт о прочтении и вовлечённости","Рубрики, права, журнал изменений","Модерация комментариев"],"plan":"","children":[]},{"id":"p0-g5-i7","name":"Телефония","status":"готово","mechanics":["Индикатор текущего звонка в меню","Счётчик пропущенных","Всплывающее уведомление о звонке в браузере"],"plan":"","children":[{"id":"p0-g5-i7-0","name":"Пропущенные звонки","status":"готово","mechanics":["Список с постраничным просмотром","Администратор видит всех, руководитель отдела и НОК — свой отдел, остальные — свои","Добавление номера: дилер, компания, тип телефона","К звонку привязывается напоминание","Справка"],"plan":"","children":[]},{"id":"p0-g5-i7-1","name":"Обработанные звонки","status":"готово","mechanics":["Список обработанных","Фильтр по сотрудникам","Добавление номера","Справка"],"plan":"","children":[]},{"id":"p0-g5-i7-2","name":"Принятые звонки","status":"готово","mechanics":["Список принятых","Фильтр по сотрудникам","Добавление номера","У звонка хранятся название напоминания и название задачи","Справка"],"plan":"","children":[]},{"id":"p0-g5-i7-3","name":"Настройки звонков","status":"готово","mechanics":["Показ пропущенных и принятых от сотрудников внутри компании","Показ пропущенных в Telegram и команды бота есть в настройках, бот сотрудников сейчас не работает","Напоминания о звонках в чат-бот заложены в настройках, бот сейчас не работает"],"plan":"","children":[]},{"id":"p0-g5-i7-4","name":"Напоминания о звонках сверх чат-бота","status":"план","mechanics":[],"plan":"Напоминания о звонках в самой CRM, не через Telegram. Ориентир: 11 декабря 2026.","children":[]},{"id":"p0-g5-i7-5","name":"Журнал возможностей АТС","status":"в процессе","mechanics":["Файл amiDiagnostics.js пишет журнал событий AMI за сутки и не меняет запись звонков в базу","Пароль AMI в файлы не попадает","Сводка дня: очереди, путь и формат записи разговора, длительности, слепой и сопровождаемый перевод","Туда же попадают форматы номеров, исходящий вызов, удержание, DTMF, конференция, голосовая почта и CDR","Отдельная проба спрашивает у станции список команд, которые CRM может вызвать"],"plan":"Сбор за рабочие дни уже запущен. Разбор сводки ami-capabilities и решение, что из этого делать в CRM, — до 14 ноября 2026. В разработку берутся только пункты, которые сводка подтвердит.","children":[]},{"id":"p0-g5-i7-6","name":"Исходящий звонок из CRM","status":"план","mechanics":[],"plan":"Звонок сотруднику или по номеру из карточки, если сводка подтвердит команду вызова. Ориентир: 18 декабря 2026.","children":[]},{"id":"p0-g5-i7-7","name":"Запись разговора","status":"план","mechanics":[],"plan":"Прослушивание записи у карточки звонка. Путь и формат берутся из сводки. Ориентир: 30 января 2027.","children":[]},{"id":"p0-g5-i7-8","name":"Перевод звонка","status":"план","mechanics":[],"plan":"Слепой и сопровождаемый перевод из CRM, если такие события есть в журнале. Ориентир: 27 февраля 2027.","children":[]},{"id":"p0-g5-i7-9","name":"Очереди","status":"план","mechanics":[],"plan":"Какие очереди есть на станции и что с ними происходит, если АТС это отдаёт. Ориентир: 27 марта 2027.","children":[]},{"id":"p0-g5-i7-10","name":"Уснувшие дилеры","status":"план","mechanics":[],"plan":"Напоминать о дилерах, которые давно не выходили на связь. Ориентир: 24 апреля 2027.","children":[]}]}]},{"id":"p0-g6","name":"Администратор","summary":"","status":"","mechanics":[],"plan":"","children":[{"id":"p0-g6-i0","name":"Активация аккаунтов","status":"готово","mechanics":["Карточка сотрудника и телефоны","Раздел виден только администратору"],"plan":"","children":[]},{"id":"p0-g6-i1","name":"Установка данных","status":"готово","mechanics":["Справочники ролей, отделов и должностей","Раздел виден только администратору"],"plan":"","children":[]},{"id":"p0-g6-i2","name":"Права доступа","status":"готово","mechanics":["Права роли на компоненты","Раздел виден только администратору"],"plan":"","children":[]}]},{"id":"p0-g7","name":"Персонал","summary":"","status":"","mechanics":[],"plan":"","children":[{"id":"p0-g7-i0","name":"Статусы сотрудников","status":"готово","mechanics":["Календарь статусов: отпуск, командировка, болезнь, обучение","Период или отдельные даты","Назначают руководитель отдела, кадры, директор и администратор","При отсутствии можно выбрать замещающего","Сводка загрузки сотрудника: задачи к исполнению и согласования задач и проектов"],"plan":"","children":[]}]},{"id":"p0-g8","name":"Справочники","summary":"","status":"","mechanics":[],"plan":"","children":[{"id":"p0-g8-i0","name":"База знаний","status":"готово","mechanics":["Документы по отделам и категориям, теги","Поиск по тексту и отдельное обновление поиска по файлам","Избранное и фильтр «только мои»","Несколько файлов у документа, версии файла и версии документа","Аудит действий","Отметка об ошибке в документе","Ссылка на документ из других мест"],"plan":"","children":[]},{"id":"p0-g8-i1","name":"Выборка заказов","status":"готово","mechanics":["Поиск заказов по полям, диапазонам и номеру","Подсказки по названию","Данные берутся из учётного контура"],"plan":"","children":[]},{"id":"p0-g8-i2","name":"Иерархия сотрудников","status":"готово","mechanics":["Дерево подчинения"],"plan":"","children":[]},{"id":"p0-g8-i3","name":"Редактор ручек","status":"готово","mechanics":["Справочник ручек для створок: создание, изменение, удаление","Подбор по параметрам створки"],"plan":"","children":[]},{"id":"p0-g8-i4","name":"Поиск материалов в заказах","status":"скрыто","mechanics":["Поиск заказов и изделий по материалу, артикулу или номеру заказа","Статусы заказа: закрыт и в производстве","Пункт меню закомментирован, экран по прямой ссылке открывается"],"plan":"","children":[]},{"id":"p0-g8-i5","name":"Карта дилеров","status":"скрыто","mechanics":["Карта регионов с масштабированием и переходом на следующий уровень","Пункт меню закомментирован, экран по прямой ссылке открывается"],"plan":"","children":[]}]},{"id":"p0-g9","name":"Статистика","summary":"","status":"","mechanics":[],"plan":"","children":[{"id":"p0-g9-i0","name":"Сервисные рейтинги","status":"готово","mechanics":["Статистика рейтингов процессов","Разрез по дилерам и распределение оценок"],"plan":"","children":[]}]},{"id":"p0-g10","name":"Почта","summary":"","status":"","mechanics":[],"plan":"","children":[{"id":"p0-g10-i0","name":"Почта mail.ru","status":"скрыто","mechanics":["Входящие и новое письмо","Подключение ящика сотрудника через отдельный почтовый сервис","Пункт меню закомментирован, экран по прямой ссылке открывается"],"plan":"","children":[]},{"id":"p0-g10-i1","name":"Чат","status":"скрыто","mechanics":["Пункт меню закомментирован","Отдельного экрана чата в маршрутах приложения нет"],"plan":"","children":[]}]}]},{"id":"p1","name":"Десктоп","summary":"Оболочка Electron поверх той же браузерной CRM. Отдельных деловых экранов, кроме уведомлений о звонке, нет.","status":"","mechanics":[],"plan":"","children":[{"id":"p1-g0","name":"Окно программы","summary":"","status":"","mechanics":[],"plan":"","children":[{"id":"p1-g0-i0","name":"Оболочка CRM","status":"готово","mechanics":["Внутри открывается та же браузерная CRM","Скачивание сборки из подвала браузерной версии"],"plan":"","children":[]},{"id":"p1-g0-i1","name":"Уведомление о звонке","status":"готово","mechanics":["Отдельное окно поверх других программ в правом верхнем углу","Типы: входящий, активный, завершённый звонок","Щелчок открывает основное окно","Окно само закрывается через 30 секунд","Иконка в трее мигает на время звонка","Обычные напоминания тоже могут показаться системным уведомлением"],"plan":"","children":[]}]}]},{"id":"p2","name":"Мобильное приложение сотрудников","summary":"Сервер ПОЗ-сотрудники. Исходников Android в этом репозитории нет, ниже механики, которые сервер уже отдаёт приложению. Пароль выдаётся в CRM.","status":"","mechanics":[],"plan":"","children":[{"id":"p2-g0","name":"Вход","summary":"","status":"","mechanics":[],"plan":"","children":[{"id":"p2-g0-i0","name":"Сессия сотрудника","status":"готово","mechanics":["Вход, обновление и выход из сессии","Пароль хранится отдельно от пароля CRM, доступ можно закрыть"],"plan":"","children":[]}]},{"id":"p2-g1","name":"Задачи и проекты","summary":"","status":"","mechanics":[],"plan":"","children":[{"id":"p2-g1-i0","name":"Задачи","status":"готово","mechanics":["Список, создание и карточка","Смена статуса исполнителем, принять или вернуть","Описание, срок, замена исполнителя","Чат: отправка, правка и удаление своего сообщения","Вложения","Дерево подзадач","Запрос продления срока, одобрение и отказ","Обновления по сокету"],"plan":"","children":[]},{"id":"p2-g1-i1","name":"Проекты","status":"готово","mechanics":["Список, создание и карточка","Статус меняет автор","Описание, цели, дополнительная информация, ответственные","Согласование","Чат, документы, история, подзадачи"],"plan":"","children":[]}]},{"id":"p2-g2","name":"Работа и связь","summary":"","status":"","mechanics":[],"plan":"","children":[{"id":"p2-g2-i0","name":"Рабочие группы","status":"готово","mechanics":["Список, создание, правка и удаление","Голосование за даты","Напоминания о встречах по расписанию"],"plan":"","children":[]},{"id":"p2-g2-i1","name":"Обращения к директору","status":"готово","mechanics":["Создание, входящие и свои","Переписка, ответ, закрытие","Отметка, что обращение переведено в задачу"],"plan":"","children":[]},{"id":"p2-g2-i2","name":"Согласования","status":"в процессе","mechanics":["Входящие, свои и завершённые","Шаблоны","Карточка, решение по шагу, проверка, файлы и сообщения"],"plan":"На тестировании вместе с браузерным компонентом. Ориентир правок: 18 декабря 2026.","children":[]},{"id":"p2-g2-i3","name":"База знаний","status":"готово","mechanics":["Список и карточка документа","Создание и правка с файлами","Версии документа и файла, избранное, скачивание"],"plan":"","children":[]},{"id":"p2-g2-i4","name":"Новости","status":"готово","mechanics":["Лента и непрочитанные","Подтверждение прочтения, реакция, комментарий, опрос"],"plan":"","children":[]},{"id":"p2-g2-i5","name":"Уведомления","status":"готово","mechanics":["Список непрочитанных и отметка прочитанным","Регистрация push-устройства","Счётчики на вкладках: уведомления, задачи, проекты, непрочитанные новости"],"plan":"","children":[]},{"id":"p2-g2-i6","name":"Отсутствия","status":"готово","mechanics":["Кто отсутствует сейчас и кто отсутствует в ближайшее время"],"plan":"","children":[]}]},{"id":"p2-g3","name":"Директор","summary":"","status":"","mechanics":[],"plan":"","children":[{"id":"p2-g3-i0","name":"Команда и сводка","status":"готово","mechanics":["Сводка по команде","Настройка дайджеста директору и отправка по расписанию"],"plan":"","children":[]},{"id":"p2-g3-i1","name":"Аналитика","status":"готово","mechanics":["Отделы, сотрудники, сводка и детализация","Бизнес-процессы и узлы","Согласования","Узкие места по людям и отделам"],"plan":"","children":[]}]}]},{"id":"p3","name":"Мобильное приложение дилеров","summary":"Сервер ПОЗ для дилеров. Код в репозитории есть. По заметке сервера сотрудников этот процесс сейчас не запускается: порт занят приложением сотрудников. Исходников Android нет.","status":"","mechanics":[],"plan":"","children":[{"id":"p3-g0","name":"Вход и новости","summary":"","status":"","mechanics":[],"plan":"","children":[{"id":"p3-g0-i0","name":"Сессия дилера","status":"готово","mechanics":["Вход по названию компании и паролю","Обновление сессии и выход","Пароль выдаётся в CRM"],"plan":"","children":[]},{"id":"p3-g0-i1","name":"Новости","status":"готово","mechanics":["Лента новостей","События ленты по веб-сокету","Push-регистрация устройства"],"plan":"","children":[]}]},{"id":"p3-g1","name":"Рекламации","summary":"","status":"","mechanics":[],"plan":"","children":[{"id":"p3-g1-i0","name":"Рекламация","status":"готово","mechanics":["Быстрая рекламация с вложениями","Пошаговый черновик: изделия из AW, позиции, причины, вложения, отправка","Список из учёта плюс обращения, которые менеджер ещё не зарегистрировал","Карточка заявки","Чат с менеджером по рекламации","Закрытые рекламации на оценку, оценка уходит в 1С","Комментарий к оценке","Фоновое подтягивание закрытых рекламаций"],"plan":"","children":[]},{"id":"p3-g1-i1","name":"Перевод обращения дилера в задачу","status":"план","mechanics":["Менеджер уже может открыть чат по напоминанию и отклонить обращение"],"plan":"В коде ответ сервера: перевод в задачу будет позже. Срок не задан.","children":[]}]}]},{"id":"p4","name":"Службы рядом с CRM","summary":"Отдельные процессы, на которые опираются экраны. Это не пункты меню.","status":"","mechanics":[],"plan":"","children":[{"id":"p4-g0","name":"Каналы","summary":"","status":"","mechanics":[],"plan":"","children":[{"id":"p4-g0-i0","name":"Telegram-бот сотрудников","status":"не работает","mechanics":["В коде есть регистрация сотрудника","В коде есть уведомления рабочих групп, пропущенных звонков, напоминаний и бизнес-процессов"],"plan":"Проект Telegram для сотрудников сейчас не работает. Срок восстановления не задан.","children":[]},{"id":"p4-g0-i1","name":"Telegram-бот дилеров","status":"не работает","mechanics":["В коде есть заказы, доставка, рекламации, консультации, расчёты","В коде есть финансы, сверки и маркетинговые сообщения","Запросы из бота рассчитаны на колонку уведомлений менеджера задач","В меню доставки пункт «На какую дату принимаете?» помечен в коде как находящийся в разработке"],"plan":"Проект Telegram для дилеров сейчас не работает. Срок восстановления не задан.","children":[]},{"id":"p4-g0-i2","name":"Телефония Asterisk","status":"в процессе","mechanics":["Приём событий звонков","Списки пропущенных, принятых и обработанных для CRM","Журнал AMI за сутки: события, каталог полей и сводка возможностей","Сводка проверяет очереди, запись разговора, переводы, форматы номеров, исходящий вызов, удержание, конференцию и голосовую почту"],"plan":"Текущие списки звонков работают. Журнал возможностей собирается до 14 ноября 2026. Дальше по сводке: исходящий звонок к 18 декабря 2026, запись разговора к 30 января 2027, перевод к 27 февраля 2027, очереди к 27 марта 2027. В работу идёт только то, что станция реально отдала.","children":[]},{"id":"p4-g0-i3","name":"Почтовый сервис","status":"готово","mechanics":["Подключение почты сотрудника для экрана писем"],"plan":"","children":[]},{"id":"p4-g0-i4","name":"Учёт и заказы","status":"готово","mechanics":["Выборка заказов и поиск материалов","Изделия заказа для рекламации дилера","Обмен с 1С по рекламациям и оценкам"],"plan":"","children":[]}]}]}]}</script>
+  <script>
+    const data = JSON.parse(document.getElementById('tree-data').textContent)
+    const treeEl = document.getElementById('tree')
+    const detailEl = document.getElementById('detail')
+    const expanded = new Set()
+    let selectedId = data.nodes[0] ? data.nodes[0].id : ''
+
+    function statusClass(status) {
+      if (!status) return 's-branch'
+      return 's-' + status.replace(/\s+/g, '-')
+    }
+
+    function statusText(status) {
+      if (status === 'готово') return 'Сделано'
+      if (status === 'в процессе') return 'В процессе'
+      if (status === 'план') return 'В планах'
+      if (status === 'не работает') return 'Не работает'
+      if (status === 'скрыто') return 'Скрыто в меню'
+      return 'Раздел'
+    }
+
+    function tally(node) {
+      const bag = { готово: 0, 'в процессе': 0, план: 0, 'не работает': 0, скрыто: 0 }
+      function walk(item) {
+        if (item.status && bag[item.status] != null) bag[item.status] += 1
+        ;(item.children || []).forEach(walk)
+      }
+      ;(node.children || []).forEach(walk)
+      return bag
+    }
+
+    function find(id, nodes) {
+      for (let i = 0; i < nodes.length; i += 1) {
+        if (nodes[i].id === id) return nodes[i]
+        const nested = find(id, nodes[i].children || [])
+        if (nested) return nested
+      }
+      return null
+    }
+
+    function dots(node) {
+      const bag = tally(node)
+      const wrap = document.createElement('span')
+      wrap.className = 'dots'
+      ;[
+        ['готово', 'done'],
+        ['в процессе', 'progress'],
+        ['план', 'plan'],
+        ['не работает', 'broken'],
+        ['скрыто', 'hidden'],
+      ].forEach(function (pair) {
+        if (!bag[pair[0]]) return
+        const mark = document.createElement('span')
+        mark.className = 'dot ' + pair[1]
+        mark.title = bag[pair[0]] + ' · ' + statusText(pair[0])
+        wrap.appendChild(mark)
+      })
+      return wrap
+    }
+
+    function drawNode(node) {
+      const block = document.createElement('div')
+      const row = document.createElement('div')
+      row.className = 'row'
+      const button = document.createElement('button')
+      button.type = 'button'
+      button.className = 'node ' + statusClass(node.status)
+      if (node.id === selectedId) button.className += ' selected'
+      const hasKids = (node.children || []).length > 0
+      button.textContent = (hasKids ? (expanded.has(node.id) ? '▾ ' : '▸ ') : '') + node.name
+      button.setAttribute('aria-pressed', node.id === selectedId ? 'true' : 'false')
+      button.addEventListener('click', function () {
+        selectedId = node.id
+        if (hasKids) {
+          if (expanded.has(node.id)) expanded.delete(node.id)
+          else expanded.add(node.id)
+        }
+        draw()
+      })
+      row.appendChild(button)
+      if (hasKids && !node.status) row.appendChild(dots(node))
+      block.appendChild(row)
+      if (hasKids && expanded.has(node.id)) {
+        const branch = document.createElement('div')
+        branch.className = 'branch'
+        node.children.forEach(function (child) {
+          branch.appendChild(drawNode(child))
+        })
+        block.appendChild(branch)
+      }
+      return block
+    }
+
+    function drawDetail() {
+      const node = find(selectedId, data.nodes)
+      while (detailEl.firstChild) detailEl.removeChild(detailEl.firstChild)
+      if (!node) return
+      const title = document.createElement('h2')
+      title.textContent = node.name
+      const state = document.createElement('p')
+      state.textContent = statusText(node.status)
+      detailEl.appendChild(title)
+      detailEl.appendChild(state)
+      if (node.summary) {
+        const summary = document.createElement('p')
+        summary.className = 'muted'
+        summary.textContent = node.summary
+        detailEl.appendChild(summary)
+      }
+      if ((node.mechanics || []).length) {
+        const list = document.createElement('ul')
+        node.mechanics.forEach(function (line) {
+          const item = document.createElement('li')
+          item.textContent = line
+          list.appendChild(item)
+        })
+        detailEl.appendChild(list)
+      }
+      if (node.plan) {
+        const plan = document.createElement('p')
+        plan.textContent = node.plan
+        detailEl.appendChild(plan)
+      }
+      if (!node.status && (node.children || []).length) {
+        const bag = tally(node)
+        const line = document.createElement('p')
+        line.className = 'muted'
+        line.textContent = 'Сделано ' + bag['готово'] + ', в процессе ' + bag['в процессе'] + ', в планах ' + bag['план'] + ', не работает ' + bag['не работает'] + ', скрыто ' + bag['скрыто']
+        detailEl.appendChild(line)
+      }
+    }
+
+    function draw() {
+      while (treeEl.firstChild) treeEl.removeChild(treeEl.firstChild)
+      data.nodes.forEach(function (node) {
+        treeEl.appendChild(drawNode(node))
+      })
+      drawDetail()
+    }
+
+    draw()
+  </script>
+</body>
+</html>

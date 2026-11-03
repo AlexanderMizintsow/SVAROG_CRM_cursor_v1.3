@@ -12,6 +12,7 @@ import useTaskStateTracker from '../../../../../store/useTaskStateTracker'
 import KnowledgeLinkPicker from '../../../../knowledgeBase/KnowledgeLinkPicker'
 import { buildKnowledgePlainMarker } from '../../../../knowledgeBase/knowledgeLinkUtils'
 import { makeChatKnowledgeRenderer } from '../../../../knowledgeBase/chatKnowledgeText'
+import PresenceDot from '../../../../../components/presenceDot/PresenceDot'
 
 const GlobalTaskChat = ({
   onClick,
@@ -357,7 +358,10 @@ const GlobalTaskChat = ({
         )}
         {!isCurrentUser && (
           <div className="author-info">
-            {msg.first_name} {msg.last_name}
+            <span className="presence-dot-row">
+              {msg.first_name} {msg.last_name}
+              <PresenceDot userId={msg.user_id} />
+            </span>
           </div>
         )}
         {isEditing ? (

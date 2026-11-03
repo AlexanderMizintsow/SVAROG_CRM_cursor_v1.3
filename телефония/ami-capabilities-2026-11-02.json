@@ -1,0 +1,70 @@
+{
+  "startedAt": "2026-11-01T20:00:16.759Z",
+  "signals": {
+    "uniqueid": false,
+    "linkedid": false,
+    "connectedLine": false,
+    "queue": false,
+    "recording": false,
+    "transfer": false,
+    "cdr": false,
+    "hold": false,
+    "dtmf": false,
+    "conference": false,
+    "voicemail": false,
+    "dial": false,
+    "bridge": false,
+    "originate": false,
+    "attendedTransfer": false,
+    "blindTransfer": false
+  },
+  "privileges": {
+    "system,all": 20
+  },
+  "contexts": {},
+  "applications": {},
+  "events": {
+    "Registry": 13,
+    "PeerStatus": 6,
+    "Shutdown": 1
+  },
+  "dialStatus": {},
+  "channelState": {},
+  "hangupCause": {},
+  "hangupCauseText": {},
+  "channelTechnologies": {},
+  "numberShapes": {},
+  "contextAndNumber": {},
+  "variableNames": {},
+  "accountCodes": {},
+  "bridgeTypes": {},
+  "extenValuesShort": {},
+  "durations": {},
+  "recording": {
+    "fields": {},
+    "formats": {},
+    "examples": []
+  },
+  "control": {
+    "probeSent": false,
+    "probeCount": 0,
+    "probeResult": null,
+    "probeMessage": null,
+    "amiCommands": {},
+    "routingApplications": {},
+    "routingExamples": [],
+    "queues": {},
+    "forwardVariables": {},
+    "stateEvents": {
+      "PeerStatus": 6
+    },
+    "targets": {}
+  },
+  "updatedAt": "2026-11-02T20:00:33.959Z",
+  "counts": {
+    "chunks": 1427,
+    "messages": 20,
+    "parseErrors": 0,
+    "bufferResets": 0
+  }
+}

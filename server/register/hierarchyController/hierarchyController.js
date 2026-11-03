@@ -8,7 +8,8 @@ const getEmployeeHierarchy = (dbPool) => async (req, res) => {
               COALESCE(p.name, 'Не указана должность') AS job_title,
               d.name AS department,  -- Добавляем отдел
               u.supervisor_id,
-              u.gender   
+              u.gender,
+              COALESCE(u.status, 'offline') AS status
           FROM users u
           LEFT JOIN positions p ON u.position_id = p.id
           LEFT JOIN departments d ON u.department_id = d.id -- Присоединяем таблицу departments
@@ -22,7 +23,8 @@ const getEmployeeHierarchy = (dbPool) => async (req, res) => {
               COALESCE(p.name, 'Не указана должность') AS job_title,
               d.name AS department,  -- Добавляем отдел
               u.supervisor_id,
-              u.gender   
+              u.gender,
+              COALESCE(u.status, 'offline') AS status 
           FROM users u
           LEFT JOIN positions p ON u.position_id = p.id
           LEFT JOIN departments d ON u.department_id = d.id -- Присоединяем таблицу departments

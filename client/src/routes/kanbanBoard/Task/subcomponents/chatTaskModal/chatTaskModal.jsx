@@ -13,6 +13,7 @@ import KnowledgeLinkPicker from '../../../../knowledgeBase/KnowledgeLinkPicker'
 import { buildKnowledgePlainMarker, enhanceKnowledgeLinksInHtml } from '../../../../knowledgeBase/knowledgeLinkUtils'
 import { handleKnowledgeDescriptionClick } from '../../../../knowledgeBase/openKnowledgeLink'
 import { makeChatKnowledgeRenderer } from '../../../../knowledgeBase/chatKnowledgeText'
+import PresenceDot from '../../../../../components/presenceDot/PresenceDot'
 import './chatTaskModal.scss'
 
 /** Отпечаток файла: SHA-256 при наличии crypto.subtle, иначе FNV (не-secure context). */
@@ -484,6 +485,7 @@ const ChatTaskModal = ({
         if (!acc.some((p) => p.id === message.senderId)) {
           acc.push({
             author: message.task_author_id,
+            senderId: message.sender_id || message.senderId,
             nameImplementer: message.sender_name,
             nameAuthor: message.author_name,
           })
@@ -1072,7 +1074,14 @@ const ChatTaskModal = ({
               {/* Отправитель и время */}
               <div className="message-header">
                 <span className="sender-name">
-                  {isMine ? 'Вы' : message.sender_name || 'Отправитель'}
+                  {isMine ? (
+                    'Вы'
+                  ) : (
+                    <span className="presence-dot-row">
+                      {message.sender_name || 'Отправитель'}
+                      <PresenceDot userId={message.sender_id} />
+                    </span>
+                  )}
                 </span>
                 <div className="message-header-actions">
                   <span className="message-time">
@@ -1271,8 +1280,14 @@ const ChatTaskModal = ({
             {participants.length > 0 ? (
               participants.map((participant) => (
                 <div className="participant" key={participant.author}>
-                  <div>{participant.nameImplementer} (Исполнитель)</div>
-                  <div>{participant.nameAuthor} (Автор)</div>
+                  <div className="presence-dot-row">
+                    {participant.nameImplementer} (Исполнитель)
+                    <PresenceDot userId={participant.senderId} />
+                  </div>
+                  <div className="presence-dot-row">
+                    {participant.nameAuthor} (Автор)
+                    <PresenceDot userId={participant.author} />
+                  </div>
                 </div>
               ))
             ) : (

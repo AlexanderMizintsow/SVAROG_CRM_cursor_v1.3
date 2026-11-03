@@ -133,6 +133,8 @@ const {
   deleteUser,
   createUser,
   updateUserStatus,
+  getUsersPresence,
+  getUserPresence,
   uploadAvatar,
   getAvatar,
   getEmailSignature,
@@ -516,6 +518,7 @@ app.get('/api/server-time', (req, res) => {
 
 /*************Маршруты для работы с СОТРУДНИКАМИ**************/
 app.get('/api/users', getUsers(dbPool))
+app.get('/api/users/presence', getUsersPresence(dbPool))
 app.get('/api/users/mobile-staff-access', getUsersMobileStaffAccess(dbPool))
 app.put('/api/users/mobile-staff-password/:id', updateMobileStaffPassword(dbPool))
 app.get('/api/users/absences/active', getActiveUserAbsences(dbPool))
@@ -526,6 +529,7 @@ app.put('/api/users/:id', updateUser(dbPool))
 app.delete('/api/users/delete/:id', deleteUser(dbPool))
 app.post('/api/users/new', createUser(dbPool))
 app.post('/update-status', updateUserStatus(dbPool, io))
+app.get('/api/users/:id/presence', getUserPresence(dbPool))
 app.post('/api/users/:id/avatar', upload.single('avatar'), uploadAvatar(dbPool))
 app.get('/api/users/:id/avatar', getAvatar(dbPool))
 app.get('/api/users/:id/email-signature', getEmailSignature(dbPool))
@@ -1186,6 +1190,73 @@ app.delete('/api/editor-handle/permissions/:id', deleteEditorPermissions(dbPool)
 
 registerApprovalRoutes(app, dbPool)
 
+// Сколько сокетов с userId сейчас открыто. Закрытие одной вкладки или экрана
+// не переводит в offline, пока жива хотя бы одна.
+const presenceCounts = new Map()
+const offlineTimers = new Map()
+const PRESENCE_OFFLINE_DELAY_MS = 20000
+
+function presenceUserId(raw) {
+  const id = Number(raw)
+  if (!Number.isFinite(id) || id <= 0) return null
+  return id
+}
+
+function clearOfflineTimer(userId) {
+  const timer = offlineTimers.get(userId)
+  if (timer) {
+    clearTimeout(timer)
+    offlineTimers.delete(userId)
+  }
+}
+
+async function setPresenceStatus(userId, status) {
+  const result = await dbPool.query(
+    `UPDATE users SET status = $2 WHERE id = $1 AND status IS DISTINCT FROM $2`,
+    [userId, status]
+  )
+  if (result.rowCount > 0) {
+    io.emit('userStatusUpdated', { userId, status })
+  }
+}
+
+// Старые записи online/not_active остаются в базе, если окно закрыли до
+// появления счётчика сокетов. Без открытого сокета это не «окно CRM открыто».
+function connectedPresenceIds() {
+  const ids = []
+  for (const [id, count] of presenceCounts) {
+    if (count > 0) ids.push(id)
+  }
+  return ids
+}
+
+async function reconcilePresence() {
+  const connectedIds = connectedPresenceIds()
+  const keepIds = [...new Set([...connectedIds, ...offlineTimers.keys()])]
+  const offlineResult = await dbPool.query(
+    `UPDATE users
+     SET status = 'offline'
+     WHERE status IS DISTINCT FROM 'offline'
+       AND NOT (id = ANY($1::int[]))
+     RETURNING id`,
+    [keepIds]
+  )
+  let changed = offlineResult.rowCount > 0
+  if (connectedIds.length > 0) {
+    const onlineResult = await dbPool.query(
+      `UPDATE users
+       SET status = 'online'
+       WHERE status = 'offline' AND id = ANY($1::int[])
+       RETURNING id`,
+      [connectedIds]
+    )
+    changed = changed || onlineResult.rowCount > 0
+  }
+  if (changed) {
+    io.emit('userStatusUpdated', { refresh: true })
+  }
+}
+
 // Комнаты соккет
 io.on('connection', (socket) => {
   const userId = socket.handshake.query.userId // Получаем userId из запроса
@@ -1194,5 +1265,57 @@ io.on('connection', (socket) => {
     socket.join(String(userId)) // Комната по userId (строка), чтобы io.to(String(uid)).emit доходил
   }
 
-  socket.on('disconnect', () => {})
+  const presenceId = presenceUserId(userId)
+  if (!presenceId) return
+
+  clearOfflineTimer(presenceId)
+  const nextCount = (presenceCounts.get(presenceId) || 0) + 1
+  presenceCounts.set(presenceId, nextCount)
+  if (nextCount === 1) {
+    dbPool
+      .query(
+        `UPDATE users SET status = 'online' WHERE id = $1 AND status = 'offline' RETURNING id`,
+        [presenceId]
+      )
+      .then((result) => {
+        if (result.rowCount > 0) {
+          io.emit('userStatusUpdated', { userId: presenceId, status: 'online' })
+        }
+      })
+      .catch((error) => {
+        console.error('Ошибка перевода в online:', error)
+      })
+  }
+
+  socket.on('disconnect', () => {
+    const left = (presenceCounts.get(presenceId) || 1) - 1
+    if (left > 0) {
+      presenceCounts.set(presenceId, left)
+      return
+    }
+    presenceCounts.delete(presenceId)
+    clearOfflineTimer(presenceId)
+    const timer = setTimeout(() => {
+      offlineTimers.delete(presenceId)
+      if ((presenceCounts.get(presenceId) || 0) > 0) return
+      setPresenceStatus(presenceId, 'offline').catch((error) => {
+        console.error('Ошибка перевода в offline:', error)
+      })
+    }, PRESENCE_OFFLINE_DELAY_MS)
+    offlineTimers.set(presenceId, timer)
+  })
 })
+
+reconcilePresence().catch((error) => {
+  console.error('Ошибка сверки статусов присутствия:', error)
+})
+setTimeout(() => {
+  reconcilePresence().catch((error) => {
+    console.error('Ошибка сверки статусов присутствия:', error)
+  })
+}, 8000)
+setInterval(() => {
+  reconcilePresence().catch((error) => {
+    console.error('Ошибка сверки статусов присутствия:', error)
+  })
+}, 60000)

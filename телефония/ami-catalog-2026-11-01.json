@@ -1,0 +1,206 @@
+{
+  "startedAt": "2026-11-01T13:48:30.688Z",
+  "events": {
+    "FullyBooted": {
+      "count": 1,
+      "fields": {
+        "Event": 1,
+        "Privilege": 1,
+        "Status": 1
+      },
+      "example": {
+        "Event": "FullyBooted",
+        "Privilege": "system,all",
+        "Status": "Fully Booted"
+      }
+    },
+    "Registry": {
+      "count": 493,
+      "fields": {
+        "Event": 493,
+        "Privilege": 493,
+        "ChannelType": 493,
+        "Domain": 493,
+        "Status": 493
+      },
+      "example": {
+        "Event": "Registry",
+        "Privilege": "system,all",
+        "ChannelType": "SIP",
+        "Domain": "ip.beeline.ru",
+        "Status": "Registered"
+      }
+    },
+    "PeerStatus": {
+      "count": 348,
+      "fields": {
+        "Event": 348,
+        "Privilege": 348,
+        "ChannelType": 348,
+        "Peer": 348,
+        "PeerStatus": 348,
+        "Address": 339,
+        "Time": 6,
+        "Cause": 3
+      },
+      "example": {
+        "Event": "PeerStatus",
+        "Privilege": "system,all",
+        "ChannelType": "SIP",
+        "Peer": "SIP/106",
+        "PeerStatus": "Registered",
+        "Address": "192.168.57.138:11911"
+      }
+    },
+    "ExtensionStatus": {
+      "count": 6,
+      "fields": {
+        "Event": 6,
+        "Privilege": 6,
+        "Exten": 6,
+        "Context": 6,
+        "Hint": 6,
+        "Status": 6
+      },
+      "example": {
+        "Event": "ExtensionStatus",
+        "Privilege": "call,all",
+        "Exten": "138",
+        "Context": "ext-local",
+        "Hint": "SIP/138",
+        "Status": "4"
+      }
+    }
+  },
+  "responses": {
+    "Success": {
+      "count": 2,
+      "fields": {
+        "Response": 2,
+        "Message": 1,
+        "ActionID": 1,
+        "WATShowSpans": 1,
+        "QueueReset": 1,
+        "QueueReload": 1,
+        "QueueRule": 1,
+        "QueuePenalty": 1,
+        "QueueLog": 1,
+        "QueuePause": 1,
+        "QueueRemove": 1,
+        "QueueAdd": 1,
+        "QueueSummary": 1,
+        "QueueStatus": 1,
+        "Queues": 1,
+        "MixMonitorMute": 1,
+        "VoicemailUsersList": 1,
+        "PlayDTMF": 1,
+        "DongleReload": 1,
+        "DongleRemove": 1,
+        "DongleStart": 1,
+        "DongleStop": 1,
+        "DongleRestart": 1,
+        "DongleReset": 1,
+        "DongleSetCCWA": 1,
+        "DongleSendPDU": 1,
+        "DongleSendSMS": 1,
+        "DongleSendUSSD": 1,
+        "DongleShowDevices": 1,
+        "MuteAudio": 1,
+        "MeetmeList": 1,
+        "MeetmeUnmute": 1,
+        "MeetmeMute": 1,
+        "IAXregistry": 1,
+        "IAXnetstats": 1,
+        "IAXpeerlist": 1,
+        "IAXpeers": 1,
+        "SIPnotify": 1,
+        "SIPshowregistry": 1,
+        "SIPqualifypeer": 1,
+        "SIPshowpeer": 1,
+        "SIPpeers": 1,
+        "WATShowSpan": 1,
+        "WATSendSms": 1,
+        "WaitEvent": 1,
+        "DAHDIRestart": 1,
+        "DAHDIShowChannels": 1,
+        "DAHDIDNDoff": 1,
+        "DAHDIDNDon": 1,
+        "DAHDIDialOffhook": 1,
+        "DAHDIHangup": 1,
+        "DAHDITransfer": 1,
+        "AgentLogoff": 1,
+        "Agents": 1,
+        "UnpauseMonitor": 1,
+        "PauseMonitor": 1,
+        "ChangeMonitor": 1,
+        "StopMonitor": 1,
+        "Monitor": 1,
+        "JabberSend": 1,
+        "DBDelTree": 1,
+        "DBDel": 1,
+        "DBPut": 1,
+        "DBGet": 1,
+        "Bridge": 1,
+        "Park": 1,
+        "ParkedCalls": 1,
+        "ShowDialPlan": 1,
+        "ModuleCheck": 1,
+        "ModuleLoad": 1,
+        "CoreShowChannels": 1,
+        "Reload": 1,
+        "CoreStatus": 1,
+        "CoreSettings": 1,
+        "UserEvent": 1,
+        "UpdateConfig": 1,
+        "SendText": 1,
+        "ListCommands": 1,
+        "MailboxCount": 1,
+        "MailboxStatus": 1,
+        "AbsoluteTimeout": 1,
+        "ExtensionState": 1,
+        "Command": 1,
+        "Originate": 1,
+        "Atxfer": 1,
+        "Redirect": 1,
+        "ListCategories": 1,
+        "CreateConfig": 1,
+        "Status": 1,
+        "GetConfigJSON": 1,
+        "GetConfig": 1,
+        "Getvar": 1,
+        "Setvar": 1,
+        "Ping": 1,
+        "Hangup": 1,
+        "Challenge": 1,
+        "Login": 1,
+        "Logoff": 1,
+        "Events": 1,
+        "LocalOptimizeAway": 1,
+        "DataGet": 1
+      },
+      "example": {
+        "Response": "Success",
+        "Message": "Authentication accepted"
+      }
+    }
+  },
+  "traces": {
+    "logger_started": 1,
+    "ami_tcp_connected": 1,
+    "control_probe_sent": 1,
+    "crm_socket_connected": 1,
+    "heartbeat": 371,
+    "parser_receiver": 1,
+    "parser_receiver_duplicate": 5
+  },
+  "updatedAt": "2026-11-01T20:00:16.757Z",
+  "counts": {
+    "chunks": 850,
+    "messages": 850,
+    "parseErrors": 0,
+    "bufferResets": 0
+  },
+  "dayBytes": 266141,
+  "part": 1,
+  "stopped": false
+}

@@ -6,6 +6,7 @@ import { LiaSmsSolid } from 'react-icons/lia'
 import { TbPhoneCall } from 'react-icons/tb'
 import { IoMdVideocam } from 'react-icons/io'
 import { API_BASE_URL } from '../../../../config'
+import PresenceDot from '../../../components/presenceDot/PresenceDot'
 import malePlaceholder from '../../../../src/assets/img/manAvatar.png'
 import femalePlaceholder from '../../../../src/assets/img/womanAvatar.png'
 import './HierarchyTreeEmployee.scss'
@@ -128,6 +129,9 @@ const HierarchyTreeEmployee = () => {
                 <p>{employee.job_title}</p>
                 <p>{employee.department || 'Не указан отдел'}</p>
                 <div className="card-footer">
+                  <span className="hierarchy-presence">
+                    <PresenceDot userId={employee.id} fallbackStatus={employee.status} />
+                  </span>
                   <TbPhoneCall className="card-footer-icon" title="Не доступно!" />
                   <LiaSmsSolid className="card-footer-icon" title="Не доступно!" />
                   <IoMdVideocam className="card-footer-icon" title="Не доступно!" />

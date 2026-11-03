@@ -1,0 +1,27 @@
+.presence-dot-row {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  max-width: 100%;
+}
+
+.presence-dot {
+  display: inline-block;
+  width: 10px;
+  height: 10px;
+  min-width: 10px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.presence-dot--online {
+  background-color: green;
+}
+
+.presence-dot--idle {
+  background-color: gray;
+}
+
+.presence-dot--offline {
+  background-color: red;
+}

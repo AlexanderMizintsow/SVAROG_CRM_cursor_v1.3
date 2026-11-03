@@ -250,6 +250,36 @@ const createUser = (dbPool) => async (req, res) => {
   }
 }
 
+const getUsersPresence = (dbPool) => async (req, res) => {
+  try {
+    const result = await dbPool.query(
+      `SELECT id, COALESCE(status, 'offline') AS status FROM users`
+    )
+    res.json(result.rows)
+  } catch (error) {
+    console.error('Ошибка при получении статусов пользователей:', error)
+    res.status(500).json({ error: 'Ошибка сервера' })
+  }
+}
+
+const getUserPresence = (dbPool) => async (req, res) => {
+  const userId = Number(req.params.id)
+  if (!Number.isFinite(userId) || userId <= 0) {
+    return res.status(400).json({ error: 'Неверный id' })
+  }
+
+  try {
+    const result = await dbPool.query('SELECT status FROM users WHERE id = $1', [userId])
+    if (!result.rows.length) {
+      return res.status(404).json({ error: 'Пользователь не найден' })
+    }
+    res.json({ status: result.rows[0].status || 'offline' })
+  } catch (error) {
+    console.error('Ошибка при получении статуса пользователя:', error)
+    res.status(500).json({ error: 'Ошибка сервера' })
+  }
+}
+
 // Обновление статуса пользователя
 const updateUserStatus = (dbPool, io) => async (req, res) => {
   const { userId, status } = req.body
@@ -1132,6 +1162,8 @@ module.exports = {
   deleteUser,
   createUser,
   updateUserStatus,
+  getUsersPresence,
+  getUserPresence,
   uploadAvatar,
   getAvatar,
   getEmailSignature,

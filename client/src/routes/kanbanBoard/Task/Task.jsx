@@ -28,6 +28,7 @@ import { handleKnowledgeDescriptionClick } from '../../knowledgeBase/openKnowled
 import { enhanceKnowledgeLinksInHtml } from '../../knowledgeBase/knowledgeLinkUtils'
 import './Task.scss'
 import ApprovalSourceMark from '../../approvals/ApprovalSourceMark'
+import PresenceDot from '../../../components/presenceDot/PresenceDot'
 
 const Task = forwardRef(({ task, provided, actionIcon, column }, ref) => {
   const {
@@ -458,6 +459,18 @@ const Task = forwardRef(({ task, provided, actionIcon, column }, ref) => {
         </div>
         <div className={`task-info ${isTaskInfoCollapsed ? 'collapsed' : ''}`}>
           <Attachments attachments={attachments} />
+          {assigned_user_ids?.filter(Boolean).length > 0 && (
+            <p className="task-participants" style={{ width: 'fit-content' }}>
+              Исполнитель:{' '}
+              {assigned_user_ids.filter(Boolean).map((assigneeId, index, list) => (
+                <span key={assigneeId}>
+                  {getUserNames(assigneeId, users)}
+                  <PresenceDot userId={assigneeId} />
+                  {index < list.length - 1 ? ', ' : ''}
+                </span>
+              ))}
+            </p>
+          )}
           <Tooltip title={getUserNames(created_by, users)} placement="right" arrow>
             <p className="task-participants" style={{ width: 'fit-content' }}>
               Автор задачи: {'  '} <TbUserEdit className="task-participants-icon" />

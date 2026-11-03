@@ -17,6 +17,7 @@ import {
 import { MdEmail, MdSettings } from 'react-icons/md'
 import { MdCalendarMonth, MdAccessTime } from 'react-icons/md'
 import useUserStore from '../../../store/userStore'
+import PresenceDot from '../../../components/presenceDot/PresenceDot'
 import {
   getPriorityClass,
   getPriorityLabel,
@@ -718,7 +719,10 @@ const GlobalTaskCard = ({
                   </div>
                   <div className="global-task-card__responsible-main">
                     <div className="global-task-card__responsible-name">
-                      {resp.name}
+                      <span className="presence-dot-row">
+                        {resp.name}
+                        <PresenceDot userId={resp.id} />
+                      </span>
                     </div>
                     <div
                       className={`global-task-card__responsible-role ${getResponsibleTextColorClass(

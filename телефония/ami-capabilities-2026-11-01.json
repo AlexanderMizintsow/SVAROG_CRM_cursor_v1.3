@@ -1,0 +1,92 @@
+{
+  "startedAt": "2026-11-01T13:48:30.689Z",
+  "signals": {
+    "uniqueid": false,
+    "linkedid": false,
+    "connectedLine": false,
+    "queue": false,
+    "recording": true,
+    "transfer": false,
+    "cdr": false,
+    "hold": false,
+    "dtmf": false,
+    "conference": false,
+    "voicemail": false,
+    "dial": false,
+    "bridge": false,
+    "originate": false,
+    "attendedTransfer": false,
+    "blindTransfer": false
+  },
+  "privileges": {
+    "system,all": 842,
+    "call,all": 6
+  },
+  "contexts": {
+    "ext-local": 6
+  },
+  "applications": {},
+  "events": {
+    "Response:Success": 2,
+    "FullyBooted": 1,
+    "Registry": 493,
+    "PeerStatus": 348,
+    "ExtensionStatus": 6
+  },
+  "dialStatus": {},
+  "channelState": {},
+  "hangupCause": {
+    "Expired": 3
+  },
+  "hangupCauseText": {},
+  "channelTechnologies": {},
+  "numberShapes": {
+    "Exten:short-3": 6
+  },
+  "contextAndNumber": {
+    "ext-local + short-3": 6
+  },
+  "variableNames": {},
+  "accountCodes": {},
+  "bridgeTypes": {},
+  "extenValuesShort": {
+    "138": 5,
+    "147": 1
+  },
+  "durations": {},
+  "recording": {
+    "fields": {
+      "event.MixMonitorMute": 1,
+      "event.UnpauseMonitor": 1,
+      "event.PauseMonitor": 1,
+      "event.ChangeMonitor": 1,
+      "event.StopMonitor": 1,
+      "event.Monitor": 1
+    },
+    "formats": {},
+    "examples": []
+  },
+  "control": {
+    "probeSent": true,
+    "probeCount": 1,
+    "probeResult": "Success",
+    "probeMessage": null,
+    "amiCommands": {},
+    "routingApplications": {},
+    "routingExamples": [],
+    "queues": {},
+    "forwardVariables": {},
+    "stateEvents": {
+      "PeerStatus": 348,
+      "ExtensionStatus": 6
+    },
+    "targets": {}
+  },
+  "updatedAt": "2026-11-01T20:00:16.757Z",
+  "counts": {
+    "chunks": 850,
+    "messages": 850,
+    "parseErrors": 0,
+    "bufferResets": 0
+  }
+}

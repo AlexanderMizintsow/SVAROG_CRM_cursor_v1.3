@@ -14,13 +14,23 @@ const useKanbanStore = create((set) => ({
       const response = await axios.get(
         `${API_BASE_URL}5000/api/employees/subordinate/${userId}` // Получение списка сотрудников со статусами, подчиненные
       )
+      let ownStatus = 'online'
+      try {
+        const presence = await axios.get(`${API_BASE_URL}5000/api/users/${userId}/presence`)
+        if (presence.data?.status) ownStatus = presence.data.status
+      } catch (presenceError) {
+        console.error(
+          'Ошибка загрузки своего статуса:',
+          presenceError.response?.data || presenceError.message
+        )
+      }
       const employeesWithTasks = [
         {
           user_id: userId,
           last_name: '',
           first_name: 'Мои задачи',
           middle_name: '',
-          status: 'online',
+          status: ownStatus,
         },
         ...response.data,
       ]

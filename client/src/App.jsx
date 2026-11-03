@@ -13,6 +13,7 @@ import useUserStore from "./store/userStore";
 import useRemindersStore from "./store/useRemindersStore";
 import callsNotificationStore from "./store/callsNotificationStore";
 import useKanbanStore from "./store/useKanbanStore.js";
+import usePresenceStore from "./store/usePresenceStore";
 import ActivityTracker from "./utils/activityTracker.js";
 import { getSeasonBackground } from "./utils/backgroundSelector.js";
 import {
@@ -43,6 +44,8 @@ function App() {
   const { reminders } = useRemindersStore();
   const [lastNotificationCount, setLastNotificationCount] = useState(0);
   const { fetchEmployees, setSelectedEmployeeId } = useKanbanStore();
+  const loadPresence = usePresenceStore((state) => state.load);
+  const setPresenceStatus = usePresenceStore((state) => state.setStatus);
   const prevRemindersRef = useRef();
   const [isConnectBD, setIsConnectBD] = useState(null);
   const { fetchTasksManager } = useTasksManageStore();
@@ -139,21 +142,30 @@ function App() {
   // Слушаем событие изменения статуса пользователя онлайн или офлайн
   useEffect(() => {
     const socket = io(`${API_BASE_URL}5000`);
-    socket.on("userStatusUpdated", () => {
+    socket.on("userStatusUpdated", (payload) => {
+      if (payload && payload.refresh) {
+        loadPresence();
+        fetchEmployees(userId);
+        return;
+      }
+      if (payload && payload.userId && payload.status) {
+        setPresenceStatus(payload.userId, payload.status);
+      }
       fetchEmployees(userId);
     });
     return () => {
       socket.off("userStatusUpdated");
       socket.disconnect();
     };
-  }, [fetchEmployees, userId]);
+  }, [fetchEmployees, userId, setPresenceStatus, loadPresence]);
   // Получение всех подчиненных сотрудников, их id списком
   useEffect(() => {
     if (userId) {
       setSelectedEmployeeId(userId);
       fetchEmployees(userId); // Загружаем сотрудников при первом запуске
+      loadPresence();
     }
-  }, [userId, fetchEmployees]);
+  }, [userId, fetchEmployees, loadPresence]);
 
   useEffect(() => {
     requestNotificationPermission(); // useEffect для запроса разрешения на уведомления

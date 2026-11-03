@@ -1,0 +1,73 @@
+{
+  "startedAt": "2026-11-01T20:00:16.759Z",
+  "events": {
+    "Registry": {
+      "count": 13,
+      "fields": {
+        "Event": 13,
+        "Privilege": 13,
+        "ChannelType": 13,
+        "Domain": 13,
+        "Status": 13
+      },
+      "example": {
+        "Event": "Registry",
+        "Privilege": "system,all",
+        "ChannelType": "SIP",
+        "Domain": "ip.beeline.ru",
+        "Status": "Registered"
+      }
+    },
+    "PeerStatus": {
+      "count": 6,
+      "fields": {
+        "Event": 6,
+        "Privilege": 6,
+        "ChannelType": 6,
+        "Peer": 6,
+        "PeerStatus": 6,
+        "Address": 6
+      },
+      "example": {
+        "Event": "PeerStatus",
+        "Privilege": "system,all",
+        "ChannelType": "SIP",
+        "Peer": "SIP/104",
+        "PeerStatus": "Registered",
+        "Address": "192.168.57.156:11928"
+      }
+    },
+    "Shutdown": {
+      "count": 1,
+      "fields": {
+        "Event": 1,
+        "Privilege": 1,
+        "Shutdown": 1,
+        "Restart": 1
+      },
+      "example": {
+        "Event": "Shutdown",
+        "Privilege": "system,all",
+        "Shutdown": "Cleanly",
+        "Restart": "False"
+      }
+    }
+  },
+  "responses": {},
+  "traces": {
+    "heartbeat": 1440,
+    "ami_tcp_end": 1409,
+    "ami_tcp_closed": 1408,
+    "ami_reconnect_scheduled": 1408
+  },
+  "updatedAt": "2026-11-02T20:00:33.959Z",
+  "counts": {
+    "chunks": 1427,
+    "messages": 20,
+    "parseErrors": 0,
+    "bufferResets": 0
+  },
+  "dayBytes": 735510,
+  "part": 1,
+  "stopped": false
+}
