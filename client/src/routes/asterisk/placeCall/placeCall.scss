@@ -1,0 +1,28 @@
+.place-call-wrap {
+  display: inline-flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-left: 8px;
+}
+
+.place-call {
+  border: 0;
+  border-radius: 6px;
+  padding: 2px 8px;
+  background: #2e7d32;
+  color: #fff;
+  font-size: 12px;
+  line-height: 1.4;
+  cursor: pointer;
+
+  &:disabled {
+    background: #c8c8c8;
+    cursor: default;
+  }
+}
+
+.place-call-note {
+  color: #1565c0;
+  font-size: 12px;
+}

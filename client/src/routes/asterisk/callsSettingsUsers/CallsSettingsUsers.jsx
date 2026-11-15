@@ -17,6 +17,10 @@ const CallsSettingsUsers = () => {
   const [showCallMissedTg, setShowCallMissedTg] = useState(false) // Новое состояние для Telegram
   const [showRemindersCalls, setShowRemindersCalls] = useState(false)
   const [openHelpModal, setOpenHelpModal] = useState(false)
+  const [canGrantStats, setCanGrantStats] = useState(false)
+  const [statsPeople, setStatsPeople] = useState([])
+  const [grantUserId, setGrantUserId] = useState('')
+  const [grantStats, setGrantStats] = useState(false)
 
   useEffect(() => {
     const fetchSettings = async () => {
@@ -40,6 +44,22 @@ const CallsSettingsUsers = () => {
           setShowAcceptedCallsEmployee(acceptedResponse.data.showAcceptedCallsEmployee)
           setShowCallMissedTg(tgResponse.data.showCallMissedTg) // Установка нового значения
           setShowRemindersCalls(remindersResponse.data.showRemindersCalls)
+          const accessResponse = await axios.get(
+            `${API_BASE_URL}5004/api/call-stats/access/${userId}`
+          )
+          setCanGrantStats(Boolean(accessResponse.data.canGrant))
+          if (accessResponse.data.canGrant) {
+            const peopleResponse = await axios.get(
+              `${API_BASE_URL}5004/api/call-stats/people/${userId}`
+            )
+            setStatsPeople(peopleResponse.data)
+            const self = peopleResponse.data.find((person) => person.id === userId)
+            const first = self || peopleResponse.data[0]
+            if (first) {
+              setGrantUserId(String(first.id))
+              setGrantStats(Boolean(first.show_call_stats))
+            }
+          }
         } catch (error) {
           console.error('Ошибка получения настроек:', error)
         } finally {
@@ -50,6 +70,38 @@ const CallsSettingsUsers = () => {
 
     fetchSettings()
   }, []) // Пустой массив, чтобы выполнить код только при монтировании компонента
+
+  const saveStatsAccess = async () => {
+    const userData = JSON.parse(localStorage.getItem('userData'))
+    const editorId = userData ? userData.id : null
+    if (!editorId || !grantUserId) return
+    try {
+      await axios.put(`${API_BASE_URL}5004/api/call-stats/access`, {
+        editorId,
+        userId: Number(grantUserId),
+        showCallStats: grantStats,
+      })
+      setStatsPeople((people) =>
+        people.map((person) =>
+          String(person.id) === String(grantUserId)
+            ? { ...person, show_call_stats: grantStats }
+            : person
+        )
+      )
+      Toastify({
+        text: grantStats ? 'Статистика открыта' : 'Статистика закрыта',
+        close: true,
+        style: { backgroundColor: 'linear-gradient(to right, #007BFF, #0056b3)' },
+        className: 'info',
+      }).showToast()
+    } catch (error) {
+      Toastify({
+        text: error.response?.data?.error || 'Не удалось сохранить доступ',
+        style: { backgroundColor: 'linear-gradient(to right, #ff0000, #ffcccc)' },
+        className: 'error',
+      }).showToast()
+    }
+  }
 
   const handleSaveSettings = async () => {
     const userData = JSON.parse(localStorage.getItem('userData'))
@@ -183,6 +235,42 @@ const CallsSettingsUsers = () => {
             </p>
           </span>
         </label>
+        {canGrantStats ? (
+          <div className="stats-grant">
+            <h4>Кому видна статистика звонков</h4>
+            <p>
+              Руководитель отдела видит статистику без галочки. Здесь её открывают
+              другому человеку.
+            </p>
+            <select
+              value={grantUserId}
+              onChange={(event) => {
+                const nextId = event.target.value
+                setGrantUserId(nextId)
+                const person = statsPeople.find((item) => String(item.id) === nextId)
+                setGrantStats(Boolean(person && person.show_call_stats))
+              }}
+            >
+              {statsPeople.map((person) => (
+                <option key={person.id} value={person.id}>
+                  {person.name || `Сотрудник ${person.id}`}
+                  {person.department_name ? `, ${person.department_name}` : ''}
+                </option>
+              ))}
+            </select>
+            <label>
+              <input
+                type="checkbox"
+                checked={grantStats}
+                onChange={() => setGrantStats((prev) => !prev)}
+              />
+              <span>Видит статистику звонков</span>
+            </label>
+            <button type="button" onClick={saveStatsAccess}>
+              Сохранить доступ
+            </button>
+          </div>
+        ) : null}
         <label>
           <h4>Параметры отображения напоминаний для чат-бота</h4>
           <input

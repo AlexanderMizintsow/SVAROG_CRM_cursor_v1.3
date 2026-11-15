@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { useSearchParams } from 'react-router-dom'
 import axios from 'axios'
 import Toastify from 'toastify-js'
 import { MdAddBusiness, MdContactSupport } from 'react-icons/md'
@@ -16,6 +17,8 @@ const DealersData = () => {
   const [isFormVisibleCompany, setIsFormVisibleCompany] = useState(false)
   const [isFormVisibleDealer, setIsFormVisibleDealer] = useState(false)
   const [searchTerm, setSearchTerm] = useState('')
+  const [searchParams] = useSearchParams()
+  const focusCompanyId = searchParams.get('company')
   const [openHelpModal, setOpenHelpModal] = useState(false)
 
   const handleCompanySubmit = async (company) => {
@@ -106,7 +109,9 @@ const DealersData = () => {
       {/* Поиск */}
       <SearchBar searchTerm={searchTerm} setSearchTerm={setSearchTerm} />
 
-      {!isFormVisibleCompany && !isFormVisibleDealer && <CompanyList searchTerm={searchTerm} />}
+      {!isFormVisibleCompany && !isFormVisibleDealer && (
+        <CompanyList searchTerm={searchTerm} focusCompanyId={focusCompanyId} />
+      )}
 
       {isFormVisibleCompany && <CompanyForm onSubmit={handleCompanySubmit} />}
       {isFormVisibleDealer && <DealerForm />}

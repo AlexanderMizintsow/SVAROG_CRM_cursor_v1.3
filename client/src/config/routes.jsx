@@ -22,6 +22,8 @@ import LeaveCalendar from '../routes/personnelDepartment/calendar/LeaveCalendar.
 import DealerMap from '../routes/references/dealerMap/DealerMap.jsx'
 import UpdatesApp from '../routes/updates/Changelog.jsx'
 import MissedCall from '../routes/asterisk/missedCall/MissedCall.jsx'
+import DayList from '../routes/asterisk/dayList/DayList.jsx'
+import CallStats from '../routes/asterisk/callStats/CallStats.jsx'
 // import { Mail } from '@mui/icons-material'
 import RatingStats from '../components/RatingStats/RatingStats.jsx'
 import MaterialSearchPage from '../routes/statistics/MaterialSearchPage.jsx'
@@ -106,6 +108,14 @@ const routes = (bgSeason, roleAdministrator, roleAdminOrDirector, isConnectBD) =
       { path: 'add-dealers', element: <DealersData /> },
       { path: 'suppliers', element: <SupplierForm /> },
 
+      {
+        path: '/notifications-asterisk-day',
+        element: <DayList />,
+      },
+      {
+        path: '/notifications-asterisk-stats',
+        element: <CallStats />,
+      },
       {
         path: '/notifications-asterisk-missed-calls',
         element: <MissedCall />,

@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback } from "react";
 import { io } from "socket.io-client";
 import { API_BASE_URL } from "../../config";
 import useUserStore from "../store/userStore";
+import useLineStore from "../store/useLineStore";
 
 const useCallNotifications = () => {
   const [currentCall, setCurrentCall] = useState(null);
@@ -24,6 +25,11 @@ const useCallNotifications = () => {
       setIsConnected(true);
       // Аутентифицируем пользователя
       socket.emit("authenticate", user.id);
+      useLineStore.getState().load();
+    });
+
+    socket.on("line_status", (rows) => {
+      useLineStore.getState().apply(rows);
     });
 
     socket.on("disconnect", () => {

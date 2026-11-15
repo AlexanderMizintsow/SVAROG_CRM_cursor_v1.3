@@ -28,9 +28,55 @@ import {
   Title,
 } from "@mui/icons-material";
 import { API_BASE_URL } from "../../../../../config";
+import useUserStore from "../../../../store/userStore";
 import "./callHistory.scss";
 
+const talkMarkText = {
+  short: "Короткий",
+  long: "Длинный",
+};
+
+const CallPlayer = ({ callId, userId }) => {
+  const [open, setOpen] = useState(false);
+  const [rate, setRate] = useState("1");
+  const src = `${API_BASE_URL}5004/api/calls/${callId}/recording?userId=${userId}`;
+
+  return (
+    <span className="call-player">
+      <button type="button" onClick={() => setOpen((value) => !value)}>
+        {open ? "Скрыть" : "Слушать"}
+      </button>
+      {open ? (
+        <>
+          <audio
+            controls
+            src={src}
+            onLoadedMetadata={(event) => {
+              event.currentTarget.playbackRate = Number(rate);
+            }}
+          />
+          <select
+            value={rate}
+            aria-label="Скорость"
+            onChange={(event) => {
+              const next = event.target.value;
+              setRate(next);
+              const audio = event.target.parentElement.querySelector("audio");
+              if (audio) audio.playbackRate = Number(next);
+            }}
+          >
+            <option value="1">1×</option>
+            <option value="1.5">1.5×</option>
+            <option value="2">2×</option>
+          </select>
+        </>
+      ) : null}
+    </span>
+  );
+};
+
 const CallHistory = ({ companyId }) => {
+  const { user } = useUserStore();
   const [calls, setCalls] = useState([]);
   const [loading, setLoading] = useState(true);
   const [pagination, setPagination] = useState({
@@ -44,8 +90,9 @@ const CallHistory = ({ companyId }) => {
       if (!companyId) return;
       setLoading(true);
       try {
+        const viewer = user?.id ? `&userId=${user.id}` : "";
         const response = await fetch(
-          `${API_BASE_URL}5004/api/company-calls/${companyId}?page=${page}&limit=${pagination.limit}`
+          `${API_BASE_URL}5004/api/company-calls/${companyId}?page=${page}&limit=${pagination.limit}${viewer}`
         );
         if (response.ok) {
           const data = await response.json();
@@ -64,7 +111,7 @@ const CallHistory = ({ companyId }) => {
         setLoading(false);
       }
     },
-    [companyId, pagination.limit]
+    [companyId, pagination.limit, user?.id]
   );
 
   useEffect(() => {
@@ -92,6 +139,10 @@ const CallHistory = ({ companyId }) => {
     switch (outcome) {
       case "success":
         return "Завершено";
+      case "failed":
+        return "Неудачно";
+      case "postponed":
+        return "Отложено";
       case "callback":
         return "Перезвонить";
       case "send_info":
@@ -99,6 +150,24 @@ const CallHistory = ({ companyId }) => {
       default:
         return "Неизвестно";
     }
+  };
+
+  const getDirectionText = (direction) => {
+    if (direction === "incoming") return "Входящий";
+    if (direction === "outgoing") return "Исходящий";
+    return "";
+  };
+
+  const formatTalk = (seconds) => {
+    if (seconds === null || seconds === undefined || seconds === "") {
+      return "нет данных";
+    }
+    const value = Number(seconds);
+    if (!Number.isFinite(value)) return "нет данных";
+    if (value < 60) return `${value} с`;
+    const minutes = Math.floor(value / 60);
+    const rest = value % 60;
+    return rest ? `${minutes} мин ${rest} с` : `${minutes} мин`;
   };
 
   const getStatusColor = (status) => {
@@ -184,7 +253,7 @@ const CallHistory = ({ companyId }) => {
           История звонков пуста
         </Typography>
         <Typography variant="body2" color="textSecondary">
-          Для этой компании пока нет звонков с описанием
+          Для этой компании пока нет звонков
         </Typography>
       </Box>
     );
@@ -206,11 +275,18 @@ const CallHistory = ({ companyId }) => {
                   <Box className="call-number-info">
                     <Phone className="call-icon" />
                     <Typography variant="h6" className="call-number">
-                      {call.caller_number}
+                      {call.external_number || call.caller_number}
                     </Typography>
                   </Box>
 
                   <Box className="call-meta">
+                    {getDirectionText(call.direction) ? (
+                      <span
+                        className={`direction-mark direction-mark--${call.direction}`}
+                      >
+                        {getDirectionText(call.direction)}
+                      </span>
+                    ) : null}
                     <Chip
                       label={getStatusText(call.status)}
                       color={getStatusColor(call.status)}
@@ -220,6 +296,24 @@ const CallHistory = ({ companyId }) => {
                     <Typography variant="caption" className="call-date">
                       {formatDate(call.accepted_at)}
                     </Typography>
+                    <Typography variant="caption" className="call-duration">
+                      {formatTalk(call.talk_seconds)}
+                    </Typography>
+                    {talkMarkText[call.talk_mark] ? (
+                      <span className={`talk-mark talk-mark--${call.talk_mark}`}>
+                        {talkMarkText[call.talk_mark]}
+                      </span>
+                    ) : null}
+                    {call.can_play && user?.id ? (
+                      <CallPlayer callId={call.id} userId={user.id} />
+                    ) : call.has_recording ? (
+                      <span
+                        className="call-recording"
+                        title="Файл лежит на АТС. Прослушивание откроется, когда папка записей доступна серверу CRM"
+                      >
+                        Запись есть
+                      </span>
+                    ) : null}
                   </Box>
                 </Box>
 
@@ -299,7 +393,6 @@ const CallHistory = ({ companyId }) => {
               {/* Основная информация о звонке */}
               <Box className="call-details">
                 <Grid container spacing={2}>
-                  {/* Звонящий */}
                   <Grid item xs={12} sm={6}>
                     <Box className="caller-info">
                       <Box className="caller-header">
@@ -308,16 +401,20 @@ const CallHistory = ({ companyId }) => {
                           variant="subtitle2"
                           className="caller-label"
                         >
-                          Звонящий:
+                          {call.direction === "outgoing"
+                            ? "Менеджер:"
+                            : "Звонящий:"}
                         </Typography>
                       </Box>
                       <Typography variant="body2" className="caller-name">
-                        {call.caller_name || "Неизвестно"}
+                        {call.caller_name ||
+                          (call.direction === "outgoing"
+                            ? "не указан"
+                            : "Неизвестно")}
                       </Typography>
                     </Box>
                   </Grid>
 
-                  {/* Получатель */}
                   <Grid item xs={12} sm={6}>
                     <Box className="receiver-info">
                       <Box className="receiver-header">
@@ -326,11 +423,16 @@ const CallHistory = ({ companyId }) => {
                           variant="subtitle2"
                           className="receiver-label"
                         >
-                          Получатель:
+                          {call.direction === "outgoing"
+                            ? "Контакт:"
+                            : "Менеджер:"}
                         </Typography>
                       </Box>
                       <Typography variant="body2" className="receiver-name">
-                        {call.receiver_name || "Неизвестно"}
+                        {call.receiver_name ||
+                          (call.direction === "outgoing"
+                            ? call.contact_name || "Неизвестно"
+                            : "не указан")}
                       </Typography>
                     </Box>
                   </Grid>

@@ -29,6 +29,7 @@ import { MdOutlineEditCalendar } from 'react-icons/md'
 import { GiSwordwoman } from 'react-icons/gi'
 import EditCompanyManageAccounts from './EditCompanyManageAccounts'
 import useUserStore from '../../../../store/userStore'
+import PlaceCall from '../../../asterisk/placeCall/PlaceCall'
 
 // Статусы с цветами
 const STATUS_STYLES = {
@@ -199,6 +200,12 @@ const DealerInfo = ({ company, setIsDelete }) => {
           </div>
           <div className="contactInfo">
             <FiPhone /> {company.phone_number}
+            <PlaceCall
+              userId={user?.id}
+              companyId={company.company_id}
+              phone={company.phone_number}
+              inlineNote
+            />
           </div>
           <div className="moreInfo">
             <div className="infoItem">

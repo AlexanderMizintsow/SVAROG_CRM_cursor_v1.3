@@ -37,7 +37,7 @@ const Card = ({ company, toggleCardWidth, setIsDelete }) => {
   };
 
   return (
-    <div ref={cardRef}>
+    <div ref={cardRef} id={`company-card-${company.company_id}`}>
       {" "}
       {/* Привязываем ref к карточке */}
       <div

@@ -1,84 +1,84 @@
-// Если таблица accepted_calls  содержит null то считать пропущенным звонком
+// Если таблица accepted_calls содержит null то считать пропущенным звонком.
+// Журнал AMI в файлы здесь не пишется.
 
 require("dotenv").config();
 const net = require("net");
 const { Pool } = require("pg");
-const path = require("path");
 const io = require("socket.io-client");
+const { createAmiConnection } = require("./amiConnection");
+const { createCallTracker } = require("./callCard");
+const { ensureCallCardSchema, saveCallCard } = require("./callCardStore");
+const { normalizePhone } = require("./phoneNumber");
+const { buildOriginate } = require("./originateCall");
+const { getCallParty } = require("./callParty");
+const { readExtensionStatus } = require("./extensionStatus");
 
 const pool = new Pool({
-  user: "postgres",
-  host: "localhost",
-  database: "Svarog",
-  password: "postgres",
-  port: 5432,
+  user: process.env.DB_USER || "postgres",
+  host: process.env.DB_HOST || "localhost",
+  database: process.env.DB_NAME || "Svarog",
+  password: process.env.DB_PASSWORD || "postgres",
+  port: parseInt(process.env.DB_PORT || "5432", 10),
+  connectionTimeoutMillis: 10000,
 });
 
-const amiHost = "192.168.57.165"; // IP-адрес Asterisk сервера
-const amiPort = 5038;
-const amiUser = "ats";
-const amiPassword = "S2s14q98svf32a";
+pool.on("error", (error) => {
+  console.error("Ошибка соединения с базой звонков:", error.message);
+});
 
-// Создание клиента для подключения к Asterisk AMI
-const client = new net.Socket();
-let currentCall = {};
-const reconnectConfig = {
-  minDelayMs: 5000,
-  maxDelayMs: 30000,
-  multiplier: 2,
-};
-let reconnectDelayMs = reconnectConfig.minDelayMs;
-let reconnectTimer = null;
-let isAmiConnected = false;
-let lastAmiVerboseLogAt = 0;
-const amiVerboseLogCooldownMs = 10000;
+const amiHost = process.env.AMI_HOST || "192.168.57.165";
+const amiPort = parseInt(process.env.AMI_PORT || "5038", 10);
+const amiUser = process.env.AMI_USER || "ats";
+const amiPassword = process.env.AMI_PASSWORD || "S2s14q98svf32a";
 
-const clearReconnectTimer = () => {
-  if (reconnectTimer) {
-    clearTimeout(reconnectTimer);
-    reconnectTimer = null;
-  }
-};
-
-const connectToAmi = () => {
-  if (isAmiConnected) {
-    return;
-  }
-
-  try {
-    client.connect(amiPort, amiHost);
-  } catch (error) {
-    console.error("Ошибка запуска подключения к AMI:", error.message);
-  }
-};
-
-const scheduleReconnect = () => {
-  if (reconnectTimer) {
-    return;
-  }
-
-  console.log(
-    `Connection closed. Reconnecting in ${Math.floor(
-      reconnectDelayMs / 1000
-    )}s...`
-  );
-
-  reconnectTimer = setTimeout(() => {
-    reconnectTimer = null;
-    connectToAmi();
-  }, reconnectDelayMs);
-
-  reconnectDelayMs = Math.min(
-    reconnectDelayMs * reconnectConfig.multiplier,
-    reconnectConfig.maxDelayMs
-  );
-};
-
-// Подключение к CRM серверу для отправки уведомлений
-const crmSocket = io("http://127.0.0.1:5004");
+const crmSocket = io(process.env.CRM_SOCKET_URL || "http://127.0.0.1:5004");
 
 crmSocket.on("connect", () => {
   console.log("Asterisk сервер подключен к CRM серверу");
+  crmSocket.emit("register_pbx");
+});
+
+const replyOriginate = (requestId, body) => {
+  try {
+    crmSocket.emit("originate_result", { requestId, ...body });
+  } catch (error) {
+    console.error("Не удалось ответить CRM по набору:", error.message);
+  }
+};
+
+crmSocket.on("originate_call", async (payload) => {
+  const requestId = payload && payload.requestId;
+  try {
+    const built = buildOriginate({
+      extension: payload && payload.extension,
+      stationNumber: payload && payload.stationNumber,
+      actionId: `crm-${Date.now()}`,
+    });
+    const response = await ami.sendAction(built.frame, built.actionId, 4000);
+    if (response.Response !== "Success") {
+      replyOriginate(requestId, {
+        ok: false,
+        message: response.Message || "АТС не приняла набор",
+      });
+      return;
+    }
+    console.log(
+      `Набор отправлен: добавочный ${built.extension}, номер ${built.stationNumber}`
+    );
+    replyOriginate(requestId, {
+      ok: true,
+      message: `Сначала зазвонит добавочный ${built.extension}, затем номер ${built.stationNumber}.`,
+    });
+  } catch (error) {
+    console.error("Набор не отправлен:", error.message);
+    replyOriginate(requestId, {
+      ok: false,
+      message:
+        error.code === "ami_offline" || error.code === "ami_timeout"
+          ? "АТС сейчас недоступна. Набор не отправлен, станция не затронута."
+          : "Не удалось отправить набор.",
+    });
+  }
 });
 
 crmSocket.on("disconnect", () => {
@@ -86,637 +86,311 @@ crmSocket.on("disconnect", () => {
 });
 
 crmSocket.on("connect_error", (error) => {
-  console.error("Ошибка подключения Asterisk к CRM серверу:", error);
+  console.error("Ошибка подключения Asterisk к CRM серверу:", error.message);
 });
 
-// Определение пути к рабочему столу
-const desktopPath = path.join(
-  process.env.HOME || process.env.USERPROFILE,
-  "Desktop"
-);
-
-// Функция для проверки внутренних номеров
 const isInternalNumber = (phoneNumber) => {
   if (!phoneNumber) return false;
-
-  // Проверяем, является ли номер трехзначным
-  if (phoneNumber.length === 3) {
-    return true;
-  }
-
-  // Можно добавить другие паттерны внутренних номеров
-  // Например, номера начинающиеся с определенных цифр
-  // const internalPatterns = [
-  //   /^777$/, // Трехзначные номера
-  //   /^888$/,
-  //   /^999$/,
-  //   /^100$/, // Можно добавить другие
-  //   /^101$/,
-  //   /^102$/,
-  // ];
-
-  // return internalPatterns.some((pattern) => pattern.test(phoneNumber));
-  return false; // Пока не нужны дополнительные паттерны
+  return String(phoneNumber).length === 3;
 };
 
-// Функция для определения пользователя по номеру телефона
+const queryPhone = async (sql, phoneNumber) => {
+  const key = normalizePhone(phoneNumber);
+  if (!key) return null;
+  try {
+    const result = await pool.query(sql, [key]);
+    return result.rows[0] || null;
+  } catch (error) {
+    if (error.code !== "42883") {
+      console.error("Ошибка поиска по номеру:", error.message);
+      return null;
+    }
+    return null;
+  }
+};
+
 const findUserByPhoneNumber = async (phoneNumber) => {
+  const found = await queryPhone(
+    `SELECT u.id, u.first_name, u.middle_name, u.last_name, up.phone_type
+     FROM users u
+     JOIN user_phones up ON u.id = up.user_id
+     WHERE phone_key(up.phone_number) = $1
+     LIMIT 1`,
+    phoneNumber
+  );
+  if (found) return found;
   try {
-    const query = `
-      SELECT u.id, u.first_name, u.middle_name, u.last_name, up.phone_type
-      FROM users u
-      JOIN user_phones up ON u.id = up.user_id
-      WHERE up.phone_number = $1
-    `;
-    const result = await pool.query(query, [phoneNumber]);
-    return result.rows[0] || null;
-  } catch (error) {
-    console.error("Ошибка при поиске пользователя по номеру:", error);
-    return null;
-  }
-};
-
-// Функция для определения дилера по номеру телефона
-const findDealerByPhoneNumber = async (phoneNumber) => {
-  try {
-    const query = `
-      SELECT d.id, d.first_name, d.middle_name, d.last_name, c.name_companies as company_name
-      FROM dealers d
-      JOIN dealer_phone_numbers dpn ON d.id = dpn.dealer_id
-      JOIN companies c ON d.company_id = c.id
-      WHERE dpn.phone_number = $1
-    `;
-    const result = await pool.query(query, [phoneNumber]);
-    return result.rows[0] || null;
-  } catch (error) {
-    console.error("Ошибка при поиске дилера по номеру:", error);
-    return null;
-  }
-};
-
-// Функция для отправки уведомления о входящем звонке
-const sendIncomingCallNotification = async (callData) => {
-  try {
-    console.log(
-      `Попытка отправки уведомления: звонящий=${callData.callerNumber}, получатель=${callData.receiverNumber}`
+    const result = await pool.query(
+      `SELECT u.id, u.first_name, u.middle_name, u.last_name, up.phone_type
+       FROM users u
+       JOIN user_phones up ON u.id = up.user_id
+       WHERE up.phone_number = $1
+       LIMIT 1`,
+      [phoneNumber]
     );
-
-    // Проверяем, не является ли звонящий внутренним номером
-    if (isInternalNumber(callData.callerNumber)) {
-      console.log(`Пропускаем внутренний номер: ${callData.callerNumber}`);
-      return;
-    }
-
-    // Определяем получателя звонка по номеру, на который звонят
-    const receiverUser = await findUserByPhoneNumber(callData.receiverNumber);
-
-    if (receiverUser) {
-      console.log(
-        `Найден получатель: ${receiverUser.first_name} ${receiverUser.last_name} (ID: ${receiverUser.id})`
-      );
-
-      // Определяем звонящего
-      const callerUser = await findUserByPhoneNumber(callData.callerNumber);
-      const callerDealer = await findDealerByPhoneNumber(callData.callerNumber);
-
-      let callerName = "Неизвестный";
-      let callerType = "unknown";
-
-      if (callerUser) {
-        callerName = `${callerUser.last_name} ${callerUser.first_name} ${
-          callerUser.middle_name || ""
-        }`.trim();
-        callerType = "user";
-        console.log(`Звонящий - пользователь: ${callerName}`);
-      } else if (callerDealer) {
-        callerName = `${callerDealer.last_name} ${callerDealer.first_name} ${
-          callerDealer.middle_name || ""
-        }`.trim();
-        callerType = "dealer";
-        console.log(`Звонящий - дилер: ${callerName}`);
-      } else {
-        console.log(
-          `Звонящий не найден в базе данных: ${callData.callerNumber}`
-        );
-      }
-
-      const notificationData = {
-        type: "incoming_call",
-        receiverUserId: receiverUser.id,
-        receiverName: `${receiverUser.last_name} ${receiverUser.first_name} ${
-          receiverUser.middle_name || ""
-        }`.trim(),
-        callerNumber: callData.callerNumber,
-        callerName: callerName,
-        callerType: callerType,
-        receiverNumber: callData.receiverNumber,
-        timestamp: new Date().toISOString(),
-        channel: callData.channel,
-      };
-
-      // Отправляем уведомление через WebSocket
-      console.log("Отправляем уведомление в CRM сервер:", notificationData);
-      crmSocket.emit("incoming_call", notificationData);
-      console.log(
-        `Отправлено уведомление о входящем звонке для пользователя ${receiverUser.id}`
-      );
-    } else {
-      console.log(
-        `Получатель не найден в базе данных: ${callData.receiverNumber}`
-      );
-    }
+    return result.rows[0] || null;
   } catch (error) {
-    console.error("Ошибка при отправке уведомления о входящем звонке:", error);
+    console.error("Ошибка при поиске пользователя по номеру:", error.message);
+    return null;
   }
 };
 
-// Функция для отправки уведомления о начале разговора
-const sendCallStartedNotification = async (callData) => {
+const findDealerByPhoneNumber = async (phoneNumber) => {
+  const found = await queryPhone(
+    `SELECT d.id, d.first_name, d.middle_name, d.last_name, c.name_companies as company_name
+     FROM dealers d
+     JOIN companies c ON d.company_id = c.id
+     WHERE d.id IN (
+       SELECT dpn.dealer_id
+       FROM dealer_phone_numbers dpn
+       WHERE phone_key(dpn.phone_number) = $1
+       UNION
+       SELECT d2.id
+       FROM dealers d2
+       JOIN phone_numbers_companies pnc ON pnc.company_id = d2.company_id
+       WHERE phone_key(pnc.phone_number) = $1
+     )
+     ORDER BY d.id
+     LIMIT 1`,
+    phoneNumber
+  );
+  if (found) return found;
   try {
-    console.log("Попытка отправки уведомления о начале разговора:", callData);
-
-    // Проверяем, не является ли звонящий внутренним номером
-    if (isInternalNumber(callData.callerNumber)) {
-      console.log(`Пропускаем внутренний номер: ${callData.callerNumber}`);
-      return;
-    }
-
-    const receiverUser = await findUserByPhoneNumber(callData.receiverNumber);
-
-    if (receiverUser) {
-      // Определяем звонящего
-      const callerUser = await findUserByPhoneNumber(callData.callerNumber);
-      const callerDealer = await findDealerByPhoneNumber(callData.callerNumber);
-
-      let callerName = "Неизвестный";
-      let callerType = "unknown";
-
-      if (callerUser) {
-        callerName = `${callerUser.last_name} ${callerUser.first_name} ${
-          callerUser.middle_name || ""
-        }`.trim();
-        callerType = "user";
-        console.log(`Звонящий - пользователь: ${callerName}`);
-      } else if (callerDealer) {
-        callerName = `${callerDealer.last_name} ${callerDealer.first_name} ${
-          callerDealer.middle_name || ""
-        }`.trim();
-        callerType = "dealer";
-        console.log(`Звонящий - дилер: ${callerName}`);
-      } else {
-        console.log(
-          `Звонящий не найден в базе данных: ${callData.callerNumber}`
-        );
-      }
-
-      const notificationData = {
-        type: "call_started",
-        callId: callData.callId, // Добавляем ID звонка
-        receiverUserId: receiverUser.id,
-        receiverName: `${receiverUser.last_name} ${receiverUser.first_name} ${
-          receiverUser.middle_name || ""
-        }`.trim(),
-        callerNumber: callData.callerNumber,
-        callerName: callerName,
-        callerType: callerType,
-        receiverNumber: callData.receiverNumber,
-        timestamp: new Date().toISOString(),
-        channel: callData.channel,
-      };
-
-      console.log(
-        "Отправляем уведомление о начале разговора в CRM сервер:",
-        notificationData
-      );
-      crmSocket.emit("call_started", notificationData);
-      console.log(
-        `Отправлено уведомление о начале разговора для пользователя ${receiverUser.id}`
-      );
-    } else {
-      console.log(
-        `Получатель не найден для уведомления о начале разговора: ${callData.receiverNumber}`
-      );
-    }
+    const result = await pool.query(
+      `SELECT d.id, d.first_name, d.middle_name, d.last_name, c.name_companies as company_name
+       FROM dealers d
+       JOIN dealer_phone_numbers dpn ON d.id = dpn.dealer_id
+       JOIN companies c ON d.company_id = c.id
+       WHERE dpn.phone_number = $1
+       LIMIT 1`,
+      [phoneNumber]
+    );
+    return result.rows[0] || null;
   } catch (error) {
-    console.error("Ошибка при отправке уведомления о начале разговора:", error);
+    console.error("Ошибка при поиске дилера по номеру:", error.message);
+    return null;
   }
 };
 
-// Функция для отправки уведомления о завершении звонка
-const sendCallEndedNotification = async (callData, callId) => {
-  console.log("=== sendCallEndedNotification вызвана ===");
-  console.log("callData:", callData);
-  console.log("callId:", callId);
+const personName = (row) =>
+  `${row.last_name} ${row.first_name} ${row.middle_name || ""}`.trim();
 
+const publishCall = async (callData, type) => {
   try {
-    // Проверяем, не является ли звонящий внутренним номером
-    if (isInternalNumber(callData.callerNumber)) {
-      console.log(`Пропускаем внутренний номер: ${callData.callerNumber}`);
+    const outgoing = callData.direction === "outgoing";
+    const partyPhone = outgoing ? callData.receiverNumber : callData.callerNumber;
+    const managerPhone = outgoing
+      ? callData.extension || callData.callerNumber
+      : callData.receiverNumber;
+    if (!partyPhone || isInternalNumber(partyPhone)) return;
+    if (!managerPhone) return;
+
+    const manager = await findUserByPhoneNumber(managerPhone);
+    if (!manager) {
+      console.log(`Менеджер не найден по добавочному ${managerPhone}`);
       return;
     }
 
-    const receiverUser = await findUserByPhoneNumber(callData.receiverNumber);
+    const party = await getCallParty(pool, partyPhone);
+    const contact = party.contactName || party.companyName || "Неизвестный";
+    const notificationData = {
+      type,
+      direction: callData.direction || "incoming",
+      callId: callData.callId || null,
+      receiverUserId: manager.id,
+      receiverName: personName(manager),
+      callerNumber: partyPhone,
+      externalNumber: partyPhone,
+      callerName: contact,
+      callerType: party.known ? "dealer" : "unknown",
+      companyId: party.companyId,
+      companyName: party.companyName,
+      dealerId: party.dealerId,
+      contactName: party.contactName,
+      lastComment: party.lastComment,
+      lastCommentAt: party.lastCommentAt,
+      receiverNumber: managerPhone,
+      timestamp: new Date().toISOString(),
+      channel: callData.channel,
+      uniqueid: callData.uniqueid,
+      duration: callData.talkSeconds || 0,
+    };
 
-    if (receiverUser) {
-      // Определяем звонящего
-      const callerUser = await findUserByPhoneNumber(callData.callerNumber);
-      const callerDealer = await findDealerByPhoneNumber(callData.callerNumber);
+    console.log(`Окно звонка ${type}:`, partyPhone, contact);
+    crmSocket.emit(type, notificationData);
+  } catch (error) {
+    console.error("Ошибка окна звонка:", error.message);
+  }
+};
 
-      let callerName = "Неизвестный";
-      let callerType = "unknown";
+const sendIncomingCallNotification = (callData) =>
+  publishCall(callData, "incoming_call");
 
-      if (callerUser) {
-        callerName = `${callerUser.last_name} ${callerUser.first_name} ${
-          callerUser.middle_name || ""
-        }`.trim();
-        callerType = "user";
-        console.log(`Звонящий - пользователь: ${callerName}`);
-      } else if (callerDealer) {
-        callerName = `${callerDealer.last_name} ${callerDealer.first_name} ${
-          callerDealer.middle_name || ""
-        }`.trim();
-        callerType = "dealer";
-        console.log(`Звонящий - дилер: ${callerName}`);
-      } else {
-        console.log(
-          `Звонящий не найден в базе данных: ${callData.callerNumber}`
-        );
-      }
+const sendCallStartedNotification = (callData) =>
+  publishCall(callData, "call_started");
 
-      const notificationData = {
-        type: "call_ended",
-        callId: callId, // Добавляем ID звонка
-        receiverUserId: receiverUser.id,
-        receiverName: `${receiverUser.last_name} ${receiverUser.first_name} ${
-          receiverUser.middle_name || ""
-        }`.trim(),
-        callerNumber: callData.callerNumber,
-        callerName: callerName,
-        callerType: callerType,
-        receiverNumber: callData.receiverNumber,
-        timestamp: new Date().toISOString(),
-        channel: callData.channel,
-        duration: callData.duration || 0,
-      };
+const sendCallEndedNotification = (callData) =>
+  publishCall(callData, "call_ended");
 
-      console.log("Отправляем уведомление call_ended:", notificationData);
-      crmSocket.emit("call_ended", notificationData);
-      console.log(
-        `Отправлено уведомление о завершении звонка для пользователя ${receiverUser.id}`
-      );
+const runtime = new Map();
+const saveQueue = new Map();
+
+const remember = (uniqueid) => {
+  if (!runtime.has(uniqueid)) {
+    runtime.set(uniqueid, {
+      notified: false,
+      started: false,
+      finished: false,
+      callId: null,
+    });
+  }
+  return runtime.get(uniqueid);
+};
+
+// События одного звонка приходят пачкой. Запись в базу идёт по порядку,
+// чтобы черновик в момент ответа не затёр длительность с отбоя.
+const enqueue = (uniqueid, job) => {
+  const previous = saveQueue.get(uniqueid) || Promise.resolve();
+  const next = previous.then(job, job);
+  saveQueue.set(uniqueid, next);
+  return next;
+};
+
+const persist = async (card) => {
+  try {
+    return await saveCallCard(pool, card);
+  } catch (error) {
+    console.error("Database error: " + error.message);
+    return null;
+  }
+};
+
+const onProgress = (card) => {
+  if (!card || (card.direction !== "incoming" && card.direction !== "outgoing")) {
+    return;
+  }
+  const partyPhone =
+    card.direction === "outgoing" ? card.receiverNumber : card.callerNumber;
+  if (!partyPhone) return;
+  const state = remember(card.uniqueid);
+  const shouldNotify = !state.notified && Boolean(card.extension);
+  const shouldStart = card.answered && !state.started;
+  if (shouldNotify) state.notified = true;
+  if (shouldStart) state.started = true;
+  if (!shouldNotify && !shouldStart) return;
+
+  return enqueue(card.uniqueid, async () => {
+    const forManager = (extra = {}) =>
+      card.direction === "outgoing"
+        ? { ...card, ...extra }
+        : { ...card, ...extra, receiverNumber: card.extension };
+
+    if (shouldNotify) {
+      await sendIncomingCallNotification(forManager());
     }
+
+    if (shouldStart) {
+      const callId = await persist(card);
+      state.callId = callId;
+      if (callId) {
+        await sendCallStartedNotification(forManager({ callId }));
+      }
+    }
+  });
+};
+
+const onDone = (card) => {
+  if (!card) return;
+  const state = remember(card.uniqueid);
+  if (state.finished) return;
+  state.finished = true;
+
+  return enqueue(card.uniqueid, async () => {
+  const callId = await persist(card);
+  state.callId = callId || state.callId;
+
+  console.log("=== CALL SUMMARY ===");
+  console.log(`Uniqueid: ${card.uniqueid}`);
+  console.log(`Direction: ${card.direction}`);
+  console.log(`Channel: ${card.channel}`);
+  console.log(`Caller Number: ${card.callerNumber}`);
+  console.log(`Receiver Number: ${card.receiverNumber}`);
+  console.log(`Extension: ${card.extension}`);
+  console.log(`Status: ${card.status}`);
+  console.log(`Talk: ${card.talkSeconds}`);
+  console.log(`Recording: ${card.recordingPath || ""}`);
+  console.log("====================");
+
+  if (callId) {
+    try {
+      await pool.query(`NOTIFY new_call_channel, '${callId.toString()}'`);
+    } catch (error) {
+      console.error("Ошибка уведомления о звонке:", error.message);
+    }
+  }
+
+  if (card.direction === "incoming" || card.direction === "outgoing") {
+    await sendCallEndedNotification({
+      ...card,
+      callId: state.callId,
+      receiverNumber: card.direction === "outgoing" ? card.receiverNumber : card.extension,
+    });
+  }
+
+  runtime.delete(card.uniqueid);
+  saveQueue.delete(card.uniqueid);
+  });
+};
+
+const tracker = createCallTracker({
+  onProgress,
+  onDone,
+});
+
+const ami = createAmiConnection({
+  host: amiHost,
+  port: amiPort,
+  username: amiUser,
+  secret: amiPassword,
+  socketFactory: () => new net.Socket(),
+  onEvent: (fields) => {
+    try {
+      tracker.feed(fields);
+    } catch (error) {
+      console.error("Ошибка карточки звонка:", error.message);
+    }
+    try {
+      const line = readExtensionStatus(fields);
+      if (line) crmSocket.emit("extension_status", line);
+    } catch (error) {
+      console.error("Ошибка занятости линии:", error.message);
+    }
+  },
+  onStatus: (name) => {
+    if (name !== "login_accepted") return;
+    ami
+      .sendAction(
+        "Action: ExtensionStateList\r\nActionID: crm-ext-state\r\n\r\n",
+        "crm-ext-state",
+        4000
+      )
+      .catch((error) => {
+        console.error("Список линий не получен:", error.message);
+      });
+  },
+});
+
+const start = async () => {
+  try {
+    await ensureCallCardSchema(pool);
+    console.log("Поля карточки звонка готовы");
   } catch (error) {
     console.error(
-      "Ошибка при отправке уведомления о завершении звонка:",
-      error
+      "Не удалось подготовить поля карточки звонка:",
+      error.message
     );
   }
+  ami.start();
 };
 
-client.connect(amiPort, amiHost, () => {
-  isAmiConnected = true;
-  reconnectDelayMs = reconnectConfig.minDelayMs;
-  clearReconnectTimer();
-  console.log("Connected to Asterisk AMI");
-  client.write(
-    `Action: Login\r\nUsername: ${amiUser}\r\nSecret: ${amiPassword}\r\n\r\n`
-  );
-});
-
-client.on("data", async (data) => {
-  const response = data.toString().split("\r\n");
-
-  // Логируем AMI-события ограниченно, чтобы не засорять консоль.
-  const now = Date.now();
-  const shouldPrintVerboseAmiLog =
-    now - lastAmiVerboseLogAt >= amiVerboseLogCooldownMs;
-
-  if (shouldPrintVerboseAmiLog) {
-    lastAmiVerboseLogAt = now;
-    console.log("=== AMI EVENT ===");
-    response.forEach((line) => {
-      if (line.trim()) {
-        console.log(`AMI: ${line}`);
-      }
-    });
-    console.log("=================");
-  }
-
-  for (const line of response) {
-    if (line.startsWith("Event: Newchannel")) {
-      // Начало нового звонка - очищаем предыдущие данные только если это новый канал
-      const newChannel = line.split(": ")[1];
-      if (!currentCall.channel || currentCall.channel !== newChannel) {
-        currentCall = {
-          channel: newChannel,
-          startTime: new Date(),
-          callerNumber: null,
-          receiverNumber: null,
-          callProcessed: false, // Флаг для отслеживания обработки звонка
-          answered: false, // Флаг для отслеживания принятия звонка
-          notificationSent: false, // Флаг для предотвращения дублирования уведомлений
-        };
-        console.log(`New call detected on channel: ${currentCall.channel}`);
-      } else {
-        console.log(`Ignoring duplicate Newchannel event for: ${newChannel}`);
-      }
-    } else if (line.startsWith("CallerIDNum:") && !currentCall.callerNumber) {
-      // Caller ID номера - сохраняем только первое значение
-      currentCall.callerNumber = line.split(": ")[1];
-      console.log(`Caller ID Number: ${currentCall.callerNumber}`);
-
-      // Отправляем уведомление о входящем звонке, если уже есть номер получателя
-      if (currentCall.receiverNumber && !currentCall.notificationSent) {
-        await sendIncomingCallNotification(currentCall);
-        currentCall.notificationSent = true;
-      }
-    } else if (line.startsWith("CallerIDNum:") && currentCall.callerNumber) {
-      // Игнорируем повторные CallerIDNum
-      console.log(`Ignoring duplicate CallerIDNum: ${line.split(": ")[1]}`);
-    } else if (line.startsWith("Exten:") && !currentCall.receiverNumber) {
-      // Номер, на который звонят - сохраняем только первое значение
-      currentCall.receiverNumber = line.split(": ")[1];
-      console.log(`Receiver Number: ${currentCall.receiverNumber}`);
-
-      // Отправляем уведомление о входящем звонке сразу при получении номера получателя
-      if (
-        currentCall.callerNumber &&
-        currentCall.receiverNumber &&
-        !currentCall.notificationSent
-      ) {
-        await sendIncomingCallNotification(currentCall);
-        currentCall.notificationSent = true;
-      }
-    } else if (line.startsWith("Exten:") && currentCall.receiverNumber) {
-      // Игнорируем повторные Exten
-      console.log(`Ignoring duplicate Exten: ${line.split(": ")[1]}`);
-    } else if (line.startsWith("Event: Dial")) {
-      // Событие Dial для получения номера получателя
-      // Извлекаем номер из строки Dial
-      const dialMatch = line.match(/Exten: (\d+)/);
-      if (dialMatch && !currentCall.receiverNumber) {
-        currentCall.receiverNumber = dialMatch[1];
-        console.log(
-          `Receiver Number from Dial event: ${currentCall.receiverNumber}`
-        );
-
-        // Отправляем уведомление о входящем звонке только здесь
-        if (!currentCall.notificationSent) {
-          await sendIncomingCallNotification(currentCall);
-          currentCall.notificationSent = true;
-        }
-      }
-    } else if (line.startsWith("Event: Answer")) {
-      // Звонок принят - начало разговора
-      // Проверяем, не был ли звонок уже завершен
-      if (currentCall.callProcessed) {
-        console.log(
-          `Ignoring Answer event for already processed call on channel: ${currentCall.channel}`
-        );
-        return;
-      }
-
-      currentCall.answered = true;
-      console.log(`Call answered on channel: ${currentCall.channel}`);
-
-      // Создаем запись в базе данных при начале звонка
-      if (
-        currentCall.callerNumber &&
-        currentCall.receiverNumber &&
-        !currentCall.callId
-      ) {
-        try {
-          const result = await pool.query(
-            "INSERT INTO calls (caller_number, receiver_number, accepted_at, status) VALUES ($1, $2, $3, $4) RETURNING id",
-            [
-              currentCall.callerNumber,
-              currentCall.receiverNumber,
-              new Date().toISOString(),
-              "accepted",
-            ]
-          );
-          currentCall.callId = result.rows[0].id;
-          console.log(`Call record created with ID: ${currentCall.callId}`);
-        } catch (err) {
-          console.error(
-            "Database error when creating call record: " + err.message
-          );
-        }
-      }
-
-      await sendCallStartedNotification(currentCall);
-    } else if (line.startsWith("DialStatus: ANSWER")) {
-      // Альтернативное событие принятия звонка
-      // Проверяем, не был ли звонок уже завершен
-      if (currentCall.callProcessed) {
-        console.log(
-          `Ignoring DialStatus: ANSWER for already processed call on channel: ${currentCall.channel}`
-        );
-        return;
-      }
-
-      currentCall.answered = true;
-      console.log(
-        `Call answered (DialStatus) on channel: ${currentCall.channel}`
-      );
-
-      // Создаем запись в базе данных при начале звонка
-      if (
-        currentCall.callerNumber &&
-        currentCall.receiverNumber &&
-        !currentCall.callId
-      ) {
-        try {
-          const result = await pool.query(
-            "INSERT INTO calls (caller_number, receiver_number, accepted_at, status) VALUES ($1, $2, $3, $4) RETURNING id",
-            [
-              currentCall.callerNumber,
-              currentCall.receiverNumber,
-              new Date().toISOString(),
-              "accepted",
-            ]
-          );
-          currentCall.callId = result.rows[0].id;
-          console.log(`Call record created with ID: ${currentCall.callId}`);
-        } catch (err) {
-          console.error(
-            "Database error when creating call record: " + err.message
-          );
-        }
-      }
-
-      await sendCallStartedNotification(currentCall);
-    } else if (line.startsWith("Event: Bridge")) {
-      // Событие соединения каналов - звонок принят
-      // Проверяем, не был ли звонок уже завершен
-      if (currentCall.callProcessed) {
-        console.log(
-          `Ignoring Bridge event for already processed call on channel: ${currentCall.channel}`
-        );
-        return;
-      }
-
-      currentCall.answered = true;
-      console.log(
-        `Call bridged (connected) on channel: ${currentCall.channel}`
-      );
-
-      // Создаем запись в базе данных при начале звонка
-      if (
-        currentCall.callerNumber &&
-        currentCall.receiverNumber &&
-        !currentCall.callId
-      ) {
-        try {
-          const result = await pool.query(
-            "INSERT INTO calls (caller_number, receiver_number, accepted_at, status) VALUES ($1, $2, $3, $4) RETURNING id",
-            [
-              currentCall.callerNumber,
-              currentCall.receiverNumber,
-              new Date().toISOString(),
-              "accepted",
-            ]
-          );
-          currentCall.callId = result.rows[0].id;
-          console.log(`Call record created with ID: ${currentCall.callId}`);
-        } catch (err) {
-          console.error(
-            "Database error when creating call record: " + err.message
-          );
-        }
-      }
-
-      await sendCallStartedNotification(currentCall);
-    } else if (line.startsWith("Event: Unlink")) {
-      // Событие разъединения каналов - может указывать на соединение
-      if (
-        !currentCall.answered &&
-        currentCall.callerNumber &&
-        currentCall.receiverNumber
-      ) {
-        currentCall.answered = true;
-        console.log(
-          `Call unlinked (connected) on channel: ${currentCall.channel}`
-        );
-
-        // Создаем запись в базе данных при начале звонка
-        if (!currentCall.callId) {
-          try {
-            const result = await pool.query(
-              "INSERT INTO calls (caller_number, receiver_number, accepted_at, status) VALUES ($1, $2, $3, $4) RETURNING id",
-              [
-                currentCall.callerNumber,
-                currentCall.receiverNumber,
-                new Date().toISOString(),
-                "accepted",
-              ]
-            );
-            currentCall.callId = result.rows[0].id;
-            console.log(`Call record created with ID: ${currentCall.callId}`);
-          } catch (err) {
-            console.error(
-              "Database error when creating call record: " + err.message
-            );
-          }
-        }
-
-        await sendCallStartedNotification(currentCall);
-      }
-    } else if (line.startsWith("Event: Hangup")) {
-      // Конец звонка - обрабатываем только один раз
-      if (currentCall.callProcessed) {
-        console.log(
-          `Call already processed for channel: ${currentCall.channel}`
-        );
-        return;
-      }
-
-      currentCall.callProcessed = true;
-      currentCall.timestamp = new Date().toISOString();
-      currentCall.duration = currentCall.startTime
-        ? Math.floor((new Date() - currentCall.startTime) / 1000)
-        : 0;
-
-      // Определяем статус звонка
-      // По умолчанию считаем звонок пропущенным, если не было события Answer
-      const status = currentCall.answered ? "accepted" : "missed";
-
-      // Дополнительная проверка и логирование
-      console.log(`=== CALL SUMMARY ===`);
-      console.log(`Channel: ${currentCall.channel}`);
-      console.log(`Caller Number: ${currentCall.callerNumber}`);
-      console.log(`Receiver Number: ${currentCall.receiverNumber}`);
-      console.log(`Status: ${status}`);
-      console.log(`Duration: ${currentCall.duration}s`);
-      console.log(`====================`);
-
-      try {
-        // Проверяем, что номера не undefined
-        if (!currentCall.callerNumber) {
-          console.error("Error: Caller number is undefined.");
-          return; // Пропускаем запись в базу данных, если данные неполные
-        }
-
-        let callId = currentCall.callId;
-
-        if (callId) {
-          // Обновляем существующую запись
-          await pool.query("UPDATE calls SET status = $1 WHERE id = $2", [
-            status,
-            callId,
-          ]);
-          console.log(`Call record updated with ID: ${callId}`);
-        } else {
-          // Создаем новую запись, если ID не был создан ранее
-          const result = await pool.query(
-            "INSERT INTO calls (caller_number, receiver_number, accepted_at, status) VALUES ($1, $2, $3, $4) RETURNING id",
-            [
-              currentCall.callerNumber,
-              currentCall.receiverNumber,
-              currentCall.timestamp,
-              status,
-            ]
-          );
-          callId = result.rows[0].id;
-          console.log(`Call record created with ID: ${callId}`);
-        }
-
-        // Отправляем уведомление о новом звонке
-        await pool.query(`NOTIFY new_call_channel, '${callId.toString()}'`);
-
-        // Отправляем уведомление о завершении звонка с ID
-        console.log("Отправляем уведомление о завершении звонка с ID:", callId);
-        await sendCallEndedNotification(currentCall, callId);
-        console.log("Уведомление о завершении звонка отправлено");
-
-        // Вывод информации о звонке
-        console.log(
-          `Call logged: Caller Number: ${currentCall.callerNumber}, Receiver Number: ${currentCall.receiverNumber}, Status: ${status}`
-        );
-        console.log("Call recording saved in database.");
-      } catch (err) {
-        console.error("Database error: " + err.message);
-      } finally {
-        // Очищаем текущие данные о звонке только после полной обработки
-        setTimeout(() => {
-          currentCall = {};
-          console.log("CurrentCall cleared after processing");
-        }, 1000); // Задержка 1 секунда для обработки всех событий
-      }
-    }
-  }
-});
-
-client.on("error", (err) => {
-  console.error("Error: " + err.message);
-});
-
-client.on("end", () => {
-  isAmiConnected = false;
-  console.log("Connection ended.");
-});
-
-client.on("close", () => {
-  isAmiConnected = false;
-  scheduleReconnect();
-});
+start();

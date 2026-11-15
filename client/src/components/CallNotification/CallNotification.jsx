@@ -29,16 +29,26 @@ import Toastify from "toastify-js";
 import { BsClock } from "react-icons/bs";
 import ScheduleCallModal from "../scheduleCallModal/ScheduleCallModal";
 import { API_BASE_URL } from "../../../config";
+import useUserStore from "../../store/userStore";
+import PlaceCall from "../../routes/asterisk/placeCall/PlaceCall";
 import "./CallNotification.scss";
 
 const CallNotification = ({ callData, onClose }) => {
+  const { user } = useUserStore();
   const [timeElapsed, setTimeElapsed] = useState(0);
+  const [party, setParty] = useState(null);
+  const [dealers, setDealers] = useState([]);
+  const [bindDealerId, setBindDealerId] = useState("");
+  const [bindPhoneType, setBindPhoneType] = useState("мобильный");
+  const [bindNote, setBindNote] = useState("");
+  const [binding, setBinding] = useState(false);
   const [isActive, setIsActive] = useState(false);
   const [isScheduleModalOpen, setScheduleModalOpen] = useState(false);
   const [callPurposes, setCallPurposes] = useState([]);
   const [selectedPurpose, setSelectedPurpose] = useState("");
   const [description, setDescription] = useState("");
   const [outcome, setOutcome] = useState("");
+  const [callbackAt, setCallbackAt] = useState("");
 
   const [isLoading, setIsLoading] = useState(false);
   const [isDataSaved, setIsDataSaved] = useState(false);
@@ -160,6 +170,48 @@ const CallNotification = ({ callData, onClose }) => {
     };
   }, [callData?.type]);
 
+  const partyPhone = callData?.externalNumber || callData?.callerNumber;
+
+  useEffect(() => {
+    if (!partyPhone) return undefined;
+    let cancelled = false;
+    const loadParty = async () => {
+      try {
+        const response = await fetch(
+          `${API_BASE_URL}5004/api/call-party?phone=${encodeURIComponent(partyPhone)}`
+        );
+        if (!response.ok) return;
+        const data = await response.json();
+        if (!cancelled) setParty(data);
+      } catch (error) {
+        console.error("Ошибка карточки номера:", error);
+      }
+    };
+    loadParty();
+    return () => {
+      cancelled = true;
+    };
+  }, [partyPhone, callData?.type]);
+
+  useEffect(() => {
+    if (!party || party.known) return undefined;
+    let cancelled = false;
+    const loadDealers = async () => {
+      try {
+        const response = await fetch(`${API_BASE_URL}5003/api/dealers/all`);
+        if (!response.ok) return;
+        const data = await response.json();
+        if (!cancelled) setDealers(Array.isArray(data) ? data : []);
+      } catch (error) {
+        console.error("Ошибка списка дилеров:", error);
+      }
+    };
+    loadDealers();
+    return () => {
+      cancelled = true;
+    };
+  }, [party]);
+
   const formatTime = (seconds) => {
     const mins = Math.floor(seconds / 60);
     const secs = seconds % 60;
@@ -186,14 +238,16 @@ const CallNotification = ({ callData, onClose }) => {
     return "Неизвестный";
   };
 
+  const outgoing = callData?.direction === "outgoing";
+
   const getNotificationTitle = () => {
     switch (callData?.type) {
       case "incoming_call":
-        return "Входящий звонок";
+        return outgoing ? "Исходящий звонок" : "Входящий звонок";
       case "call_started":
-        return "Активный звонок";
+        return outgoing ? "Исходящий разговор" : "Активный звонок";
       case "call_ended":
-        return "Вызов завершен";
+        return outgoing ? "Исходящий завершён" : "Вызов завершен";
       default:
         return "Звонок";
     }
@@ -202,7 +256,9 @@ const CallNotification = ({ callData, onClose }) => {
   const getNotificationMessage = () => {
     switch (callData?.type) {
       case "incoming_call":
-        return "Необходимо взять трубку";
+        return outgoing
+          ? "Сначала ваш телефон, затем номер дилера"
+          : "Необходимо взять трубку";
       case "call_started":
         return "Разговор активен";
       case "call_ended":
@@ -211,6 +267,57 @@ const CallNotification = ({ callData, onClose }) => {
         return "";
     }
   };
+
+  const openCompany = () => {
+    if (!party?.companyId) return;
+    window.location.assign(`/add-dealers?company=${party.companyId}`);
+  };
+
+  const bindPhone = async (event) => {
+    event.preventDefault();
+    if (!bindDealerId || !partyPhone) {
+      setBindNote("Выберите дилера");
+      return;
+    }
+    setBinding(true);
+    setBindNote("");
+    try {
+      const response = await fetch(`${API_BASE_URL}5004/api/add-phone`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          dealerId: bindDealerId,
+          phoneNumber: partyPhone,
+          phoneType: bindPhoneType,
+          isPrimary: true,
+        }),
+      });
+      if (!response.ok) {
+        setBindNote("Не удалось привязать номер");
+        return;
+      }
+      const refreshed = await fetch(
+        `${API_BASE_URL}5004/api/call-party?phone=${encodeURIComponent(partyPhone)}`
+      );
+      if (refreshed.ok) setParty(await refreshed.json());
+      setBindNote("Номер привязан к дилеру");
+    } catch (error) {
+      console.error(error);
+      setBindNote("Не удалось привязать номер");
+    } finally {
+      setBinding(false);
+    }
+  };
+
+  const commentWhen = party?.lastCommentAt
+    ? new Date(party.lastCommentAt).toLocaleString("ru-RU", {
+        day: "2-digit",
+        month: "2-digit",
+        year: "numeric",
+        hour: "2-digit",
+        minute: "2-digit",
+      })
+    : "";
 
   const getStatusColor = () => {
     switch (callData?.type) {
@@ -255,6 +362,11 @@ const CallNotification = ({ callData, onClose }) => {
       return;
     }
 
+    if (outcome === "callback" && !callbackAt) {
+      alert("Укажите, когда перезвонить");
+      return;
+    }
+
     setIsLoading(true);
     try {
       // Если итог выбран, но цель не выбрана, автоматически устанавливаем "Без цели"
@@ -271,8 +383,13 @@ const CallNotification = ({ callData, onClose }) => {
         purpose_id: finalPurposeId || null,
         description: description || "",
         outcome: outcome || null,
-        reminder_id: existingReminderId, // Сохраняем существующий reminder_id
-        task_id: existingTaskId, // Сохраняем существующий task_id
+        reminder_id: existingReminderId,
+        task_id: existingTaskId,
+        user_id: user?.id || callData?.receiverUserId || null,
+        callback_at:
+          outcome === "callback" && callbackAt
+            ? new Date(callbackAt).toISOString()
+            : null,
       };
 
       console.log("Отправляем запрос:", {
@@ -301,19 +418,28 @@ const CallNotification = ({ callData, onClose }) => {
         const result = await response.json();
         console.log("Данные звонка успешно сохранены:", result);
         setIsDataSaved(true);
+        if (result.reminder_id) setExistingReminderId(result.reminder_id);
+        const movedAt = result.callbackAt
+          ? new Date(result.callbackAt).toLocaleString("ru-RU", {
+              day: "2-digit",
+              month: "2-digit",
+              hour: "2-digit",
+              minute: "2-digit",
+            })
+          : "";
         Toastify({
-          text: `Информация о звонке успешно сохранена!`,
+          text:
+            outcome === "callback"
+              ? result.callbackAdjusted
+                ? `Вне рабочих часов напоминание перенесено на ${movedAt}`
+                : "Напоминание поставлено вам и этой компании"
+              : "Информация о звонке успешно сохранена!",
           duration: 5000,
           close: true,
           style: {
             background: "linear-gradient(to right, #800080, #DA70D6)",
           },
         }).showToast();
-
-        // Если итог "Перезвонить", автоматически открываем модальное окно для назначения времени
-        if (outcome === "callback") {
-          setScheduleModalOpen(true);
-        }
 
         // Если итог "Создать задачу", автоматически открываем AddModal
         if (outcome === "send_info") {
@@ -587,6 +713,67 @@ const CallNotification = ({ callData, onClose }) => {
               </div>
             </div>
 
+            {party ? (
+              <div className="call-party">
+                <p>
+                  <span>Компания</span>
+                  {party.known
+                    ? party.companyName || "Без названия"
+                    : "не найдена"}
+                </p>
+                <p>
+                  <span>Контакт</span>
+                  {party.contactName || "не указан"}
+                </p>
+                <p>
+                  <span>Последний комментарий</span>
+                  {party.lastComment
+                    ? `${party.lastComment}${commentWhen ? ` · ${commentWhen}` : ""}`
+                    : "ещё нет"}
+                </p>
+                {party.known ? (
+                  <div className="call-party-actions">
+                    <button type="button" onClick={openCompany}>
+                      Открыть карточку
+                    </button>
+                    <PlaceCall
+                      userId={user?.id || callData?.receiverUserId}
+                      companyId={party.companyId}
+                      phone={partyPhone}
+                      label="Перезвонить"
+                      onResult={setBindNote}
+                    />
+                  </div>
+                ) : (
+                  <form className="call-party-bind" onSubmit={bindPhone}>
+                    <p>Номер не найден. Привяжите его к дилеру.</p>
+                    <select
+                      value={bindDealerId}
+                      onChange={(event) => setBindDealerId(event.target.value)}
+                    >
+                      <option value="">Дилер</option>
+                      {dealers.map((dealer) => (
+                        <option key={dealer.id} value={dealer.id}>
+                          {dealer.last_name} {dealer.first_name}
+                        </option>
+                      ))}
+                    </select>
+                    <select
+                      value={bindPhoneType}
+                      onChange={(event) => setBindPhoneType(event.target.value)}
+                    >
+                      <option value="мобильный">мобильный</option>
+                      <option value="рабочий">рабочий</option>
+                    </select>
+                    <button type="submit" disabled={binding}>
+                      {binding ? "Привязываем…" : "Привязать"}
+                    </button>
+                  </form>
+                )}
+                {bindNote ? <p className="call-party-note">{bindNote}</p> : null}
+              </div>
+            ) : null}
+
             <div className="call-message">
               <Typography variant="body1" className="message-text">
                 {getNotificationMessage()}
@@ -709,6 +896,20 @@ const CallNotification = ({ callData, onClose }) => {
                     </MenuItem>
                   </Select>
                 </FormControl>
+
+                {outcome === "callback" ? (
+                  <label className="call-callback-time">
+                    Когда перезвонить
+                    <input
+                      type="datetime-local"
+                      value={callbackAt}
+                      onChange={(event) => {
+                        setCallbackAt(event.target.value);
+                        setIsDataSaved(false);
+                      }}
+                    />
+                  </label>
+                ) : null}
 
                 {/* Кнопка сохранения */}
                 <Button

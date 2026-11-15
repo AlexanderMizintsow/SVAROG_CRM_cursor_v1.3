@@ -49,6 +49,19 @@ notifyClient.connect()
 // Подписка на канал
 notifyClient.query('LISTEN new_call_channel')
 notifyClient.query('LISTEN reminder_notifications')
+
+const {
+  filterDueReminders,
+  runDailyCompanyCheck,
+  scheduleCallTime,
+  normalizeClock,
+} = require('./workHours')
+const { applyLine, snapshot } = require('./lineBoard')
+const {
+  decorateCompanyCalls,
+  openRecording,
+  saveTalkMarks,
+} = require('./callRecording')
 // Обработка уведомлений
 notifyClient.on('notification', (msg) => {
   io.emit('new_call', msg.payload) // Эмитируем событие для всех подключенных клиентов
@@ -56,6 +69,8 @@ notifyClient.on('notification', (msg) => {
 
 // Хранение активных соединений пользователей
 const userConnections = new Map()
+let pbxSocket = null
+const originateWaiters = new Map()
 
 // Обработка подключений пользователей
 io.on('connection', (socket) => {
@@ -67,10 +82,45 @@ io.on('connection', (socket) => {
     socket.userId = userId
     console.log(`Пользователь ${userId} аутентифицирован`)
     console.log('Текущие подключения:', Array.from(userConnections.entries()))
+    snapshot(dbPool)
+      .then((rows) => {
+        if (rows.length) socket.emit('line_status', rows)
+      })
+      .catch((error) => {
+        console.error('Ошибка снимка линий:', error.message)
+      })
+  })
+
+  socket.on('register_pbx', () => {
+    pbxSocket = socket
+    socket.isPbx = true
+    console.log('АТС подключена к CRM для набора')
+  })
+
+  socket.on('extension_status', async (line) => {
+    if (!socket.isPbx || !line) return
+    try {
+      const updates = await applyLine(dbPool, line)
+      if (updates.length) io.emit('line_status', updates)
+    } catch (error) {
+      console.error('Ошибка занятости линии:', error.message)
+    }
+  })
+
+  socket.on('originate_result', (result) => {
+    if (!result || !result.requestId) return
+    const waiter = originateWaiters.get(result.requestId)
+    if (!waiter) return
+    originateWaiters.delete(result.requestId)
+    waiter(result)
   })
 
   // Обработка отключения
   socket.on('disconnect', () => {
+    if (socket.isPbx && pbxSocket === socket) {
+      pbxSocket = null
+      console.log('АТС отключена от набора')
+    }
     if (socket.userId) {
       userConnections.delete(socket.userId)
       console.log(`Пользователь ${socket.userId} отключился`)
@@ -137,10 +187,11 @@ const fetchAndNotifyReminders = async () => {
     WHERE date_time <= $1 AND is_completed = FALSE
   `
     const results = await dbPool.query(query, [now])
+    const visible = await filterDueReminders(dbPool, results.rows, now)
 
-    if (results.rows.length > 0) {
-      // Отправляем все напоминания, соответствующие условиям
-      io.emit('reminders', results.rows)
+    if (visible.length > 0) {
+      // Звонки вне рабочих часов не рассылаются. Остальные напоминания — как раньше.
+      io.emit('reminders', visible)
     }
   } catch (error) {
     console.error('Ошибка получения напоминаний:', error)
@@ -149,6 +200,20 @@ const fetchAndNotifyReminders = async () => {
   }
 }
 fetchAndNotifyReminders()
+
+const checkCompanies = async () => {
+  try {
+    const result = await runDailyCompanyCheck(dbPool)
+    if (!result.skipped) {
+      console.log(`Проверка компаний: напоминаний ${result.created}`)
+    }
+  } catch (error) {
+    console.error('Проверка компаний не выполнена:', error.message)
+  } finally {
+    setTimeout(checkCompanies, 5 * 60 * 1000)
+  }
+}
+setTimeout(checkCompanies, 30000)
 // Установка интервала проверки каждую минуту
 //setInterval(fetchAndNotifyReminders, 10000) // Каждые 60 секунд
 app.get('/api/reminders', async (req, res) => {
@@ -166,8 +231,9 @@ app.get('/api/reminders', async (req, res) => {
       AND date_time <= NOW() -- Добавлено условие, чтобы получать только те напоминания, которые надо показывать
     `
     const results = await dbPool.query(query, [userId])
+    const visible = await filterDueReminders(dbPool, results.rows)
 
-    res.json(results.rows) // Отправляем найденные напоминания в ответе
+    res.json(visible) // Отправляем найденные напоминания в ответе
   } catch (error) {
     console.error('Ошибка получения напоминаний:', error)
     res.status(500).json({ error: 'Ошибка получения напоминаний' })
@@ -266,13 +332,13 @@ app.get('/api/calls', async (req, res) => {
 
     // Всегда включаем базовые JOIN для users, даже если userId не передан
     let joins = [
-      'LEFT JOIN dealer_phone_numbers ON calls.caller_number = dealer_phone_numbers.phone_number',
+      'LEFT JOIN dealer_phone_numbers ON phone_key(calls.caller_number) = phone_key(dealer_phone_numbers.phone_number)',
       'LEFT JOIN dealers ON dealer_phone_numbers.dealer_id = dealers.id',
-      'LEFT JOIN user_phones ON calls.caller_number = user_phones.phone_number',
+      'LEFT JOIN user_phones ON phone_key(calls.caller_number) = phone_key(user_phones.phone_number)',
       'LEFT JOIN users ON user_phones.user_id = users.id',
-      'LEFT JOIN dealer_phone_numbers AS dealer_phone_numbers2 ON calls.receiver_number = dealer_phone_numbers2.phone_number',
+      'LEFT JOIN dealer_phone_numbers AS dealer_phone_numbers2 ON phone_key(calls.receiver_number) = phone_key(dealer_phone_numbers2.phone_number)',
       'LEFT JOIN dealers AS dealers2 ON dealer_phone_numbers2.dealer_id = dealers2.id',
-      'LEFT JOIN user_phones AS user_phones2 ON calls.receiver_number = user_phones2.phone_number',
+      'LEFT JOIN user_phones AS user_phones2 ON phone_key(calls.receiver_number) = phone_key(user_phones2.phone_number)',
       'LEFT JOIN users AS users2 ON user_phones2.user_id = users2.id',
     ]
 
@@ -326,6 +392,12 @@ app.get('/api/calls', async (req, res) => {
         calls.receiver_number,
         calls.accepted_at,
         calls.status,
+        calls.direction,
+        calls.extension,
+        calls.uniqueid,
+        calls.talk_seconds,
+        calls.dialed_seconds,
+        calls.recording_path,
         calls.reminder_id,
         calls.task_id,
         CASE 
@@ -887,6 +959,15 @@ app.post('/api/reminders', async (req, res) => {
   const linksValue = links ? JSON.stringify(links) : JSON.stringify([]) // Преобразуем в строку JSON
 
   try {
+    let when = date_time
+    if (type_reminders === 'call') {
+      try {
+        const scheduled = await scheduleCallTime(dbPool, user_id, new Date(date_time))
+        if (scheduled && scheduled.date) when = scheduled.date
+      } catch (scheduleError) {
+        console.error('Рабочие часы напоминания:', scheduleError.message)
+      }
+    }
     const query = `
           INSERT INTO reminders (related_id, user_id, date_time, comment, type_reminders, priority_notifications, title, tags, links)
           VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9) RETURNING *;
@@ -894,7 +975,7 @@ app.post('/api/reminders', async (req, res) => {
     const values = [
       related_id,
       user_id,
-      date_time,
+      when,
       comment,
       type_reminders,
       priority_notifications || 'low', // Устанавливаем приоритет по умолчанию
@@ -1306,6 +1387,29 @@ app.put('/api/calls/:callId', async (req, res) => {
       return res.status(404).json({ error: 'Звонок не найден' })
     }
 
+    let nextReminderId = reminder_id || null
+    let callbackMeta = null
+    if (outcome === 'callback' && req.body.callback_at) {
+      const managerId = parseInt(req.body.user_id, 10)
+      if (!managerId) {
+        return res.status(400).json({ error: 'Не указан менеджер' })
+      }
+      const { createCallbackReminder } = require('./callFollowup')
+      const created = await createCallbackReminder(dbPool, {
+        callId,
+        userId: managerId,
+        callbackAt: req.body.callback_at,
+        description,
+      })
+      if (created.error) {
+        return res.status(created.status).json({ error: created.error })
+      }
+      nextReminderId = created.reminderId
+      callbackMeta = created
+    } else if (outcome === 'callback' && !nextReminderId) {
+      return res.status(400).json({ error: 'Укажите, когда перезвонить' })
+    }
+
     const query = `
       UPDATE calls 
       SET purpose_id = $1, description = $2, outcome = $3, reminder_id = $4, task_id = $5, updated_at = NOW()
@@ -1326,17 +1430,48 @@ app.put('/api/calls/:callId', async (req, res) => {
       purpose_id,
       description,
       outcome,
-      reminder_id,
+      nextReminderId,
       task_id,
       callId,
     ])
 
     console.log('Результат обновления:', result.rows[0])
 
-    res.json(result.rows[0])
+    res.json({
+      ...result.rows[0],
+      callbackAt: callbackMeta ? callbackMeta.scheduledAt : null,
+      callbackAdjusted: callbackMeta ? Boolean(callbackMeta.adjusted) : false,
+      workStart: callbackMeta ? callbackMeta.workStart : null,
+      workEnd: callbackMeta ? callbackMeta.workEnd : null,
+    })
   } catch (error) {
     console.error('Ошибка при обновлении звонка:', error)
     res.status(500).json({ error: 'Ошибка сервера', details: error.message })
+  }
+})
+
+app.get('/api/calls/:callId/recording', async (req, res) => {
+  const callId = parseInt(req.params.callId, 10)
+  const userId = parseInt(req.query.userId, 10)
+  if (!callId || !userId) {
+    return res.status(400).json({ error: 'Нужны звонок и сотрудник' })
+  }
+  try {
+    const opened = await openRecording(dbPool, userId, callId)
+    if (opened.error) return res.status(opened.status).json({ error: opened.error })
+    res.sendFile(opened.file)
+  } catch (error) {
+    console.error('Ошибка прослушивания:', error)
+    res.status(500).json({ error: 'Не удалось открыть запись' })
+  }
+})
+
+app.get('/api/line-status', async (req, res) => {
+  try {
+    res.json(await snapshot(dbPool))
+  } catch (error) {
+    console.error('Ошибка занятости линии:', error)
+    res.status(500).json({ error: 'Не удалось прочитать линии' })
   }
 })
 
@@ -1354,6 +1489,12 @@ app.get('/api/calls/:callId/details', async (req, res) => {
         c.receiver_number,
         c.accepted_at,
         c.status,
+        c.direction,
+        c.extension,
+        c.uniqueid,
+        c.talk_seconds,
+        c.dialed_seconds,
+        c.recording_path,
         c.purpose_id,
         c.description,
         c.outcome,
@@ -1383,6 +1524,12 @@ app.get('/api/calls/:callId/details', async (req, res) => {
     console.error('Ошибка при получении деталей звонка:', error)
     res.status(500).json({ error: 'Ошибка сервера', details: error.message })
   }
+})
+
+const { ensureCallCardSchema } = require('../asterisk_server/callCardStore')
+
+ensureCallCardSchema(dbPool).catch((error) => {
+  console.error('Не удалось подготовить поля карточки звонка:', error.message)
 })
 
 // Запуск сервера
@@ -1472,100 +1619,543 @@ app.get('/api/department-employees/:departmentId', async (req, res) => {
   }
 })
 
-// API для получения истории звонков по компании
+const {
+  getCallDay,
+  canEditMissedMinutes,
+  canEditSilenceDefault,
+  headedDepartmentIds,
+} = require('./callDay')
+
+app.put('/api/telephony-day-settings', async (req, res) => {
+  const userId = parseInt(req.body && req.body.userId, 10)
+  const missedMinutes = parseInt(req.body && req.body.missedMinutes, 10)
+  if (!userId || !missedMinutes || missedMinutes < 1 || missedMinutes > 1440) {
+    return res.status(400).json({ error: 'Укажите срок в минутах от 1 до 1440' })
+  }
+  try {
+    const viewer = await dbPool.query(
+      `SELECT u.department_id, p.name AS position_name, r.name AS role_name,
+              EXISTS (SELECT 1 FROM departments d WHERE d.head_user_id = u.id) AS heads_department
+       FROM users u
+       LEFT JOIN positions p ON p.id = u.position_id
+       LEFT JOIN roles r ON r.id = u.role_id
+       WHERE u.id = $1`,
+      [userId]
+    )
+    if (!canEditMissedMinutes(viewer.rows[0])) {
+      return res.status(403).json({ error: 'Срок на пропущенный задаёт руководитель' })
+    }
+    await dbPool.query(
+      'UPDATE telephony_day_settings SET missed_minutes = $1 WHERE id = 1',
+      [missedMinutes]
+    )
+    res.json({ missedMinutes })
+  } catch (error) {
+    console.error('Ошибка срока пропущенного:', error)
+    res.status(500).json({ error: 'Не удалось сохранить срок' })
+  }
+})
+
+app.put('/api/telephony-talk-marks', async (req, res) => {
+  const userId = parseInt(req.body && req.body.userId, 10)
+  const shortSeconds = parseInt(req.body && req.body.shortSeconds, 10)
+  const longSeconds = parseInt(req.body && req.body.longSeconds, 10)
+  if (!userId) return res.status(400).json({ error: 'Не указан сотрудник' })
+  try {
+    const saved = await saveTalkMarks(dbPool, userId, shortSeconds, longSeconds)
+    if (saved.error) return res.status(saved.status).json({ error: saved.error })
+    res.json(saved)
+  } catch (error) {
+    console.error('Ошибка порога разговора:', error)
+    res.status(500).json({ error: 'Не удалось сохранить порог' })
+  }
+})
+
+app.put('/api/telephony-silence', async (req, res) => {
+  const userId = parseInt(req.body && req.body.userId, 10)
+  const scope = req.body && req.body.scope
+  const departmentId = parseInt(req.body && req.body.departmentId, 10)
+  const raw = req.body ? req.body.silenceDays : undefined
+  const clearing = raw === null || raw === ''
+  const silenceDays = clearing ? null : parseInt(raw, 10)
+  if (!userId || !['user', 'department', 'default'].includes(scope)) {
+    return res.status(400).json({ error: 'Не указано, чей срок сохранять' })
+  }
+  if (scope === 'default' && clearing) {
+    return res.status(400).json({ error: 'Общий срок нельзя очистить' })
+  }
+  if (!clearing && (!silenceDays || silenceDays < 1 || silenceDays > 365)) {
+    return res.status(400).json({ error: 'Укажите срок в днях от 1 до 365' })
+  }
+
+  try {
+    const viewerResult = await dbPool.query(
+      `SELECT u.department_id, p.name AS position_name, r.name AS role_name,
+              EXISTS (SELECT 1 FROM departments d WHERE d.head_user_id = u.id) AS heads_department
+       FROM users u
+       LEFT JOIN positions p ON p.id = u.position_id
+       LEFT JOIN roles r ON r.id = u.role_id
+       WHERE u.id = $1`,
+      [userId]
+    )
+    const viewer = viewerResult.rows[0]
+    if (!viewer) {
+      return res.status(404).json({ error: 'Пользователь не найден' })
+    }
+
+    if (scope === 'default') {
+      if (!canEditSilenceDefault(viewer)) {
+        return res.status(403).json({ error: 'Общий срок задаёт администратор или директор' })
+      }
+      await dbPool.query(
+        'UPDATE telephony_day_settings SET silence_days = $1 WHERE id = 1',
+        [silenceDays]
+      )
+      return res.json({ silenceDays, scope })
+    }
+
+    if (scope === 'department') {
+      const headed = await headedDepartmentIds(dbPool, userId, viewer)
+      if (!departmentId || !headed.has(departmentId)) {
+        return res.status(403).json({ error: 'Срок отдела задаёт его руководитель' })
+      }
+      await dbPool.query('UPDATE departments SET silence_days = $1 WHERE id = $2', [
+        silenceDays,
+        departmentId,
+      ])
+      return res.json({ silenceDays, scope, departmentId })
+    }
+
+    await dbPool.query(
+      `INSERT INTO calls_settings_users (user_id, silence_days)
+       VALUES ($1, $2)
+       ON CONFLICT (user_id) DO UPDATE SET silence_days = EXCLUDED.silence_days`,
+      [userId, silenceDays]
+    )
+    res.json({ silenceDays, scope })
+  } catch (error) {
+    console.error('Ошибка срока «пора позвонить»:', error)
+    res.status(500).json({ error: 'Не удалось сохранить срок' })
+  }
+})
+
+app.put('/api/telephony-work-hours', async (req, res) => {
+  const userId = parseInt(req.body && req.body.userId, 10)
+  const scope = req.body && req.body.scope
+  const departmentId = parseInt(req.body && req.body.departmentId, 10)
+  const clearing =
+    scope === 'department' &&
+    (req.body.workStart === null || req.body.workStart === '') &&
+    (req.body.workEnd === null || req.body.workEnd === '')
+  const workStart = clearing ? null : normalizeClock(req.body && req.body.workStart)
+  const workEnd = clearing ? null : normalizeClock(req.body && req.body.workEnd)
+  if (!userId || !['department', 'default'].includes(scope)) {
+    return res.status(400).json({ error: 'Не указано, чьи рабочие часы сохранять' })
+  }
+  if (!clearing && (!workStart || !workEnd || workEnd <= workStart)) {
+    return res.status(400).json({ error: 'Укажите окно: конец позже начала, например 09:00 и 18:00' })
+  }
+
+  try {
+    const viewerResult = await dbPool.query(
+      `SELECT u.department_id, p.name AS position_name, r.name AS role_name,
+              EXISTS (SELECT 1 FROM departments d WHERE d.head_user_id = u.id) AS heads_department
+       FROM users u
+       LEFT JOIN positions p ON p.id = u.position_id
+       LEFT JOIN roles r ON r.id = u.role_id
+       WHERE u.id = $1`,
+      [userId]
+    )
+    const viewer = viewerResult.rows[0]
+    if (!viewer) {
+      return res.status(404).json({ error: 'Пользователь не найден' })
+    }
+
+    if (scope === 'default') {
+      if (!canEditSilenceDefault(viewer)) {
+        return res.status(403).json({ error: 'Общие рабочие часы задаёт администратор или директор' })
+      }
+      await dbPool.query(
+        'UPDATE telephony_day_settings SET work_start = $1::time, work_end = $2::time WHERE id = 1',
+        [workStart, workEnd]
+      )
+      return res.json({ workStart, workEnd, scope })
+    }
+
+    const headed = await headedDepartmentIds(dbPool, userId, viewer)
+    if (!departmentId || !headed.has(departmentId)) {
+      return res.status(403).json({ error: 'Часы отдела задаёт его руководитель' })
+    }
+    await dbPool.query(
+      'UPDATE departments SET work_start = $1::time, work_end = $2::time WHERE id = $3',
+      [workStart, workEnd, departmentId]
+    )
+    res.json({ workStart, workEnd, scope, departmentId })
+  } catch (error) {
+    console.error('Ошибка рабочих часов:', error)
+    res.status(500).json({ error: 'Не удалось сохранить рабочие часы' })
+  }
+})
+const { prepareOriginate } = require('./callOriginate')
+const { getCallParty } = require('../asterisk_server/callParty')
+
+app.get('/api/call-party', async (req, res) => {
+  const phone = req.query.phone
+  if (!phone) {
+    return res.status(400).json({ error: 'Не указан номер' })
+  }
+  try {
+    const party = await getCallParty(dbPool, phone)
+    res.json(party)
+  } catch (error) {
+    console.error('Ошибка карточки номера:', error)
+    res.status(500).json({ error: 'Не удалось найти номер' })
+  }
+})
+
+app.post('/api/call-originate', async (req, res) => {
+  const userId = parseInt(req.body && req.body.userId, 10)
+  const companyId = parseInt(req.body && req.body.companyId, 10)
+  const phone = req.body && req.body.phone
+  if (!userId || !companyId || !phone) {
+    return res.status(400).json({ error: 'Нужны менеджер, компания и номер' })
+  }
+
+  try {
+    const prepared = await prepareOriginate(dbPool, { userId, companyId, phone })
+    if (prepared.error) {
+      return res.status(prepared.status).json({ error: prepared.error })
+    }
+    if (!pbxSocket) {
+      return res.status(503).json({
+        error: 'АТС сейчас недоступна. Набор не отправлен.',
+      })
+    }
+
+    const requestId = `crm-${Date.now()}-${userId}`
+    const result = await new Promise((resolve) => {
+      const timer = setTimeout(() => {
+        originateWaiters.delete(requestId)
+        resolve({
+          ok: false,
+          message: 'АТС не ответила на набор. Повтор не отправлялся.',
+        })
+      }, 5000)
+      originateWaiters.set(requestId, (payload) => {
+        clearTimeout(timer)
+        resolve(payload)
+      })
+      try {
+        pbxSocket.emit('originate_call', {
+          requestId,
+          extension: prepared.extension,
+          stationNumber: prepared.stationNumber,
+        })
+      } catch (emitError) {
+        clearTimeout(timer)
+        originateWaiters.delete(requestId)
+        resolve({
+          ok: false,
+          message: 'Не удалось передать набор на АТС.',
+        })
+      }
+    })
+
+    if (!result.ok) {
+      return res.status(502).json({ error: result.message })
+    }
+    res.json({ ok: true, message: result.message })
+  } catch (error) {
+    console.error('Ошибка набора из CRM:', error)
+    res.status(500).json({ error: 'Не удалось подготовить набор' })
+  }
+})
+
+const {
+  canViewCallStats,
+  canGrantCallStats,
+  getCallStats,
+  listStatsPeople,
+  setCallStatsAccess,
+  loadViewer: loadStatsViewer,
+} = require('./callStats')
+
+app.get('/api/call-stats/access/:userId', async (req, res) => {
+  const userId = parseInt(req.params.userId, 10)
+  if (!userId) return res.status(400).json({ error: 'Не указан пользователь' })
+  try {
+    await require('../asterisk_server/callCardStore').ensureCallCardSchema(dbPool)
+    const viewer = await loadStatsViewer(dbPool, userId)
+    res.json({
+      canView: canViewCallStats(viewer),
+      canGrant: canGrantCallStats(viewer),
+    })
+  } catch (error) {
+    console.error('Ошибка доступа к статистике:', error)
+    res.status(500).json({ error: 'Не удалось проверить доступ' })
+  }
+})
+
+app.get('/api/call-stats/people/:editorId', async (req, res) => {
+  const editorId = parseInt(req.params.editorId, 10)
+  if (!editorId) return res.status(400).json({ error: 'Не указан пользователь' })
+  try {
+    const result = await listStatsPeople(dbPool, editorId)
+    if (result.error) return res.status(result.status).json({ error: result.error })
+    res.json(result.people)
+  } catch (error) {
+    console.error('Ошибка списка доступа к статистике:', error)
+    res.status(500).json({ error: 'Не удалось собрать список' })
+  }
+})
+
+app.put('/api/call-stats/access', async (req, res) => {
+  const editorId = parseInt(req.body && req.body.editorId, 10)
+  const userId = parseInt(req.body && req.body.userId, 10)
+  if (!editorId || !userId || typeof req.body.showCallStats !== 'boolean') {
+    return res.status(400).json({ error: 'Нужны руководитель, сотрудник и галочка' })
+  }
+  try {
+    const result = await setCallStatsAccess(dbPool, {
+      editorId,
+      userId,
+      showCallStats: req.body.showCallStats,
+    })
+    if (result.error) return res.status(result.status).json({ error: result.error })
+    res.json(result)
+  } catch (error) {
+    console.error('Ошибка галочки статистики:', error)
+    res.status(500).json({ error: 'Не удалось сохранить доступ' })
+  }
+})
+
+app.get('/api/call-stats/:userId', async (req, res) => {
+  const userId = parseInt(req.params.userId, 10)
+  if (!userId) return res.status(400).json({ error: 'Не указан пользователь' })
+  try {
+    const stats = await getCallStats(dbPool, userId, req.query.from, req.query.to)
+    if (stats.error) return res.status(stats.status).json({ error: stats.error })
+    res.json(stats)
+  } catch (error) {
+    console.error('Ошибка статистики звонков:', error)
+    res.status(500).json({ error: 'Не удалось собрать статистику' })
+  }
+})
+
+app.get('/api/call-day/:userId', async (req, res) => {
+  const userId = parseInt(req.params.userId, 10)
+  if (!userId) {
+    return res.status(400).json({ error: 'Не указан менеджер' })
+  }
+
+  try {
+    const day = await getCallDay(dbPool, userId)
+    res.json(day)
+  } catch (error) {
+    console.error('Ошибка списка дел на день:', error)
+    res.status(500).json({ error: 'Ошибка сервера', details: error.message })
+  }
+})
+
+// История звонков компании в обе стороны.
+// Номер компании и телефоны контактов сравниваются в одном виде.
+// Внутренние разговоры сотрудников в эту ленту не попадают.
+const companyCallsSql = `
+  WITH company_phones AS (
+    SELECT DISTINCT ON (key)
+      key,
+      dealer_id,
+      contact_name
+    FROM (
+      SELECT
+        phone_key(dpn.phone_number) AS key,
+        d.id AS dealer_id,
+        NULLIF(btrim(concat_ws(' ', d.last_name, d.first_name, d.middle_name)), '') AS contact_name,
+        1 AS rank
+      FROM dealers d
+      JOIN dealer_phone_numbers dpn ON dpn.dealer_id = d.id
+      WHERE d.company_id = $1
+      UNION ALL
+      SELECT
+        phone_key(pnc.phone_number),
+        NULL,
+        NULL,
+        2
+      FROM phone_numbers_companies pnc
+      WHERE pnc.company_id = $1
+    ) raw_phones
+    WHERE key IS NOT NULL AND length(key) > 5
+    ORDER BY key, rank, dealer_id NULLS LAST
+  ),
+  matched AS (
+    SELECT
+      c.id,
+      c.caller_number,
+      c.receiver_number,
+      c.accepted_at,
+      c.status,
+      c.purpose_id,
+      c.description,
+      c.outcome,
+      c.reminder_id,
+      c.task_id,
+      c.updated_at,
+      c.extension,
+      c.talk_seconds,
+      c.recording_path,
+      CASE
+        WHEN c.direction IN ('incoming', 'outgoing') THEN c.direction
+        WHEN caller_phone.key IS NOT NULL THEN 'incoming'
+        ELSE 'outgoing'
+      END AS call_direction,
+      COALESCE(caller_phone.dealer_id, receiver_phone.dealer_id) AS dealer_id,
+      COALESCE(caller_phone.contact_name, receiver_phone.contact_name) AS contact_name,
+      phone_key(
+        CASE
+          WHEN (
+            CASE
+              WHEN c.direction IN ('incoming', 'outgoing') THEN c.direction
+              WHEN caller_phone.key IS NOT NULL THEN 'incoming'
+              ELSE 'outgoing'
+            END
+          ) = 'outgoing' THEN c.receiver_number
+          ELSE c.caller_number
+        END
+      ) AS external_number,
+      CASE
+        WHEN NULLIF(btrim(c.extension), '') IS NOT NULL THEN c.extension
+        WHEN (
+          CASE
+            WHEN c.direction IN ('incoming', 'outgoing') THEN c.direction
+            WHEN caller_phone.key IS NOT NULL THEN 'incoming'
+            ELSE 'outgoing'
+          END
+        ) = 'incoming' THEN c.receiver_number
+        ELSE c.caller_number
+      END AS manager_number
+    FROM calls c
+    LEFT JOIN company_phones caller_phone
+      ON caller_phone.key = phone_key(c.caller_number)
+    LEFT JOIN company_phones receiver_phone
+      ON receiver_phone.key = phone_key(c.receiver_number)
+    WHERE (caller_phone.key IS NOT NULL OR receiver_phone.key IS NOT NULL)
+      AND COALESCE(c.direction, '') <> 'internal'
+  )
+`
+
 app.get('/api/company-calls/:companyId', async (req, res) => {
-  const { companyId } = req.params
-  const { page = 1, limit = 20 } = req.query
+  const companyId = parseInt(req.params.companyId, 10)
+  const page = Math.max(parseInt(req.query.page, 10) || 1, 1)
+  const limit = Math.min(Math.max(parseInt(req.query.limit, 10) || 10, 1), 50)
+
+  if (!companyId) {
+    return res.status(400).json({ error: 'Не указана компания' })
+  }
 
   try {
     const offset = (page - 1) * limit
 
-    // Запрос для получения звонков, связанных с компанией
     const query = `
-      SELECT 
-        c.id,
-        c.caller_number,
-        c.receiver_number,
-        c.accepted_at,
-        c.status,
-        c.purpose_id,
-        c.description,
-        c.outcome,
-        c.reminder_id,
-        c.task_id,
-        c.updated_at,
-        cp.name as purpose_name,
-        cp.description as purpose_description,
-        -- Информация о звонящем (дилер)
-        CONCAT(d.last_name, ' ', d.first_name, ' ', COALESCE(d.middle_name, '')) as caller_name,
-        d.id as dealer_id,
-        -- Информация о получателе (сотрудник)
-        CONCAT(u.last_name, ' ', u.first_name, ' ', COALESCE(u.middle_name, '')) as receiver_name,
-        u.id as receiver_user_id,
-        -- Информация о напоминании
-        r.title as reminder_title,
-        r.comment as reminder_comment,
-        r.date_time as reminder_date,
-        -- Исполнитель напоминания
-        CONCAT(reminder_executor.last_name, ' ', reminder_executor.first_name, ' ', COALESCE(reminder_executor.middle_name, '')) as reminder_executor_name,
-        reminder_executor.id as reminder_executor_id,
-        -- Информация о задаче
-        t.title as task_title,
-        t.description as task_description,
-        t.status as task_status,
-        -- Создатель задачи
-        CONCAT(task_creator.last_name, ' ', task_creator.first_name, ' ', COALESCE(task_creator.middle_name, '')) as task_creator_name,
-        task_creator.id as task_creator_id,
-        -- Исполнители задачи (объединенные в строку)
+      ${companyCallsSql}
+      SELECT
+        m.id,
+        m.caller_number,
+        m.receiver_number,
+        m.external_number,
+        m.accepted_at,
+        m.status,
+        m.call_direction AS direction,
+        m.talk_seconds,
+        m.recording_path,
+        (m.recording_path IS NOT NULL AND btrim(m.recording_path) <> '') AS has_recording,
+        m.purpose_id,
+        m.description,
+        m.outcome,
+        m.reminder_id,
+        m.task_id,
+        m.updated_at,
+        cp.name AS purpose_name,
+        cp.description AS purpose_description,
+        m.dealer_id,
+        COALESCE(m.contact_name, companies.name_companies) AS contact_name,
+        CASE
+          WHEN m.call_direction = 'outgoing' THEN manager.manager_name
+          ELSE COALESCE(m.contact_name, companies.name_companies)
+        END AS caller_name,
+        CASE
+          WHEN m.call_direction = 'outgoing' THEN COALESCE(m.contact_name, companies.name_companies)
+          ELSE manager.manager_name
+        END AS receiver_name,
+        manager.manager_user_id AS receiver_user_id,
+        manager.manager_name,
+        manager.manager_user_id,
+        manager.manager_department_id,
+        r.title AS reminder_title,
+        r.comment AS reminder_comment,
+        r.date_time AS reminder_date,
+        NULLIF(btrim(concat_ws(' ', reminder_executor.last_name, reminder_executor.first_name, reminder_executor.middle_name)), '') AS reminder_executor_name,
+        reminder_executor.id AS reminder_executor_id,
+        t.title AS task_title,
+        t.description AS task_description,
+        t.status AS task_status,
+        NULLIF(btrim(concat_ws(' ', task_creator.last_name, task_creator.first_name, task_creator.middle_name)), '') AS task_creator_name,
+        task_creator.id AS task_creator_id,
         COALESCE(
-          (SELECT STRING_AGG(
-            CONCAT(task_executors.last_name, ' ', task_executors.first_name, ' ', COALESCE(task_executors.middle_name, '')), 
-            ', '
-          ) 
-          FROM task_assignments ta
-          JOIN users task_executors ON ta.user_id = task_executors.id
-          WHERE ta.task_id = t.id), 
+          (
+            SELECT STRING_AGG(
+              concat_ws(' ', task_executors.last_name, task_executors.first_name, task_executors.middle_name),
+              ', '
+            )
+            FROM task_assignments ta
+            JOIN users task_executors ON ta.user_id = task_executors.id
+            WHERE ta.task_id = t.id
+          ),
           'Не назначен'
-        ) as task_executors_names
-      FROM calls c
-      LEFT JOIN call_purposes cp ON c.purpose_id = cp.id
-      -- Связь с дилерами через номера телефонов
-      LEFT JOIN dealer_phone_numbers dpn ON c.caller_number = dpn.phone_number
-      LEFT JOIN dealers d ON dpn.dealer_id = d.id
-      -- Связь с сотрудниками через номера телефонов
-      LEFT JOIN user_phones up ON c.receiver_number = up.phone_number
-      LEFT JOIN users u ON up.user_id = u.id
-      -- Связь с напоминаниями и их исполнителями
-      LEFT JOIN reminders r ON c.reminder_id = r.id
+        ) AS task_executors_names
+      FROM matched m
+      LEFT JOIN companies ON companies.id = $1
+      LEFT JOIN call_purposes cp ON m.purpose_id = cp.id
+      LEFT JOIN LATERAL (
+        SELECT
+          u.id AS manager_user_id,
+          u.department_id AS manager_department_id,
+          NULLIF(btrim(concat_ws(' ', u.last_name, u.first_name, u.middle_name)), '') AS manager_name
+        FROM user_phones up
+        JOIN users u ON u.id = up.user_id
+        WHERE phone_key(up.phone_number) = phone_key(m.manager_number)
+        ORDER BY u.id
+        LIMIT 1
+      ) manager ON true
+      LEFT JOIN reminders r ON m.reminder_id = r.id
       LEFT JOIN users reminder_executor ON r.user_id = reminder_executor.id
-      -- Связь с задачами и их создателями
-      LEFT JOIN tasks t ON c.task_id = t.id
+      LEFT JOIN tasks t ON m.task_id = t.id
       LEFT JOIN users task_creator ON t.created_by = task_creator.id
-      WHERE c.description IS NOT NULL 
-        AND d.company_id = $1
-      ORDER BY c.accepted_at DESC
+      ORDER BY m.accepted_at DESC NULLS LAST, m.id DESC
       LIMIT $2 OFFSET $3
     `
 
     const result = await dbPool.query(query, [companyId, limit, offset])
+    const viewerId = parseInt(req.query.userId, 10)
+    try {
+      await decorateCompanyCalls(dbPool, viewerId, result.rows)
+    } catch (decorateError) {
+      console.error('Ошибка отметки записи:', decorateError.message)
+      result.rows.forEach((row) => {
+        delete row.recording_path
+        delete row.manager_department_id
+      })
+    }
 
-    // Запрос для общего количества
-    const countQuery = `
-      SELECT COUNT(*) 
-      FROM calls c
-      LEFT JOIN dealer_phone_numbers dpn ON c.caller_number = dpn.phone_number
-      LEFT JOIN dealers d ON dpn.dealer_id = d.id
-      WHERE c.description IS NOT NULL 
-        AND d.company_id = $1
-    `
-
-    const countResult = await dbPool.query(countQuery, [companyId])
+    const countResult = await dbPool.query(
+      `${companyCallsSql} SELECT COUNT(*) FROM matched`,
+      [companyId]
+    )
 
     res.json({
       data: result.rows,
       total: parseInt(countResult.rows[0].count, 10),
-      page: parseInt(page, 10),
-      limit: parseInt(limit, 10),
+      page,
+      limit,
     })
   } catch (error) {
     console.error('Ошибка при получении истории звонков компании:', error)

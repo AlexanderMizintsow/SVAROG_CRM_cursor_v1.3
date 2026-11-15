@@ -7,8 +7,11 @@ import { FcDeleteColumn } from 'react-icons/fc'
 import EditDealerCard from './EditDealerCard'
 import ConfirmationDialog from '../../../../components/confirmationDialog/ConfirmationDialog' // Импортируйте ваш диалог
 import { FaBirthdayCake, FaEnvelope, FaPhone, FaStar, FaUser } from 'react-icons/fa'
+import useUserStore from '../../../../store/userStore'
+import PlaceCall from '../../../asterisk/placeCall/PlaceCall'
 
 const Representatives = ({ companyId }) => {
+  const { user } = useUserStore((state) => state)
   const [dealers, setDealers] = useState([])
   const [editingDealer, setEditingDealer] = useState({
     positions: [],
@@ -260,7 +263,12 @@ const Representatives = ({ companyId }) => {
                         ? removeDuplicates(dealer.phones, 'phone_number').map((phone) => (
                             <span key={phone.id}>
                               {phone.phone_number}
-
+                              <PlaceCall
+                                userId={user?.id}
+                                companyId={companyId}
+                                phone={phone.phone_number}
+                                inlineNote
+                              />
                               <br />
                             </span>
                           ))

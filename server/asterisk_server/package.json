@@ -6,7 +6,16 @@
   "scripts": {
     "start": "node Asterisk.js",
     "dev": "nodemon Asterisk.js",
-    "test-call": "node simulate-call.js"
+    "test-call": "node simulate-call.js",
+    "replay-call": "node replay-call-card.js",
+    "replay-originate": "node replay-originate.js",
+    "replay-window": "node replay-call-window.js",
+    "replay-followup": "node ../CRM-server/replay-call-followup.js",
+    "replay-silence": "node ../CRM-server/replay-call-silence.js",
+    "replay-hours": "node ../CRM-server/replay-call-hours.js",
+    "replay-stats": "node ../CRM-server/replay-call-stats.js",
+    "replay-recording": "node ../CRM-server/replay-call-recording.js",
+    "replay-line": "node ../CRM-server/replay-line-status.js"
   },
   "dependencies": {
     "dotenv": "^16.4.7",

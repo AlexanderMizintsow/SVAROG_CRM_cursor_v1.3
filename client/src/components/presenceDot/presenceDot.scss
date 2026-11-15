@@ -25,3 +25,28 @@
 .presence-dot--offline {
   background-color: red;
 }
+
+.presence-with-line {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  max-width: 100%;
+}
+
+.line-state {
+  font-size: 11px;
+  line-height: 1.2;
+  white-space: nowrap;
+}
+
+.line-state--free {
+  color: #3f6212;
+}
+
+.line-state--ringing {
+  color: #1d4ed8;
+}
+
+.line-state--talking {
+  color: #b45309;
+}

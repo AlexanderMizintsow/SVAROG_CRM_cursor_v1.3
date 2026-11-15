@@ -480,7 +480,25 @@ const NotificationList = ({
               <p className="notification-receiver">
                 Получатель: {notification.receiverNumber} (
                 {notification.receiverName})
-              </p>{" "}
+              </p>
+              {notification.direction ? (
+                <p className="notification-card-facts">
+                  {notification.direction === "incoming"
+                    ? "Входящий"
+                    : notification.direction === "outgoing"
+                    ? "Исходящий"
+                    : "Внутренний"}
+                  {notification.extension
+                    ? `, добавочный ${notification.extension}`
+                    : ", добавочный не дошёл"}
+                  {notification.talkSeconds !== null &&
+                  notification.talkSeconds !== undefined
+                    ? `, разговор ${notification.talkSeconds} с`
+                    : ""}
+                  {notification.uniqueid ? `, ${notification.uniqueid}` : ""}
+                  {notification.recordingPath ? ", запись есть" : ""}
+                </p>
+              ) : null}
               <span className="notification-time">
                 Дата:{" "}
                 {new Date(notification.dateTime).toLocaleString("ru-RU", {

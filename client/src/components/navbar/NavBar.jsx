@@ -1,5 +1,7 @@
 import { useEffect, useState } from 'react'
+import axios from 'axios'
 import Menu from './Menu'
+import { API_BASE_URL } from '../../../config'
 import useUserStore from '../../store/userStore'
 import useCallNotifications from '../../hooks/useCallNotifications'
 import CallStatusIndicator from '../CallStatusIndicator/CallStatusIndicator'
@@ -40,6 +42,26 @@ const NavBar = () => {
   const [canSeeManagerRequests, setCanSeeManagerRequests] = useState(
     Boolean(roleAdministrator || user?.role_name === 'Директор')
   )
+  const [canViewCallStats, setCanViewCallStats] = useState(false)
+
+  useEffect(() => {
+    let active = true
+    if (!user?.id) {
+      setCanViewCallStats(false)
+      return undefined
+    }
+    axios
+      .get(`${API_BASE_URL}5004/api/call-stats/access/${user.id}`)
+      .then((response) => {
+        if (active) setCanViewCallStats(Boolean(response.data.canView))
+      })
+      .catch(() => {
+        if (active) setCanViewCallStats(false)
+      })
+    return () => {
+      active = false
+    }
+  }, [user?.id])
 
   useEffect(() => {
     let active = true
@@ -188,6 +210,20 @@ const NavBar = () => {
       name: 'Телефония (asterisk)',
       icon: DiAsterisk,
       subMenuItems: [
+        {
+          name: 'Дела на день',
+          icon: FaTasks,
+          link: '/notifications-asterisk-day',
+        },
+        ...(canViewCallStats
+          ? [
+              {
+                name: 'Статистика',
+                icon: MdAssessment,
+                link: '/notifications-asterisk-stats',
+              },
+            ]
+          : []),
         {
           name: 'Пропущенные звонки',
           icon: MdPhoneMissed,

@@ -40,6 +40,31 @@
     }
   }
 
+  .stats-grant {
+    margin: 20px 0;
+    padding: 12px;
+    border: 1px solid #d0d7e2;
+    border-radius: 8px;
+    background: #fff;
+
+    select {
+      display: block;
+      margin: 8px 0 12px;
+      max-width: 420px;
+      padding: 6px 8px;
+    }
+
+    button {
+      margin-top: 8px;
+      border: 0;
+      border-radius: 8px;
+      padding: 6px 12px;
+      background: #1565c0;
+      color: #fff;
+      cursor: pointer;
+    }
+  }
+
   .save-settings {
     background: #007bff;
     color: white;

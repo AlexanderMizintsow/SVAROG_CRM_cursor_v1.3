@@ -56,6 +56,7 @@
         .call-meta {
           display: flex;
           align-items: center;
+          flex-wrap: wrap;
           gap: 12px;
 
           .status-chip {
@@ -63,9 +64,68 @@
             font-weight: 500;
           }
 
-          .call-date {
+          .call-date,
+          .call-duration {
             color: #666;
             font-size: 0.8rem;
+          }
+
+          .direction-mark {
+            font-size: 0.75rem;
+            font-weight: 600;
+            line-height: 1.4;
+            padding: 2px 8px;
+            border-radius: 999px;
+          }
+
+          .direction-mark--incoming {
+            color: #1565c0;
+            background: #e3f2fd;
+          }
+
+          .direction-mark--outgoing {
+            color: #2e7d32;
+            background: #e8f5e9;
+          }
+
+          .call-recording {
+            color: #6d4c41;
+            font-size: 0.75rem;
+          }
+
+          .talk-mark {
+            font-size: 0.75rem;
+            font-weight: 600;
+            line-height: 1.4;
+            padding: 2px 8px;
+            border-radius: 999px;
+          }
+
+          .talk-mark--short {
+            color: #8a5a00;
+            background: #fff4d6;
+          }
+
+          .talk-mark--long {
+            color: #6a1b9a;
+            background: #f3e5f5;
+          }
+
+          .call-player {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+
+            button,
+            select {
+              font: inherit;
+              font-size: 0.75rem;
+            }
+
+            audio {
+              height: 32px;
+              max-width: 220px;
+            }
           }
         }
       }
