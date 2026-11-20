@@ -1,31 +1,33 @@
 .call-notification-modal {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  backdrop-filter: blur(8px);
-  background: rgba(0, 0, 0, 0.4);
+  position: fixed;
+  top: 16px;
+  right: 16px;
+  z-index: 1200;
+  width: min(420px, calc(100vw - 32px));
+  max-height: calc(100vh - 32px);
+  pointer-events: none;
 
   .call-notification-content {
     position: relative;
+    pointer-events: auto;
     background: linear-gradient(135deg, #ffffff 0%, #f8fafc 100%);
     border-radius: 20px;
     padding: 0;
-    max-width: 450px;
-    width: 90%;
-    max-height: 85vh;
+    width: 100%;
+    max-height: calc(100vh - 32px);
+    overflow-x: hidden;
     overflow-y: auto;
     box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25),
       0 0 0 1px rgba(255, 255, 255, 0.1);
     animation: modalSlideIn 0.4s cubic-bezier(0.16, 1, 0.3, 1);
-    overflow: hidden;
 
     @keyframes modalSlideIn {
       from {
-        transform: translateY(-60px) scale(0.95);
+        transform: translateX(24px);
         opacity: 0;
       }
       to {
-        transform: translateY(0) scale(1);
+        transform: translateX(0);
         opacity: 1;
       }
     }
@@ -72,6 +74,24 @@
       color: white;
       margin: 0;
       text-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+    }
+
+    .call-header-side {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .call-close {
+      width: 28px;
+      height: 28px;
+      border: none;
+      border-radius: 50%;
+      background: rgba(255, 255, 255, 0.2);
+      color: white;
+      font-size: 20px;
+      line-height: 1;
+      cursor: pointer;
     }
 
     .call-timer {
@@ -492,8 +512,8 @@
 @media (max-width: 480px) {
   .call-notification-modal {
     .call-notification-content {
-      width: 95%;
-      margin: 20px;
+      width: 100%;
+      margin: 0;
 
       .call-header {
         padding: 24px 20px 16px;

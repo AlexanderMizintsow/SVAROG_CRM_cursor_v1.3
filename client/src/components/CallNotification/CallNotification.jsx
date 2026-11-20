@@ -1,7 +1,5 @@
 import React, { useState, useEffect } from "react";
 import {
-  Modal,
-  Box,
   Typography,
   Button,
   IconButton,
@@ -138,6 +136,15 @@ const CallNotification = ({ callData, onClose }) => {
       console.log("ID звонка не найден в callData");
     }
   }, [callData]);
+
+  useEffect(() => {
+    if (!callData || isScheduleModalOpen || isAddModalOpen) return undefined;
+    const onKey = (event) => {
+      if (event.key === "Escape") onClose();
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [callData, isScheduleModalOpen, isAddModalOpen, onClose]);
 
   useEffect(() => {
     let timer = null;
@@ -666,19 +673,8 @@ const CallNotification = ({ callData, onClose }) => {
 
   return (
     <>
-      <Modal
-        open={!!callData}
-        onClose={(event, reason) => {
-          // Закрываем модальное окно только если звонок завершен или нажата клавиша Escape
-          if (reason === "escapeKeyDown" && callData?.type === "call_ended") {
-            onClose();
-          }
-          // Не закрываем при клике вне окна (backdropClick)
-        }}
-        className="call-notification-modal"
-        disableEscapeKeyDown={callData?.type !== "call_ended"}
-      >
-        <Box
+      <div className="call-notification-modal">
+        <div
           className={`call-notification-content ${
             isActive ? "active-call" : ""
           }`}
@@ -687,14 +683,24 @@ const CallNotification = ({ callData, onClose }) => {
             <Typography variant="h6" className="call-title">
               {getNotificationTitle()}
             </Typography>
-            {isActive && (
-              <Chip
-                label={formatTime(timeElapsed)}
-                color={getStatusColor()}
-                size="small"
-                className="call-timer"
-              />
-            )}
+            <div className="call-header-side">
+              {isActive && (
+                <Chip
+                  label={formatTime(timeElapsed)}
+                  color={getStatusColor()}
+                  size="small"
+                  className="call-timer"
+                />
+              )}
+              <button
+                type="button"
+                className="call-close"
+                onClick={onClose}
+                aria-label="Закрыть"
+              >
+                ×
+              </button>
+            </div>
           </div>
 
           <div className="call-info">
@@ -961,8 +967,8 @@ const CallNotification = ({ callData, onClose }) => {
               </Button>
             )}
           </div>
-        </Box>
-      </Modal>
+        </div>
+      </div>
 
       {/* Модальное окно для назначения времени перезвона */}
       {isScheduleModalOpen && (

@@ -132,3 +132,16 @@ CREATE TABLE IF NOT EXISTS call_recording_plays (
   user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
   played_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
+
+-- Сбои телефонии на рабочем компьютере. Не журнал всех действий.
+CREATE TABLE IF NOT EXISTS crm_work_log (
+  id SERIAL PRIMARY KEY,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  process VARCHAR(40) NOT NULL,
+  kind VARCHAR(40) NOT NULL,
+  message TEXT NOT NULL,
+  detail TEXT
+);
+
+CREATE INDEX IF NOT EXISTS crm_work_log_created_idx
+  ON crm_work_log (created_at DESC);

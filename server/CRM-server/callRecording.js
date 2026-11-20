@@ -4,6 +4,7 @@
 const fs = require("fs");
 const path = require("path");
 const { ensureCallCardSchema } = require("../asterisk_server/callCardStore");
+const { noteWork } = require("../asterisk_server/workLog");
 const { canEditMissedMinutes, headedDepartmentIds } = require("./callDay");
 const { loadViewer } = require("./callStats");
 
@@ -116,6 +117,8 @@ const callAccessRow = async (pool, callId) => {
   return result.rows[0] || null;
 };
 
+const missingRecordingNoted = new Set();
+
 const openRecording = async (pool, userId, callId) => {
   await ensureCallCardSchema(pool);
   const call = await callAccessRow(pool, callId);
@@ -126,7 +129,18 @@ const openRecording = async (pool, userId, callId) => {
     return { status: 403, error: "Эту запись слушать нельзя" };
   }
   const file = recordingFile(call.recording_path);
-  if (!file) return { status: 404, error: "Файл записи сейчас недоступен" };
+  if (!file) {
+    if (call.recording_path && !missingRecordingNoted.has(call.id)) {
+      missingRecordingNoted.add(call.id);
+      noteWork(pool, {
+        process: "CRM-server",
+        kind: "mismatch",
+        message: "В карточке есть запись, файла на диске нет",
+        detail: `звонок ${call.id}`,
+      });
+    }
+    return { status: 404, error: "Файл записи сейчас недоступен" };
+  }
   try {
     await pool.query(
       `INSERT INTO call_recording_plays (call_id, user_id) VALUES ($1, $2)`,

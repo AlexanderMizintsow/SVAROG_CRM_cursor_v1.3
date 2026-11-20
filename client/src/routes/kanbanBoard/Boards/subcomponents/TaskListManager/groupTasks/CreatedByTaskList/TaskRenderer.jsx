@@ -23,7 +23,7 @@ import { FcInspection, FcRedo, FcMindMap, FcApproval } from 'react-icons/fc'
 import { IoIosChatboxes } from 'react-icons/io'
 import { FaCopy, FaEdit } from 'react-icons/fa'
 import { LiaUserCogSolid } from 'react-icons/lia'
-import { TbSubtask } from 'react-icons/tb'
+import { TbSubtask, TbUserEdit } from 'react-icons/tb'
 import { getStatusLabel } from '../../../taskUtils'
 import styles from '../../taskListManager.module.scss'
 import { getUserNames } from '../../../../../Task/utils/taskUtils'
@@ -56,6 +56,15 @@ function idList(value) {
     ids.push(id)
   })
   return ids
+}
+
+function taskAuthorName(task, users) {
+  const raw = task?.created_by
+  const id = raw && typeof raw === 'object' ? raw.id : raw
+  if (id == null || id === '') return ''
+  const numeric = Number(id)
+  const ids = Number.isInteger(numeric) ? [numeric, String(numeric)] : [id]
+  return getUserNames(ids, Array.isArray(users) ? users : [])
 }
 
 function tagsToFormString(tags) {
@@ -434,6 +443,15 @@ const TaskRenderer = ({
               </Typography>
             </Box>
 
+            {isArchive && (
+              <Box display="flex" alignItems="center" mb={2} sx={{ color: 'text.secondary' }}>
+                <TbUserEdit size={18} style={{ marginRight: 8, flexShrink: 0 }} aria-hidden />
+                <Typography variant="body2" color="text.secondary">
+                  Автор: {taskAuthorName(task, users) || 'не указан'}
+                </Typography>
+              </Box>
+            )}
+
             {!isArchive ? (
               /* Дедлайн */
               <Box display="flex" alignItems="center" mb={2}>
@@ -797,6 +815,14 @@ const TaskRenderer = ({
                     Исполнитель: {getUserNames(task.assigned_user_ids, users)}
                   </Typography>
                 </Box>
+
+                {isArchive && (
+                  <Box display="flex" alignItems="center" mb={1}>
+                    <Typography variant="caption" color="text.secondary">
+                      Автор: {taskAuthorName(task, users) || 'не указан'}
+                    </Typography>
+                  </Box>
+                )}
 
                 <TaskCardParticipants task={task} users={users} />
             <ApprovalSourceMark userId={userId || user?.id} taskId={task.task_id} />

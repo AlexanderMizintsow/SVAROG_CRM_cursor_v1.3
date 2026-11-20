@@ -12,6 +12,7 @@ const { normalizePhone } = require("./phoneNumber");
 const { buildOriginate } = require("./originateCall");
 const { getCallParty } = require("./callParty");
 const { readExtensionStatus } = require("./extensionStatus");
+const { noteWork } = require("./workLog");
 
 const pool = new Pool({
   user: process.env.DB_USER || "postgres",
@@ -31,10 +32,24 @@ const amiPort = parseInt(process.env.AMI_PORT || "5038", 10);
 const amiUser = process.env.AMI_USER || "ats";
 const amiPassword = process.env.AMI_PASSWORD || "S2s14q98svf32a";
 
-const crmSocket = io(process.env.CRM_SOCKET_URL || "http://127.0.0.1:5004");
+const crmSocket = io(process.env.CRM_SOCKET_URL || "http://127.0.0.1:5004", {
+  transports: ["websocket", "polling"],
+  reconnection: true,
+  reconnectionDelay: 2000,
+});
+
+let crmLinkDown = false;
 
 crmSocket.on("connect", () => {
   console.log("Asterisk сервер подключен к CRM серверу");
+  if (crmLinkDown) {
+    crmLinkDown = false;
+    noteWork(pool, {
+      process: "asterisk-server",
+      kind: "link",
+      message: "Связь asterisk-server с CRM восстановлена",
+    });
+  }
   crmSocket.emit("register_pbx");
 });
 
@@ -81,12 +96,25 @@ crmSocket.on("originate_call", async (payload) => {
   }
 });
 
-crmSocket.on("disconnect", () => {
+const rememberCrmLinkDown = (detail) => {
+  if (crmLinkDown) return;
+  crmLinkDown = true;
+  noteWork(pool, {
+    process: "asterisk-server",
+    kind: "link",
+    message: "Связь asterisk-server с CRM прервана",
+    detail,
+  });
+};
+
+crmSocket.on("disconnect", (reason) => {
   console.log("Asterisk сервер отключен от CRM сервера");
+  rememberCrmLinkDown(reason);
 });
 
 crmSocket.on("connect_error", (error) => {
   console.error("Ошибка подключения Asterisk к CRM серверу:", error.message);
+  rememberCrmLinkDown(error && error.message);
 });
 
 const isInternalNumber = (phoneNumber) => {
@@ -175,6 +203,8 @@ const findDealerByPhoneNumber = async (phoneNumber) => {
 const personName = (row) =>
   `${row.last_name} ${row.first_name} ${row.middle_name || ""}`.trim();
 
+const missingManagerNoted = new Set();
+
 const publishCall = async (callData, type) => {
   try {
     const outgoing = callData.direction === "outgoing";
@@ -188,6 +218,17 @@ const publishCall = async (callData, type) => {
     const manager = await findUserByPhoneNumber(managerPhone);
     if (!manager) {
       console.log(`Менеджер не найден по добавочному ${managerPhone}`);
+      const mark = callData.uniqueid || managerPhone;
+      if (!missingManagerNoted.has(mark)) {
+        missingManagerNoted.add(mark);
+        if (missingManagerNoted.size > 1000) missingManagerNoted.clear();
+        noteWork(pool, {
+          process: "asterisk-server",
+          kind: "mismatch",
+          message: "Окно не открыто: добавочный не найден у сотрудников",
+          detail: `добавочный ${managerPhone}, звонок ${callData.uniqueid || "без номера"}`,
+        });
+      }
       return;
     }
 
@@ -261,6 +302,12 @@ const persist = async (card) => {
     return await saveCallCard(pool, card);
   } catch (error) {
     console.error("Database error: " + error.message);
+    noteWork(pool, {
+      process: "asterisk-server",
+      kind: "error",
+      message: "Карточка звонка не сохранилась",
+      detail: error.message,
+    });
     return null;
   }
 };

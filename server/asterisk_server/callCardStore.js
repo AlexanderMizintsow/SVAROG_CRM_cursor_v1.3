@@ -1,5 +1,6 @@
 const fs = require("fs");
 const path = require("path");
+const { noteWork } = require("./workLog");
 
 const migrationPath = path.join(
   __dirname,
@@ -17,6 +18,12 @@ const saveCallCard = async (pool, card) => {
       "Карточка звонка без номера или Uniqueid не записана:",
       card && card.uniqueid
     );
+    noteWork(pool, {
+      process: "asterisk-server",
+      kind: "mismatch",
+      message: "Карточка звонка не записана: нет номера или Uniqueid",
+      detail: card && card.uniqueid,
+    });
     return null;
   }
 
